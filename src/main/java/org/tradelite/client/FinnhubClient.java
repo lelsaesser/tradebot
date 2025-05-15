@@ -19,7 +19,7 @@ import org.tradelite.common.StockTicker;
 public class FinnhubClient {
 
     private static final String API_URL = "https://finnhub.io/api/v1";
-    private static final String API_KEY = "";
+    private static final String API_KEY = System.getenv("FINNHUB_API_KEY");
 
     private final RestTemplate restTemplate;
 
