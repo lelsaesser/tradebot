@@ -1,0 +1,13 @@
+org/tradelite/config/BeanConfig.class
+org/tradelite/client/dto/InsiderTransactionResponse.class
+org/tradelite/common/TargetPrice.class
+org/tradelite/Entrypoint.class
+org/tradelite/common/StockTicker.class
+org/tradelite/Application.class
+org/tradelite/core/TargetPriceManager.class
+org/tradelite/core/InsiderTracker.class
+org/tradelite/client/dto/InsiderTransactionResponse$Transaction.class
+org/tradelite/client/FinnhubClient.class
+org/tradelite/client/dto/FinnhubResponseDto.class
+org/tradelite/client/dto/PriceQuoteResponse.class
+org/tradelite/core/PriceEvaluator.class
