@@ -24,7 +24,7 @@ public class TargetPriceManager {
             new TargetPrice(StockTicker.UBER, 75, 0),
             new TargetPrice(StockTicker.PLTR, 112, 0),
             new TargetPrice(StockTicker.SPOT, 610, 0),
-            new TargetPrice(StockTicker.HOOD, 45, 62)
+            new TargetPrice(StockTicker.HOOD, 50, 0)
     );
 
 }

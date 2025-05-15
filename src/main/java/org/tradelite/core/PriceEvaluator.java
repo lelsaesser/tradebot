@@ -34,6 +34,8 @@ public class PriceEvaluator {
             priceQuotes.add(priceQuote);
         }
 
+        int totalCalls = 0;
+
         for (PriceQuoteResponse priceQuote : priceQuotes) {
             for (TargetPrice targetPrice : targetPrices) {
                 if (priceQuote.getStockTicker().equals(targetPrice.getTicker())) {
@@ -42,13 +44,19 @@ public class PriceEvaluator {
                     double targetPriceSell = targetPrice.getTargetPriceSell();
 
                     if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
+                        totalCalls++;
                         log.info("Potential sell opportunity for {}", priceQuote.getStockTicker());
                     }
                     if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
+                        totalCalls++;
                         log.info("Potential buy opportunity for {}", priceQuote.getStockTicker());
                     }
                 }
             }
+        }
+
+        if (totalCalls == 0) {
+            log.info("Market monitoring completed. No potential buy or sell opportunities.");
         }
 
     }
