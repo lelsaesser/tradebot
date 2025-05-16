@@ -10,9 +10,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.tradelite.client.dto.InsiderSentimentResponse;
 import org.tradelite.client.dto.InsiderTransactionResponse;
 import org.tradelite.client.dto.PriceQuoteResponse;
 import org.tradelite.common.StockTicker;
+import org.tradelite.utils.DateUtil;
 
 @Slf4j
 @Component
@@ -50,7 +52,7 @@ public class FinnhubClient {
     }
 
     public InsiderTransactionResponse getInsiderTransactions(StockTicker ticker) {
-        String fromDate = "2025-04-15";
+        String fromDate = DateUtil.getDateTwoMonthsAgo();
         String baseUrl = "/stock/insider-transactions?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
         url = url + "&from=" + fromDate;
@@ -84,6 +86,24 @@ public class FinnhubClient {
             }
             quote.setStockTicker(ticker);
             return quote;
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+    }
+
+    public InsiderSentimentResponse getInsiderSentiment(StockTicker ticker) {
+        String fromDate = DateUtil.getDateTwoMonthsAgo();
+        String baseUrl = "/stock/insider-sentiment?symbol=%s&from=" + fromDate;
+        String url = getApiUrl(baseUrl, ticker);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        HttpHeaders headers = new HttpHeaders();
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<InsiderSentimentResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderSentimentResponse.class);
+            return response.getBody();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new IllegalStateException(e.getMessage(), e);

@@ -23,6 +23,7 @@ public class Entrypoint {
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         insiderTracker.evaluateInsiderActivity();
+        insiderTracker.evaluateInsiderSentiment();
 
     }
 

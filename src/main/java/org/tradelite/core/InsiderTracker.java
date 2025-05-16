@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.FinnhubClient;
+import org.tradelite.client.dto.InsiderSentimentResponse;
 import org.tradelite.client.dto.InsiderTransactionResponse;
 import org.tradelite.common.StockTicker;
 
@@ -28,6 +29,13 @@ public class InsiderTracker {
         }
     }
 
+    public void evaluateInsiderSentiment() {
+        List<StockTicker> tickers = StockTicker.getAll();
+        for (StockTicker ticker : tickers) {
+            evaluateInsiderSentimentForTicker(ticker);
+        }
+    }
+
     private void evaluateInsiderActivityForTicker(StockTicker ticker) {
         InsiderTransactionResponse response = finnhubClient.getInsiderTransactions(ticker);
 
@@ -45,5 +53,18 @@ public class InsiderTracker {
         if (sellCount > 0) {
             log.info("Insider transactions found for {}: {} sells", ticker.getTicker(), sellCount);
         }
+    }
+
+    private void evaluateInsiderSentimentForTicker(StockTicker ticker) {
+        InsiderSentimentResponse response = finnhubClient.getInsiderSentiment(ticker);
+
+        for (InsiderSentimentResponse.InsiderSentiment sentiment : response.data()) {
+            log.info("{} - Insider sentiment: MSPR: {} | Change: {}",
+                    sentiment.symbol(),
+                    sentiment.mspr(),
+                    sentiment.change()
+            );
+        }
+
     }
 }
