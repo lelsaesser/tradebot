@@ -18,13 +18,18 @@ public class TargetPriceManager {
             new TargetPrice(StockTicker.NFLX, 975, 0),
             new TargetPrice(StockTicker.NVDA, 105, 150),
             new TargetPrice(StockTicker.TSLA, 250, 392),
-            new TargetPrice(StockTicker.COIN, 176, 280),
+            new TargetPrice(StockTicker.COIN, 226, 0),
             new TargetPrice(StockTicker.MSTR, 300, 0),
-            new TargetPrice(StockTicker.RKLB, 18, 0),
+            new TargetPrice(StockTicker.RKLB, 23, 0),
             new TargetPrice(StockTicker.UBER, 75, 0),
             new TargetPrice(StockTicker.PLTR, 112, 0),
             new TargetPrice(StockTicker.SPOT, 610, 0),
-            new TargetPrice(StockTicker.HOOD, 50, 0)
+            new TargetPrice(StockTicker.HOOD, 50, 0),
+            new TargetPrice(StockTicker.NET, 152, 0),
+            new TargetPrice(StockTicker.AVGO, 190, 0),
+            new TargetPrice(StockTicker.AXON, 600, 0),
+            new TargetPrice(StockTicker.CRWD, 400, 0),
+            new TargetPrice(StockTicker.OKTA, 105, 0)
     );
 
 }

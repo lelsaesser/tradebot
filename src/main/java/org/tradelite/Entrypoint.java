@@ -21,14 +21,14 @@ public class Entrypoint {
     }
 
     @EventListener(ApplicationReadyEvent.class)
-    public void onApplicationReady() {
+    public void onApplicationReady() throws InterruptedException {
         insiderTracker.evaluateInsiderActivity();
         insiderTracker.evaluateInsiderSentiment();
 
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
-    public void scheduledActivity() {
+    public void scheduledActivity() throws InterruptedException {
         priceEvaluator.evaluatePriceQuotes();
     }
 }

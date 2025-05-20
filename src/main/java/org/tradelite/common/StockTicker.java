@@ -21,7 +21,12 @@ public enum StockTicker {
     UBER("UBER"),
     PLTR("PLTR"),
     SPOT("SPOT"),
-    HOOD("HOOD");
+    HOOD("HOOD"),
+    AVGO("AVGO"),
+    AXON("AXON"),
+    CRWD("CRWD"),
+    OKTA("OKTA"),
+    NET("NET");
 
     private final String ticker;
 

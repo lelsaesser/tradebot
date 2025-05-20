@@ -24,7 +24,7 @@ public class PriceEvaluator {
         this.targetPriceManager = targetPriceManager;
     }
 
-    public void evaluatePriceQuotes() {
+    public void evaluatePriceQuotes() throws InterruptedException {
         List<StockTicker> tickers = StockTicker.getAll();
         List<PriceQuoteResponse> priceQuotes = new ArrayList<>();
         List<TargetPrice> targetPrices = targetPriceManager.getTargetPrices();
@@ -32,6 +32,7 @@ public class PriceEvaluator {
         for (StockTicker ticker : tickers) {
             PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker);
             priceQuotes.add(priceQuote);
+            Thread.sleep(100);
         }
 
         int totalCalls = 0;

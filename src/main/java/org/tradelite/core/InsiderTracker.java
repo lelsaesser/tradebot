@@ -22,17 +22,19 @@ public class InsiderTracker {
         this.finnhubClient = finnhubClient;
     }
 
-    public void evaluateInsiderActivity() {
+    public void evaluateInsiderActivity() throws InterruptedException {
         List<StockTicker> tickers = StockTicker.getAll();
         for (StockTicker ticker : tickers) {
             evaluateInsiderActivityForTicker(ticker);
+            Thread.sleep(100);
         }
     }
 
-    public void evaluateInsiderSentiment() {
+    public void evaluateInsiderSentiment() throws InterruptedException {
         List<StockTicker> tickers = StockTicker.getAll();
         for (StockTicker ticker : tickers) {
             evaluateInsiderSentimentForTicker(ticker);
+            Thread.sleep(100);
         }
     }
 
