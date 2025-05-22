@@ -1,4 +1,4 @@
-package org.tradelite.client;
+package org.tradelite.client.finnhub;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.tradelite.client.dto.InsiderSentimentResponse;
-import org.tradelite.client.dto.InsiderTransactionResponse;
-import org.tradelite.client.dto.PriceQuoteResponse;
+import org.tradelite.client.finnhub.dto.InsiderSentimentResponse;
+import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
+import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockTicker;
 import org.tradelite.utils.DateUtil;
 

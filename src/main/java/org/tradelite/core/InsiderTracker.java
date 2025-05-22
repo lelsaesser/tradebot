@@ -3,9 +3,9 @@ package org.tradelite.core;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.FinnhubClient;
-import org.tradelite.client.dto.InsiderSentimentResponse;
-import org.tradelite.client.dto.InsiderTransactionResponse;
+import org.tradelite.client.finnhub.FinnhubClient;
+import org.tradelite.client.finnhub.dto.InsiderSentimentResponse;
+import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.common.StockTicker;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package org.tradelite.client.dto;
+package org.tradelite.client.finnhub.dto;
 
 import java.util.List;
 
