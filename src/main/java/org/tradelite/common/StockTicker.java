@@ -8,7 +8,7 @@ import java.util.List;
 public enum StockTicker {
     AAPL("AAPL"),
 //    MSFT("MSFT"),
-//    GOOGL("GOOGL"),
+    GOOG("GOOG"),
 //    AMZN("AMZN"),
     TSLA("TSLA"),
     META("META"),

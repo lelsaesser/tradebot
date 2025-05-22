@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockTicker;
 import org.tradelite.common.TargetPrice;
 
@@ -17,11 +18,13 @@ public class PriceEvaluator {
 
     private final FinnhubClient finnhubClient;
     private final TargetPriceManager targetPriceManager;
+    private final TelegramClient telegramClient;
 
     @Autowired
-    public PriceEvaluator(FinnhubClient finnhubClient, TargetPriceManager targetPriceManager) {
+    public PriceEvaluator(FinnhubClient finnhubClient, TargetPriceManager targetPriceManager, TelegramClient telegramClient) {
         this.finnhubClient = finnhubClient;
         this.targetPriceManager = targetPriceManager;
+        this.telegramClient = telegramClient;
     }
 
     public void evaluatePriceQuotes() throws InterruptedException {
@@ -47,10 +50,14 @@ public class PriceEvaluator {
                     if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
                         totalCalls++;
                         log.info("Potential sell opportunity for {}", priceQuote.getStockTicker());
+                        telegramClient.broadcastMessage("Potential sell opportunity for " + priceQuote.getStockTicker() +
+                                ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
                     }
                     if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
                         totalCalls++;
                         log.info("Potential buy opportunity for {}", priceQuote.getStockTicker());
+                        telegramClient.broadcastMessage("Potential buy opportunity for " + priceQuote.getStockTicker() +
+                                ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
                     }
                 }
             }

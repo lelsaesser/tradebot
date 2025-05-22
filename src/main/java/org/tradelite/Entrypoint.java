@@ -1,8 +1,6 @@
 package org.tradelite;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.tradelite.core.InsiderTracker;
@@ -20,7 +18,7 @@ public class Entrypoint {
         this.priceEvaluator = priceEvaluator;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    @Scheduled(fixedRate = 60 * 60 * 1000)
     public void onApplicationReady() throws InterruptedException {
         insiderTracker.evaluateInsiderActivity();
         insiderTracker.evaluateInsiderSentiment();
