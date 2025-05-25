@@ -9,7 +9,7 @@ public enum StockTicker {
     AAPL("AAPL"),
 //    MSFT("MSFT"),
     GOOG("GOOG"),
-//    AMZN("AMZN"),
+    AMZN("AMZN"),
     TSLA("TSLA"),
     META("META"),
     NFLX("NFLX"),

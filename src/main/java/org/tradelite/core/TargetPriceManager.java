@@ -12,10 +12,10 @@ import java.util.List;
 public class TargetPriceManager {
 
     private final List<TargetPrice> targetPrices = List.of(
-            new TargetPrice(StockTicker.AAPL, 200.0, 245.0),
+            new TargetPrice(StockTicker.AAPL, 190.0, 245.0),
             new TargetPrice(StockTicker.AMD, 90.0, 170.0),
             new TargetPrice(StockTicker.META, 556.0, 718.0),
-            new TargetPrice(StockTicker.NFLX, 975, 0),
+            new TargetPrice(StockTicker.NFLX, 1130, 0),
             new TargetPrice(StockTicker.NVDA, 105, 150),
             new TargetPrice(StockTicker.TSLA, 280, 392),
             new TargetPrice(StockTicker.COIN, 226, 0),
@@ -30,7 +30,8 @@ public class TargetPriceManager {
             new TargetPrice(StockTicker.AXON, 600, 0),
             new TargetPrice(StockTicker.CRWD, 400, 0),
             new TargetPrice(StockTicker.OKTA, 105, 0),
-            new TargetPrice(StockTicker.GOOG, 165, 0)
+            new TargetPrice(StockTicker.GOOG, 165, 0),
+            new TargetPrice(StockTicker.AMZN, 192, 0)
     );
 
 }
