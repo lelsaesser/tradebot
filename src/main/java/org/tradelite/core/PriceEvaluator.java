@@ -38,34 +38,26 @@ public class PriceEvaluator {
             Thread.sleep(100);
         }
 
-        int totalCalls = 0;
-
         for (PriceQuoteResponse priceQuote : priceQuotes) {
             for (TargetPrice targetPrice : targetPrices) {
                 if (priceQuote.getStockTicker().equals(targetPrice.getTicker())) {
-                    double currentPrice = priceQuote.getCurrentPrice();
-                    double targetPriceBuy = targetPrice.getTargetPriceBuy();
-                    double targetPriceSell = targetPrice.getTargetPriceSell();
-
-                    if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
-                        totalCalls++;
-                        log.info("Potential sell opportunity for {}", priceQuote.getStockTicker());
-                        telegramClient.broadcastMessage("Potential sell opportunity for " + priceQuote.getStockTicker() +
-                                ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
-                    }
-                    if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
-                        totalCalls++;
-                        log.info("Potential buy opportunity for {}", priceQuote.getStockTicker());
-                        telegramClient.broadcastMessage("Potential buy opportunity for " + priceQuote.getStockTicker() +
-                                ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
-                    }
+                    comparePrices(priceQuote.getStockTicker(), priceQuote.getCurrentPrice(), targetPrice.getTargetPriceBuy(), targetPrice.getTargetPriceSell());
                 }
             }
         }
 
-        if (totalCalls == 0) {
-            log.info("Market monitoring completed. No potential buy or sell opportunities.");
-        }
+        log.info("Market monitoring round completed.");
 
+    }
+
+    private void comparePrices(StockTicker ticker, double currentPrice, double targetPriceBuy, double targetPriceSell) {
+        if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
+            log.info("Potential sell opportunity for {}", ticker);
+            telegramClient.broadcastMessage("Potential sell opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
+        }
+        if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
+            log.info("Potential buy opportunity for {}", ticker);
+            telegramClient.broadcastMessage("Potential buy opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
+        }
     }
 }
