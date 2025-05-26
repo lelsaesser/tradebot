@@ -13,7 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.finnhub.dto.InsiderSentimentResponse;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
-import org.tradelite.common.TickerSymbol;
+import org.tradelite.common.StockSymbol;
 import org.tradelite.utils.DateUtil;
 
 @Slf4j
@@ -30,11 +30,11 @@ public class FinnhubClient {
         this.restTemplate = restTemplate;
     }
 
-    private String getApiUrl(String baseUrl, TickerSymbol ticker) {
+    private String getApiUrl(String baseUrl, StockSymbol ticker) {
         return API_URL + String.format(baseUrl, ticker.getTicker()) + "&token=" + API_KEY;
     }
 
-    public void getFinancialData(TickerSymbol ticker) {
+    public void getFinancialData(StockSymbol ticker) {
         String baseUrl = "/stock/metric?symbol=%s&metric=all";
         String url = getApiUrl(baseUrl, ticker);
 
@@ -51,7 +51,7 @@ public class FinnhubClient {
         }
     }
 
-    public InsiderTransactionResponse getInsiderTransactions(TickerSymbol ticker) {
+    public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
         String fromDate = DateUtil.getDateTwoMonthsAgo();
         String baseUrl = "/stock/insider-transactions?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
@@ -70,7 +70,7 @@ public class FinnhubClient {
         }
     }
 
-    public PriceQuoteResponse getPriceQuote(TickerSymbol ticker) {
+    public PriceQuoteResponse getPriceQuote(StockSymbol ticker) {
         String baseUrl = "/quote?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
 
@@ -84,7 +84,7 @@ public class FinnhubClient {
             if (quote == null) {
                 throw new IllegalStateException("Response body is null");
             }
-            quote.setTickerSymbol(ticker);
+            quote.setStockSymbol(ticker);
             return quote;
         } catch (Exception e) {
             log.error(e.getMessage(), e);
@@ -92,7 +92,7 @@ public class FinnhubClient {
         }
     }
 
-    public InsiderSentimentResponse getInsiderSentiment(TickerSymbol ticker) {
+    public InsiderSentimentResponse getInsiderSentiment(StockSymbol ticker) {
         String fromDate = DateUtil.getDateTwoMonthsAgo();
         String baseUrl = "/stock/insider-sentiment?symbol=%s&from=" + fromDate;
         String url = getApiUrl(baseUrl, ticker);

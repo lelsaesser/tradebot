@@ -1,26 +1,26 @@
 package org.tradelite;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.coingecko.CoinGeckoClient;
-import org.tradelite.client.coingecko.CoinId;
-import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
+import org.tradelite.core.CoinGeckoPriceEvaluator;
+import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
-import org.tradelite.core.PriceEvaluator;
 
+@Slf4j
 @Component
 public class Entrypoint {
 
     private final InsiderTracker insiderTracker;
-    private final PriceEvaluator priceEvaluator;
-    private final CoinGeckoClient coinGeckoClient;
+    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
     @Autowired
-    public Entrypoint(InsiderTracker insiderTracker, PriceEvaluator priceEvaluator, CoinGeckoClient coinGeckoClient) {
+    public Entrypoint(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator) {
         this.insiderTracker = insiderTracker;
-        this.priceEvaluator = priceEvaluator;
-        this.coinGeckoClient = coinGeckoClient;
+        this.finnhubPriceEvaluator = finnhubPriceEvaluator;
+        this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
     }
 
     //@Scheduled(fixedRate = 60 * 60 * 1000)
@@ -32,7 +32,9 @@ public class Entrypoint {
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     public void scheduledActivity() throws InterruptedException {
-        CoinGeckoPriceResponse.CoinData data = coinGeckoClient.getCoinPriceData(CoinId.BITCOIN);
-        priceEvaluator.evaluatePriceQuotes();
+        coinGeckoPriceEvaluator.evaluatePrice();
+        finnhubPriceEvaluator.evaluatePrice();
+
+        log.info("Market monitoring round completed.");
     }
 }

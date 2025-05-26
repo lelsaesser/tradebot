@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderSentimentResponse;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
-import org.tradelite.common.TickerSymbol;
+import org.tradelite.common.StockSymbol;
 
 import java.util.List;
 import java.util.Objects;
@@ -23,22 +23,22 @@ public class InsiderTracker {
     }
 
     public void evaluateInsiderActivity() throws InterruptedException {
-        List<TickerSymbol> tickers = TickerSymbol.getAll();
-        for (TickerSymbol ticker : tickers) {
+        List<StockSymbol> tickers = StockSymbol.getAll();
+        for (StockSymbol ticker : tickers) {
             evaluateInsiderActivityForTicker(ticker);
             Thread.sleep(100);
         }
     }
 
     public void evaluateInsiderSentiment() throws InterruptedException {
-        List<TickerSymbol> tickers = TickerSymbol.getAll();
-        for (TickerSymbol ticker : tickers) {
+        List<StockSymbol> tickers = StockSymbol.getAll();
+        for (StockSymbol ticker : tickers) {
             evaluateInsiderSentimentForTicker(ticker);
             Thread.sleep(100);
         }
     }
 
-    private void evaluateInsiderActivityForTicker(TickerSymbol ticker) {
+    private void evaluateInsiderActivityForTicker(StockSymbol ticker) {
         InsiderTransactionResponse response = finnhubClient.getInsiderTransactions(ticker);
 
         if (response.data().isEmpty()) {
@@ -57,7 +57,7 @@ public class InsiderTracker {
         }
     }
 
-    private void evaluateInsiderSentimentForTicker(TickerSymbol ticker) {
+    private void evaluateInsiderSentimentForTicker(StockSymbol ticker) {
         InsiderSentimentResponse response = finnhubClient.getInsiderSentiment(ticker);
 
         for (InsiderSentimentResponse.InsiderSentiment sentiment : response.data()) {

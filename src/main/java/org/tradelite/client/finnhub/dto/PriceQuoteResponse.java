@@ -3,13 +3,13 @@ package org.tradelite.client.finnhub.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
-import org.tradelite.common.TickerSymbol;
+import org.tradelite.common.StockSymbol;
 
 @Getter
 @Setter
 public class PriceQuoteResponse {
 
-    TickerSymbol tickerSymbol;
+    StockSymbol stockSymbol;
 
     @JsonProperty("c")
     double currentPrice;

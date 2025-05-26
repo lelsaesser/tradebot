@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
+import org.tradelite.common.CoinId;
 
 @Slf4j
 @Component
@@ -38,7 +39,9 @@ public class CoinGeckoClient {
         try {
             ResponseEntity<CoinGeckoPriceResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity, CoinGeckoPriceResponse.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return response.getBody().getCoinData().get(coinId.getId());
+                CoinGeckoPriceResponse.CoinData data = response.getBody().getCoinData().get(coinId.getId());
+                data.setCoinId(coinId);
+                return data;
             } else {
                 log.error("Failed to fetch coin price data for {}: {}", coinId.getId(), response.getStatusCode());
                 throw new IllegalStateException(response.getStatusCode().toString());
