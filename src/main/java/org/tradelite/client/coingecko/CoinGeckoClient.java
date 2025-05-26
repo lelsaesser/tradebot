@@ -1,7 +1,5 @@
 package org.tradelite.client.coingecko;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -21,12 +19,10 @@ public class CoinGeckoClient {
     private static final String API_KEY = System.getenv("COINGECKO_API_KEY");
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
 
     @Autowired
-    public CoinGeckoClient(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public CoinGeckoClient(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper;
     }
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
