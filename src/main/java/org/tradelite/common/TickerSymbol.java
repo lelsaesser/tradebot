@@ -5,7 +5,7 @@ import lombok.Getter;
 import java.util.List;
 
 @Getter
-public enum StockTicker {
+public enum TickerSymbol {
     AAPL("AAPL"),
 //    MSFT("MSFT"),
     GOOG("GOOG"),
@@ -30,11 +30,11 @@ public enum StockTicker {
 
     private final String ticker;
 
-    StockTicker(String ticker) {
+    TickerSymbol(String ticker) {
         this.ticker = ticker;
     }
 
-    public static List<StockTicker> getAll() {
-        return List.of(StockTicker.values());
+    public static List<TickerSymbol> getAll() {
+        return List.of(TickerSymbol.values());
     }
 }

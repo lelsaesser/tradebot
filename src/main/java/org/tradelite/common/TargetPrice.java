@@ -12,7 +12,7 @@ import lombok.Setter;
 @EqualsAndHashCode
 public class TargetPrice {
 
-    StockTicker ticker;
+    TickerSymbol ticker;
     double targetPriceBuy;
     double targetPriceSell;
 }
