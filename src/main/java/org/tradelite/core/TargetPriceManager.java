@@ -17,7 +17,7 @@ public class TargetPriceManager {
             new TargetPrice(StockSymbol.AMD.getTicker(), 90.0, 170.0),
             new TargetPrice(StockSymbol.META.getTicker(), 556.0, 718.0),
             new TargetPrice(StockSymbol.NFLX.getTicker(), 1130, 0),
-            new TargetPrice(StockSymbol.NVDA.getTicker(), 105, 150),
+            new TargetPrice(StockSymbol.NVDA.getTicker(), 120, 150),
             new TargetPrice(StockSymbol.TSLA.getTicker(), 280, 392),
             new TargetPrice(StockSymbol.COIN.getTicker(), 226, 0),
             new TargetPrice(StockSymbol.MSTR.getTicker(), 300, 0),
@@ -31,12 +31,14 @@ public class TargetPriceManager {
             new TargetPrice(StockSymbol.AXON.getTicker(), 600, 0),
             new TargetPrice(StockSymbol.CRWD.getTicker(), 400, 0),
             new TargetPrice(StockSymbol.OKTA.getTicker(), 105, 0),
-            new TargetPrice(StockSymbol.GOOG.getTicker(), 165, 0),
+            new TargetPrice(StockSymbol.GOOG.getTicker(), 167, 0),
             new TargetPrice(StockSymbol.AMZN.getTicker(), 192, 0)
     );
 
     private final List<TargetPrice> coinTargetPrices = List.of(
-            new TargetPrice(CoinId.BITCOIN.getId(), 100000, 0)
+            new TargetPrice(CoinId.BITCOIN.getId(), 100000, 0),
+            new TargetPrice(CoinId.ETHEREUM.getId(), 2000, 0),
+            new TargetPrice(CoinId.SOLANA.getId(), 154, 0)
     );
 
 }

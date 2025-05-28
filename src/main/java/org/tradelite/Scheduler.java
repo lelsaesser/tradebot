@@ -10,14 +10,14 @@ import org.tradelite.core.InsiderTracker;
 
 @Slf4j
 @Component
-public class Entrypoint {
+public class Scheduler {
 
     private final InsiderTracker insiderTracker;
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
     @Autowired
-    public Entrypoint(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator) {
+    public Scheduler(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator) {
         this.insiderTracker = insiderTracker;
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;

@@ -6,7 +6,9 @@ import java.util.List;
 
 @Getter
 public enum CoinId implements TickerSymbol {
-    BITCOIN("bitcoin");
+    BITCOIN("bitcoin"),
+    SOLANA("solana"),
+    ETHEREUM("ethereum");
 
     private final String id;
 
