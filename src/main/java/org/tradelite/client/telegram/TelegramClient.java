@@ -5,6 +5,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
+import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
+
+import java.util.List;
 
 @Slf4j
 @Component
@@ -37,6 +41,22 @@ public class TelegramClient {
             }
         } catch (Exception e) {
             log.error("Error sending message: {}", e.getMessage());
+        }
+    }
+
+    public List<TelegramUpdateResponse> getChatUpdates() {
+        String url = String.format("https://api.telegram.org/bot%s/getUpdates", BOT_TOKEN);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        try {
+            log.info("Fetching chat updates");
+            ResponseEntity<TelegramUpdateResponseWrapper> response = restTemplate.exchange(url, HttpMethod.GET, entity, TelegramUpdateResponseWrapper.class);
+            return response.getBody().getResult();
+        } catch (Exception e) {
+            log.error("Error fetching chat updates: {}", e.getMessage());
+            throw new IllegalStateException("Error fetching chat updates: " + e.getMessage());
         }
     }
 
