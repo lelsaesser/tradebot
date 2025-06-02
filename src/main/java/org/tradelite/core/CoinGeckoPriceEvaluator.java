@@ -20,7 +20,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     @Autowired
     public CoinGeckoPriceEvaluator(CoinGeckoClient coinGeckoClient, TargetPriceManager targetPriceManager,
                                    TelegramClient telegramClient) {
-        super(telegramClient);
+        super(telegramClient, targetPriceManager);
         this.coinGeckoClient = coinGeckoClient;
         this.targetPriceManager = targetPriceManager;
     }

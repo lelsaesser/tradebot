@@ -1,3 +1,5 @@
 package org.tradelite.common;
 
-public interface TickerSymbol { }
+public interface TickerSymbol {
+    String getName();
+}

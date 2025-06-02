@@ -5,12 +5,19 @@ import org.springframework.stereotype.Component;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
+import org.tradelite.common.TickerSymbol;
 
+import java.time.Instant;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Getter
 public class TargetPriceManager {
+
+    private final Map<String, Date> ignoredSymbols = new HashMap<>();
 
     private final List<TargetPrice> targetPrices = List.of(
             new TargetPrice(StockSymbol.AAPL.getTicker(), 195.0, 0),
@@ -42,5 +49,23 @@ public class TargetPriceManager {
             new TargetPrice(CoinId.SOLANA.getId(), 150, 0),
             new TargetPrice(CoinId.HYPERLIQUID.getId(), 30, 0)
     );
+
+    public void addIgnoredSymbol(TickerSymbol symbol) {
+        ignoredSymbols.put(symbol.getName(), new Date());
+    }
+
+    public boolean isSymbolIgnored(TickerSymbol symbol) {
+        Date ignoredDate = ignoredSymbols.get(symbol.getName());
+        return ignoredDate != null;
+    }
+
+    public void cleanupIgnoreSymbols() {
+        long maxIgnoredDuration = 3600L; // 1 hour in seconds
+        Instant now = Instant.now();
+        ignoredSymbols.entrySet().removeIf(entry -> {
+            Instant ignoredTime = entry.getValue().toInstant();
+            return now.minusSeconds(maxIgnoredDuration).isAfter(ignoredTime);
+        });
+    }
 
 }

@@ -21,7 +21,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
     @Autowired
     public FinnhubPriceEvaluator(FinnhubClient finnhubClient, TargetPriceManager targetPriceManager, TelegramClient telegramClient) {
-        super(telegramClient);
+        super(telegramClient, targetPriceManager);
         this.finnhubClient = finnhubClient;
         this.targetPriceManager = targetPriceManager;
     }

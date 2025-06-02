@@ -38,4 +38,9 @@ public enum StockSymbol implements TickerSymbol {
     public static List<StockSymbol> getAll() {
         return List.of(StockSymbol.values());
     }
+
+    @Override
+    public String getName() {
+        return ticker;
+    }
 }

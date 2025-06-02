@@ -20,4 +20,9 @@ public enum CoinId implements TickerSymbol {
     public static List<CoinId> getAll() {
         return List.of(CoinId.values());
     }
+
+    @Override
+    public String getName() {
+        return id;
+    }
 }

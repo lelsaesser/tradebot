@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
+import org.tradelite.core.TargetPriceManager;
 
 @Slf4j
 @Component
@@ -15,26 +16,35 @@ public class Scheduler {
     private final InsiderTracker insiderTracker;
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+    private final TargetPriceManager targetPriceManager;
 
     @Autowired
-    public Scheduler(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator) {
+    public Scheduler(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
+                     TargetPriceManager targetPriceManager) {
         this.insiderTracker = insiderTracker;
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
+        this.targetPriceManager = targetPriceManager;
     }
 
     //@Scheduled(fixedRate = 60 * 60 * 1000)
-    public void onApplicationReady() throws InterruptedException {
+    private void onApplicationReady() throws InterruptedException {
         insiderTracker.evaluateInsiderActivity();
         insiderTracker.evaluateInsiderSentiment();
 
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
-    public void scheduledActivity() throws InterruptedException {
+    private void scheduledActivity() throws InterruptedException {
         coinGeckoPriceEvaluator.evaluatePrice();
         finnhubPriceEvaluator.evaluatePrice();
 
         log.info("Market monitoring round completed.");
+    }
+
+    @Scheduled(fixedRate = 600000)
+    private void cleanupIgnoreSymbols() {
+        targetPriceManager.cleanupIgnoreSymbols();
+        log.info("Cleanup of ignored symbols completed.");
     }
 }
