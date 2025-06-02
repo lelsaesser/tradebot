@@ -8,6 +8,7 @@ import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
+import org.tradelite.common.TargetPriceProvider;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,19 +18,19 @@ import java.util.List;
 public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
     private final FinnhubClient finnhubClient;
-    private final TargetPriceManager targetPriceManager;
+    private final TargetPriceProvider targetPriceProvider;
 
     @Autowired
-    public FinnhubPriceEvaluator(FinnhubClient finnhubClient, TargetPriceManager targetPriceManager, TelegramClient telegramClient) {
-        super(telegramClient, targetPriceManager);
+    public FinnhubPriceEvaluator(FinnhubClient finnhubClient, TargetPriceProvider targetPriceProvider, TelegramClient telegramClient) {
+        super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
-        this.targetPriceManager = targetPriceManager;
+        this.targetPriceProvider = targetPriceProvider;
     }
 
     public void evaluatePrice() throws InterruptedException {
         List<StockSymbol> tickers = StockSymbol.getAll();
         List<PriceQuoteResponse> finnhubData = new ArrayList<>();
-        List<TargetPrice> targetPrices = targetPriceManager.getTargetPrices();
+        List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
 
         for (StockSymbol ticker : tickers) {
             PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker);
@@ -40,7 +41,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         for (PriceQuoteResponse priceQuote : finnhubData) {
             for (TargetPrice targetPrice : targetPrices) {
                 if (priceQuote.getStockSymbol().getTicker().equals(targetPrice.getSymbol())) {
-                    comparePrices(priceQuote.getStockSymbol(), priceQuote.getCurrentPrice(), targetPrice.getTargetPriceBuy(), targetPrice.getTargetPriceSell());
+                    comparePrices(priceQuote.getStockSymbol(), priceQuote.getCurrentPrice(), targetPrice.getBuyTarget(), targetPrice.getSellTarget());
                 }
             }
         }
