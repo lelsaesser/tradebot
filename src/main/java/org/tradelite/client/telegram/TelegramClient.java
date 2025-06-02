@@ -6,16 +6,12 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Slf4j
 @Component
 public class TelegramClient {
 
     private static final String BOT_TOKEN = System.getenv("TELEGRAM_BOT_TOKEN");
-    private static final String CHAT_ID = System.getenv("TELEGRAM_BOT_CHAT_ID");
-    private static final String CHAT_ID_CHARLY = System.getenv("TELEGRAM_BOT_CHAT_ID_CHARLY");
+    private static final String GROUP_CHAT_ID = System.getenv("TELEGRAM_BOT_GROUP_CHAT_ID");
     private static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s";
 
     private final RestTemplate restTemplate;
@@ -25,18 +21,8 @@ public class TelegramClient {
         this.restTemplate = restTemplate;
     }
 
-    public void broadcastMessage(String message) {
-        List<String> chatIds = new ArrayList<>();
-        chatIds.add(CHAT_ID);
-        chatIds.add(CHAT_ID_CHARLY);
-
-        for (String chatId : chatIds) {
-            sendMessage(message, chatId);
-        }
-    }
-
-    public void sendMessage(String message, String chatId) {
-        String url = String.format(BASE_URL, BOT_TOKEN, chatId, message);
+    public void sendMessage(String message) {
+        String url = String.format(BASE_URL, BOT_TOKEN, GROUP_CHAT_ID, message);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> entity = new HttpEntity<>(headers);

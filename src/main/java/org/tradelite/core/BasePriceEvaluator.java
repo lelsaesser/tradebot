@@ -16,11 +16,11 @@ public abstract class BasePriceEvaluator {
     protected void comparePrices(TickerSymbol ticker, double currentPrice, double targetPriceBuy, double targetPriceSell) {
         if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
             log.info("Potential sell opportunity for {}", ticker);
-            telegramClient.broadcastMessage("Potential sell opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
+            telegramClient.sendMessage("\uD83D\uDCB0 Potential sell opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
         }
         if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
             log.info("Potential buy opportunity for {}", ticker);
-            telegramClient.broadcastMessage("Potential buy opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
+            telegramClient.sendMessage("\uD83D\uDE80 Potential buy opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
         }
     }
 

@@ -8,6 +8,7 @@ import java.util.List;
 public enum CoinId implements TickerSymbol {
     BITCOIN("bitcoin"),
     SOLANA("solana"),
+    HYPERLIQUID("hyperliquid"),
     ETHEREUM("ethereum");
 
     private final String id;

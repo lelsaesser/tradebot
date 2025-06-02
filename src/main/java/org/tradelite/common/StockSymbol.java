@@ -26,6 +26,7 @@ public enum StockSymbol implements TickerSymbol {
     AXON("AXON"),
     CRWD("CRWD"),
     OKTA("OKTA"),
+    GLXY("GLXY"),
     NET("NET");
 
     private final String ticker;
