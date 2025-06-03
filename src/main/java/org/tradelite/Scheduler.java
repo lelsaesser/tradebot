@@ -26,7 +26,7 @@ public class Scheduler {
     private final TelegramMessageProcessor telegramMessageProcessor;
 
     @Autowired
-    public Scheduler(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
+    Scheduler(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
                      TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor) {
         this.insiderTracker = insiderTracker;
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
@@ -43,7 +43,7 @@ public class Scheduler {
 
     }
 
-    //@Scheduled(initialDelay = 0, fixedRate = 300000)
+    @Scheduled(initialDelay = 0, fixedRate = 300000)
     private void scheduledActivity() throws InterruptedException {
         coinGeckoPriceEvaluator.evaluatePrice();
         finnhubPriceEvaluator.evaluatePrice();
@@ -51,7 +51,7 @@ public class Scheduler {
         log.info("Market monitoring round completed.");
     }
 
-    //@Scheduled(fixedRate = 600000)
+    @Scheduled(fixedRate = 600000)
     private void cleanupIgnoreSymbols() {
         targetPriceProvider.cleanupIgnoreSymbols();
 
@@ -61,7 +61,7 @@ public class Scheduler {
     @Scheduled(fixedRate = 60000)
     private void pollTelegramChatUpdates() {
         List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
-        telegramMessageProcessor.parseMessage(chatUpdates);
+        telegramMessageProcessor.processUpdates(chatUpdates);
 
         log.info("Telegram chat updates processed.");
     }

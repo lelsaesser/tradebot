@@ -18,8 +18,8 @@ import java.util.Map;
 @Component
 public class TargetPriceProvider {
 
-    private static final String FILE_PATH_STOCKS = "config/target-prices-stocks.json";
-    private static final String FILE_PATH_COINS = "config/target-prices-coins.json";
+    public static final String FILE_PATH_STOCKS = "config/target-prices-stocks.json";
+    public static final String FILE_PATH_COINS = "config/target-prices-coins.json";
 
     private final Map<String, Date> ignoredSymbols = new HashMap<>();
     private final ObjectMapper objectMapper;
