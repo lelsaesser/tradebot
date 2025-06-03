@@ -8,16 +8,17 @@
   { "symbol": "COIN", "buyTarget": 216, "sellTarget": 0 },
   { "symbol": "MSTR", "buyTarget": 300, "sellTarget": 0 },
   { "symbol": "RKLB", "buyTarget": 26, "sellTarget": 0 },
-  { "symbol": "UBER", "buyTarget": 83, "sellTarget": 0 },
+  { "symbol": "UBER", "buyTarget": 83, "sellTarget": 93 },
   { "symbol": "PLTR", "buyTarget": 115, "sellTarget": 0 },
   { "symbol": "SPOT", "buyTarget": 631, "sellTarget": 0 },
   { "symbol": "HOOD", "buyTarget": 52, "sellTarget": 0 },
-  { "symbol": "NET", "buyTarget": 127, "sellTarget": 0 },
+  { "symbol": "NET", "buyTarget": 127, "sellTarget": 168 },
   { "symbol": "AVGO", "buyTarget": 211, "sellTarget": 0 },
   { "symbol": "AXON", "buyTarget": 640, "sellTarget": 0 },
   { "symbol": "CRWD", "buyTarget": 443, "sellTarget": 0 },
   { "symbol": "OKTA", "buyTarget": 100, "sellTarget": 0 },
   { "symbol": "GOOG", "buyTarget": 167, "sellTarget": 0 },
   { "symbol": "AMZN", "buyTarget": 195, "sellTarget": 0 },
-  { "symbol": "GLXY", "buyTarget": 16.5, "sellTarget": 0 }
+  { "symbol": "GLXY", "buyTarget": 16.5, "sellTarget": 0 },
+  { "symbol": "BABA", "buyTarget": 100, "sellTarget": 140 }
 ]
