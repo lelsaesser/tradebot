@@ -37,7 +37,7 @@ public class TargetPriceProvider {
         return loadTargetPrices(FILE_PATH_COINS);
     }
 
-    private List<TargetPrice> loadTargetPrices(String filePath) {
+    protected List<TargetPrice> loadTargetPrices(String filePath) {
         File file = new File(filePath);
         try (InputStream inputStream = new FileInputStream(file)) {
             return objectMapper.readValue(inputStream, new TypeReference<>() {});
@@ -63,4 +63,30 @@ public class TargetPriceProvider {
             return now.minusSeconds(maxIgnoredDuration).isAfter(ignoredTime);
         });
     }
+
+    public synchronized void updateTargetPrice(TickerSymbol symbol, Double newBuyTarget, Double newSellTarget, String filePath) {
+        File file = new File(filePath);
+
+        try {
+            List<TargetPrice> prices = objectMapper.readValue(file, new TypeReference<>() {});
+
+            for (TargetPrice tp : prices) {
+                if (tp.getSymbol().equalsIgnoreCase(symbol.getName())) {
+                    if (newBuyTarget != null) {
+                        tp.setBuyTarget(newBuyTarget);
+                    }
+                    if (newSellTarget != null) {
+                        tp.setSellTarget(newSellTarget);
+                    }
+                    break;
+                }
+            }
+
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, prices);
+
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to update target prices in JSON file", e);
+        }
+    }
+
 }
