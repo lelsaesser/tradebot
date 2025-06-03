@@ -5,6 +5,8 @@ import java.time.format.DateTimeFormatter;
 
 public class DateUtil {
 
+    private DateUtil() {}
+
     public static String getDateTwoMonthsAgo() {
         LocalDate twoMonthsAgo = LocalDate.now().minusMonths(2).withDayOfMonth(1);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");

@@ -1,0 +1,21 @@
+[ {
+  "symbol" : "BITCOIN",
+  "buyTarget" : 104000.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "ETHEREUM",
+  "buyTarget" : 2000.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "SOLANA",
+  "buyTarget" : 250.0,
+  "sellTarget" : 1100.0
+}, {
+  "symbol" : "HYPERLIQUID",
+  "buyTarget" : 30.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "SUI",
+  "buyTarget" : 2.5,
+  "sellTarget" : 0.0
+} ]

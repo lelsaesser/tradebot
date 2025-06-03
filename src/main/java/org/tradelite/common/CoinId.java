@@ -9,6 +9,7 @@ public enum CoinId implements TickerSymbol {
     BITCOIN("bitcoin"),
     SOLANA("solana"),
     HYPERLIQUID("hyperliquid"),
+    SUI("sui"),
     ETHEREUM("ethereum");
 
     private final String id;
