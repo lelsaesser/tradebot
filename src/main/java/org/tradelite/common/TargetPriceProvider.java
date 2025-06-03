@@ -3,9 +3,10 @@ package org.tradelite.common;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -17,8 +18,8 @@ import java.util.Map;
 @Component
 public class TargetPriceProvider {
 
-    private static final String FILE_PATH_STOCKS = "target-prices-stocks.json";
-    private static final String FILE_PATH_COINS = "target-prices-coins.json";
+    private static final String FILE_PATH_STOCKS = "config/target-prices-stocks.json";
+    private static final String FILE_PATH_COINS = "config/target-prices-coins.json";
 
     private final Map<String, Date> ignoredSymbols = new HashMap<>();
     private final ObjectMapper objectMapper;
@@ -37,7 +38,8 @@ public class TargetPriceProvider {
     }
 
     private List<TargetPrice> loadTargetPrices(String filePath) {
-        try (InputStream inputStream = new ClassPathResource(filePath).getInputStream()) {
+        File file = new File(filePath);
+        try (InputStream inputStream = new FileInputStream(file)) {
             return objectMapper.readValue(inputStream, new TypeReference<>() {});
         } catch (IOException e) {
             throw new IllegalStateException("Failed to load target prices from JSON file", e);
