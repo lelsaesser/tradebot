@@ -1,25 +1,93 @@
-[
-  { "symbol": "AAPL", "buyTarget": 195.0, "sellTarget": 0 },
-  { "symbol": "AMD", "buyTarget": 90.0, "sellTarget": 170.0 },
-  { "symbol": "META", "buyTarget": 556.0, "sellTarget": 718.0 },
-  { "symbol": "NFLX", "buyTarget": 1130, "sellTarget": 0 },
-  { "symbol": "NVDA", "buyTarget": 120, "sellTarget": 0 },
-  { "symbol": "TSLA", "buyTarget": 280, "sellTarget": 0 },
-  { "symbol": "COIN", "buyTarget": 216, "sellTarget": 0 },
-  { "symbol": "MSTR", "buyTarget": 300, "sellTarget": 0 },
-  { "symbol": "RKLB", "buyTarget": 26, "sellTarget": 0 },
-  { "symbol": "UBER", "buyTarget": 83, "sellTarget": 93 },
-  { "symbol": "PLTR", "buyTarget": 115, "sellTarget": 0 },
-  { "symbol": "SPOT", "buyTarget": 631, "sellTarget": 0 },
-  { "symbol": "HOOD", "buyTarget": 52, "sellTarget": 0 },
-  { "symbol": "NET", "buyTarget": 127, "sellTarget": 0 },
-  { "symbol": "AVGO", "buyTarget": 211, "sellTarget": 0 },
-  { "symbol": "AXON", "buyTarget": 640, "sellTarget": 0 },
-  { "symbol": "CRWD", "buyTarget": 443, "sellTarget": 0 },
-  { "symbol": "OKTA", "buyTarget": 96, "sellTarget": 0 },
-  { "symbol": "GOOG", "buyTarget": 167, "sellTarget": 0 },
-  { "symbol": "AMZN", "buyTarget": 195, "sellTarget": 0 },
-  { "symbol": "GLXY", "buyTarget": 16.5, "sellTarget": 0 },
-  { "symbol": "BABA", "buyTarget": 100, "sellTarget": 140 },
-  { "symbol": "PANW", "buyTarget": 170, "sellTarget": 0 }
-]
+[ {
+  "symbol" : "AAPL",
+  "buyTarget" : 190.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "AMD",
+  "buyTarget" : 95.0,
+  "sellTarget" : 170.0
+}, {
+  "symbol" : "META",
+  "buyTarget" : 556.0,
+  "sellTarget" : 718.0
+}, {
+  "symbol" : "NFLX",
+  "buyTarget" : 1130.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "NVDA",
+  "buyTarget" : 120.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "TSLA",
+  "buyTarget" : 280.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "COIN",
+  "buyTarget" : 216.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "MSTR",
+  "buyTarget" : 300.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "RKLB",
+  "buyTarget" : 26.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "UBER",
+  "buyTarget" : 82.0,
+  "sellTarget" : 93.0
+}, {
+  "symbol" : "PLTR",
+  "buyTarget" : 115.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "SPOT",
+  "buyTarget" : 631.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "HOOD",
+  "buyTarget" : 52.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "NET",
+  "buyTarget" : 127.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "AVGO",
+  "buyTarget" : 211.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "AXON",
+  "buyTarget" : 640.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "CRWD",
+  "buyTarget" : 443.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "OKTA",
+  "buyTarget" : 96.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "GOOG",
+  "buyTarget" : 167.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "AMZN",
+  "buyTarget" : 195.0,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "GLXY",
+  "buyTarget" : 16.5,
+  "sellTarget" : 0.0
+}, {
+  "symbol" : "BABA",
+  "buyTarget" : 100.0,
+  "sellTarget" : 140.0
+}, {
+  "symbol" : "PANW",
+  "buyTarget" : 170.0,
+  "sellTarget" : 0.0
+} ]

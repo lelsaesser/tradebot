@@ -41,7 +41,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
         for (CoinGeckoPriceResponse.CoinData priceData : coinData) {
             for (TargetPrice targetPrice : targetPrices) {
-                if (priceData.getCoinId().getId().equals(targetPrice.getSymbol())) {
+                if (priceData.getCoinId().getId().equalsIgnoreCase(targetPrice.getSymbol())) {
                     comparePrices(priceData.getCoinId(), priceData.getUsd(), targetPrice.getBuyTarget(), targetPrice.getSellTarget());
                 }
             }
