@@ -56,7 +56,7 @@ public class TargetPriceProvider {
     }
 
     public void cleanupIgnoreSymbols() {
-        long maxIgnoredDuration = 3600L; // 1 hour in seconds
+        long maxIgnoredDuration = 7200L; // 2 hours in seconds
         Instant now = Instant.now();
         ignoredSymbols.entrySet().removeIf(entry -> {
             Instant ignoredTime = entry.getValue().toInstant();
