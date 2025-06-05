@@ -66,7 +66,7 @@ public class TelegramMessageProcessor {
         return Optional.empty();
     }
 
-    private Optional<SetCommand> buildSetCommand(String subCommand, String symbol, double target) {
+    protected Optional<SetCommand> buildSetCommand(String subCommand, String symbol, double target) {
         String errorMessageCommandFormat = "Invalid command format. Use /set <buy|sell> <symbol> <target>";
         String errorMessageInvalidSymbol = "Invalid symbol. Please provide a valid symbol.";
         String errorMessageInvalidTarget = "Invalid target. Please provide a valid target price.";
