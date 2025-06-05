@@ -49,7 +49,7 @@ public class TelegramMessageProcessor {
 
     protected Optional<TelegramCommand> parseMessage(TelegramUpdateResponse update) {
         String messageText = update.getMessage().getText();
-        if (messageText != null && messageText.startsWith("/set")) {
+        if (messageText != null && messageText.toLowerCase().startsWith("/set")) {
             String[] parts = messageText.split("\\s+");
             if (parts.length == 4) {
                 String subCommand = parts[1]; // buy or sell
@@ -58,9 +58,17 @@ public class TelegramMessageProcessor {
 
                 Optional<SetCommand> cmd = buildSetCommand(subCommand, symbol, target);
                 if (cmd.isPresent()) {
-                    log.info("Received set message for command: {}, symbol: {}, target: {}", subCommand, symbol, target);
+                    log.info("Received set command: {}, symbol: {}, target: {}", subCommand, symbol, target);
+                    return Optional.of(cmd.get());
                 }
-                return cmd.map(telegramCommand -> telegramCommand);
+            }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/show")) {
+            String[] parts = messageText.split("\\s+");
+            if (parts.length == 2) {
+                String subCommand = parts[1]; // coins / stocks / all
+                ShowCommand showCommand = new ShowCommand(subCommand);
+                log.info("Received show command for sub-command: {}", subCommand);
+                return Optional.of(showCommand);
             }
         }
         return Optional.empty();
