@@ -48,7 +48,7 @@ public class ShowCommandProcessor implements TelegramCommandProcessor<ShowComman
 
     }
 
-    private boolean isValidCommand(ShowCommand command) {
+    protected boolean isValidCommand(ShowCommand command) {
         errorMessage = "";
         if (command.getSubCommand() == null || command.getSubCommand().isEmpty()) {
             errorMessage = "Sub-command is required. Use " + ShowCommandOptions.ALL.getName() + ", " + ShowCommandOptions.COINS.getName() + ", or " + ShowCommandOptions.STOCKS.getName() + ".";
@@ -61,7 +61,7 @@ public class ShowCommandProcessor implements TelegramCommandProcessor<ShowComman
         return true;
     }
 
-    private String builtResponseMessage(List<TargetPrice> coinPrices, List<TargetPrice> stockPrices) {
+    protected String builtResponseMessage(List<TargetPrice> coinPrices, List<TargetPrice> stockPrices) {
         StringBuilder message = new StringBuilder();
 
         message.append("Current monitoring watchlist contains following symbols:%n%n".formatted());
