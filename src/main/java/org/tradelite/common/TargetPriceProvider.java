@@ -18,8 +18,8 @@ import java.util.Map;
 @Component
 public class TargetPriceProvider {
 
-    private static final String FILE_PATH_STOCKS = "config/target-prices-stocks.json";
-    private static final String FILE_PATH_COINS = "config/target-prices-coins.json";
+    public static final String FILE_PATH_STOCKS = "config/target-prices-stocks.json";
+    public static final String FILE_PATH_COINS = "config/target-prices-coins.json";
 
     private final Map<String, Date> ignoredSymbols = new HashMap<>();
     private final ObjectMapper objectMapper;
@@ -56,7 +56,7 @@ public class TargetPriceProvider {
     }
 
     public void cleanupIgnoreSymbols() {
-        long maxIgnoredDuration = 3600L; // 1 hour in seconds
+        long maxIgnoredDuration = 7200L; // 2 hours in seconds
         Instant now = Instant.now();
         ignoredSymbols.entrySet().removeIf(entry -> {
             Instant ignoredTime = entry.getValue().toInstant();

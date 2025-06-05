@@ -2,7 +2,9 @@ package org.tradelite.common;
 
 import lombok.Getter;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Getter
 public enum StockSymbol implements TickerSymbol {
@@ -27,6 +29,7 @@ public enum StockSymbol implements TickerSymbol {
     CRWD("CRWD"),
     OKTA("OKTA"),
     GLXY("GLXY"),
+    PANW("PANW"),
     NET("NET");
 
     private final String ticker;
@@ -37,6 +40,12 @@ public enum StockSymbol implements TickerSymbol {
 
     public static List<StockSymbol> getAll() {
         return List.of(StockSymbol.values());
+    }
+
+    public static Optional<StockSymbol> fromString(String input) {
+        return Arrays.stream(StockSymbol.values())
+                .filter(symbol -> symbol.getTicker().equalsIgnoreCase(input))
+                .findFirst();
     }
 
     @Override
