@@ -30,6 +30,7 @@ public enum StockSymbol implements TickerSymbol {
     OKTA("OKTA"),
     GLXY("GLXY"),
     PANW("PANW"),
+    MP("MP"),
     NET("NET");
 
     private final String ticker;

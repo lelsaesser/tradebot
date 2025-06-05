@@ -90,4 +90,8 @@
   "symbol" : "PANW",
   "buyTarget" : 170.0,
   "sellTarget" : 0.0
+}, {
+  "symbol": "MP",
+  "buyTarget": 20.0,
+  "sellTarget": 0.0
 } ]
