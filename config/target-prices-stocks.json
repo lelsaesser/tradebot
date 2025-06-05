@@ -102,4 +102,12 @@
   "symbol": "ASML",
   "buyTarget": 620.0,
   "sellTarget": 0.0
+}, {
+  "symbol": "COST",
+  "buyTarget": 915.0,
+  "sellTarget": 0.0
+}, {
+  "symbol": "WMT",
+  "buyTarget": 84.0,
+  "sellTarget": 0.0
 } ]
