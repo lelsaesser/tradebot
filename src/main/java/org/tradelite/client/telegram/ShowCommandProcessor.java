@@ -64,10 +64,10 @@ public class ShowCommandProcessor implements TelegramCommandProcessor<ShowComman
     private String builtResponseMessage(List<TargetPrice> coinPrices, List<TargetPrice> stockPrices) {
         StringBuilder message = new StringBuilder();
 
-        message.append("Current monitoring watchlist contains following symbols:%n%n");
+        message.append("Current monitoring watchlist contains following symbols:%n%n".formatted());
 
         if (!coinPrices.isEmpty()) {
-            message.append("*Coin Targets:*").append("%n".formatted());
+            message.append("*Cryptos:*").append("%n".formatted());
             message.append("```").append("%n".formatted());
             message.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Buy Target", "Sell Target"));
             for (TargetPrice price : coinPrices) {
@@ -78,7 +78,7 @@ public class ShowCommandProcessor implements TelegramCommandProcessor<ShowComman
         }
 
         if (!stockPrices.isEmpty()) {
-            message.append("*Stock Targets:*").append("%n".formatted());
+            message.append("*Stocks:*").append("%n".formatted());
             message.append("```").append("%n".formatted());
             message.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Buy Target", "Sell Target"));
             for (TargetPrice price : stockPrices) {
