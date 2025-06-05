@@ -47,7 +47,7 @@ public class TelegramMessageProcessor {
         }
     }
 
-    private Optional<TelegramCommand> parseMessage(TelegramUpdateResponse update) {
+    protected Optional<TelegramCommand> parseMessage(TelegramUpdateResponse update) {
         String messageText = update.getMessage().getText();
         if (messageText != null && messageText.startsWith("/set")) {
             String[] parts = messageText.split("\\s+");
@@ -89,7 +89,7 @@ public class TelegramMessageProcessor {
             telegramClient.sendMessage(errorMessageInvalidSymbol);
             return Optional.empty();
         }
-        if (target <= 0) {
+        if (target < 0) {
             telegramClient.sendMessage(errorMessageInvalidTarget);
             return Optional.empty();
         }

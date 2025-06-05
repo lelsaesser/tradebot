@@ -1,17 +1,24 @@
 package org.tradelite.client.telegram;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.client.telegram.dto.TelegramMessage;
+import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramMessageProcessorTest {
@@ -45,7 +52,9 @@ class TelegramMessageProcessorTest {
                 Arguments.of("buy", "bitcoin", 50000.0),
                 Arguments.of("sell", "solana", 1000.0),
                 Arguments.of("buy", "pltr", 80.0),
-                Arguments.of("sell", "aapl", 500.0)
+                Arguments.of("sell", "aapl", 500.0),
+                Arguments.of("buy", "aapl", 0),
+                Arguments.of("sell", "aapl", 0)
         );
     }
 
@@ -59,13 +68,91 @@ class TelegramMessageProcessorTest {
     private static Stream<Arguments> invalidInputsProvider() {
         return Stream.of(
                 Arguments.of("buy", "bitcoin", -50000.0), // Negative target
-                Arguments.of("sell", "solana", 0.0), // Zero target
                 Arguments.of("buy", "pltr", -80.0), // Negative target for stock
-                Arguments.of("sell", "aapl", 0.0), // Zero target for stock
                 Arguments.of(null, "bitcoin", 50000.0), // Null subCommand
                 Arguments.of("invalid", "bitcoin", 50000.0), // Invalid subCommand
                 Arguments.of("buy", "", 50000.0), // Empty symbol
                 Arguments.of("buy", "invalid_symbol", 50000.0) // Invalid symbol
         );
+    }
+
+    @Test
+    void parseMessage_validSetCommand_returnsSetCommand() {
+        String text = "/set buy bitcoin 50000.0";
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(SetCommand.class)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("parseMessageInvalidInputsProvider")
+    void parseMessage_invalidInputs_returnsEmpty(String text) {
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+        assertThat(command.isPresent(), is(false));
+    }
+
+    private static Stream<Arguments> parseMessageInvalidInputsProvider() {
+        return Stream.of(
+                Arguments.of("/set buy bitcoin -50000.0"), // Negative target
+                Arguments.of("/set buy pltr -80.0"), // Negative target for stock
+                Arguments.of("/set invalid_symbol 50000.0"), // Invalid symbol
+                Arguments.of("set AAPL 50000.0"), // missing slash
+                Arguments.of("invalid command format"), // Not a set command
+                Arguments.of("") // Not a set command
+        );
+    }
+
+    @Test
+    void processUpdates_validUpdate_processesCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/set buy bitcoin 50000.0");
+        message.setMessageId(1L);
+
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        verify(commandDispatcher, times(1)).dispatch(any(SetCommand.class));
+        verify(messageTracker, times(1)).setLastProcessedMessageId(1L);
+    }
+
+    @Test
+    void processUpdates_alreadyProcessedMessage_skipsProcessing() {
+        when(messageTracker.getLastProcessedMessageId()).thenReturn(1L);
+
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/set buy bitcoin 50000.0");
+        message.setMessageId(1L);
+
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        verify(messageTracker, times(1)).getLastProcessedMessageId();
+        verify(commandDispatcher, never()).dispatch(any(SetCommand.class));
+        verify(messageTracker, never()).setLastProcessedMessageId(1L);
+    }
+
+    @Test
+    void processUpdates_nullMessageText_skipsProcessing() {
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(new TelegramMessage());
+
+        messageProcessor.processUpdates(List.of(update));
+
+        verify(commandDispatcher, never()).dispatch(any());
+        verify(messageTracker, never()).setLastProcessedMessageId(anyLong());
     }
 }
