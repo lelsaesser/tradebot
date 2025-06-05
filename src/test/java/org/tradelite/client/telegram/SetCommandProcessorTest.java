@@ -39,7 +39,7 @@ class SetCommandProcessorTest {
 
     @Test
     void canProcess_returnsFalse_forNonSetCommand() {
-        ShowCommand command = new ShowCommand();
+        ShowCommand command = new ShowCommand("all");
         boolean canProcess = setCommandProcessor.canProcess(command);
 
         assertThat(canProcess, is(false));

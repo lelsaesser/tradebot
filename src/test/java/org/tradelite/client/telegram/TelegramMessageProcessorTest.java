@@ -76,9 +76,9 @@ class TelegramMessageProcessorTest {
         );
     }
 
-    @Test
-    void parseMessage_validSetCommand_returnsSetCommand() {
-        String text = "/set buy bitcoin 50000.0";
+    @ParameterizedTest
+    @MethodSource("parseSetCommandValidInputsProvider")
+    void parseMessage_validSetCommand_returnsSetCommand(String text) {
         TelegramMessage message = new TelegramMessage();
         message.setText(text);
         TelegramUpdateResponse update = new TelegramUpdateResponse();
@@ -87,6 +87,41 @@ class TelegramMessageProcessorTest {
         var command = messageProcessor.parseMessage(update);
         assertThat(command.isPresent(), is(true));
         assertThat(command.get(), is(instanceOf(SetCommand.class)));
+    }
+
+    private static Stream<Arguments> parseSetCommandValidInputsProvider() {
+        return Stream.of(
+                Arguments.of("/set buy bitcoin 50000.0"),
+                Arguments.of("/SET sell solana 1000.0"),
+                Arguments.of("/Set buy pltr 80.0"),
+                Arguments.of("/sEt sell aapl 500.0"),
+                Arguments.of("/seT buy aapl 0"),
+                Arguments.of("/sET sell aapl 0")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("parseShowCommandValidInputsProvider")
+    void parseMessage_validShowCommand_returnsShowCommand(String text) {
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(ShowCommand.class)));
+    }
+
+    private static Stream<Arguments> parseShowCommandValidInputsProvider() {
+        return Stream.of(
+                Arguments.of("/show all"),
+                Arguments.of("/show coins"),
+                Arguments.of("/show stocks"),
+                Arguments.of("/SHOW stocks"),
+                Arguments.of("/Show stocks"),
+                Arguments.of("/shOW stocks")
+        );
     }
 
     @ParameterizedTest
@@ -108,7 +143,10 @@ class TelegramMessageProcessorTest {
                 Arguments.of("/set invalid_symbol 50000.0"), // Invalid symbol
                 Arguments.of("set AAPL 50000.0"), // missing slash
                 Arguments.of("invalid command format"), // Not a set command
-                Arguments.of("") // Not a set command
+                Arguments.of(""), // Not a set command
+                Arguments.of("show all"), // missing slash
+                Arguments.of("/show all bla bla"), // Not a valid show command
+                Arguments.of("/show all bla") // Not a valid show command
         );
     }
 

@@ -48,7 +48,7 @@ class TelegramCommandDispatcherTest {
     void dispatch_showCommand_success() {
         when(showCommandProcessor.canProcess(any(ShowCommand.class))).thenReturn(true);
 
-        ShowCommand command = new ShowCommand();
+        ShowCommand command = new ShowCommand("all");
 
         dispatcher.dispatch(command);
 

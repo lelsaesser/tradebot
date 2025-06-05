@@ -9,7 +9,9 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -34,12 +36,15 @@ public class TelegramClient {
 
     public void sendMessage(String message) {
         String url = String.format(BASE_URL, botToken, groupChatId, message);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("parse_mode", "Markdown");
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> entity = new HttpEntity<>(headers);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
         try {
-            log.info("bot url: {}", url);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
             if (response.getStatusCode() == HttpStatus.OK) {
                 log.info("Message sent successfully");
