@@ -44,7 +44,7 @@
   "sellTarget" : 0.0
 }, {
   "symbol" : "SPOT",
-  "buyTarget" : 631.0,
+  "buyTarget" : 650.0,
   "sellTarget" : 0.0
 }, {
   "symbol" : "HOOD",
@@ -93,5 +93,9 @@
 }, {
   "symbol": "MP",
   "buyTarget": 20.0,
+  "sellTarget": 0.0
+}, {
+  "symbol": "APP",
+  "buyTarget": 310.0,
   "sellTarget": 0.0
 } ]
