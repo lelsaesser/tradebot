@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.hamcrest.CoreMatchers.any;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.AdditionalMatchers.gt;
+import static org.hamcrest.Matchers.greaterThan;
 
 class TelegramMessageTrackerTest {
 
@@ -22,7 +22,7 @@ class TelegramMessageTrackerTest {
         long messageId = tracker.getLastProcessedMessageId();
 
         assertThat(messageId, any(long.class));
-        assertThat(messageId, is(gt(0L)));
+        assertThat(messageId, greaterThan(0L));
     }
 
     @Test
@@ -30,7 +30,7 @@ class TelegramMessageTrackerTest {
         long currentMessageId = tracker.getLastProcessedMessageId();
 
         assertThat(currentMessageId, any(long.class));
-        assertThat(currentMessageId, is(gt(0L)));
+        assertThat(currentMessageId, greaterThan(0L));
 
         long newMessageId = 123456789L;
         tracker.setLastProcessedMessageId(newMessageId);
