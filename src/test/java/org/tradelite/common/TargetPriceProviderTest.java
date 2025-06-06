@@ -5,11 +5,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.core.IgnoreReason;
 
 import java.util.List;
 
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.aMapWithSize;
 
 @ExtendWith(MockitoExtension.class)
 class TargetPriceProviderTest {
@@ -21,6 +23,64 @@ class TargetPriceProviderTest {
     @BeforeEach
     void setUp() {
         targetPriceProvider = new TargetPriceProvider(new ObjectMapper());
+    }
+
+    @Test
+    void addIgnoreSymbol_symbolNotExists() {
+        targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
+
+        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(1));
+
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+
+        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
+
+        targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+
+        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
+        assertThat(targetPriceProvider.ignoredSymbols.get(CoinId.SOLANA.getName()).getIgnoreReasons(), aMapWithSize(2));
+        assertThat(targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreReasons(), aMapWithSize(1));
+
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.BUY_ALERT);
+        assertThat(targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreReasons(), aMapWithSize(2));
+    }
+
+    @Test
+    void isSymbolIgnored() {
+        targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+
+        assertThat(targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.BUY_ALERT), is(true));
+        assertThat(targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.SELL_ALERT), is(false));
+        assertThat(targetPriceProvider.isSymbolIgnored(StockSymbol.AMZN, IgnoreReason.SELL_ALERT), is(true));
+        assertThat(targetPriceProvider.isSymbolIgnored(StockSymbol.AMZN, IgnoreReason.BUY_ALERT), is(false));
+        assertThat(targetPriceProvider.isSymbolIgnored(StockSymbol.AMD, IgnoreReason.BUY_ALERT), is(false));
+        assertThat(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.SELL_ALERT), is(false));
+    }
+
+    @Test
+    void cleanupIgnoreSymbols() throws InterruptedException {
+        targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+
+        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
+        Thread.sleep(3000);
+        targetPriceProvider.cleanupIgnoreSymbols(1L);
+        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(0));
+
+        targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.BUY_ALERT);
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.META, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.PLTR, IgnoreReason.BUY_ALERT);
+
+        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(3));
+        Thread.sleep(3500);
+        targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(StockSymbol.META, IgnoreReason.BUY_ALERT);
+        targetPriceProvider.cleanupIgnoreSymbols(1L);
+        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
     }
 
     @Test

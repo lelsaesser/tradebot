@@ -14,6 +14,8 @@ import org.tradelite.core.InsiderTracker;
 
 import java.util.List;
 
+import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS;
+
 @Slf4j
 @Component
 public class Scheduler {
@@ -53,7 +55,7 @@ public class Scheduler {
 
     @Scheduled(fixedRate = 600000)
     private void cleanupIgnoreSymbols() {
-        targetPriceProvider.cleanupIgnoreSymbols();
+        targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS);
 
         log.info("Cleanup of ignored symbols completed.");
     }

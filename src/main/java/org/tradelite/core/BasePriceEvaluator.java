@@ -16,19 +16,23 @@ public abstract class BasePriceEvaluator {
     public abstract void evaluatePrice() throws InterruptedException;
 
     protected void comparePrices(TickerSymbol ticker, double currentPrice, double targetPriceBuy, double targetPriceSell) {
-        if (targetPriceProvider.isSymbolIgnored(ticker)) {
-            log.info("Notification for {} was already sent within 4 hours. Skipping.", ticker);
-            return;
-        }
+
         if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
+            if (targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.SELL_ALERT)) {
+                return;
+            }
             log.info("Potential sell opportunity for {}", ticker);
             telegramClient.sendMessage("\uD83D\uDCB0 Potential sell opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
-            targetPriceProvider.addIgnoredSymbol(ticker);
+            targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.SELL_ALERT);
         }
+
         if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
+            if (targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.BUY_ALERT)) {
+                return;
+            }
             log.info("Potential buy opportunity for {}", ticker);
             telegramClient.sendMessage("\uD83D\uDE80 Potential buy opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
-            targetPriceProvider.addIgnoredSymbol(ticker);
+            targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.BUY_ALERT);
         }
     }
 
