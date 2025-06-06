@@ -17,7 +17,7 @@ public abstract class BasePriceEvaluator {
 
     protected void comparePrices(TickerSymbol ticker, double currentPrice, double targetPriceBuy, double targetPriceSell) {
         if (targetPriceProvider.isSymbolIgnored(ticker)) {
-            log.info("Notification for {} was already sent within 2 hours. Skipping.", ticker);
+            log.info("Notification for {} was already sent within 4 hours. Skipping.", ticker);
             return;
         }
         if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {

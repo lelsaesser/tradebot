@@ -32,7 +32,7 @@
   "sellTarget" : 0.0
 }, {
   "symbol" : "RKLB",
-  "buyTarget" : 26.0,
+  "buyTarget" : 25.0,
   "sellTarget" : 0.0
 }, {
   "symbol" : "UBER",
@@ -91,23 +91,23 @@
   "buyTarget" : 170.0,
   "sellTarget" : 0.0
 }, {
-  "symbol": "MP",
-  "buyTarget": 20.0,
-  "sellTarget": 0.0
+  "symbol" : "MP",
+  "buyTarget" : 20.0,
+  "sellTarget" : 0.0
 }, {
-  "symbol": "APP",
-  "buyTarget": 310.0,
-  "sellTarget": 0.0
+  "symbol" : "APP",
+  "buyTarget" : 310.0,
+  "sellTarget" : 0.0
 }, {
-  "symbol": "ASML",
-  "buyTarget": 620.0,
-  "sellTarget": 0.0
+  "symbol" : "ASML",
+  "buyTarget" : 620.0,
+  "sellTarget" : 0.0
 }, {
-  "symbol": "COST",
-  "buyTarget": 915.0,
-  "sellTarget": 0.0
+  "symbol" : "COST",
+  "buyTarget" : 915.0,
+  "sellTarget" : 0.0
 }, {
-  "symbol": "WMT",
-  "buyTarget": 84.0,
-  "sellTarget": 0.0
+  "symbol" : "WMT",
+  "buyTarget" : 84.0,
+  "sellTarget" : 0.0
 } ]
