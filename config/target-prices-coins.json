@@ -1,6 +1,6 @@
 [ {
   "symbol" : "BITCOIN",
-  "buyTarget" : 95000.0,
+  "buyTarget" : 100000.0,
   "sellTarget" : 0.0
 }, {
   "symbol" : "ETHEREUM",
