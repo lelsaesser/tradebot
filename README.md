@@ -1,5 +1,7 @@
 ## Swing trading support bot.  
 
+Integrates into several APIs and sends notifications and updates to Telegram chats.
+
 Stock market and price data from Finnhub.io (https://finnhub.io/)  
 Crypto market and price data by CoinGecko (https://www.coingecko.com/)  
 
