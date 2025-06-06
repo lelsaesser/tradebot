@@ -21,7 +21,7 @@
 }, {
   "symbol" : "TSLA",
   "buyTarget" : 280.0,
-  "sellTarget" : 0.0
+  "sellTarget" : 390.0
 }, {
   "symbol" : "COIN",
   "buyTarget" : 216.0,
