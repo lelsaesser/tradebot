@@ -52,7 +52,7 @@ public class FinnhubClient {
     }
 
     public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
-        String fromDate = DateUtil.getDateTwoMonthsAgo();
+        String fromDate = DateUtil.getDateTwoMonthsAgo(null);
         String baseUrl = "/stock/insider-transactions?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
         url = url + "&from=" + fromDate;
@@ -93,7 +93,7 @@ public class FinnhubClient {
     }
 
     public InsiderSentimentResponse getInsiderSentiment(StockSymbol ticker) {
-        String fromDate = DateUtil.getDateTwoMonthsAgo();
+        String fromDate = DateUtil.getDateTwoMonthsAgo(null);
         String baseUrl = "/stock/insider-sentiment?symbol=%s&from=" + fromDate;
         String url = getApiUrl(baseUrl, ticker);
 

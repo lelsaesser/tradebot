@@ -11,6 +11,7 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
+import org.tradelite.utils.DateUtil;
 
 import java.util.List;
 
@@ -47,8 +48,10 @@ public class Scheduler {
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     private void scheduledActivity() throws InterruptedException {
+        if (DateUtil.isWeekday(null)) {
+            finnhubPriceEvaluator.evaluatePrice();
+        }
         coinGeckoPriceEvaluator.evaluatePrice();
-        finnhubPriceEvaluator.evaluatePrice();
 
         log.info("Market monitoring round completed.");
     }
