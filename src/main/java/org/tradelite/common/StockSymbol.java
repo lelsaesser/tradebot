@@ -31,6 +31,10 @@ public enum StockSymbol implements TickerSymbol {
     GLXY("GLXY"),
     PANW("PANW"),
     MP("MP"),
+    APP("APP"),
+    ASML("ASML"),
+    COST("COST"),
+    WMT("WMT"),
     NET("NET");
 
     private final String ticker;
