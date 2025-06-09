@@ -25,3 +25,4 @@ replay_pid*
 /.idea/
 /target/
 setup_env.sh
+deploy.sh
