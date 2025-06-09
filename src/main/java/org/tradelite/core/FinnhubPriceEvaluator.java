@@ -11,7 +11,9 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -21,6 +23,8 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
 
+    protected final Map<StockSymbol, Double> lastPriceCache = new EnumMap<>(StockSymbol.class);
+
     @Autowired
     public FinnhubPriceEvaluator(FinnhubClient finnhubClient, TargetPriceProvider targetPriceProvider, TelegramClient telegramClient) {
         super(telegramClient, targetPriceProvider);
@@ -29,13 +33,20 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         this.telegramClient = telegramClient;
     }
 
-    public void evaluatePrice() throws InterruptedException {
+    public int evaluatePrice() throws InterruptedException {
         List<StockSymbol> tickers = StockSymbol.getAll();
         List<PriceQuoteResponse> finnhubData = new ArrayList<>();
         List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
 
         for (StockSymbol ticker : tickers) {
             PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker);
+
+            Double lastPrice = lastPriceCache.get(ticker);
+            if (priceQuote == null || (lastPrice != null && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
+                continue;
+            }
+            lastPriceCache.put(ticker, priceQuote.getCurrentPrice());
+
             finnhubData.add(priceQuote);
             Thread.sleep(100);
         }
@@ -49,6 +60,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
                 }
             }
         }
+        return finnhubData.size();
     }
 
     public void evaluateHighPriceChange(PriceQuoteResponse priceQuote) {

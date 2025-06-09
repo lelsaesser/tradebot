@@ -9,14 +9,15 @@ import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Component
 public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
     private final CoinGeckoClient coinGeckoClient;
     private final TargetPriceProvider targetPriceProvider;
+
+    protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
 
     @Autowired
     public CoinGeckoPriceEvaluator(CoinGeckoClient coinGeckoClient, TargetPriceProvider targetPriceProvider,
@@ -27,7 +28,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     }
 
     @Override
-    public void evaluatePrice() throws InterruptedException {
+    public int evaluatePrice() throws InterruptedException {
 
         List<CoinId> coinIds = CoinId.getAll();
         List<CoinGeckoPriceResponse.CoinData> coinData = new ArrayList<>();
@@ -35,6 +36,13 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
         for (CoinId coinId : coinIds) {
             CoinGeckoPriceResponse.CoinData priceData = coinGeckoClient.getCoinPriceData(coinId);
+
+            Double lastPrice = lastPriceCache.get(coinId);
+            if (priceData == null || (lastPrice != null && Math.abs(lastPrice - priceData.getUsd()) < 0.0001)) {
+                continue;
+            }
+            lastPriceCache.put(coinId, priceData.getUsd());
+
             coinData.add(priceData);
             Thread.sleep(100);
         }
@@ -46,6 +54,8 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
                 }
             }
         }
+
+        return coinData.size();
 
     }
 }

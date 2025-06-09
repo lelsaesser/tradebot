@@ -13,7 +13,7 @@ public abstract class BasePriceEvaluator {
     private final TelegramClient telegramClient;
     private final TargetPriceProvider targetPriceProvider;
 
-    public abstract void evaluatePrice() throws InterruptedException;
+    public abstract int evaluatePrice() throws InterruptedException;
 
     protected void comparePrices(TickerSymbol ticker, double currentPrice, double targetPriceBuy, double targetPriceSell) {
 

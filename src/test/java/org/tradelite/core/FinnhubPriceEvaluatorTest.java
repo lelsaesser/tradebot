@@ -12,8 +12,12 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.aMapWithSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -93,5 +97,33 @@ class FinnhubPriceEvaluatorTest {
 
         verify(telegramClient, never()).sendMessage(any());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
+    }
+
+    @Test
+    void evaluatePrice_priceDidNotChange() throws InterruptedException {
+        double lastPrice = Math.random();
+
+        for (StockSymbol symbol : StockSymbol.getAll()) {
+            finnhubPriceEvaluator.lastPriceCache.put(symbol, lastPrice);
+        }
+
+        List<TargetPrice> targetPrices = new ArrayList<>();
+        for (StockSymbol symbol : StockSymbol.getAll()) {
+            targetPrices.add(new TargetPrice(symbol.getTicker(), lastPrice - 1000, lastPrice + 1000));
+        }
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setCurrentPrice(lastPrice);
+
+        when(finnhubClient.getPriceQuote(any())).thenReturn(priceQuoteResponse);
+
+        int finDataSize = finnhubPriceEvaluator.evaluatePrice();
+
+        verify(targetPriceProvider, times(1)).getStockTargetPrices();
+        verify(finnhubClient, times(StockSymbol.getAll().size())).getPriceQuote(any());
+
+        assertThat(finnhubPriceEvaluator.lastPriceCache, aMapWithSize(StockSymbol.getAll().size()));
+        assertThat(finDataSize, is(0));
     }
 }
