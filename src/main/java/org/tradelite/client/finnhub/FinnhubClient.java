@@ -81,14 +81,14 @@ public class FinnhubClient {
         try {
             ResponseEntity<PriceQuoteResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
             PriceQuoteResponse quote = response.getBody();
-            if (quote == null) {
-                throw new IllegalStateException("Response body is null");
+            if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
+                throw new IllegalStateException("Failed to fetch price quote for " + ticker.getTicker() + ": " + response.getStatusCode());
             }
             quote.setStockSymbol(ticker);
             return quote;
         } catch (Exception e) {
             log.error(e.getMessage(), e);
-            throw new IllegalStateException(e.getMessage(), e);
+            throw e;
         }
     }
 

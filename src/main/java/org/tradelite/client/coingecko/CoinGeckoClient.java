@@ -44,11 +44,11 @@ public class CoinGeckoClient {
                 return data;
             } else {
                 log.error("Failed to fetch coin price data for {}: {}", coinId.getId(), response.getStatusCode());
-                throw new IllegalStateException(response.getStatusCode().toString());
+                throw new IllegalStateException("Failed to fetch coin price data: " + response.getStatusCode());
             }
         } catch (RestClientException e) {
             log.error("Error fetching coin price data for {}: {}", coinId.getId(), e.getMessage());
-            throw new IllegalStateException("Failed to fetch coin price data", e);
+            throw e;
         }
 
     }

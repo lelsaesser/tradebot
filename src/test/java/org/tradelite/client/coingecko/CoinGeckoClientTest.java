@@ -9,12 +9,14 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.common.CoinId;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
@@ -23,9 +25,6 @@ class CoinGeckoClientTest {
 
     @Mock
     private RestTemplate restTemplate;
-
-    private static final String BASE_URL = "https://api.coingecko.com/api/v3";
-    private static final String API_KEY = "api-key";
 
     private CoinGeckoClient coinGeckoClient;
 
@@ -50,5 +49,27 @@ class CoinGeckoClientTest {
         CoinGeckoPriceResponse.CoinData result = coinGeckoClient.getCoinPriceData(CoinId.BITCOIN);
 
         assertThat(result, notNullValue());
+    }
+
+    @Test
+    void testGetCoinPriceData_no2xxResponse() {
+        ResponseEntity<CoinGeckoPriceResponse> response = new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(CoinGeckoPriceResponse.class)))
+                .thenReturn(response);
+
+        assertThrows(IllegalStateException.class, () -> {
+            coinGeckoClient.getCoinPriceData(CoinId.BITCOIN);
+        });
+    }
+
+    @Test
+    void testGetCoinPriceData_restClientException() {
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(CoinGeckoPriceResponse.class)))
+                .thenThrow(new RestClientException("Network error"));
+
+        assertThrows(RestClientException.class, () -> {
+            coinGeckoClient.getCoinPriceData(CoinId.BITCOIN);
+        });
     }
 }

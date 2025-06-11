@@ -10,7 +10,6 @@ import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
-import org.tradelite.core.InsiderTracker;
 import org.tradelite.utils.DateUtil;
 
 import java.util.List;
@@ -21,44 +20,38 @@ import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECON
 @Component
 public class Scheduler {
 
-    private final InsiderTracker insiderTracker;
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
     private final TelegramMessageProcessor telegramMessageProcessor;
+    private final RootErrorHandler rootErrorHandler;
 
     @Autowired
-    Scheduler(InsiderTracker insiderTracker, FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
-                     TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor) {
-        this.insiderTracker = insiderTracker;
+    Scheduler(FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
+              TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor,
+              RootErrorHandler rootErrorHandler) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.telegramMessageProcessor = telegramMessageProcessor;
-    }
-
-    //@Scheduled(fixedRate = 60 * 60 * 1000)
-    private void onApplicationReady() throws InterruptedException {
-        insiderTracker.evaluateInsiderActivity();
-        insiderTracker.evaluateInsiderSentiment();
-
+        this.rootErrorHandler = rootErrorHandler;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     private void scheduledActivity() throws InterruptedException {
         if (DateUtil.isWeekday(null)) {
-            finnhubPriceEvaluator.evaluatePrice();
+            rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
         }
-        coinGeckoPriceEvaluator.evaluatePrice();
+        rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
 
         log.info("Market monitoring round completed.");
     }
 
     @Scheduled(fixedRate = 600000)
     private void cleanupIgnoreSymbols() {
-        targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS);
+        rootErrorHandler.run(() -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
 
         log.info("Cleanup of ignored symbols completed.");
     }
@@ -66,7 +59,7 @@ public class Scheduler {
     @Scheduled(fixedRate = 60000)
     private void pollTelegramChatUpdates() {
         List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
-        telegramMessageProcessor.processUpdates(chatUpdates);
+        rootErrorHandler.run(() -> telegramMessageProcessor.processUpdates(chatUpdates));
 
         log.info("Telegram chat updates processed.");
     }
