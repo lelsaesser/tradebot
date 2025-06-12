@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.client.telegram.AddCommand;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.core.IgnoredSymbol;
 
@@ -123,6 +124,48 @@ public class TargetPriceProvider {
 
         } catch (IOException e) {
             throw new IllegalStateException("Failed to update target prices in JSON file", e);
+        }
+    }
+
+    public synchronized boolean addSymbolToTargetPriceConfig(AddCommand addCommand) {
+        List<TargetPrice> entries;
+        String filePath = addCommand.getSymbolType() == SymbolType.STOCK ? FILE_PATH_STOCKS : FILE_PATH_COINS;
+
+        File file = new File(filePath);
+        try {
+            entries = objectMapper.readValue(file, new TypeReference<>() {});
+
+            boolean alreayExists = entries.stream()
+                    .anyMatch(tp -> tp.getSymbol().equalsIgnoreCase(addCommand.getSymbol().getName()));
+
+            if (alreayExists) {
+                log.warn("Symbol {} already exists in target prices", addCommand.getSymbol().getName());
+                return false;
+            }
+
+            TargetPrice newEntry = new TargetPrice(addCommand.getSymbol().getName(), addCommand.getBuyTargetPrice(), addCommand.getSellTargetPrice());
+            entries.add(newEntry);
+
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
+
+            return true;
+
+        } catch (IOException e) {
+            log.error("Failed to update target price in JSON file", e);
+            return false;
+        }
+    }
+
+    public synchronized void removeSymbolFromTargetPriceConfig(TickerSymbol symbol, String filePath) {
+        File file = new File(filePath);
+        try {
+            List<TargetPrice> entries = objectMapper.readValue(file, new TypeReference<>() {});
+
+            entries.removeIf(tp -> tp.getSymbol().equalsIgnoreCase(symbol.getName()));
+
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to remove symbol from target prices in JSON file", e);
         }
     }
 

@@ -34,4 +34,9 @@ public enum CoinId implements TickerSymbol {
     public String getName() {
         return id;
     }
+
+    @Override
+    public SymbolType getSymbolType() {
+        return SymbolType.CRYPTO;
+    }
 }
