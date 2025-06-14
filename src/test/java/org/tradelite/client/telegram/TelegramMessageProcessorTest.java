@@ -5,13 +5,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.dto.TelegramMessage;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
+import org.tradelite.common.CoinId;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.common.TickerSymbol;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -124,6 +129,20 @@ class TelegramMessageProcessorTest {
         );
     }
 
+    @Test
+    void parseMessage_validAddCommand_returnsAddCommand() {
+        String text = "/add bitcoin 50000.0 60000.0";
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(AddCommand.class)));
+    }
+
     @ParameterizedTest
     @MethodSource("parseMessageInvalidInputsProvider")
     void parseMessage_invalidInputs_returnsEmpty(String text) {
@@ -146,7 +165,8 @@ class TelegramMessageProcessorTest {
                 Arguments.of(""), // Not a set command
                 Arguments.of("show all"), // missing slash
                 Arguments.of("/show all bla bla"), // Not a valid show command
-                Arguments.of("/show all bla") // Not a valid show command
+                Arguments.of("/show all bla"), // Not a valid show command
+                Arguments.of("/add all bla") // Not a valid add command
         );
     }
 
@@ -192,5 +212,73 @@ class TelegramMessageProcessorTest {
 
         verify(commandDispatcher, never()).dispatch(any());
         verify(messageTracker, never()).setLastProcessedMessageId(anyLong());
+    }
+
+    @Test
+    void parseAddCommand_validInput_returnsAddCommand() {
+        String messageText = "/add bitcoin 50000.0 60000.0";
+        Optional<AddCommand> command = messageProcessor.parseAddCommand(messageText);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().getSymbol(), is(CoinId.BITCOIN));
+        assertThat(command.get().getBuyTargetPrice(), is(50000.0));
+        assertThat(command.get().getSellTargetPrice(), is(60000.0));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "/add bitcoin 50000.0 60000.0 123",
+            "/add 123 50000.0 60000.0",
+            "/add bitcoin 60000.0",
+            "/add bitcoin _ 60000.0",
+            "/add bitcoin -1 60000.0",
+            "/add bitcoin -1 -60000.0",
+            "/add bitcoin abc -60000.0",
+            "/add bitcoin abc def",
+            "/add bitcoin 100 def",
+    })
+    void parseAddCommand_invalidInputs_returnsEmpty(String commandText) {
+        Optional<AddCommand> command = messageProcessor.parseAddCommand(commandText);
+
+        assertThat(command.isPresent(), is(false));
+
+        verify(commandDispatcher, never()).dispatch(any(AddCommand.class));
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
+    @Test
+    void parseTickerSymbol_validStock_returnsStockSymbol() {
+        String ticker = "AAPL";
+        Optional<TickerSymbol> stockSymbol = messageProcessor.parseTickerSymbol(ticker);
+
+        assertThat(stockSymbol.isPresent(), is(true));
+        assertThat(stockSymbol.get().getName(), is("AAPL"));
+        assertThat(stockSymbol.get(), instanceOf(StockSymbol.class));
+    }
+
+    @Test
+    void parseTickerSymbol_validCoin_returnsCoinId() {
+        String ticker = "bitcoin";
+        Optional<TickerSymbol> coinId = messageProcessor.parseTickerSymbol(ticker);
+
+        assertThat(coinId.isPresent(), is(true));
+        assertThat(coinId.get().getName(), is("bitcoin"));
+        assertThat(coinId.get(), instanceOf(CoinId.class));
+    }
+
+    @Test
+    void parseTickerSymbol_invalidTicker_returnsEmpty() {
+        String ticker = "invalid_ticker";
+        Optional<TickerSymbol> result = messageProcessor.parseTickerSymbol(ticker);
+
+        assertThat(result.isPresent(), is(false));
+    }
+
+    @Test
+    void parseTickerSymbol_emptyTicker_returnsEmpty() {
+        String ticker = "";
+        Optional<TickerSymbol> result = messageProcessor.parseTickerSymbol(ticker);
+
+        assertThat(result.isPresent(), is(false));
     }
 }

@@ -40,7 +40,7 @@ public class Scheduler {
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
-    private void scheduledActivity() throws InterruptedException {
+    private void scheduledActivity() {
         if (DateUtil.isWeekday(null)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
         }

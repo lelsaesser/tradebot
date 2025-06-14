@@ -12,6 +12,7 @@ public enum CoinId implements TickerSymbol {
     SOLANA("solana"),
     HYPERLIQUID("hyperliquid"),
     SUI("sui"),
+    POLKADOT("polkadot"),
     ETHEREUM("ethereum");
 
     private final String id;
@@ -33,5 +34,10 @@ public enum CoinId implements TickerSymbol {
     @Override
     public String getName() {
         return id;
+    }
+
+    @Override
+    public SymbolType getSymbolType() {
+        return SymbolType.CRYPTO;
     }
 }

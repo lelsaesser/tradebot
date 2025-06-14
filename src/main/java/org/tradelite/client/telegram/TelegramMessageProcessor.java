@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.TickerSymbol;
 
 import java.util.List;
 import java.util.Optional;
@@ -70,6 +71,12 @@ public class TelegramMessageProcessor {
                 log.info("Received show command for sub-command: {}", subCommand);
                 return Optional.of(showCommand);
             }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/add")) {
+            Optional<AddCommand> addCommand = parseAddCommand(messageText);
+            if (addCommand.isPresent()) {
+                log.info("Received add command: {}", addCommand.get());
+                return Optional.of(addCommand.get());
+            }
         }
         return Optional.empty();
     }
@@ -91,9 +98,7 @@ public class TelegramMessageProcessor {
             telegramClient.sendMessage(errorMessageInvalidSymbol);
             return Optional.empty();
         }
-        Optional<CoinId> coinId = CoinId.fromString(symbol);
-        Optional<StockSymbol> stockSymbol = StockSymbol.fromString(symbol);
-        if (coinId.isEmpty() && stockSymbol.isEmpty()) {
+        if (parseTickerSymbol(symbol).isEmpty()) {
             telegramClient.sendMessage(errorMessageInvalidSymbol);
             return Optional.empty();
         }
@@ -103,6 +108,53 @@ public class TelegramMessageProcessor {
         }
 
         return Optional.of(new SetCommand(subCommand, symbol, target));
+    }
+
+    protected Optional<AddCommand> parseAddCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 4) {
+            telegramClient.sendMessage("Invalid command format. Use /add <symbol> <buyTarget> <sellTarget>");
+            return Optional.empty();
+        }
+
+        String symbol = parts[1];
+        double buyTarget;
+        double sellTarget;
+
+        try {
+            buyTarget = Double.parseDouble(parts[2]);
+            sellTarget = Double.parseDouble(parts[3]);
+        } catch (NumberFormatException | NullPointerException _) {
+            telegramClient.sendMessage("Invalid target price. Please provide valid numbers.");
+            return Optional.empty();
+        }
+
+        if (buyTarget < 0 || sellTarget < 0) {
+            telegramClient.sendMessage("Target prices must be non-negative.");
+            return Optional.empty();
+        }
+
+        Optional<TickerSymbol> tickerSymbol = parseTickerSymbol(symbol);
+        if (tickerSymbol.isEmpty()) {
+            telegramClient.sendMessage("Invalid symbol. Please provide a valid symbol.");
+            return Optional.empty();
+        }
+
+        return Optional.of(new AddCommand(tickerSymbol.get(), buyTarget, sellTarget, tickerSymbol.get().getSymbolType()));
+    }
+
+    protected Optional<TickerSymbol> parseTickerSymbol(String symbol) {
+        if (symbol == null || symbol.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<CoinId> coinId = CoinId.fromString(symbol);
+        Optional<StockSymbol> stockSymbol = StockSymbol.fromString(symbol);
+        if (coinId.isPresent()) {
+            return Optional.of(coinId.get());
+        } else if (stockSymbol.isPresent()) {
+            return Optional.of(stockSymbol.get());
+        }
+        return  Optional.empty();
     }
 
 }
