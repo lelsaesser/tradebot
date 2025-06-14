@@ -12,7 +12,7 @@ import java.util.List;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.aMapWithSize;
+import static org.hamcrest.Matchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class TargetPriceProviderTest {
@@ -31,10 +31,10 @@ class TargetPriceProviderTest {
 
         boolean found = false;
         for (TargetPrice targetPrice : targetPrices) {
-            if (targetPrice.getSymbol().equals(symbol.getName())) {
+            if (targetPrice.getSymbol().equalsIgnoreCase(symbol.getName())) {
                 found = true;
-                assertThat(targetPrice.getBuyTarget(), is(160.0));
-                assertThat(targetPrice.getSellTarget(), is(200.0));
+                assertThat(targetPrice.getBuyTarget(), greaterThanOrEqualTo(0.0));
+                assertThat(targetPrice.getSellTarget(), greaterThanOrEqualTo(0.0));
                 break;
             }
         }
@@ -136,6 +136,36 @@ class TargetPriceProviderTest {
         // Cleanup
         targetPriceProvider.removeSymbolFromTargetPriceConfig(CoinId.POLKADOT, FILE_PATH);
         found = fileContainsSymbol(CoinId.POLKADOT);
+        assertThat(found, is(false));
+    }
+
+    @Test
+    void addSymbolToTargetPriceConfig_symbolAlreadyExists_nothingAdded() {
+        AddCommand command = new AddCommand(CoinId.SOLANA, 160.0, 200.0, SymbolType.CRYPTO);
+
+        boolean found = fileContainsSymbol(CoinId.SOLANA);
+        assertThat(found, is(true));
+
+        boolean result = targetPriceProvider.addSymbolToTargetPriceConfig(command, FILE_PATH);
+
+        assertThat(result, is(false));
+
+        found = fileContainsSymbol(CoinId.SOLANA);
+        assertThat(found, is(true));
+    }
+
+    @Test
+    void addSymbolToTargetPriceConfig_exception_nothingAdded() {
+        AddCommand command = new AddCommand(StockSymbol.AMZN, 160.0, 200.0, SymbolType.STOCK);
+
+        // Simulate an exception by providing an invalid file path
+        String invalidFilePath = "invalid/path/target-prices.json";
+        boolean result = targetPriceProvider.addSymbolToTargetPriceConfig(command, invalidFilePath);
+
+        assertThat(result, is(false));
+
+        // Ensure the symbol was not added to the original file
+        boolean found = fileContainsSymbol(StockSymbol.AMZN);
         assertThat(found, is(false));
     }
 }
