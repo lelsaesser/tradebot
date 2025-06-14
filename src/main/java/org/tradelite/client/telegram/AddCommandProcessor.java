@@ -2,7 +2,11 @@ package org.tradelite.client.telegram;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
+
+import static org.tradelite.common.TargetPriceProvider.FILE_PATH_COINS;
+import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
 
 @Component
 public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand> {
@@ -23,7 +27,9 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
 
     @Override
     public void processCommand(AddCommand command) {
-        boolean success = targetPriceProvider.addSymbolToTargetPriceConfig(command);
+        String filePath = command.getSymbolType() == SymbolType.STOCK ? FILE_PATH_STOCKS : FILE_PATH_COINS;
+
+        boolean success = targetPriceProvider.addSymbolToTargetPriceConfig(command, filePath);
         if (success) {
             telegramClient.sendMessage("All set!\n" +
                     "Added " + command.getSymbol().getName() + " with buy target " + command.getBuyTargetPrice() +

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.client.telegram.AddCommand;
 import org.tradelite.core.IgnoreReason;
 
 import java.util.List;
@@ -23,6 +24,21 @@ class TargetPriceProviderTest {
     @BeforeEach
     void setUp() {
         targetPriceProvider = new TargetPriceProvider(new ObjectMapper());
+    }
+
+    private boolean fileContainsSymbol(TickerSymbol symbol) {
+        List<TargetPrice> targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
+
+        boolean found = false;
+        for (TargetPrice targetPrice : targetPrices) {
+            if (targetPrice.getSymbol().equals(symbol.getName())) {
+                found = true;
+                assertThat(targetPrice.getBuyTarget(), is(160.0));
+                assertThat(targetPrice.getSellTarget(), is(200.0));
+                break;
+            }
+        }
+        return found;
     }
 
     @Test
@@ -104,5 +120,22 @@ class TargetPriceProviderTest {
                 assertThat(targetPrice.getSellTarget(), is(1100.0));
             }
         }
+    }
+
+    @Test
+    void addSymbolToTargetPriceConfig_ok() {
+        AddCommand command = new AddCommand(CoinId.POLKADOT, 160.0, 200.0, SymbolType.CRYPTO);
+
+        boolean result = targetPriceProvider.addSymbolToTargetPriceConfig(command, FILE_PATH);
+
+        assertThat(result, is(true));
+
+        boolean found = fileContainsSymbol(CoinId.POLKADOT);
+        assertThat(found, is(true));
+
+        // Cleanup
+        targetPriceProvider.removeSymbolFromTargetPriceConfig(CoinId.POLKADOT, FILE_PATH);
+        found = fileContainsSymbol(CoinId.POLKADOT);
+        assertThat(found, is(false));
     }
 }

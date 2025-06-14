@@ -127,18 +127,16 @@ public class TargetPriceProvider {
         }
     }
 
-    public synchronized boolean addSymbolToTargetPriceConfig(AddCommand addCommand) {
+    public synchronized boolean addSymbolToTargetPriceConfig(AddCommand addCommand, String filePath) {
         List<TargetPrice> entries;
-        String filePath = addCommand.getSymbolType() == SymbolType.STOCK ? FILE_PATH_STOCKS : FILE_PATH_COINS;
-
         File file = new File(filePath);
         try {
             entries = objectMapper.readValue(file, new TypeReference<>() {});
 
-            boolean alreayExists = entries.stream()
+            boolean alreadyExists = entries.stream()
                     .anyMatch(tp -> tp.getSymbol().equalsIgnoreCase(addCommand.getSymbol().getName()));
 
-            if (alreayExists) {
+            if (alreadyExists) {
                 log.warn("Symbol {} already exists in target prices", addCommand.getSymbol().getName());
                 return false;
             }
