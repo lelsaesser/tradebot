@@ -57,4 +57,9 @@ public enum StockSymbol implements TickerSymbol {
     public String getName() {
         return ticker;
     }
+
+    @Override
+    public SymbolType getSymbolType() {
+        return SymbolType.STOCK;
+    }
 }
