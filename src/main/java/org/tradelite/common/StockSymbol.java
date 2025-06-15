@@ -9,7 +9,7 @@ import java.util.Optional;
 @Getter
 public enum StockSymbol implements TickerSymbol {
     AAPL("AAPL"),
-//    MSFT("MSFT"),
+    MSFT("MSFT"),
     GOOG("GOOG"),
     AMZN("AMZN"),
     TSLA("TSLA"),
@@ -35,6 +35,8 @@ public enum StockSymbol implements TickerSymbol {
     ASML("ASML"),
     COST("COST"),
     WMT("WMT"),
+    SMCI("SMCI"),
+    UNH("UNH"),
     NET("NET");
 
     private final String ticker;
