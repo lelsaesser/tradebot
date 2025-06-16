@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.AddCommand;
+import org.tradelite.client.telegram.RemoveCommand;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.core.IgnoredSymbol;
 
@@ -154,14 +155,15 @@ public class TargetPriceProvider {
         }
     }
 
-    public synchronized void removeSymbolFromTargetPriceConfig(TickerSymbol symbol, String filePath) {
+    public synchronized void removeSymbolFromTargetPriceConfig(RemoveCommand command, String filePath) {
         File file = new File(filePath);
         try {
             List<TargetPrice> entries = objectMapper.readValue(file, new TypeReference<>() {});
 
-            entries.removeIf(tp -> tp.getSymbol().equalsIgnoreCase(symbol.getName()));
+            entries.removeIf(tp -> tp.getSymbol().equalsIgnoreCase(command.getSymbol().getName()));
 
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
+
         } catch (IOException e) {
             throw new IllegalStateException("Failed to remove symbol from target prices in JSON file", e);
         }

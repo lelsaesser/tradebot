@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.AddCommand;
+import org.tradelite.client.telegram.RemoveCommand;
 import org.tradelite.core.IgnoreReason;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class TargetPriceProviderTest {
@@ -78,6 +80,7 @@ class TargetPriceProviderTest {
     }
 
     @Test
+    @SuppressWarnings("java:S2925") // Sleep is used to test the cleanup functionality
     void cleanupIgnoreSymbols() throws InterruptedException {
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
         targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
@@ -134,7 +137,7 @@ class TargetPriceProviderTest {
         assertThat(found, is(true));
 
         // Cleanup
-        targetPriceProvider.removeSymbolFromTargetPriceConfig(CoinId.POLKADOT, FILE_PATH);
+        targetPriceProvider.removeSymbolFromTargetPriceConfig(new RemoveCommand(CoinId.POLKADOT, SymbolType.CRYPTO), FILE_PATH);
         found = fileContainsSymbol(CoinId.POLKADOT);
         assertThat(found, is(false));
     }
@@ -167,5 +170,48 @@ class TargetPriceProviderTest {
         // Ensure the symbol was not added to the original file
         boolean found = fileContainsSymbol(StockSymbol.AMZN);
         assertThat(found, is(false));
+    }
+
+    @Test
+    void removeSymbolFromTargetPriceConfig_symbolPresent_isRemoved() {
+        RemoveCommand command = new RemoveCommand(CoinId.SOLANA, SymbolType.CRYPTO);
+
+        boolean found = fileContainsSymbol(CoinId.SOLANA);
+        assertThat(found, is(true));
+
+        targetPriceProvider.removeSymbolFromTargetPriceConfig(command, FILE_PATH);
+
+        found = fileContainsSymbol(CoinId.SOLANA);
+        assertThat(found, is(false));
+
+        // cleanup: add it back for other tests
+        AddCommand addCommand = new AddCommand(CoinId.SOLANA, 160.0, 200.0, SymbolType.CRYPTO);
+        targetPriceProvider.addSymbolToTargetPriceConfig(addCommand, FILE_PATH);
+    }
+
+    @Test
+    void removeSymbolFromTargetPriceConfig_symbolNotPresent_nothingHappens() {
+        RemoveCommand command = new RemoveCommand(CoinId.POLKADOT, SymbolType.CRYPTO);
+
+        boolean found = fileContainsSymbol(CoinId.POLKADOT);
+        assertThat(found, is(false));
+
+        targetPriceProvider.removeSymbolFromTargetPriceConfig(command, FILE_PATH);
+
+        found = fileContainsSymbol(CoinId.POLKADOT);
+        assertThat(found, is(false));
+    }
+
+    @Test
+    void removeSymbolFromTargetPriceConfig_exception_nothingHappens() {
+        RemoveCommand command = new RemoveCommand(CoinId.BITCOIN, SymbolType.CRYPTO);
+
+        // Simulate an exception by providing an invalid file path
+        String invalidFilePath = "invalid/path/target-prices.json";
+        assertThrows(IllegalStateException.class, () -> targetPriceProvider.removeSymbolFromTargetPriceConfig(command, invalidFilePath));
+
+        // Ensure the symbol was not removed from the original file
+        boolean found = fileContainsSymbol(CoinId.BITCOIN);
+        assertThat(found, is(true));
     }
 }
