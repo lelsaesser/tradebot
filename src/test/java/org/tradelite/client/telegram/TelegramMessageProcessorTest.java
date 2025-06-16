@@ -143,6 +143,20 @@ class TelegramMessageProcessorTest {
         assertThat(command.get(), is(instanceOf(AddCommand.class)));
     }
 
+    @Test
+    void parseMessage_validRemoveCommand_returnsRemoveCommand() {
+        String text = "/remove bitcoin";
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(RemoveCommand.class)));
+    }
+
     @ParameterizedTest
     @MethodSource("parseMessageInvalidInputsProvider")
     void parseMessage_invalidInputs_returnsEmpty(String text) {
@@ -166,7 +180,9 @@ class TelegramMessageProcessorTest {
                 Arguments.of("show all"), // missing slash
                 Arguments.of("/show all bla bla"), // Not a valid show command
                 Arguments.of("/show all bla"), // Not a valid show command
-                Arguments.of("/add all bla") // Not a valid add command
+                Arguments.of("/add all bla"), // Not a valid add command
+                Arguments.of("/remove bla bla"), // Not a valid remove command
+                Arguments.of("/remove bit") // invalid symbol
         );
     }
 
