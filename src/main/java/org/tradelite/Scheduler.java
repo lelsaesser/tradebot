@@ -41,7 +41,7 @@ public class Scheduler {
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     private void scheduledActivity() {
-        if (DateUtil.isWeekday(null)) {
+        if (DateUtil.isWeekday(null) && !DateUtil.isMarketOffHours(null)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
         }
         rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
