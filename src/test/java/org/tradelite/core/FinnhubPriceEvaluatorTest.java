@@ -126,4 +126,25 @@ class FinnhubPriceEvaluatorTest {
         assertThat(finnhubPriceEvaluator.lastPriceCache, aMapWithSize(StockSymbol.getAll().size()));
         assertThat(finDataSize, is(0));
     }
+
+    @Test
+    void evaluatePrice_invalidTickerSymbolInTargetPrice_sendsMessage() throws InterruptedException {
+        List<TargetPrice> targetPrices = List.of(
+                new TargetPrice("INVALID", 150.0, 160.0),
+                new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200)
+        );
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(StockSymbol.GOOG);
+        priceQuoteResponse.setCurrentPrice(155.0);
+        priceQuoteResponse.setChangePercent(3.0);
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(priceQuoteResponse);
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        verify(targetPriceProvider, times(1)).getStockTargetPrices();
+        verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.GOOG);
+        verify(telegramClient, times(1)).sendMessage("INVALID not found in enum and is not monitored.");
+    }
 }

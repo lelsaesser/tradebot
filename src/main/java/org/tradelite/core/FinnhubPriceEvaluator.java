@@ -10,10 +10,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @Component
@@ -33,19 +30,26 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         this.telegramClient = telegramClient;
     }
 
+    @SuppressWarnings("java:S135") // allow multiple continue in for-loop
     public int evaluatePrice() throws InterruptedException {
-        List<StockSymbol> tickers = StockSymbol.getAll();
         List<PriceQuoteResponse> finnhubData = new ArrayList<>();
         List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
 
-        for (StockSymbol ticker : tickers) {
-            PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker);
+        for (TargetPrice targetPrice : targetPrices) {
+            Optional<StockSymbol> ticker = StockSymbol.fromString(targetPrice.getSymbol());
+            if (ticker.isEmpty()) {
+                log.warn("Target price symbol {} not found in StockSymbol enum", targetPrice.getSymbol());
+                telegramClient.sendMessage(targetPrice.getSymbol() + " not found in enum and is not monitored.");
+                continue;
+            }
 
-            Double lastPrice = lastPriceCache.get(ticker);
+            PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker.get());
+
+            Double lastPrice = lastPriceCache.get(ticker.get());
             if (priceQuote == null || (lastPrice != null && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
                 continue;
             }
-            lastPriceCache.put(ticker, priceQuote.getCurrentPrice());
+            lastPriceCache.put(ticker.get(), priceQuote.getCurrentPrice());
 
             finnhubData.add(priceQuote);
             Thread.sleep(100);
