@@ -1,7 +1,6 @@
 package org.tradelite.utils;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 
 public class DateUtil {
@@ -22,5 +21,18 @@ public class DateUtil {
             dayOfWeek = LocalDate.now().getDayOfWeek();
         }
         return dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY;
+    }
+
+    public static boolean isMarketOffHours(LocalTime currentTime) {
+        if (currentTime == null) {
+            ZoneId cetZone = ZoneId.of("Europe/Berlin"); // CET/CEST timezone
+            ZonedDateTime nowInCET = ZonedDateTime.now(cetZone);
+            currentTime = nowInCET.toLocalTime();
+        }
+        LocalTime start = LocalTime.of(23, 0); // 23:00
+        LocalTime end = LocalTime.of(14, 30);    // 14:30
+
+        // Handles time ranges that go past midnight
+        return currentTime.isAfter(start) || currentTime.isBefore(end);
     }
 }
