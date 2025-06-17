@@ -43,6 +43,8 @@ public class Scheduler {
     private void scheduledActivity() {
         if (DateUtil.isWeekday(null) && !DateUtil.isMarketOffHours(null)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+        } else {
+            log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
         rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
 
