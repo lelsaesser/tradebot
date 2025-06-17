@@ -1,0 +1,20 @@
+name: OSV Scanner - Pull Request
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  merge_group:
+    branches: [ "main" ]
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  scan:
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.0.3
+    with:
+      scan-args: |
+        -r
+        --skip-git
+        ./
