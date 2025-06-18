@@ -29,3 +29,21 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn clean verify
+      
+    - name: Generate code coverage badge
+      uses: cicirello/jacoco-badge-generator@v2
+      with:
+        jacoco-csv-file: target/site/jacoco/jacoco.csv
+        coverage-badge-filename: badge-coverage.svg
+        coverage-label: Coverage
+        generate-coverage-badge: true
+        generate-coverage-summary: true
+        
+    - name: Commit coverage badge
+      if: github.ref == 'refs/heads/main'
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@github.com"
+        git add -A
+        git commit -m "Update code coverage badge" || echo "No changes to commit"
+        git push
