@@ -38,6 +38,7 @@ public enum StockSymbol implements TickerSymbol {
     SMCI("SMCI"),
     UNH("UNH"),
     BABA("BABA"),
+    TEM("TEM"),
     NET("NET");
 
     private final String ticker;
