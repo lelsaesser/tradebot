@@ -81,14 +81,14 @@ class DateUtilTest {
 
     @Test
     void returnsFalse_whenTimeIsExactlyAtMarketOpen() {
-        LocalTime time = LocalTime.of(14, 30); // 14:30
+        LocalTime time = LocalTime.of(14, 55); // 14:55
         boolean marketClosed = DateUtil.isMarketOffHours(time);
         assertThat(marketClosed, is(false));
     }
 
     @Test
     void returnsFalse_whenTimeIsExactlyAtOffHoursStart() {
-        LocalTime time = LocalTime.of(23, 0); // 23:00
+        LocalTime time = LocalTime.of(22, 30); // 22:30
         boolean marketClosed = DateUtil.isMarketOffHours(time);
         assertThat(marketClosed, is(false));
     }

@@ -29,8 +29,8 @@ public class DateUtil {
             ZonedDateTime nowInCET = ZonedDateTime.now(cetZone);
             currentTime = nowInCET.toLocalTime();
         }
-        LocalTime start = LocalTime.of(23, 0); // 23:00
-        LocalTime end = LocalTime.of(14, 30);    // 14:30
+        LocalTime start = LocalTime.of(22, 30);
+        LocalTime end = LocalTime.of(14, 55);
 
         // Handles time ranges that go past midnight
         return currentTime.isAfter(start) || currentTime.isBefore(end);
