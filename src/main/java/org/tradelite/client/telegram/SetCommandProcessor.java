@@ -55,6 +55,6 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
         }
 
         telegramClient.sendMessage("All set!\n" +
-                "Updated " + command.getSubCommand() + " price for " + symbol + " to " + command.getTarget() + ".");
+                "Updated " + command.getSubCommand() + " price for " + symbol.toUpperCase() + " to " + command.getTarget() + ".");
     }
 }
