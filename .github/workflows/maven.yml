@@ -43,15 +43,15 @@ jobs:
         
     - name: Commit coverage badge
       if: github.ref == 'refs/heads/main'
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "github-actions@github.com"
-        git remote set-url origin https://x-access-token:${GIT_AUTH_TOKEN}@github.com/${{ github.repository }}
-        git add .github/badges/*
-        git commit -m "Update code coverage badge" || echo "No changes to commit"
-        git push
       env:
         GIT_AUTH_TOKEN: ${{ secrets.PAT_GITHUB }}
-      shell: bash
-      continue-on-error: true
-      working-directory: ${{ github.workspace }}
+      run: |
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+        git remote set-url origin https://x-access-token:${GIT_AUTH_TOKEN}@github.com/${{ github.repository }}
+        git fetch origin main
+        git checkout main
+        git add .github/badges/*
+        git commit -m "Update code coverage badge" || echo "No changes to commit"
+        git push origin main
+
