@@ -37,7 +37,9 @@ jobs:
         coverage-badge-filename: badge-coverage.svg
         coverage-label: Coverage
         generate-coverage-badge: true
-        generate-coverage-summary: true
+        generate-summary: true
+        generate-workflow-summary: true
+        workflow-summary-heading: "Code Coverage"
         
     - name: Commit coverage badge
       if: github.ref == 'refs/heads/main'
