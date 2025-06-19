@@ -10,6 +10,7 @@ import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
+import org.tradelite.core.InsiderTracker;
 import org.tradelite.utils.DateUtil;
 
 import java.time.DayOfWeek;
@@ -28,6 +29,7 @@ public class Scheduler {
     private final TelegramClient telegramClient;
     private final TelegramMessageProcessor telegramMessageProcessor;
     private final RootErrorHandler rootErrorHandler;
+    private final InsiderTracker insiderTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -36,13 +38,14 @@ public class Scheduler {
     @Autowired
     Scheduler(FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
               TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor,
-              RootErrorHandler rootErrorHandler) {
+              RootErrorHandler rootErrorHandler, InsiderTracker insiderTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.telegramMessageProcessor = telegramMessageProcessor;
         this.rootErrorHandler = rootErrorHandler;
+        this.insiderTracker = insiderTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -70,5 +73,12 @@ public class Scheduler {
         rootErrorHandler.run(() -> telegramMessageProcessor.processUpdates(chatUpdates));
 
         log.info("Telegram chat updates processed.");
+    }
+
+    @Scheduled(cron = "0 0 12 ? * SAT", zone = "CET")
+    protected void weeklyInsiderTradingReport() {
+        rootErrorHandler.run(insiderTracker::trackInsiderTransactions);
+
+        log.info("Weekly insider trading report generated.");
     }
 }

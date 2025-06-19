@@ -11,6 +11,7 @@ import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
+import org.tradelite.core.InsiderTracker;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -35,13 +36,15 @@ class SchedulerTest {
     private TelegramMessageProcessor telegramMessageProcessor;
     @Mock
     private RootErrorHandler rootErrorHandler;
+    @Mock
+    private InsiderTracker insiderTracker;
 
     private Scheduler scheduler;
 
     @BeforeEach
     void setUp() {
         scheduler = new Scheduler(finnhubPriceEvaluator, coinGeckoPriceEvaluator, targetPriceProvider,
-                telegramClient, telegramMessageProcessor, rootErrorHandler);
+                telegramClient, telegramMessageProcessor, rootErrorHandler, insiderTracker);
     }
 
     @Test
@@ -108,5 +111,18 @@ class SchedulerTest {
         captor.getValue().run();
 
         verify(telegramMessageProcessor, times(1)).processUpdates(anyList());
+    }
+
+    @Test
+    void weeklyInsiderTradingReport_sendsReport() throws Exception {
+        scheduler.weeklyInsiderTradingReport();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(insiderTracker, times(1)).trackInsiderTransactions();
     }
 }
