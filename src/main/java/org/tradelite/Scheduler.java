@@ -12,6 +12,8 @@ import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.utils.DateUtil;
 
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS;
@@ -27,6 +29,10 @@ public class Scheduler {
     private final TelegramMessageProcessor telegramMessageProcessor;
     private final RootErrorHandler rootErrorHandler;
 
+    protected DayOfWeek dayOfWeek = null;
+    protected LocalTime localTime = null;
+
+
     @Autowired
     Scheduler(FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
               TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor,
@@ -40,8 +46,8 @@ public class Scheduler {
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
-    private void scheduledActivity() {
-        if (DateUtil.isWeekday(null) && !DateUtil.isMarketOffHours(null)) {
+    protected void marketMonitoring() {
+        if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
@@ -52,14 +58,14 @@ public class Scheduler {
     }
 
     @Scheduled(fixedRate = 600000)
-    private void cleanupIgnoreSymbols() {
+    protected void cleanupIgnoreSymbols() {
         rootErrorHandler.run(() -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
 
         log.info("Cleanup of ignored symbols completed.");
     }
 
     @Scheduled(fixedRate = 60000)
-    private void pollTelegramChatUpdates() {
+    protected void pollTelegramChatUpdates() {
         List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
         rootErrorHandler.run(() -> telegramMessageProcessor.processUpdates(chatUpdates));
 

@@ -35,4 +35,8 @@ public class DateUtil {
         // Handles time ranges that go past midnight
         return currentTime.isAfter(start) || currentTime.isBefore(end);
     }
+
+    public static boolean isStockMarketOpen(DayOfWeek dayOfWeek, LocalTime localTime) {
+        return (DateUtil.isWeekday(dayOfWeek) && !DateUtil.isMarketOffHours(localTime));
+    }
 }

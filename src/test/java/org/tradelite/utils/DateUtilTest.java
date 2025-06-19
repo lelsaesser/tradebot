@@ -110,4 +110,34 @@ class DateUtilTest {
         boolean expected = currentTime.isAfter(start) || currentTime.isBefore(end);
         assertThat(marketClosed, is(expected));
     }
+
+    @Test
+    void isStockMarketOpen_weekdayAndOpenHours_marketOpen() {
+        DayOfWeek dayOfWeek = DayOfWeek.MONDAY;
+        LocalTime localTime = LocalTime.of(17, 0); // 17:00
+
+        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+
+        assertThat(isOpen, is(true));
+    }
+
+    @Test
+    void isStockMarketOpen_weekend_marketClosed() {
+        DayOfWeek dayOfWeek = DayOfWeek.SATURDAY;
+        LocalTime localTime = LocalTime.of(17, 0); // 17:00
+
+        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+
+        assertThat(isOpen, is(false));
+    }
+
+    @Test
+    void isStockMarketOpen_weekdayAndOffHours_marketClosed() {
+        DayOfWeek dayOfWeek = DayOfWeek.MONDAY;
+        LocalTime localTime = LocalTime.of(23, 0); // 23:00
+
+        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+
+        assertThat(isOpen, is(false));
+    }
 }
