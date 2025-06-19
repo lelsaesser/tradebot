@@ -25,4 +25,8 @@ public class PriceQuoteResponse {
     double changePercent;
     @JsonProperty("pc")
     double previousClose;
+
+    public boolean isValid() {
+        return stockSymbol != null && currentPrice >= 0;
+    }
 }

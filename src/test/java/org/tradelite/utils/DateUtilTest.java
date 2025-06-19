@@ -4,9 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -104,10 +102,43 @@ class DateUtilTest {
     void returnsValue_whenCurrentTimeIsUsed() {
         boolean marketClosed = DateUtil.isMarketOffHours(null);
 
-        LocalTime currentTime = LocalTime.now();
-        LocalTime start = LocalTime.of(23, 0); // 23:00
-        LocalTime end = LocalTime.of(14, 30);    // 14:30
+        ZoneId cetZone = ZoneId.of("Europe/Berlin"); // CET/CEST timezone
+        ZonedDateTime nowInCET = ZonedDateTime.now(cetZone);
+        LocalTime currentTime = nowInCET.toLocalTime();
+
+        LocalTime start = ZonedDateTime.of(LocalDate.now(), LocalTime.of(22, 30), cetZone).toLocalTime();
+        LocalTime end = ZonedDateTime.of(LocalDate.now(), LocalTime.of(14, 55), cetZone).toLocalTime();
         boolean expected = currentTime.isAfter(start) || currentTime.isBefore(end);
         assertThat(marketClosed, is(expected));
+    }
+
+    @Test
+    void isStockMarketOpen_weekdayAndOpenHours_marketOpen() {
+        DayOfWeek dayOfWeek = DayOfWeek.MONDAY;
+        LocalTime localTime = LocalTime.of(17, 0); // 17:00
+
+        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+
+        assertThat(isOpen, is(true));
+    }
+
+    @Test
+    void isStockMarketOpen_weekend_marketClosed() {
+        DayOfWeek dayOfWeek = DayOfWeek.SATURDAY;
+        LocalTime localTime = LocalTime.of(17, 0); // 17:00
+
+        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+
+        assertThat(isOpen, is(false));
+    }
+
+    @Test
+    void isStockMarketOpen_weekdayAndOffHours_marketClosed() {
+        DayOfWeek dayOfWeek = DayOfWeek.MONDAY;
+        LocalTime localTime = LocalTime.of(23, 0); // 23:00
+
+        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+
+        assertThat(isOpen, is(false));
     }
 }
