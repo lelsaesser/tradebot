@@ -1,6 +1,6 @@
 ## FinnhubClient.java
 
-```
+```java
     public void getFinancialData(StockSymbol ticker) {
         String baseUrl = "/stock/metric?symbol=%s&metric=all";
         String url = getApiUrl(baseUrl, ticker);
@@ -19,7 +19,7 @@
     }
 ```
 
-```
+```java
     public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
         String fromDate = DateUtil.getDateTwoMonthsAgo(null);
         String baseUrl = "/stock/insider-transactions?symbol=%s";
@@ -60,17 +60,15 @@
     }
 ```
 
-
 ## InsiderTracker.java
 
-```
+```java
 package org.tradelite.core;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
-import org.tradelite.client.finnhub.dto.InsiderSentimentResponse;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.common.StockSymbol;
 
@@ -137,4 +135,49 @@ public class InsiderTracker {
     }
 }
 
+```
+
+## InsiderSentimentResponse.java
+
+```java
+package org.tradelite.client.finnhub.dto;
+
+import java.util.List;
+
+
+public record InsiderSentimentResponse (
+        List<InsiderSentiment> data,
+        String symbol
+) {
+    public record InsiderSentiment(
+            int change,
+            int month,
+            int year,
+            String symbol,
+            double mspr
+    ) {}
+}
+```
+
+## InsiderTransactionResponse.java
+
+```java
+package org.tradelite.client.finnhub.dto;
+
+import java.util.List;
+
+public record InsiderTransactionResponse(
+        List<Transaction> data,
+        String symbol
+) {
+    public record Transaction(
+            String name,
+            int share,
+            int change,
+            String filingDate,
+            String transactionDate,
+            String transactionCode,
+            double transactionPrice
+    ) {}
+}
 ```
