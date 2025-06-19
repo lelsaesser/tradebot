@@ -10,11 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.tradelite.client.finnhub.dto.InsiderSentimentResponse;
-import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
-import org.tradelite.utils.DateUtil;
 
 @Slf4j
 @Component
@@ -32,42 +29,6 @@ public class FinnhubClient {
 
     private String getApiUrl(String baseUrl, StockSymbol ticker) {
         return API_URL + String.format(baseUrl, ticker.getTicker()) + "&token=" + API_KEY;
-    }
-
-    public void getFinancialData(StockSymbol ticker) {
-        String baseUrl = "/stock/metric?symbol=%s&metric=all";
-        String url = getApiUrl(baseUrl, ticker);
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-        try {
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
-            log.info(response.getBody());
-        } catch (Exception e) {
-            log.error("Error fetching financial data: {}", e.getMessage());
-            throw new IllegalStateException(e.getMessage(), e);
-        }
-    }
-
-    public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
-        String fromDate = DateUtil.getDateTwoMonthsAgo(null);
-        String baseUrl = "/stock/insider-transactions?symbol=%s";
-        String url = getApiUrl(baseUrl, ticker);
-        url = url + "&from=" + fromDate;
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-        try {
-            ResponseEntity<InsiderTransactionResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
-            return response.getBody();
-        } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            throw new IllegalStateException(e.getMessage(), e);
-        }
     }
 
     public PriceQuoteResponse getPriceQuote(StockSymbol ticker) {
@@ -89,24 +50,6 @@ public class FinnhubClient {
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw e;
-        }
-    }
-
-    public InsiderSentimentResponse getInsiderSentiment(StockSymbol ticker) {
-        String fromDate = DateUtil.getDateTwoMonthsAgo(null);
-        String baseUrl = "/stock/insider-sentiment?symbol=%s&from=" + fromDate;
-        String url = getApiUrl(baseUrl, ticker);
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-        try {
-            ResponseEntity<InsiderSentimentResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderSentimentResponse.class);
-            return response.getBody();
-        } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            throw new IllegalStateException(e.getMessage(), e);
         }
     }
 }
