@@ -19,27 +19,6 @@
     }
 ```
 
-```java
-    public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
-        String fromDate = DateUtil.getDateTwoMonthsAgo(null);
-        String baseUrl = "/stock/insider-transactions?symbol=%s";
-        String url = getApiUrl(baseUrl, ticker);
-        url = url + "&from=" + fromDate;
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-        try {
-            ResponseEntity<InsiderTransactionResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
-            return response.getBody();
-        } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            throw new IllegalStateException(e.getMessage(), e);
-        }
-    }
-```
-
 ```
     public InsiderSentimentResponse getInsiderSentiment(StockSymbol ticker) {
         String fromDate = DateUtil.getDateTwoMonthsAgo(null);

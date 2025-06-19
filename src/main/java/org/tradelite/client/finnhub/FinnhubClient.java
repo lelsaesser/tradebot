@@ -10,8 +10,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.utils.DateUtil;
 
 @Slf4j
 @Component
@@ -47,6 +49,25 @@ public class FinnhubClient {
             }
             quote.setStockSymbol(ticker);
             return quote;
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
+        String fromDate = DateUtil.getDateTwoMonthsAgo(null);
+        String baseUrl = "/stock/insider-transactions?symbol=%s";
+        String url = getApiUrl(baseUrl, ticker);
+        url = url + "&from=" + fromDate;
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        HttpHeaders headers = new HttpHeaders();
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<InsiderTransactionResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
+            return response.getBody();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw e;
