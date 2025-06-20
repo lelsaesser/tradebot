@@ -9,13 +9,12 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @Component
 public class InsiderTracker {
+
+    private static final String INSIDER_SELLS = "sells";
 
     private final FinnhubClient finnhubClient;
     private final TelegramClient telegramClient;
@@ -31,32 +30,38 @@ public class InsiderTracker {
     public void trackInsiderTransactions() {
         List<String> monitoredSymbols = targetPriceProvider.getStockTargetPrices().stream().map(TargetPrice::getSymbol).toList();
 
-        Map<StockSymbol, Integer> insiderSells = new EnumMap<>(StockSymbol.class);
+        Map<StockSymbol, Map<String, Integer>> insiderTransactions = new EnumMap<>(StockSymbol.class);
 
         for (String symbolString : monitoredSymbols) {
             StockSymbol stockSymbol = StockSymbol.fromString(symbolString).orElseThrow();
 
             InsiderTransactionResponse response = finnhubClient.getInsiderTransactions(stockSymbol);
 
-            insiderSells.put(stockSymbol, 0);
+            Map<String, Integer> sells = new HashMap<>();
+            sells.put(INSIDER_SELLS, 0);
+            insiderTransactions.put(stockSymbol, sells);
 
             for (InsiderTransactionResponse.Transaction insiderTransaction : response.data()) {
                 if (Objects.equals(insiderTransaction.transactionCode(), "S")) {
-                    insiderSells.put(stockSymbol, insiderSells.get(stockSymbol) + 1);
+                    insiderTransactions.computeIfAbsent(stockSymbol, k -> new HashMap<>())
+                            .merge(INSIDER_SELLS, 1, Integer::sum);
+
                 }
             }
         }
 
-        sendInsiderTransactionReport(insiderSells);
+        sendInsiderTransactionReport(insiderTransactions);
     }
 
-    private void sendInsiderTransactionReport(Map<StockSymbol, Integer> insiderSells) {
+    private void sendInsiderTransactionReport(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
         StringBuilder report = new StringBuilder("*Weekly Insider Transactions Report:*\n\n");
 
         report.append("```\n");
-        for (Map.Entry<StockSymbol, Integer> entry : insiderSells.entrySet()) {
+
+        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : insiderTransactions.entrySet()) {
             StockSymbol symbol = entry.getKey();
-            int sellCount = entry.getValue();
+            Map<String, Integer> transactionTypes = entry.getValue();
+            int sellCount = transactionTypes.get(INSIDER_SELLS);
 
             if (sellCount > 0) {
                 report.append(String.format("%s: %d sells%n", symbol.getTicker(), sellCount));
