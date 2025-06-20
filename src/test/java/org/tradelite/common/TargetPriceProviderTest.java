@@ -13,7 +13,8 @@ import java.util.List;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.aMapWithSize;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
@@ -103,7 +104,7 @@ class TargetPriceProviderTest {
     }
 
     @Test
-    void updateTargetPrice() {
+    void updateTargetPrice_ok() {
         targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 160.0, 200.0, FILE_PATH);
         List<TargetPrice> targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
 
@@ -123,6 +124,18 @@ class TargetPriceProviderTest {
                 assertThat(targetPrice.getSellTarget(), is(1100.0));
             }
         }
+    }
+
+    @Test
+    void updateTargetPrice_exception() {
+        String invalidFilePath = "invalid/path/target-prices.json";
+
+        assertThrows(IllegalStateException.class, () -> {
+            targetPriceProvider.updateTargetPrice(StockSymbol.UNH, 160.0, 200.0, invalidFilePath);
+        });
+
+        boolean found = fileContainsSymbol(StockSymbol.UNH);
+        assertThat(found, is(false));
     }
 
     @Test

@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolType;
 
 import java.util.List;
 
@@ -58,6 +59,8 @@ class FinnhubClientTest {
                 .thenThrow(new RestClientException("Error fetching price quote"));
 
         assertThrows(RestClientException.class, () -> finnhubClient.getPriceQuote(StockSymbol.META));
+
+        assertThat(StockSymbol.META.getSymbolType(), is(SymbolType.STOCK));
 
         verify(restTemplate, times(1)).exchange(
                 anyString(),
