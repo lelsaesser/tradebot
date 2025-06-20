@@ -52,17 +52,13 @@ class InsiderPersistenceTest {
 
         String invalidFilePath = "invalid/path/insider-transactions.json";
 
-        assertThrows(IllegalStateException.class, () -> {
-            insiderPersistence.persistToFile(transactions, invalidFilePath);
-        });
+        assertThrows(IllegalStateException.class, () -> insiderPersistence.persistToFile(transactions, invalidFilePath));
     }
 
     @Test
     void readFromFile_exception() {
         String invalidFilePath = "invalid/path/insider-transactions.json";
 
-        assertThrows(IllegalStateException.class, () -> {
-            insiderPersistence.readFromFile(invalidFilePath);
-        });
+        assertThrows(IllegalStateException.class, () -> insiderPersistence.readFromFile(invalidFilePath));
     }
 }
