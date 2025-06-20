@@ -44,12 +44,12 @@ jobs:
         workflow-summary-heading: "Code Coverage"
         
     - name: Commit coverage badge
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main' && github.actor != 'dependabot[bot]'
       env:
         GIT_AUTH_TOKEN: ${{ secrets.PAT_GITHUB }}
       run: |
-        git config --global user.name "${{ github.actor }}"
-        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+        git config --global user.name "lelsaesser"
+        git config --global user.email "lelsaesser@users.noreply.github.com"
         git remote set-url origin https://x-access-token:${GIT_AUTH_TOKEN}@github.com/${{ github.repository }}
         git fetch origin main
         git checkout main
