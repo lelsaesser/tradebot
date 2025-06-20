@@ -43,7 +43,7 @@ public class InsiderTracker {
 
             for (InsiderTransactionResponse.Transaction insiderTransaction : response.data()) {
                 if (Objects.equals(insiderTransaction.transactionCode(), "S")) {
-                    insiderTransactions.computeIfAbsent(stockSymbol, k -> new HashMap<>())
+                    insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
                             .merge(INSIDER_SELLS, 1, Integer::sum);
 
                 }
