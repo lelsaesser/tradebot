@@ -50,10 +50,13 @@ jobs:
       run: |
         git config --global user.name "lelsaesser"
         git config --global user.email "lelsaesser@users.noreply.github.com"
-        git remote set-url origin https://x-access-token:${GIT_AUTH_TOKEN}@github.com/${{ github.repository }}
+    
         git fetch origin main
         git checkout main
+    
         git add .github/badges/*
         git commit -m "Update code coverage badge" || echo "No changes to commit"
-        git push origin main
+    
+        git push "https://x-access-token:${GIT_AUTH_TOKEN}@github.com/${{ github.repository }}" main
+
 
