@@ -19,9 +19,9 @@ import java.util.Map;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class InsiderTrackerTest {
@@ -96,6 +96,11 @@ class InsiderTrackerTest {
         insiderTracker.trackInsiderTransactions();
         verify(telegramClient).sendMessage(reportCaptor.capture());
         String report = reportCaptor.getValue();
+
+        verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(finnhubClient, times(5)).getInsiderTransactions(any(StockSymbol.class));
+        verify(insiderPersistence, times(1)).readFromFile(anyString());
+        verify(insiderPersistence, times(1)).persistToFile(any(), anyString());
 
         assertThat(report, containsString("AAPL: 2 sells (-40)"));
         assertThat(report, containsString("GOOG: 5 sells (+3)"));

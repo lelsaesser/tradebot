@@ -52,6 +52,8 @@ public class InsiderTracker {
         }
 
         sendInsiderTransactionReport(insiderTransactions);
+
+        insiderPersistence.persistToFile(insiderTransactions, InsiderPersistence.PERSISTENCE_FILE_PATH);
     }
 
     private void sendInsiderTransactionReport(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
