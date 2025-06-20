@@ -8,13 +8,6 @@
     <artifactId>tradebots</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <properties>
-        <java.version>23</java.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring.boot.version>3.3.3</spring.boot.version>
-        <spring.doc.version>2.3.0</spring.doc.version> <!-- Add this if you're using springdoc -->
-    </properties>
-
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
