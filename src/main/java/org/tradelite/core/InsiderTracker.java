@@ -78,8 +78,6 @@ public class InsiderTracker {
                 int sellDifference = sellCount - historicSellCount;
                 if (sellDifference > 0) {
                     sign = "+";
-                } else if (sellDifference == 0) {
-                    sign = "+-";
                 }
                 String diff = sign + sellDifference;
                 report.append(String.format("%-12s %-12d %-12s%n",
