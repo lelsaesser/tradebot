@@ -31,7 +31,7 @@ public class InsiderTracker {
     public void trackInsiderTransactions() {
         List<String> monitoredSymbols = targetPriceProvider.getStockTargetPrices().stream().map(TargetPrice::getSymbol).toList();
 
-        Map<StockSymbol, Map<String, Integer>> insiderTransactions = new EnumMap<>(StockSymbol.class);
+        Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
 
         for (String symbolString : monitoredSymbols) {
             StockSymbol stockSymbol = StockSymbol.fromString(symbolString).orElseThrow();
@@ -56,13 +56,15 @@ public class InsiderTracker {
         insiderPersistence.persistToFile(insiderTransactions, InsiderPersistence.PERSISTENCE_FILE_PATH);
     }
 
-    private void sendInsiderTransactionReport(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
+    protected void sendInsiderTransactionReport(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
 
         Map<StockSymbol, Map<String, Integer>> insiderTransactionsWithHistoricData = enrichWithHistoricData(insiderTransactions);
 
         StringBuilder report = new StringBuilder("*Weekly Insider Transactions Report:*\n\n");
 
-        report.append("```\n");
+        report.append("```").append("%n".formatted());
+        report.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Sells", "Diff"));
+
 
         for (Map.Entry<StockSymbol, Map<String, Integer>> entry : insiderTransactionsWithHistoricData.entrySet()) {
             StockSymbol symbol = entry.getKey();
@@ -74,12 +76,14 @@ public class InsiderTracker {
 
                 String sign = "";
                 int sellDifference = sellCount - historicSellCount;
-                if (sellCount > historicSellCount) {
+                if (sellDifference > 0) {
                     sign = "+";
-                } else if (sellCount == historicSellCount) {
+                } else if (sellDifference == 0) {
                     sign = "+-";
                 }
-                report.append(String.format("%s: %d sells (%s%d) %n", symbol.getTicker(), sellCount, sign, sellDifference));
+                String diff = sign + sellDifference;
+                report.append(String.format("%-12s %-12d %-12s%n",
+                        symbol.getTicker(), sellCount, diff));
             }
         }
         report.append("```");

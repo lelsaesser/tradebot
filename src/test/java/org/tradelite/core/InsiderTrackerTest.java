@@ -13,12 +13,12 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -102,11 +102,46 @@ class InsiderTrackerTest {
         verify(insiderPersistence, times(1)).readFromFile(anyString());
         verify(insiderPersistence, times(1)).persistToFile(any(), anyString());
 
-        assertThat(report, containsString("AAPL: 2 sells (-40)"));
-        assertThat(report, containsString("GOOG: 5 sells (+3)"));
-        assertThat(report, not(containsString("META")));
-        assertThat(report, containsString("AMZN: 2 sells (+-0)"));
-        assertThat(report, containsString("NVDA: 0 sells (-21)"));
+        String expectedReport = """
+        *Weekly Insider Transactions Report:*
+        
+        ```
+        Symbol       Sells        Diff       \s
+        AAPL         2            -40        \s
+        GOOG         5            +3         \s
+        AMZN         2            +-0        \s
+        NVDA         0            -21        \s
+        ```""";
+
+        assertThat(report, containsString(expectedReport));
+    }
+
+    @Test
+    void sendInsiderTransactionReport() {
+        Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
+        insiderTransactions.put(StockSymbol.PLTR, Map.of("S", 10, "S_HISTORIC", 0));
+        insiderTransactions.put(StockSymbol.GOOG, Map.of("S", 5, "S_HISTORIC", 10));
+        insiderTransactions.put(StockSymbol.AAPL, Map.of("S", 40, "S_HISTORIC", 20));
+        insiderTransactions.put(StockSymbol.HOOD, Map.of("S", 0, "S_HISTORIC", 15));
+
+        insiderTracker.sendInsiderTransactionReport(insiderTransactions);
+
+        ArgumentCaptor<String> reportCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(reportCaptor.capture());
+        String report = reportCaptor.getValue();
+
+        String expectedReport = """
+        *Weekly Insider Transactions Report:*
+        
+        ```
+        Symbol       Sells        Diff       \s
+        PLTR         10           +10        \s
+        GOOG         5            -5         \s
+        AAPL         40           +20        \s
+        HOOD         0            -15        \s
+        ```""";
+
+        assertThat(report, containsString(expectedReport));
     }
 
 }
