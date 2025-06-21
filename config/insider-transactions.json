@@ -1,0 +1,114 @@
+{
+  "AAPL" : {
+    "S" : 2,
+    "S_HISTORIC" : 2
+  },
+  "AMD" : {
+    "S" : 5,
+    "S_HISTORIC" : 5
+  },
+  "META" : {
+    "S" : 72,
+    "S_HISTORIC" : 72
+  },
+  "NFLX" : {
+    "S" : 223,
+    "S_HISTORIC" : 223
+  },
+  "NVDA" : {
+    "S" : 7,
+    "S_HISTORIC" : 7
+  },
+  "TSLA" : {
+    "S" : 69,
+    "S_HISTORIC" : 69
+  },
+  "COIN" : {
+    "S" : 57,
+    "S_HISTORIC" : 57
+  },
+  "MSTR" : {
+    "S" : 69,
+    "S_HISTORIC" : 69
+  },
+  "RKLB" : {
+    "S" : 13,
+    "S_HISTORIC" : 13
+  },
+  "UBER" : {
+    "S" : 2,
+    "S_HISTORIC" : 2
+  },
+  "PLTR" : {
+    "S" : 63,
+    "S_HISTORIC" : 63
+  },
+  "SPOT" : {
+    "S" : 0,
+    "S_HISTORIC" : 0
+  },
+  "HOOD" : {
+    "S" : 15,
+    "S_HISTORIC" : 15
+  },
+  "NET" : {
+    "S" : 81,
+    "S_HISTORIC" : 81
+  },
+  "AVGO" : {
+    "S" : 4,
+    "S_HISTORIC" : 4
+  },
+  "AXON" : {
+    "S" : 62,
+    "S_HISTORIC" : 62
+  },
+  "CRWD" : {
+    "S" : 75,
+    "S_HISTORIC" : 75
+  },
+  "OKTA" : {
+    "S" : 2,
+    "S_HISTORIC" : 2
+  },
+  "GOOG" : {
+    "S" : 43,
+    "S_HISTORIC" : 43
+  },
+  "AMZN" : {
+    "S" : 23,
+    "S_HISTORIC" : 23
+  },
+  "GLXY" : {
+    "S" : 8,
+    "S_HISTORIC" : 8
+  },
+  "BABA" : {
+    "S" : 0,
+    "S_HISTORIC" : 0
+  },
+  "PANW" : {
+    "S" : 21,
+    "S_HISTORIC" : 21
+  },
+  "MP" : {
+    "S" : 2,
+    "S_HISTORIC" : 2
+  },
+  "APP" : {
+    "S" : 215,
+    "S_HISTORIC" : 215
+  },
+  "ASML" : {
+    "S" : 0,
+    "S_HISTORIC" : 0
+  },
+  "COST" : {
+    "S" : 4,
+    "S_HISTORIC" : 4
+  },
+  "WMT" : {
+    "S" : 26,
+    "S_HISTORIC" : 26
+  }
+}
