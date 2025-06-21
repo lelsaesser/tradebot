@@ -35,13 +35,16 @@ public class InsiderPersistence {
     public List<InsiderTransactionHistoric> readFromFile(String filePath) {
         File file = new File(filePath);
         try {
+            if (!file.exists()) {
+                persistToFile(Map.of(), filePath);
+            }
             Map<String, Map<String, Integer>> map = objectMapper.readValue(file, new TypeReference<>() {});
 
             return map.entrySet().stream()
                     .map(e -> new InsiderTransactionHistoric(StockSymbol.fromString(e.getKey()).orElseThrow(), e.getValue()))
                     .toList();
 
-        } catch (IOException e) {
+        } catch (IOException | IllegalStateException e) {
             throw new IllegalStateException("Failed to read file for insider transactions", e);
         }
     }
