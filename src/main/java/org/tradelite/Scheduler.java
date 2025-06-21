@@ -75,7 +75,7 @@ public class Scheduler {
         log.info("Telegram chat updates processed.");
     }
 
-    @Scheduled(cron = "0 0 12 ? * SAT", zone = "CET")
+    @Scheduled(cron = "0 30 12 ? * SAT", zone = "CET")
     protected void weeklyInsiderTradingReport() {
         rootErrorHandler.run(insiderTracker::trackInsiderTransactions);
 
