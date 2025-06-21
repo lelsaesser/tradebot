@@ -48,7 +48,7 @@ public class Scheduler {
         this.insiderTracker = insiderTracker;
     }
 
-//    @Scheduled(initialDelay = 0, fixedRate = 300000)
+    @Scheduled(initialDelay = 0, fixedRate = 300000)
     protected void marketMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
@@ -60,14 +60,14 @@ public class Scheduler {
         log.info("Market monitoring round completed.");
     }
 
-//    @Scheduled(fixedRate = 600000)
+    @Scheduled(fixedRate = 600000)
     protected void cleanupIgnoreSymbols() {
         rootErrorHandler.run(() -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
 
         log.info("Cleanup of ignored symbols completed.");
     }
 
-//    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 60000)
     protected void pollTelegramChatUpdates() {
         List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
         rootErrorHandler.run(() -> telegramMessageProcessor.processUpdates(chatUpdates));
@@ -75,8 +75,7 @@ public class Scheduler {
         log.info("Telegram chat updates processed.");
     }
 
-//    @Scheduled(cron = "0 30 12 ? * SAT", zone = "CET")
-    @Scheduled(fixedRate = 600000)
+    @Scheduled(cron = "0 0 12 ? * SAT", zone = "CET")
     protected void weeklyInsiderTradingReport() {
         rootErrorHandler.run(insiderTracker::trackInsiderTransactions);
 
