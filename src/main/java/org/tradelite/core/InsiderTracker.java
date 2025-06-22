@@ -10,6 +10,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class InsiderTracker {
@@ -59,6 +60,7 @@ public class InsiderTracker {
     protected void sendInsiderTransactionReport(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
 
         Map<StockSymbol, Map<String, Integer>> insiderTransactionsWithHistoricData = enrichWithHistoricData(insiderTransactions);
+        Map<StockSymbol, Map<String, Integer>> sortedInsiderTransactionsWithHistoricData = orderMapBySellCount(insiderTransactionsWithHistoricData);
 
         StringBuilder report = new StringBuilder("*Weekly Insider Transactions Report:*\n\n");
 
@@ -66,7 +68,7 @@ public class InsiderTracker {
         report.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Sells", "Diff"));
 
 
-        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : insiderTransactionsWithHistoricData.entrySet()) {
+        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderTransactionsWithHistoricData.entrySet()) {
             StockSymbol symbol = entry.getKey();
             Map<String, Integer> transactionTypes = entry.getValue();
             int sellCount = transactionTypes.get(InsiderTransactionCodes.SELL.getCode());
@@ -99,7 +101,18 @@ public class InsiderTracker {
         }
 
         return insiderTransactions;
-
     }
 
+    private Map<StockSymbol, Map<String, Integer>> orderMapBySellCount(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
+        return insiderTransactions.entrySet().stream()
+                .sorted((e1, e2) -> Integer.compare(
+                        e2.getValue().getOrDefault(InsiderTransactionCodes.SELL.getCode(), 0),
+                        e1.getValue().getOrDefault(InsiderTransactionCodes.SELL.getCode(), 0)))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
+    }
 }

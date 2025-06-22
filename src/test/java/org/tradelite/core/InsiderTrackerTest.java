@@ -107,8 +107,8 @@ class InsiderTrackerTest {
         
         ```
         Symbol       Sells        Diff       \s
-        AAPL         2            -40        \s
         GOOG         5            +3         \s
+        AAPL         2            -40        \s
         AMZN         2            0          \s
         NVDA         0            -21        \s
         ```""";
@@ -135,9 +135,9 @@ class InsiderTrackerTest {
         
         ```
         Symbol       Sells        Diff       \s
+        AAPL         40           +20        \s
         PLTR         10           +10        \s
         GOOG         5            -5         \s
-        AAPL         40           +20        \s
         HOOD         0            -15        \s
         ```""";
 
