@@ -40,14 +40,30 @@ public class InsiderTracker {
             InsiderTransactionResponse response = finnhubClient.getInsiderTransactions(stockSymbol);
 
             Map<String, Integer> sells = new HashMap<>();
+            Map<String, Integer> buys = new HashMap<>();
             sells.put(InsiderTransactionCodes.SELL.getCode(), 0);
-            insiderTransactions.put(stockSymbol, sells);
+            buys.put(InsiderTransactionCodes.BUY.getCode(), 0);
+            Map<String, Integer> transactions = new HashMap<>();
+            transactions.putAll(sells);
+            transactions.putAll(buys);
+            insiderTransactions.put(stockSymbol, transactions);
 
             for (InsiderTransactionResponse.Transaction insiderTransaction : response.data()) {
                 if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.SELL.getCode())) {
                     insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
                             .merge(InsiderTransactionCodes.SELL.getCode(), 1, Integer::sum);
-
+                }
+                else if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode())) {
+                    insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
+                            .merge(InsiderTransactionCodes.SELL.getCode(), 1, Integer::sum);
+                }
+                else if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.BUY.getCode())) {
+                    insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
+                            .merge(InsiderTransactionCodes.BUY.getCode(), 1, Integer::sum);
+                }
+                else if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode())) {
+                    insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
+                            .merge(InsiderTransactionCodes.BUY.getCode(), 1, Integer::sum);
                 }
             }
         }
@@ -66,8 +82,6 @@ public class InsiderTracker {
 
         report.append("```").append("%n".formatted());
         report.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Sells", "Diff"));
-
-
         for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderTransactionsWithHistoricData.entrySet()) {
             StockSymbol symbol = entry.getKey();
             Map<String, Integer> transactionTypes = entry.getValue();
@@ -75,15 +89,21 @@ public class InsiderTracker {
             int historicSellCount = transactionTypes.getOrDefault(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 0);
 
             if (sellCount > 0 || historicSellCount > 0) {
+                addHistoryTransactionCountDiff(sellCount, historicSellCount, symbol, report);
+            }
+        }
+        report.append("```");
 
-                String sign = "";
-                int sellDifference = sellCount - historicSellCount;
-                if (sellDifference > 0) {
-                    sign = "+";
-                }
-                String diff = sign + sellDifference;
-                report.append(String.format("%-12s %-12d %-12s%n",
-                        symbol.getTicker(), sellCount, diff));
+        report.append("%n".formatted()).append("%n".formatted()).append(("```")).append("%n".formatted());
+        report.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Buys", "Diff"));
+        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderTransactionsWithHistoricData.entrySet()) {
+            StockSymbol symbol = entry.getKey();
+            Map<String, Integer> transactionTypes = entry.getValue();
+            int buyCount = transactionTypes.get(InsiderTransactionCodes.BUY.getCode());
+            int historicBuyCount = transactionTypes.getOrDefault(InsiderTransactionCodes.BUY_HISTORIC.getCode(), 0);
+
+            if (buyCount > 0 || historicBuyCount > 0) {
+                addHistoryTransactionCountDiff(buyCount, historicBuyCount, symbol, report);
             }
         }
         report.append("```");
@@ -98,6 +118,7 @@ public class InsiderTracker {
             StockSymbol symbol = historic.getSymbol();
 
             insiderTransactions.get(symbol).put(InsiderTransactionCodes.SELL_HISTORIC.getCode(), historic.getTransactions().get(InsiderTransactionCodes.SELL.getCode()));
+            insiderTransactions.get(symbol).put(InsiderTransactionCodes.BUY_HISTORIC.getCode(), historic.getTransactions().get(InsiderTransactionCodes.BUY.getCode()));
         }
 
         return insiderTransactions;
@@ -114,5 +135,16 @@ public class InsiderTracker {
                         (a, _) -> a,
                         LinkedHashMap::new
                 ));
+    }
+
+    private void addHistoryTransactionCountDiff(int currentCount, int historicCount, StockSymbol symbol, StringBuilder report) {
+        String sign = "";
+        int difference = currentCount - historicCount;
+        if (difference > 0) {
+            sign = "+";
+        }
+        String diff = sign + difference;
+        report.append(String.format("%-12s %-12d %-12s%n",
+                symbol.getTicker(), currentCount, diff));
     }
 }
