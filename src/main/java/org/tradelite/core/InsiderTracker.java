@@ -42,7 +42,9 @@ public class InsiderTracker {
             Map<String, Integer> sells = new HashMap<>();
             Map<String, Integer> buys = new HashMap<>();
             sells.put(InsiderTransactionCodes.SELL.getCode(), 0);
+            sells.put(InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode(), 0);
             buys.put(InsiderTransactionCodes.BUY.getCode(), 0);
+            buys.put(InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode(), 0);
             Map<String, Integer> transactions = new HashMap<>();
             transactions.putAll(sells);
             transactions.putAll(buys);
@@ -53,15 +55,15 @@ public class InsiderTracker {
                     insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
                             .merge(InsiderTransactionCodes.SELL.getCode(), 1, Integer::sum);
                 }
-                else if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode())) {
+                if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode())) {
                     insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
                             .merge(InsiderTransactionCodes.SELL.getCode(), 1, Integer::sum);
                 }
-                else if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.BUY.getCode())) {
+                if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.BUY.getCode())) {
                     insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
                             .merge(InsiderTransactionCodes.BUY.getCode(), 1, Integer::sum);
                 }
-                else if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode())) {
+                if (Objects.equals(insiderTransaction.transactionCode(), InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode())) {
                     insiderTransactions.computeIfAbsent(stockSymbol, _ -> new HashMap<>())
                             .merge(InsiderTransactionCodes.BUY.getCode(), 1, Integer::sum);
                 }
@@ -85,7 +87,7 @@ public class InsiderTracker {
         for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderTransactionsWithHistoricData.entrySet()) {
             StockSymbol symbol = entry.getKey();
             Map<String, Integer> transactionTypes = entry.getValue();
-            int sellCount = transactionTypes.get(InsiderTransactionCodes.SELL.getCode());
+            int sellCount = transactionTypes.get(InsiderTransactionCodes.SELL.getCode()) + transactionTypes.getOrDefault(InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode(), 0);
             int historicSellCount = transactionTypes.getOrDefault(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 0);
 
             if (sellCount > 0 || historicSellCount > 0) {
@@ -99,7 +101,7 @@ public class InsiderTracker {
         for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderTransactionsWithHistoricData.entrySet()) {
             StockSymbol symbol = entry.getKey();
             Map<String, Integer> transactionTypes = entry.getValue();
-            int buyCount = transactionTypes.get(InsiderTransactionCodes.BUY.getCode());
+            int buyCount = transactionTypes.get(InsiderTransactionCodes.BUY.getCode()) + transactionTypes.getOrDefault(InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode(), 0);
             int historicBuyCount = transactionTypes.getOrDefault(InsiderTransactionCodes.BUY_HISTORIC.getCode(), 0);
 
             if (buyCount > 0 || historicBuyCount > 0) {
