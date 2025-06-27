@@ -12,6 +12,7 @@ import org.tradelite.core.IgnoreReason;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
@@ -224,5 +225,19 @@ class TargetPriceProviderTest {
         // Ensure the symbol was not removed from the original file
         boolean found = fileContainsSymbol(CoinId.BITCOIN);
         assertThat(found, is(true));
+    }
+
+    @Test
+    void getStockTargetPrices_ok() {
+        List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
+
+        assertThat(targetPrices, notNullValue());
+    }
+
+    @Test
+    void getCoinTargetPrices_ok() {
+        List<TargetPrice> targetPrices = targetPriceProvider.getCoinTargetPrices();
+
+        assertThat(targetPrices, notNullValue());
     }
 }
