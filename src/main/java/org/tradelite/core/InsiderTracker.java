@@ -91,9 +91,7 @@ public class InsiderTracker {
             int sellCount = transactionTypes.get(InsiderTransactionCodes.SELL.getCode()) + transactionTypes.getOrDefault(InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode(), 0);
             int historicSellCount = transactionTypes.getOrDefault(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 0);
 
-            if (sellCount > 0 || historicSellCount > 0) {
-                addHistoryTransactionCountDiff(sellCount, historicSellCount, symbol, report);
-            }
+            addHistoryTransactionCountDiff(sellCount, historicSellCount, symbol, report);
         }
         report.append("```");
 
@@ -105,9 +103,7 @@ public class InsiderTracker {
             int buyCount = transactionTypes.get(InsiderTransactionCodes.BUY.getCode()) + transactionTypes.getOrDefault(InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode(), 0);
             int historicBuyCount = transactionTypes.getOrDefault(InsiderTransactionCodes.BUY_HISTORIC.getCode(), 0);
 
-            if (buyCount > 0 || historicBuyCount > 0) {
-                addHistoryTransactionCountDiff(buyCount, historicBuyCount, symbol, report);
-            }
+            addHistoryTransactionCountDiff(buyCount, historicBuyCount, symbol, report);
         }
         report.append("```");
 
