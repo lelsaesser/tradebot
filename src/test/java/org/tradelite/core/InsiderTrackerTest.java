@@ -122,8 +122,8 @@ class InsiderTrackerTest {
         
         ```
         Symbol       Buys         Diff       \s
-        GOOG         3            -2         \s
         AAPL         3            -7         \s
+        GOOG         3            -2         \s
         AMZN         0            -2         \s
         ```""";
 
@@ -157,9 +157,9 @@ class InsiderTrackerTest {
         
         ```
         Symbol       Buys         Diff       \s
+        HOOD         43           -33        \s
         AAPL         5            +5         \s
         GOOG         4            +2         \s
-        HOOD         43           -33        \s
         ```""";
 
         assertThat(report, is(expectedReport));

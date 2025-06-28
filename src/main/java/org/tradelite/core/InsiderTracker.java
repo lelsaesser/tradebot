@@ -78,13 +78,14 @@ public class InsiderTracker {
     protected void sendInsiderTransactionReport(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
 
         Map<StockSymbol, Map<String, Integer>> insiderTransactionsWithHistoricData = enrichWithHistoricData(insiderTransactions);
-        Map<StockSymbol, Map<String, Integer>> sortedInsiderTransactionsWithHistoricData = orderMapBySellCount(insiderTransactionsWithHistoricData);
+        Map<StockSymbol, Map<String, Integer>> sortedInsiderSells = orderMapByCodeCount(insiderTransactionsWithHistoricData, InsiderTransactionCodes.SELL);
+        Map<StockSymbol, Map<String, Integer>> sortedInsiderBuys = orderMapByCodeCount(insiderTransactionsWithHistoricData, InsiderTransactionCodes.BUY);
 
         StringBuilder report = new StringBuilder("*Weekly Insider Transactions Report:*\n\n");
 
         report.append("```").append("%n".formatted());
         report.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Sells", "Diff"));
-        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderTransactionsWithHistoricData.entrySet()) {
+        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderSells.entrySet()) {
             StockSymbol symbol = entry.getKey();
             Map<String, Integer> transactionTypes = entry.getValue();
             int sellCount = transactionTypes.get(InsiderTransactionCodes.SELL.getCode()) + transactionTypes.getOrDefault(InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode(), 0);
@@ -98,7 +99,7 @@ public class InsiderTracker {
 
         report.append("%n".formatted()).append("%n".formatted()).append(("```")).append("%n".formatted());
         report.append(String.format("%-12s %-12s %-12s%n", "Symbol", "Buys", "Diff"));
-        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderTransactionsWithHistoricData.entrySet()) {
+        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : sortedInsiderBuys.entrySet()) {
             StockSymbol symbol = entry.getKey();
             Map<String, Integer> transactionTypes = entry.getValue();
             int buyCount = transactionTypes.get(InsiderTransactionCodes.BUY.getCode()) + transactionTypes.getOrDefault(InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode(), 0);
@@ -126,11 +127,11 @@ public class InsiderTracker {
         return insiderTransactions;
     }
 
-    private Map<StockSymbol, Map<String, Integer>> orderMapBySellCount(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
+    private Map<StockSymbol, Map<String, Integer>> orderMapByCodeCount(Map<StockSymbol, Map<String, Integer>> insiderTransactions, InsiderTransactionCodes code) {
         return insiderTransactions.entrySet().stream()
                 .sorted((e1, e2) -> Integer.compare(
-                        e2.getValue().getOrDefault(InsiderTransactionCodes.SELL.getCode(), 0),
-                        e1.getValue().getOrDefault(InsiderTransactionCodes.SELL.getCode(), 0)))
+                        e2.getValue().getOrDefault(code.getCode(), 0),
+                        e1.getValue().getOrDefault(code.getCode(), 0)))
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         Map.Entry::getValue,
