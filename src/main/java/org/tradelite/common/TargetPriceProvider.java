@@ -111,12 +111,8 @@ public class TargetPriceProvider {
 
             for (TargetPrice tp : prices) {
                 if (tp.getSymbol().equalsIgnoreCase(symbol.getName())) {
-                    if (newBuyTarget != null) {
-                        tp.setBuyTarget(newBuyTarget);
-                    }
-                    if (newSellTarget != null) {
-                        tp.setSellTarget(newSellTarget);
-                    }
+                    tp.setBuyTarget(newBuyTarget);
+                    tp.setSellTarget(newSellTarget);
                     break;
                 }
             }
