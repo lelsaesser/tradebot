@@ -43,10 +43,12 @@ public class TelegramMessageProcessor {
                 continue;
             }
 
-            Optional<TelegramCommand> command = parseMessage(chatUpdate);
-            command.ifPresent(telegramCommandDispatcher::dispatch);
-
-            telegramMessageTracker.setLastProcessedMessageId(messageId);
+            try {
+                Optional<TelegramCommand> command = parseMessage(chatUpdate);
+                command.ifPresent(telegramCommandDispatcher::dispatch);
+            } finally {
+                telegramMessageTracker.setLastProcessedMessageId(messageId);
+            }
         }
     }
 
