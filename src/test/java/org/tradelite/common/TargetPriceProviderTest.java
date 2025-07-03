@@ -14,8 +14,7 @@ import java.util.List;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.aMapWithSize;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
@@ -123,6 +122,29 @@ class TargetPriceProviderTest {
             if (targetPrice.getSymbol().equals(CoinId.SOLANA.getName())) {
                 assertThat(targetPrice.getBuyTarget(), is(250.0));
                 assertThat(targetPrice.getSellTarget(), is(1100.0));
+            }
+        }
+    }
+
+    @Test
+    void updateTargetPrice_withNullValues() {
+        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 165.0, null, FILE_PATH);
+        List<TargetPrice> targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
+
+        for (TargetPrice targetPrice : targetPrices) {
+            if (targetPrice.getSymbol().equals(CoinId.SOLANA.getName())) {
+                assertThat(targetPrice.getBuyTarget(), is(165.0));
+                assertThat(targetPrice.getSellTarget(), greaterThan(0.0));
+            }
+        }
+
+        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, null, 1105.0, FILE_PATH);
+        targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
+
+        for (TargetPrice targetPrice : targetPrices) {
+            if (targetPrice.getSymbol().equals(CoinId.SOLANA.getName())) {
+                assertThat(targetPrice.getBuyTarget(), greaterThan(0.0));
+                assertThat(targetPrice.getSellTarget(), is(1105.0));
             }
         }
     }
