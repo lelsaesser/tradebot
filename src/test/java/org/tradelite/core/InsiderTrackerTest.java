@@ -13,9 +13,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -167,6 +165,57 @@ class InsiderTrackerTest {
         ```""";
 
         assertThat(report, is(expectedReport));
+    }
+
+    @Test
+    void enrichWithHistoricData_withHistoricNullValues() {
+        Map<StockSymbol, Map<String, Integer>> insiderTransactions = new EnumMap<>(StockSymbol.class);
+
+        Map<String, Integer> aaplMap = new HashMap<>();
+        aaplMap.put("S", 10);
+        aaplMap.put("P", 5);
+
+        Map<String, Integer> googMap = new HashMap<>();
+        googMap.put("S", 3);
+        googMap.put("P", 2);
+
+        Map<String, Integer> metaMap = new HashMap<>();
+        metaMap.put("S", 0);
+        metaMap.put("P", 0);
+
+        insiderTransactions.put(StockSymbol.AAPL, aaplMap);
+        insiderTransactions.put(StockSymbol.GOOG, googMap);
+        insiderTransactions.put(StockSymbol.META, metaMap);
+
+
+        List<InsiderTransactionHistoric> historicData = new ArrayList<>();
+
+        Map<String, Integer> map1 = new HashMap<>();
+        map1.put("S", null);
+        map1.put("P", null);
+        historicData.add(new InsiderTransactionHistoric(StockSymbol.AAPL, map1));
+
+        Map<String, Integer> map2 = new HashMap<>();
+        map2.put("S", null);
+        map2.put("P", null);
+        historicData.add(new InsiderTransactionHistoric(StockSymbol.GOOG, map2));
+
+        Map<String, Integer> map3 = new HashMap<>();
+        map3.put("S", null);
+        map3.put("P", null);
+        historicData.add(new InsiderTransactionHistoric(StockSymbol.META, map3));
+
+
+        when(insiderPersistence.readFromFile(InsiderPersistence.PERSISTENCE_FILE_PATH)).thenReturn(historicData);
+
+        Map<StockSymbol, Map<String, Integer>> enrichedData = insiderTracker.enrichWithHistoricData(insiderTransactions);
+
+        assertThat(enrichedData.get(StockSymbol.AAPL).get("S_HISTORIC"), is(0));
+        assertThat(enrichedData.get(StockSymbol.AAPL).get("P_HISTORIC"), is(0));
+        assertThat(enrichedData.get(StockSymbol.GOOG).get("S_HISTORIC"), is(0));
+        assertThat(enrichedData.get(StockSymbol.GOOG).get("P_HISTORIC"), is(0));
+        assertThat(enrichedData.get(StockSymbol.META).get("S_HISTORIC"), is(0));
+        assertThat(enrichedData.get(StockSymbol.META).get("P_HISTORIC"), is(0));
     }
 
 }

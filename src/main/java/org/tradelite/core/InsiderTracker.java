@@ -110,14 +110,23 @@ public class InsiderTracker {
         telegramClient.sendMessage(report.toString());
     }
 
-    private Map<StockSymbol, Map<String, Integer>> enrichWithHistoricData(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
+    protected Map<StockSymbol, Map<String, Integer>> enrichWithHistoricData(Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
         List<InsiderTransactionHistoric> historicData = insiderPersistence.readFromFile(InsiderPersistence.PERSISTENCE_FILE_PATH);
 
         for (InsiderTransactionHistoric historic : historicData) {
             StockSymbol symbol = historic.getSymbol();
 
-            insiderTransactions.get(symbol).put(InsiderTransactionCodes.SELL_HISTORIC.getCode(), historic.getTransactions().get(InsiderTransactionCodes.SELL.getCode()));
-            insiderTransactions.get(symbol).put(InsiderTransactionCodes.BUY_HISTORIC.getCode(), historic.getTransactions().get(InsiderTransactionCodes.BUY.getCode()));
+            Integer historicSellTransactionCount = historic.getTransactions().get(InsiderTransactionCodes.SELL.getCode());
+            Integer historicBuyTransactionCount = historic.getTransactions().get(InsiderTransactionCodes.BUY.getCode());
+            if (historicBuyTransactionCount == null) {
+                historicBuyTransactionCount = 0;
+            }
+            if (historicSellTransactionCount == null) {
+                historicSellTransactionCount = 0;
+            }
+
+            insiderTransactions.get(symbol).put(InsiderTransactionCodes.SELL_HISTORIC.getCode(), historicSellTransactionCount);
+            insiderTransactions.get(symbol).put(InsiderTransactionCodes.BUY_HISTORIC.getCode(), historicBuyTransactionCount);
         }
 
         return insiderTransactions;
