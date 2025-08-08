@@ -69,7 +69,19 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, times(1)).sendMessage("⚠️ High daily price swing detected for AVGO: 6.0%");
+        verify(telegramClient, times(1)).sendMessage("📈 High daily price swing detected for AVGO: 6.00%");
+        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT);
+    }
+
+    @Test
+    void evaluateHighPriceChange_decrease_success() {
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
+        priceQuoteResponse.setChangePercent(-6.0);
+
+        finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
+
+        verify(telegramClient, times(1)).sendMessage("📉 High daily price swing detected for AVGO: -6.00%");
         verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT);
     }
 
