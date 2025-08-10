@@ -125,4 +125,17 @@ class SchedulerTest {
 
         verify(insiderTracker, times(1)).trackInsiderTransactions();
     }
+
+    @Test
+    void resetDailyCryptoPrices_shouldRun() throws Exception {
+        scheduler.resetDailyCryptoPrices();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(coinGeckoPriceEvaluator, times(1)).resetDailyPrices();
+    }
 }

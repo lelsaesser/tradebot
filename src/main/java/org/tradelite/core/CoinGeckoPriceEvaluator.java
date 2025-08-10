@@ -10,14 +10,19 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
     private final CoinGeckoClient coinGeckoClient;
     private final TargetPriceProvider targetPriceProvider;
+    private final TelegramClient telegramClient;
 
     protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
+    protected final Map<CoinId, Double> dailyLowPrice = new ConcurrentHashMap<>();
+    protected final Map<CoinId, Double> dailyHighPrice = new ConcurrentHashMap<>();
+
 
     @Autowired
     public CoinGeckoPriceEvaluator(CoinGeckoClient coinGeckoClient, TargetPriceProvider targetPriceProvider,
@@ -25,6 +30,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
         super(telegramClient, targetPriceProvider);
         this.coinGeckoClient = coinGeckoClient;
         this.targetPriceProvider = targetPriceProvider;
+        this.telegramClient = telegramClient;
     }
 
     @Override
@@ -48,6 +54,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
         }
 
         for (CoinGeckoPriceResponse.CoinData priceData : coinData) {
+            evaluateHighPriceChange(priceData);
             for (TargetPrice targetPrice : targetPrices) {
                 if (priceData.getCoinId().getId().equalsIgnoreCase(targetPrice.getSymbol())) {
                     comparePrices(priceData.getCoinId(), priceData.getUsd(), targetPrice.getBuyTarget(), targetPrice.getSellTarget());
@@ -57,5 +64,35 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
         return coinData.size();
 
+    }
+
+    public void evaluateHighPriceChange(CoinGeckoPriceResponse.CoinData priceData) {
+        CoinId coinId = priceData.getCoinId();
+        double currentPrice = priceData.getUsd();
+
+        dailyLowPrice.putIfAbsent(coinId, currentPrice);
+        dailyHighPrice.putIfAbsent(coinId, currentPrice);
+
+        if (currentPrice < dailyLowPrice.get(coinId)) {
+            dailyLowPrice.put(coinId, currentPrice);
+        }
+        if (currentPrice > dailyHighPrice.get(coinId)) {
+            dailyHighPrice.put(coinId, currentPrice);
+        }
+
+        double low = dailyLowPrice.get(coinId);
+        double high = dailyHighPrice.get(coinId);
+        double percentChange = ((high - low) / low) * 100;
+
+        if ((percentChange > 5.0 || percentChange < -5.0) && !targetPriceProvider.isSymbolIgnored(coinId, IgnoreReason.CHANGE_PERCENT_ALERT)) {
+            String emoji = currentPrice > lastPriceCache.get(coinId) ? "📈" : "📉";
+            telegramClient.sendMessage(emoji + " High daily price swing detected for " + coinId.getId() + ": " + String.format("%.2f", percentChange) + "%");
+            targetPriceProvider.addIgnoredSymbol(coinId, IgnoreReason.CHANGE_PERCENT_ALERT);
+        }
+    }
+
+    public void resetDailyPrices() {
+        dailyLowPrice.clear();
+        dailyHighPrice.clear();
     }
 }

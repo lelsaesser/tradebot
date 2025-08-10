@@ -159,4 +159,54 @@ class FinnhubPriceEvaluatorTest {
         verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.GOOG);
         verify(telegramClient, times(1)).sendMessage("INVALID not found in enum and is not monitored.");
     }
+
+    @Test
+    void evaluatePrice_nullPriceQuote() throws InterruptedException {
+        List<TargetPrice> targetPrices = List.of(
+                new TargetPrice(StockSymbol.AVGO.getTicker(), 150.0, 160.0),
+                new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200)
+        );
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+
+        when(finnhubClient.getPriceQuote(StockSymbol.AVGO)).thenReturn(null);
+
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(StockSymbol.GOOG);
+        priceQuoteResponse.setCurrentPrice(155.0);
+        priceQuoteResponse.setChangePercent(3.0);
+        when(finnhubClient.getPriceQuote(StockSymbol.GOOG)).thenReturn(priceQuoteResponse);
+
+        int finDataSize = finnhubPriceEvaluator.evaluatePrice();
+
+        verify(targetPriceProvider, times(1)).getStockTargetPrices();
+        verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.AVGO);
+        verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.GOOG);
+        assertThat(finDataSize, is(1));
+    }
+
+    @Test
+    void comparePrices_zeroSellTarget() {
+        finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 200.0, 150.0, 0.0);
+        verify(telegramClient, never()).sendMessage(any());
+    }
+
+    @Test
+    void comparePrices_zeroBuyTarget() {
+        finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 100.0, 0.0, 150.0);
+        verify(telegramClient, never()).sendMessage(any());
+    }
+
+    @Test
+    void comparePrices_sellAlertIgnored() {
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.SELL_ALERT)).thenReturn(true);
+        finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 200.0, 150.0, 180.0);
+        verify(telegramClient, never()).sendMessage(any());
+    }
+
+    @Test
+    void comparePrices_buyAlertIgnored() {
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.BUY_ALERT)).thenReturn(true);
+        finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 100.0, 120.0, 150.0);
+        verify(telegramClient, never()).sendMessage(any());
+    }
 }
