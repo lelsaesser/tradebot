@@ -151,4 +151,74 @@ class CoinGeckoPriceEvaluatorTest {
         assertThat(coinGeckoPriceEvaluator.dailyLowPrice.isEmpty(), is(true));
         assertThat(coinGeckoPriceEvaluator.dailyHighPrice.isEmpty(), is(true));
     }
+
+    @Test
+    void evaluatePrice_nullCoinData() throws InterruptedException {
+        when(coinGeckoClient.getCoinPriceData(any())).thenReturn(null);
+
+        int coinDataSize = coinGeckoPriceEvaluator.evaluatePrice();
+
+        assertThat(coinDataSize, is(0));
+    }
+
+    @Test
+    void evaluateHighPriceChange_negativeChange() {
+        CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
+        coinData.setCoinId(CoinId.BITCOIN);
+        coinData.setUsd(90.0);
+
+        coinGeckoPriceEvaluator.lastPriceCache.put(CoinId.BITCOIN, 100.0);
+        coinGeckoPriceEvaluator.dailyLowPrice.put(CoinId.BITCOIN, 90.0);
+        coinGeckoPriceEvaluator.dailyHighPrice.put(CoinId.BITCOIN, 100.0);
+
+        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(false);
+
+        coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
+
+        verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(targetPriceProvider, times(1)).addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT);
+    }
+
+    @Test
+    void evaluatePrice_lastPriceNotNull() throws InterruptedException {
+        coinGeckoPriceEvaluator.lastPriceCache.put(CoinId.BITCOIN, 1500.0);
+
+        List<TargetPrice> targetPrices = new ArrayList<>();
+        targetPrices.add(new TargetPrice(CoinId.BITCOIN.getName(), 1000, 2000));
+
+        when(targetPriceProvider.getCoinTargetPrices()).thenReturn(targetPrices);
+
+        CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
+        coinData.setUsd(1500.00001);
+        coinData.setCoinId(CoinId.BITCOIN);
+
+        when(coinGeckoClient.getCoinPriceData(CoinId.BITCOIN)).thenReturn(coinData);
+
+        int coinDataSize = coinGeckoPriceEvaluator.evaluatePrice();
+
+        assertThat(coinDataSize, is(0));
+        verify(coinGeckoClient, times(CoinId.getAll().size())).getCoinPriceData(any());
+    }
+
+    @Test
+    void evaluatePrice_lastPriceNull() throws InterruptedException {
+        coinGeckoPriceEvaluator.lastPriceCache.put(CoinId.BITCOIN, null);
+
+        List<TargetPrice> targetPrices = new ArrayList<>();
+        targetPrices.add(new TargetPrice(CoinId.BITCOIN.getName(), 1000, 2000));
+
+        when(targetPriceProvider.getCoinTargetPrices()).thenReturn(targetPrices);
+
+        CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
+        coinData.setUsd(1500.0);
+        coinData.setCoinId(CoinId.BITCOIN);
+
+        when(coinGeckoClient.getCoinPriceData(CoinId.BITCOIN)).thenReturn(coinData);
+
+        int coinDataSize = coinGeckoPriceEvaluator.evaluatePrice();
+
+        assertThat(coinDataSize, is(1));
+        verify(coinGeckoClient, times(1)).getCoinPriceData(CoinId.BITCOIN);
+        verify(coinGeckoPriceEvaluator, times(1)).comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000, 2000);
+    }
 }
