@@ -70,7 +70,9 @@ public class InsiderTracker {
             }
         }
 
-        sendInsiderTransactionReport(insiderTransactions);
+        if (!insiderTransactions.isEmpty()) {
+            sendInsiderTransactionReport(insiderTransactions);
+        }
 
         insiderPersistence.persistToFile(insiderTransactions, InsiderPersistence.PERSISTENCE_FILE_PATH);
     }
