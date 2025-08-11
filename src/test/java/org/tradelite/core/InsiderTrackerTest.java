@@ -218,4 +218,47 @@ class InsiderTrackerTest {
         assertThat(enrichedData.get(StockSymbol.META).get("P_HISTORIC"), is(0));
     }
 
+    @Test
+    void trackInsiderTransactions_noMonitoredSymbols() {
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(Collections.emptyList());
+
+        insiderTracker.trackInsiderTransactions();
+
+        verify(finnhubClient, never()).getInsiderTransactions(any());
+        verify(telegramClient, never()).sendMessage(anyString());
+        verify(insiderPersistence, never()).readFromFile(anyString());
+    }
+
+    @Test
+    void trackInsiderTransactions_emptyInsiderTransactions() {
+        List<TargetPrice> targetPrices = List.of(
+            new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0)
+        );
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(new InsiderTransactionResponse(Collections.emptyList()));
+        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+
+        insiderTracker.trackInsiderTransactions();
+
+        verify(telegramClient).sendMessage(anyString());
+        verify(insiderPersistence).persistToFile(any(), anyString());
+    }
+
+    @Test
+    void trackInsiderTransactions_noHistoricData() {
+        List<TargetPrice> targetPrices = List.of(
+            new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0)
+        );
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+        InsiderTransactionResponse responseAAPL = new InsiderTransactionResponse(List.of(
+            new InsiderTransactionResponse.Transaction("Alice", 100, 5, "2023-10-02", "2023-10-01", "S", 10200.0)
+        ));
+        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(responseAAPL);
+        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+
+        insiderTracker.trackInsiderTransactions();
+
+        verify(telegramClient).sendMessage(anyString());
+        verify(insiderPersistence).persistToFile(any(), anyString());
+    }
 }
