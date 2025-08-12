@@ -60,11 +60,11 @@ class TargetPriceProviderTest {
         targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
 
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
-        assertThat(targetPriceProvider.ignoredSymbols.get(CoinId.SOLANA.getName()).getIgnoreReasons(), aMapWithSize(2));
-        assertThat(targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreReasons(), aMapWithSize(1));
+        assertThat(targetPriceProvider.ignoredSymbols.get(CoinId.SOLANA.getName()).getIgnoreTimes(), aMapWithSize(2));
+        assertThat(targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreTimes(), aMapWithSize(1));
 
         targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.BUY_ALERT);
-        assertThat(targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreReasons(), aMapWithSize(2));
+        assertThat(targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreTimes(), aMapWithSize(2));
     }
 
     @Test
@@ -78,6 +78,14 @@ class TargetPriceProviderTest {
         assertThat(targetPriceProvider.isSymbolIgnored(StockSymbol.AMZN, IgnoreReason.BUY_ALERT), is(false));
         assertThat(targetPriceProvider.isSymbolIgnored(StockSymbol.AMD, IgnoreReason.BUY_ALERT), is(false));
         assertThat(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.SELL_ALERT), is(false));
+    }
+
+    @Test
+    void isSymbolIgnored_withThreshold() {
+        targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
+
+        assertThat(targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.CHANGE_PERCENT_ALERT, 5), is(true));
+        assertThat(targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.CHANGE_PERCENT_ALERT, 10), is(false));
     }
 
     @Test

@@ -52,44 +52,50 @@ public class TargetPriceProvider {
         }
     }
 
-    public void addIgnoredSymbol(TickerSymbol symbol, IgnoreReason reason) {
-        IgnoredSymbol existingSymbol = ignoredSymbols.get(symbol.getName());
-
-        if (existingSymbol == null) {
-            Map<IgnoreReason, Instant> reasonMap = new ConcurrentHashMap<>();
-            reasonMap.put(reason, Instant.now());
-            ignoredSymbols.put(symbol.getName(), new IgnoredSymbol(symbol, reasonMap));
-        } else {
-            Map<IgnoreReason, Instant> reasons = existingSymbol.getIgnoreReasons();
-            reasons.putIfAbsent(reason, Instant.now());
-        }
+    public void addIgnoredSymbol(TickerSymbol symbol, IgnoreReason reason, int alertThreshold) {
+        IgnoredSymbol existingSymbol = ignoredSymbols.computeIfAbsent(symbol.getName(), s -> new IgnoredSymbol(symbol));
+        existingSymbol.getIgnoreTimes().put(reason, Instant.now());
+        existingSymbol.getAlertThresholds().put(reason, alertThreshold);
     }
 
-    public boolean isSymbolIgnored(TickerSymbol symbol, IgnoreReason reason) {
+    public void addIgnoredSymbol(TickerSymbol symbol, IgnoreReason reason) {
+        addIgnoredSymbol(symbol, reason, 0);
+    }
+
+    public boolean isSymbolIgnored(TickerSymbol symbol, IgnoreReason reason, int alertThreshold) {
         IgnoredSymbol ignoredSymbol = ignoredSymbols.get(symbol.getName());
 
         if (ignoredSymbol == null) {
             return false;
         }
 
-        Map<IgnoreReason, Instant> reasons = ignoredSymbol.getIgnoreReasons();
-        Instant ignoreTime = reasons.get(reason);
+        if (alertThreshold > 0) {
+            Integer lastAlertedThreshold = ignoredSymbol.getAlertThresholds().get(reason);
+            return lastAlertedThreshold != null && alertThreshold <= lastAlertedThreshold;
+        }
 
+        Instant ignoreTime = ignoredSymbol.getIgnoreTimes().get(reason);
         if (ignoreTime == null) {
             return false;
         }
-        long elapsedSeconds = Duration.between(ignoreTime, Instant.now()).getSeconds();
-        long remainingSeconds = IGNORE_DURATION_TTL_SECONDS - elapsedSeconds;
 
-        log.info("{} is ignored for reason {}. Time remaining: {} seconds", symbol.getName(), reason, remainingSeconds);
-        return true;
+        long elapsedSeconds = Duration.between(ignoreTime, Instant.now()).getSeconds();
+        if (elapsedSeconds < IGNORE_DURATION_TTL_SECONDS) {
+            log.info("{} is ignored for reason {}. Time remaining: {} seconds", symbol.getName(), reason, IGNORE_DURATION_TTL_SECONDS - elapsedSeconds);
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isSymbolIgnored(TickerSymbol symbol, IgnoreReason reason) {
+        return isSymbolIgnored(symbol, reason, 0);
     }
 
     public void cleanupIgnoreSymbols(long ttlSeconds) {
         Instant now = Instant.now();
 
         for (IgnoredSymbol ignoredSymbol : ignoredSymbols.values()) {
-            Map<IgnoreReason, Instant> reasons = ignoredSymbol.getIgnoreReasons();
+            Map<IgnoreReason, Instant> reasons = ignoredSymbol.getIgnoreTimes();
             List<IgnoreReason> toRemove = new ArrayList<>();
             for (Map.Entry<IgnoreReason, Instant> entry : reasons.entrySet()) {
                 long duration = now.getEpochSecond() - entry.getValue().getEpochSecond();
@@ -98,9 +104,10 @@ public class TargetPriceProvider {
                 }
             }
             toRemove.forEach(reasons::remove);
+            toRemove.forEach(ignoredSymbol.getAlertThresholds()::remove);
         }
 
-        ignoredSymbols.entrySet().removeIf(entry -> entry.getValue().getIgnoreReasons().isEmpty());
+        ignoredSymbols.entrySet().removeIf(entry -> entry.getValue().getIgnoreTimes().isEmpty());
     }
 
     public synchronized void updateTargetPrice(TickerSymbol symbol, Double newBuyTarget, Double newSellTarget, String filePath) {
