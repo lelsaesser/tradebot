@@ -28,7 +28,7 @@ public class CoinGeckoClient {
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
         String endpointUrl = "/simple/price";
-        String url = BASE_URL + endpointUrl + "?ids=" + coinId.getId() + "&vs_currencies=usd";
+        String url = BASE_URL + endpointUrl + "?ids=" + coinId.getId() + "&vs_currencies=usd" + "&include_24hr_change=true";
 
         HttpHeaders headers = new HttpHeaders();
         headers.add("x-cg-demo-api-key", API_KEY);
