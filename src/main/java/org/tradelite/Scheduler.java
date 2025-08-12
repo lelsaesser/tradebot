@@ -81,11 +81,4 @@ public class Scheduler {
 
         log.info("Weekly insider trading report generated.");
     }
-
-    @Scheduled(cron = "0 0 0 * * *")
-    protected void resetDailyCryptoPrices() {
-        rootErrorHandler.run(coinGeckoPriceEvaluator::resetDailyPrices);
-
-        log.info("Daily crypto prices reset.");
-    }
 }

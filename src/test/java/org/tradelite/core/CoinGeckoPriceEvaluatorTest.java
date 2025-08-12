@@ -95,11 +95,7 @@ class CoinGeckoPriceEvaluatorTest {
     void evaluateHighPriceChange_shouldSendMessageWhenPriceSwingExceedsThreshold() {
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
         coinData.setCoinId(CoinId.BITCOIN);
-        coinData.setUsd(100.0);
-
-        coinGeckoPriceEvaluator.lastPriceCache.put(CoinId.BITCOIN, 90.0);
-        coinGeckoPriceEvaluator.dailyLowPrice.put(CoinId.BITCOIN, 95.0);
-        coinGeckoPriceEvaluator.dailyHighPrice.put(CoinId.BITCOIN, 105.0);
+        coinData.setUsd_24h_change(6.0);
 
         when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(false);
 
@@ -113,10 +109,7 @@ class CoinGeckoPriceEvaluatorTest {
     void evaluateHighPriceChange_shouldNotSendMessageWhenPriceSwingIsBelowThreshold() {
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
         coinData.setCoinId(CoinId.BITCOIN);
-        coinData.setUsd(100.0);
-
-        coinGeckoPriceEvaluator.dailyLowPrice.put(CoinId.BITCOIN, 98.0);
-        coinGeckoPriceEvaluator.dailyHighPrice.put(CoinId.BITCOIN, 102.0);
+        coinData.setUsd_24h_change(4.0);
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
@@ -128,10 +121,7 @@ class CoinGeckoPriceEvaluatorTest {
     void evaluateHighPriceChange_shouldNotSendMessageWhenSymbolIsIgnored() {
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
         coinData.setCoinId(CoinId.BITCOIN);
-        coinData.setUsd(100.0);
-
-        coinGeckoPriceEvaluator.dailyLowPrice.put(CoinId.BITCOIN, 90.0);
-        coinGeckoPriceEvaluator.dailyHighPrice.put(CoinId.BITCOIN, 110.0);
+        coinData.setUsd_24h_change(6.0);
 
         when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(true);
 
@@ -139,17 +129,6 @@ class CoinGeckoPriceEvaluatorTest {
 
         verify(telegramClient, never()).sendMessage(anyString());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
-    }
-
-    @Test
-    void resetDailyPrices_shouldClearMaps() {
-        coinGeckoPriceEvaluator.dailyLowPrice.put(CoinId.BITCOIN, 100.0);
-        coinGeckoPriceEvaluator.dailyHighPrice.put(CoinId.ETHEREUM, 200.0);
-
-        coinGeckoPriceEvaluator.resetDailyPrices();
-
-        assertThat(coinGeckoPriceEvaluator.dailyLowPrice.isEmpty(), is(true));
-        assertThat(coinGeckoPriceEvaluator.dailyHighPrice.isEmpty(), is(true));
     }
 
     @Test
@@ -165,11 +144,7 @@ class CoinGeckoPriceEvaluatorTest {
     void evaluateHighPriceChange_negativeChange() {
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
         coinData.setCoinId(CoinId.BITCOIN);
-        coinData.setUsd(90.0);
-
-        coinGeckoPriceEvaluator.lastPriceCache.put(CoinId.BITCOIN, 100.0);
-        coinGeckoPriceEvaluator.dailyLowPrice.put(CoinId.BITCOIN, 90.0);
-        coinGeckoPriceEvaluator.dailyHighPrice.put(CoinId.BITCOIN, 100.0);
+        coinData.setUsd_24h_change(-6.0);
 
         when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(false);
 
