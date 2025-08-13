@@ -69,12 +69,19 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
     public void evaluateHighPriceChange(PriceQuoteResponse priceQuote) {
         double percentChange = priceQuote.getChangePercent();
+        double absPercentChange = Math.abs(percentChange);
 
-        if ((percentChange > 5.0 || percentChange < -5.0) && !targetPriceProvider.isSymbolIgnored(priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT)) {
+        if (absPercentChange < 5.0) {
+            return;
+        }
+
+        int alertThreshold = (int) (absPercentChange / 5.0) * 5;
+
+        if (alertThreshold > 0 && !targetPriceProvider.isSymbolIgnored(priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
             log.info("High price change detected for {}: {}%", priceQuote.getStockSymbol(), percentChange);
             String emoji = percentChange > 0 ? "📈" : "📉";
             telegramClient.sendMessage(emoji + " High daily price swing detected for " + priceQuote.getStockSymbol() + ": " + String.format("%.2f", percentChange) + "%");
-            targetPriceProvider.addIgnoredSymbol(priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT);
+            targetPriceProvider.addIgnoredSymbol(priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
         }
     }
 }

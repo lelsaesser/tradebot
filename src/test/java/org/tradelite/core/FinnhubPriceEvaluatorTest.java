@@ -67,10 +67,12 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(6.0);
 
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
+
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, times(1)).sendMessage("📈 High daily price swing detected for AVGO: 6.00%");
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT);
+        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test
@@ -79,10 +81,12 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(-6.0);
 
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
+
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, times(1)).sendMessage("📉 High daily price swing detected for AVGO: -6.00%");
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT);
+        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test
@@ -103,12 +107,40 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(true);
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, never()).sendMessage(any());
-        verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
+        verify(targetPriceProvider, never()).addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
+    }
+
+    @Test
+    void evaluateHighPriceChange_multipleThresholds() {
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
+        priceQuoteResponse.setChangePercent(11.0);
+
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10)).thenReturn(false);
+
+        finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
+
+        verify(telegramClient, times(1)).sendMessage("📈 High daily price swing detected for AVGO: 11.00%");
+        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10);
+    }
+
+    @Test
+    void evaluateHighPriceChange_thresholdAlreadyAlerted() {
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
+        priceQuoteResponse.setChangePercent(11.0);
+
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10)).thenReturn(true);
+
+        finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
+
+        verify(telegramClient, never()).sendMessage(any());
+        verify(targetPriceProvider, never()).addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
     }
 
     @Test

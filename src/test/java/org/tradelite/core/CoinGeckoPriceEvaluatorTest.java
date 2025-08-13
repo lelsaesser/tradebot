@@ -97,12 +97,12 @@ class CoinGeckoPriceEvaluatorTest {
         coinData.setCoinId(CoinId.BITCOIN);
         coinData.setUsd_24h_change(6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
         verify(telegramClient, times(1)).sendMessage(anyString());
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT);
+        verify(targetPriceProvider, times(1)).addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test
@@ -123,12 +123,12 @@ class CoinGeckoPriceEvaluatorTest {
         coinData.setCoinId(CoinId.BITCOIN);
         coinData.setUsd_24h_change(6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(true);
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
         verify(telegramClient, never()).sendMessage(anyString());
-        verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
+        verify(targetPriceProvider, never()).addIgnoredSymbol(any(CoinId.class), any(IgnoreReason.class), anyInt());
     }
 
     @Test
@@ -146,12 +146,12 @@ class CoinGeckoPriceEvaluatorTest {
         coinData.setCoinId(CoinId.BITCOIN);
         coinData.setUsd_24h_change(-6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT)).thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
         verify(telegramClient, times(1)).sendMessage(anyString());
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT);
+        verify(targetPriceProvider, times(1)).addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test

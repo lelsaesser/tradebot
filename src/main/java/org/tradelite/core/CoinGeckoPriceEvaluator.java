@@ -67,11 +67,18 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     public void evaluateHighPriceChange(CoinGeckoPriceResponse.CoinData priceData) {
         CoinId coinId = priceData.getCoinId();
         double percentChange = priceData.getUsd_24h_change();
+        double absPercentChange = Math.abs(percentChange);
 
-        if ((percentChange > 5.0 || percentChange < -5.0) && !targetPriceProvider.isSymbolIgnored(coinId, IgnoreReason.CHANGE_PERCENT_ALERT)) {
+        if (absPercentChange < 5.0) {
+            return;
+        }
+
+        int alertThreshold = (int) (absPercentChange / 5.0) * 5;
+
+        if (alertThreshold > 0 && !targetPriceProvider.isSymbolIgnored(coinId, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
             String emoji = percentChange > 0 ? "📈" : "📉";
             telegramClient.sendMessage(emoji + " High daily price swing detected for " + coinId.getId() + ": " + String.format("%.2f", percentChange) + "%");
-            targetPriceProvider.addIgnoredSymbol(coinId, IgnoreReason.CHANGE_PERCENT_ALERT);
+            targetPriceProvider.addIgnoredSymbol(coinId, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
         }
     }
 }
