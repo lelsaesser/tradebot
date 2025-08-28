@@ -128,4 +128,30 @@ class SchedulerTest {
 
         verify(insiderTracker, times(1)).trackInsiderTransactions();
     }
+
+    @Test
+    void rsiStockMonitoring_shouldFetchStockPrices() throws Exception {
+        scheduler.rsiStockMonitoring();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(rsiPriceFetcher, times(1)).fetchStockClosingPrices();
+    }
+
+    @Test
+    void rsiCryptoMonitoring_shouldFetchCryptoPrices() throws Exception {
+        scheduler.rsiCryptoMonitoring();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(rsiPriceFetcher, times(1)).fetchCryptoClosingPrices();
+    }
 }

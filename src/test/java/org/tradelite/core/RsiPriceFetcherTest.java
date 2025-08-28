@@ -49,6 +49,16 @@ public class RsiPriceFetcherTest {
     }
 
     @Test
+    void testFetchStockClosingPrices_exception() {
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenThrow(new RuntimeException("API error"));
+
+        rsiPriceFetcher.fetchStockClosingPrices();
+
+        verify(rsiService, never()).addPrice(any(StockSymbol.class), anyDouble(), any());
+    }
+
+    @Test
     void testFetchCryptoClosingPrices() {
         when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
@@ -58,5 +68,15 @@ public class RsiPriceFetcherTest {
         rsiPriceFetcher.fetchCryptoClosingPrices();
 
         verify(rsiService, times(1)).addPrice(any(CoinId.class), anyDouble(), any());
+    }
+
+    @Test
+    void testFetchCryptoClosingPrices_coinNotFound() {
+        when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("not_a_coin", 100, 200)));
+
+        rsiPriceFetcher.fetchCryptoClosingPrices();
+
+        verify(coinGeckoClient, never()).getCoinPriceData(any(CoinId.class));
+        verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), any());
     }
 }

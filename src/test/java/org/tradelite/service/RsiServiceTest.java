@@ -15,6 +15,8 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -25,8 +27,6 @@ public class RsiServiceTest {
     @Mock
     private TelegramClient telegramClient;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
-
     private RsiService rsiService;
 
     private final StockSymbol symbol = StockSymbol.AAPL;
@@ -34,57 +34,102 @@ public class RsiServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Ensure the test starts with a clean state
         new File(rsiDataFile).delete();
         rsiService = new RsiService(telegramClient, new ObjectMapper());
     }
 
     @Test
-    void testAddPriceAndCalculateRsi() {
+    void testAddPriceAndCalculateRsi_overbought() {
         for (int i = 0; i < 14; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
         }
 
-        // Verify RSI calculation and notification
         verify(telegramClient, times(1)).sendMessage(anyString());
     }
 
     @Test
+    void testAddPriceAndCalculateRsi_oversold() {
+        // Add declining prices to trigger oversold condition (RSI <= 30)
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
+        }
+
+        // Verify RSI calculation and notification for oversold (may be called multiple times as we add prices)
+        verify(telegramClient, atLeastOnce()).sendMessage(contains("oversold"));
+    }
+
+    @Test
+    void testCalculateRsi_withLosses() {
+        // Test RSI calculation with declining prices to cover loss calculation
+        java.util.List<Double> decliningPrices = java.util.Arrays.asList(
+            100.0, 95.0, 90.0, 85.0, 80.0, 75.0, 70.0, 65.0, 
+            60.0, 55.0, 50.0, 45.0, 40.0, 35.0, 30.0
+        );
+        
+        double rsi = rsiService.calculateRsi(decliningPrices);
+        
+        // RSI should be low for declining prices
+        assertThat(rsi, is(closeTo(0.0, 0.1)));
+    }
+
+    @Test
+    void testCalculateRsi_mixedPrices() {
+        // Test RSI calculation with mixed gains and losses to cover RS calculation
+        java.util.List<Double> mixedPrices = java.util.Arrays.asList(
+            100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0,
+            108.0, 114.0, 110.0, 116.0, 112.0, 118.0, 114.0
+        );
+        
+        double rsi = rsiService.calculateRsi(mixedPrices);
+        
+        // RSI should be between 0 and 100
+        assertThat(rsi, is(both(greaterThanOrEqualTo(0.0)).and(lessThanOrEqualTo(100.0))));
+    }
+
+    @Test
     void testPriceHistoryPersistence() throws Exception {
-        // Create a dummy file to make file.exists() true
         File dummyFile = new File(rsiDataFile);
         dummyFile.getParentFile().mkdirs();
         dummyFile.createNewFile();
 
-        // Create the data that should be "loaded"
         Map<org.tradelite.common.TickerSymbol, RsiDailyClosePrice> expectedHistory = new HashMap<>();
         RsiDailyClosePrice priceData = new RsiDailyClosePrice();
         priceData.addPrice(LocalDate.now(), 150.0);
         expectedHistory.put(symbol, priceData);
 
-        // Mock objectMapper to return the data when readValue is called
         ObjectMapper spyObjectMapper = spy(new ObjectMapper());
         doReturn(expectedHistory).when(spyObjectMapper).readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
 
-        // Create the service. Its constructor will call loadPriceHistory.
         RsiService serviceWithHistory = new RsiService(telegramClient, spyObjectMapper);
 
-        // Assert that the history was loaded correctly.
         assertEquals(1, serviceWithHistory.getPriceHistory().get(symbol).getPrices().size());
         assertEquals(150.0, serviceWithHistory.getPriceHistory().get(symbol).getPriceValues().get(0));
 
-        // Clean up the dummy file
         dummyFile.delete();
     }
 
     @Test
     void testLoadPriceHistory_fileNotFound() {
-        // Ensure the file does not exist
         new File(rsiDataFile).delete();
 
-        // This should not throw an exception
         rsiService.loadPriceHistory();
 
         assertEquals(0, rsiService.getPriceHistory().size());
+    }
+
+    @Test
+    void testLoadPriceHistory_invalidFile() throws Exception {
+        File dummyFile = new File(rsiDataFile);
+        dummyFile.getParentFile().mkdirs();
+        dummyFile.createNewFile();
+
+        ObjectMapper spyObjectMapper = spy(new ObjectMapper());
+        doThrow(new java.io.IOException("Invalid file format")).when(spyObjectMapper).readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
+
+        RsiService serviceWithHistory = new RsiService(telegramClient, spyObjectMapper);
+
+        assertEquals(0, serviceWithHistory.getPriceHistory().size());
+
+        dummyFile.delete();
     }
 }
