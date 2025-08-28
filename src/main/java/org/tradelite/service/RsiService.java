@@ -59,7 +59,7 @@ public class RsiService {
         }
     }
 
-    private double calculateRsi(List<Double> prices) {
+    protected double calculateRsi(List<Double> prices) {
         List<Double> gains = new ArrayList<>();
         List<Double> losses = new ArrayList<>();
 
@@ -85,7 +85,7 @@ public class RsiService {
         return 100 - (100 / (1 + rs));
     }
 
-    private void loadPriceHistory() {
+    protected void loadPriceHistory() {
         try {
             File file = new File(RSI_DATA_FILE);
             if (file.exists()) {
@@ -102,5 +102,9 @@ public class RsiService {
         } catch (IOException e) {
             log.error("Error saving RSI data", e);
         }
+    }
+
+    protected Map<TickerSymbol, RsiDailyClosePrice> getPriceHistory() {
+        return priceHistory;
     }
 }
