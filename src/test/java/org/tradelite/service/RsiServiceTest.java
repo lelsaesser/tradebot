@@ -176,4 +176,95 @@ class RsiServiceTest {
         assertEquals(LocalDate.of(2023, 1, 15), deserializedData.get(symbol.getName()).getPrices().getFirst().getDate());
         assertEquals(150.0, deserializedData.get(symbol.getName()).getPrices().getFirst().getPrice());
     }
+
+    @Test
+    void testHolidayDetection_identicalPrices() throws IOException {
+        LocalDate firstDay = LocalDate.of(2023, 12, 22);
+        LocalDate secondDay = LocalDate.of(2023, 12, 25); // Christmas Day
+        double price = 150.50;
+
+        // Add first price
+        rsiService.addPrice(symbol, price, firstDay);
+        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        
+        // Add identical price on different day - should trigger holiday detection and skip adding
+        rsiService.addPrice(symbol, price, secondDay);
+
+        // Verify holiday was detected but price was NOT added (still only 1 entry)
+        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        
+        // Verify the date is still the first day, not the holiday
+        assertEquals(firstDay, rsiService.getPriceHistory().get(symbol.getName()).getPrices().getFirst().getDate());
+    }
+
+    @Test
+    void testHolidayDetection_slightlyDifferentPrices() throws IOException {
+        LocalDate firstDay = LocalDate.of(2023, 12, 22);
+        LocalDate secondDay = LocalDate.of(2023, 12, 25);
+        
+        // Add first price
+        rsiService.addPrice(symbol, 150.50, firstDay);
+        
+        // Add slightly different price - should NOT trigger holiday detection
+        rsiService.addPrice(symbol, 150.51, secondDay);
+
+        assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+    }
+
+    @Test
+    void testHolidayDetection_sameDate() throws IOException {
+        LocalDate sameDay = LocalDate.of(2023, 12, 22);
+        double price = 150.50;
+
+        // Add first price
+        rsiService.addPrice(symbol, price, sameDay);
+        
+        // Add identical price on same day - should be filtered out as duplicate
+        rsiService.addPrice(symbol, price, sameDay);
+
+        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+    }
+
+    @Test
+    void testHolidayDetection_noPreviousData() throws IOException {
+        LocalDate firstDay = LocalDate.of(2023, 12, 22);
+        double price = 150.50;
+
+        // Add first price with no previous data
+        rsiService.addPrice(symbol, price, firstDay);
+
+        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+    }
+
+    @Test
+    void testHolidayDetection_withinEpsilon() throws IOException {
+        LocalDate firstDay = LocalDate.of(2023, 12, 22);
+        LocalDate secondDay = LocalDate.of(2023, 12, 25);
+        
+        // Add first price
+        rsiService.addPrice(symbol, 150.5000, firstDay);
+        
+        // Verify we have 1 price entry
+        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        
+        // Add price within epsilon (0.0001) - should trigger holiday detection and skip adding
+        rsiService.addPrice(symbol, 150.5000, secondDay);
+
+        // Verify holiday was detected but price was NOT added (still only 1 entry)
+        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+    }
+
+    @Test
+    void testHolidayDetection_outsideEpsilon() throws IOException {
+        LocalDate firstDay = LocalDate.of(2023, 12, 22);
+        LocalDate secondDay = LocalDate.of(2023, 12, 25);
+        
+        // Add first price
+        rsiService.addPrice(symbol, 150.5000, firstDay);
+        
+        // Add price outside epsilon (0.0001) - should NOT trigger holiday detection
+        rsiService.addPrice(symbol, 150.5002, secondDay);
+
+        assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+    }
 }

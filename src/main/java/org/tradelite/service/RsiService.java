@@ -7,15 +7,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -40,10 +38,35 @@ public class RsiService {
     public void addPrice(TickerSymbol symbol, double price, LocalDate date) throws IOException {
         String symbolKey = symbol.getName();
         RsiDailyClosePrice rsiDailyClosePrice = priceHistory.getOrDefault(symbolKey, new RsiDailyClosePrice());
+        
+        if (isPotentialMarketHoliday(rsiDailyClosePrice, price, date)) {
+            log.info("Potential market holiday detected for {}: price {} on {} is identical to previous trading day. Skipping price update.", 
+                    symbol, price, date);
+            return;
+        }
+        
         rsiDailyClosePrice.addPrice(date, price);
         priceHistory.put(symbolKey, rsiDailyClosePrice);
         savePriceHistory();
         calculateAndNotifyRsi(symbol, rsiDailyClosePrice);
+    }
+
+    private boolean isPotentialMarketHoliday(RsiDailyClosePrice rsiDailyClosePrice, double newPrice, LocalDate newDate) {
+        if (rsiDailyClosePrice.getPrices().isEmpty()) {
+            return false; // No previous data to compare
+        }
+        
+        // Use getPriceValues() to ensure data is sorted, then get the most recent price entry
+        rsiDailyClosePrice.getPriceValues(); // This is expected to sort the prices list
+        var mostRecentPrice = rsiDailyClosePrice.getPrices().getLast();
+        
+        // Check if the new price is identical to the most recent price
+        // Use a small epsilon for double comparison to handle floating point precision
+        double epsilon = 0.0001;
+        boolean pricesIdentical = Math.abs(newPrice - mostRecentPrice.getPrice()) < epsilon;
+        
+        // Only consider it a potential holiday if prices are identical, and it's not the same date
+        return pricesIdentical && !newDate.equals(mostRecentPrice.getDate());
     }
 
     private void calculateAndNotifyRsi(TickerSymbol symbol, RsiDailyClosePrice rsiDailyClosePrice) {
