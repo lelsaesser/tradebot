@@ -8,9 +8,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.core.CoinGeckoPriceEvaluator;
-import org.tradelite.core.FinnhubPriceEvaluator;
-import org.tradelite.core.InsiderTracker;
+import org.tradelite.core.*;
 import org.tradelite.utils.DateUtil;
 
 import java.time.DayOfWeek;
@@ -30,6 +28,7 @@ public class Scheduler {
     private final TelegramMessageProcessor telegramMessageProcessor;
     private final RootErrorHandler rootErrorHandler;
     private final InsiderTracker insiderTracker;
+    private final RsiPriceFetcher rsiPriceFetcher;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -38,9 +37,10 @@ public class Scheduler {
     @Autowired
     Scheduler(FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
               TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor,
-              RootErrorHandler rootErrorHandler, InsiderTracker insiderTracker) {
+              RootErrorHandler rootErrorHandler, InsiderTracker insiderTracker, RsiPriceFetcher rsiPriceFetcher) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
+        this.rsiPriceFetcher = rsiPriceFetcher;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.telegramMessageProcessor = telegramMessageProcessor;
@@ -58,6 +58,20 @@ public class Scheduler {
         rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
 
         log.info("Market monitoring round completed.");
+    }
+
+    @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
+    protected void rsiStockMonitoring() {
+        rootErrorHandler.run(rsiPriceFetcher::fetchStockClosingPrices);
+
+        log.info("RSI daily stock price data fetch completed.");
+    }
+
+    @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
+    protected void rsiCryptoMonitoring() {
+        rootErrorHandler.run(rsiPriceFetcher::fetchCryptoClosingPrices);
+
+        log.info("RSI daily crypto price data fetch completed.");
     }
 
     @Scheduled(fixedRate = 600000)

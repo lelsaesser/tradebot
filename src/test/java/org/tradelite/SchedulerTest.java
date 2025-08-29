@@ -12,6 +12,7 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
+import org.tradelite.core.RsiPriceFetcher;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -38,13 +39,15 @@ class SchedulerTest {
     private RootErrorHandler rootErrorHandler;
     @Mock
     private InsiderTracker insiderTracker;
+    @Mock
+    private RsiPriceFetcher rsiPriceFetcher;
 
     private Scheduler scheduler;
 
     @BeforeEach
     void setUp() {
         scheduler = new Scheduler(finnhubPriceEvaluator, coinGeckoPriceEvaluator, targetPriceProvider,
-                telegramClient, telegramMessageProcessor, rootErrorHandler, insiderTracker);
+                telegramClient, telegramMessageProcessor, rootErrorHandler, insiderTracker, rsiPriceFetcher);
     }
 
     @Test
@@ -124,5 +127,31 @@ class SchedulerTest {
         captor.getValue().run();
 
         verify(insiderTracker, times(1)).trackInsiderTransactions();
+    }
+
+    @Test
+    void rsiStockMonitoring_shouldFetchStockPrices() throws Exception {
+        scheduler.rsiStockMonitoring();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(rsiPriceFetcher, times(1)).fetchStockClosingPrices();
+    }
+
+    @Test
+    void rsiCryptoMonitoring_shouldFetchCryptoPrices() throws Exception {
+        scheduler.rsiCryptoMonitoring();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(rsiPriceFetcher, times(1)).fetchCryptoClosingPrices();
     }
 }
