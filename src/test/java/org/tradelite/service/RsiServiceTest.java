@@ -1,6 +1,7 @@
 package org.tradelite.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +12,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,11 +20,12 @@ import java.util.Map;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class RsiServiceTest {
+class RsiServiceTest {
 
     @Mock
     private TelegramClient telegramClient;
@@ -33,13 +36,15 @@ public class RsiServiceTest {
     private final String rsiDataFile = "config/rsi-data.json";
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         new File(rsiDataFile).delete();
-        rsiService = new RsiService(telegramClient, new ObjectMapper());
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        rsiService = new RsiService(telegramClient, objectMapper);
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_overbought() {
+    void testAddPriceAndCalculateRsi_overbought() throws IOException {
         for (int i = 0; i < 14; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
         }
@@ -48,7 +53,7 @@ public class RsiServiceTest {
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_oversold() {
+    void testAddPriceAndCalculateRsi_oversold() throws IOException {
         // Add declining prices to trigger oversold condition (RSI <= 30)
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
@@ -109,7 +114,7 @@ public class RsiServiceTest {
     }
 
     @Test
-    void testLoadPriceHistory_fileNotFound() {
+    void testLoadPriceHistory_fileNotFound() throws IOException {
         new File(rsiDataFile).delete();
 
         rsiService.loadPriceHistory();
@@ -126,9 +131,7 @@ public class RsiServiceTest {
         ObjectMapper spyObjectMapper = spy(new ObjectMapper());
         doThrow(new java.io.IOException("Invalid file format")).when(spyObjectMapper).readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
 
-        RsiService serviceWithHistory = new RsiService(telegramClient, spyObjectMapper);
-
-        assertEquals(0, serviceWithHistory.getPriceHistory().size());
+        assertThrows(IOException.class, () -> new RsiService(telegramClient, spyObjectMapper));
 
         dummyFile.delete();
     }

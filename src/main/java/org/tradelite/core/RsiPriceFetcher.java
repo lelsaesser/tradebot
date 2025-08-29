@@ -13,6 +13,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -26,7 +27,7 @@ public class RsiPriceFetcher {
     private final TargetPriceProvider targetPriceProvider;
     private final RsiService rsiService;
 
-    public void fetchStockClosingPrices() {
+    public void fetchStockClosingPrices() throws IOException {
         LocalDate today = LocalDate.now();
 
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
@@ -38,11 +39,12 @@ public class RsiPriceFetcher {
                 }
             } catch (Exception e) {
                 log.error("Error fetching stock price for RSI", e);
+                throw e;
             }
         }
     }
 
-    public void fetchCryptoClosingPrices() {
+    public void fetchCryptoClosingPrices() throws IOException {
         LocalDate today = LocalDate.now();
 
         for (TargetPrice targetPrice : targetPriceProvider.getCoinTargetPrices()) {
@@ -54,6 +56,7 @@ public class RsiPriceFetcher {
                 }
             } catch (Exception e) {
                 log.error("Error fetching crypto price for RSI", e);
+                throw e;
             }
         }
     }

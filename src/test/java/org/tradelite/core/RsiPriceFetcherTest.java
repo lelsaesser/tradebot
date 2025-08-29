@@ -15,13 +15,15 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
 
+import java.io.IOException;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class RsiPriceFetcherTest {
+class RsiPriceFetcherTest {
 
     @Mock
     private FinnhubClient finnhubClient;
@@ -39,7 +41,7 @@ public class RsiPriceFetcherTest {
     private RsiPriceFetcher rsiPriceFetcher;
 
     @Test
-    void testFetchStockClosingPrices() {
+    void testFetchStockClosingPrices() throws IOException {
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(new PriceQuoteResponse());
 
@@ -49,17 +51,17 @@ public class RsiPriceFetcherTest {
     }
 
     @Test
-    void testFetchStockClosingPrices_exception() {
+    void testFetchStockClosingPrices_exception() throws IOException {
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenThrow(new RuntimeException("API error"));
 
-        rsiPriceFetcher.fetchStockClosingPrices();
+        assertThrows(RuntimeException.class, () -> rsiPriceFetcher.fetchStockClosingPrices());
 
         verify(rsiService, never()).addPrice(any(StockSymbol.class), anyDouble(), any());
     }
 
     @Test
-    void testFetchCryptoClosingPrices() {
+    void testFetchCryptoClosingPrices() throws IOException {
         when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
         coinData.setUsd(50000);
@@ -71,7 +73,7 @@ public class RsiPriceFetcherTest {
     }
 
     @Test
-    void testFetchCryptoClosingPrices_coinNotFound() {
+    void testFetchCryptoClosingPrices_coinNotFound() throws IOException {
         when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("not_a_coin", 100, 200)));
 
         rsiPriceFetcher.fetchCryptoClosingPrices();
