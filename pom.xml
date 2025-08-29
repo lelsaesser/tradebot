@@ -38,6 +38,10 @@
             <artifactId>lombok</artifactId>
             <version>1.18.34</version>
         </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
 
         <!-- TEST SCOPE -->
         <dependency>

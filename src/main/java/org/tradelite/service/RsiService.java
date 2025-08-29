@@ -28,7 +28,7 @@ public class RsiService {
     private final ObjectMapper objectMapper;
 
     @Getter
-    private Map<TickerSymbol, RsiDailyClosePrice> priceHistory = new HashMap<>();
+    private Map<String, RsiDailyClosePrice> priceHistory = new HashMap<>();
 
     @Autowired
     public RsiService(TelegramClient telegramClient, ObjectMapper objectMapper) throws IOException {
@@ -38,9 +38,10 @@ public class RsiService {
     }
 
     public void addPrice(TickerSymbol symbol, double price, LocalDate date) throws IOException {
-        RsiDailyClosePrice rsiDailyClosePrice = priceHistory.getOrDefault(symbol, new RsiDailyClosePrice());
+        String symbolKey = symbol.getName();
+        RsiDailyClosePrice rsiDailyClosePrice = priceHistory.getOrDefault(symbolKey, new RsiDailyClosePrice());
         rsiDailyClosePrice.addPrice(date, price);
-        priceHistory.put(symbol, rsiDailyClosePrice);
+        priceHistory.put(symbolKey, rsiDailyClosePrice);
         savePriceHistory();
         calculateAndNotifyRsi(symbol, rsiDailyClosePrice);
     }
@@ -116,7 +117,7 @@ public class RsiService {
         try {
             File file = new File(RSI_DATA_FILE);
             if (file.exists()) {
-                priceHistory = objectMapper.readValue(file, objectMapper.getTypeFactory().constructMapType(HashMap.class, TickerSymbol.class, RsiDailyClosePrice.class));
+                priceHistory = objectMapper.readValue(file, objectMapper.getTypeFactory().constructMapType(HashMap.class, String.class, RsiDailyClosePrice.class));
             }
         } catch (IOException e) {
             log.error("Error loading RSI data", e);

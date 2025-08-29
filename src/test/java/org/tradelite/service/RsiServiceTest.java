@@ -1,12 +1,11 @@
 package org.tradelite.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.service.model.RsiDailyClosePrice;
@@ -25,11 +24,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.contains;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
 class RsiServiceTest {
 
-    @Mock
+    @MockitoBean
     private TelegramClient telegramClient;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private RsiService rsiService;
 
@@ -39,8 +41,6 @@ class RsiServiceTest {
     @BeforeEach
     void setUp() throws IOException {
         new File(rsiDataFile).delete();
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
         rsiService = spy(new RsiService(telegramClient, objectMapper));
     }
 
@@ -114,18 +114,18 @@ class RsiServiceTest {
         dummyFile.getParentFile().mkdirs();
         dummyFile.createNewFile();
 
-        Map<org.tradelite.common.TickerSymbol, RsiDailyClosePrice> expectedHistory = new HashMap<>();
+        Map<String, RsiDailyClosePrice> expectedHistory = new HashMap<>();
         RsiDailyClosePrice priceData = new RsiDailyClosePrice();
         priceData.addPrice(LocalDate.now(), 150.0);
-        expectedHistory.put(symbol, priceData);
+        expectedHistory.put(symbol.getName(), priceData);
 
         ObjectMapper spyObjectMapper = spy(new ObjectMapper());
         doReturn(expectedHistory).when(spyObjectMapper).readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
 
         RsiService serviceWithHistory = new RsiService(telegramClient, spyObjectMapper);
 
-        assertEquals(1, serviceWithHistory.getPriceHistory().get(symbol).getPrices().size());
-        assertEquals(150.0, serviceWithHistory.getPriceHistory().get(symbol).getPriceValues().get(0));
+        assertEquals(1, serviceWithHistory.getPriceHistory().get(symbol.getName()).getPrices().size());
+        assertEquals(150.0, serviceWithHistory.getPriceHistory().get(symbol.getName()).getPriceValues().get(0));
 
         dummyFile.delete();
     }
@@ -151,5 +151,29 @@ class RsiServiceTest {
         assertThrows(IOException.class, () -> new RsiService(telegramClient, spyObjectMapper));
 
         dummyFile.delete();
+    }
+
+    @Test
+    void testObjectMapperCanSerializeLocalDate() throws Exception {
+        // This test ensures the Spring-configured ObjectMapper can handle LocalDate serialization
+        // If the JSR310 module is not registered, this test will fail
+        RsiDailyClosePrice priceData = new RsiDailyClosePrice();
+        priceData.addPrice(LocalDate.of(2023, 1, 15), 150.0);
+        
+        Map<String, RsiDailyClosePrice> testData = new HashMap<>();
+        testData.put(symbol.getName(), priceData);
+        
+        // This should not throw an exception if JSR310 module is properly configured
+        String json = objectMapper.writeValueAsString(testData);
+        // LocalDate is serialized as an array [year, month, day] by default with JSR310
+        assertThat(json, containsString("[2023,1,15]"));
+        
+        // Verify we can also deserialize it back
+        Map<String, RsiDailyClosePrice> deserializedData = 
+            objectMapper.readValue(json, objectMapper.getTypeFactory().constructMapType(HashMap.class, String.class, RsiDailyClosePrice.class));
+        
+        assertEquals(1, deserializedData.get(symbol.getName()).getPrices().size());
+        assertEquals(LocalDate.of(2023, 1, 15), deserializedData.get(symbol.getName()).getPrices().getFirst().getDate());
+        assertEquals(150.0, deserializedData.get(symbol.getName()).getPrices().getFirst().getPrice());
     }
 }
