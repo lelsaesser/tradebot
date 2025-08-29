@@ -25,7 +25,7 @@ public class RsiDailyClosePrice {
             prices.add(newPrice);
         }
 
-        if (prices.size() > 14) {
+        if (prices.size() > 15) {
             prices.sort((p1, p2) -> p1.getDate().compareTo(p2.getDate()));
             prices.removeFirst();
         }

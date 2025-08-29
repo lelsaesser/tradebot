@@ -44,7 +44,8 @@ public class RsiService {
     }
 
     private void calculateAndNotifyRsi(TickerSymbol symbol, RsiDailyClosePrice rsiDailyClosePrice) {
-        if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD) {
+        // Need 15 prices to calculate 14 price changes for RSI
+        if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD + 1) {
             return;
         }
 
@@ -60,9 +61,14 @@ public class RsiService {
     }
 
     protected double calculateRsi(List<Double> prices) {
+        if (prices.size() < RSI_PERIOD + 1) {
+            throw new IllegalArgumentException("Need at least " + (RSI_PERIOD + 1) + " prices to calculate RSI");
+        }
+
         List<Double> gains = new ArrayList<>();
         List<Double> losses = new ArrayList<>();
 
+        // Calculate price changes
         for (int i = 1; i < prices.size(); i++) {
             double change = prices.get(i) - prices.get(i - 1);
             if (change > 0) {
@@ -74,8 +80,27 @@ public class RsiService {
             }
         }
 
-        double avgGain = gains.stream().mapToDouble(d -> d).average().orElse(0.0);
-        double avgLoss = losses.stream().mapToDouble(d -> d).average().orElse(0.0);
+        // Calculate initial average gain and loss (simple average for first RSI_PERIOD)
+        double initialAvgGain = 0.0;
+        double initialAvgLoss = 0.0;
+        
+        for (int i = 0; i < RSI_PERIOD; i++) {
+            initialAvgGain += gains.get(i);
+            initialAvgLoss += losses.get(i);
+        }
+        
+        initialAvgGain /= RSI_PERIOD;
+        initialAvgLoss /= RSI_PERIOD;
+
+        // Use Wilder's smoothing for subsequent calculations
+        double avgGain = initialAvgGain;
+        double avgLoss = initialAvgLoss;
+        
+        // Apply Wilder's smoothing for any additional periods beyond the initial 14
+        for (int i = RSI_PERIOD; i < gains.size(); i++) {
+            avgGain = ((avgGain * (RSI_PERIOD - 1)) + gains.get(i)) / RSI_PERIOD;
+            avgLoss = ((avgLoss * (RSI_PERIOD - 1)) + losses.get(i)) / RSI_PERIOD;
+        }
 
         if (avgLoss == 0) {
             return 100;

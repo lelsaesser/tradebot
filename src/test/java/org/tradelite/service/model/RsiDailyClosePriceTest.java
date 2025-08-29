@@ -18,8 +18,8 @@ class RsiDailyClosePriceTest {
         rsiDailyClosePrice.addPrice(date, 100.0);
         
         assertThat(rsiDailyClosePrice.getPrices(), hasSize(1));
-        assertThat(rsiDailyClosePrice.getPrices().get(0).getPrice(), is(equalTo(100.0)));
-        assertThat(rsiDailyClosePrice.getPrices().get(0).getDate(), is(equalTo(date)));
+        assertThat(rsiDailyClosePrice.getPrices().getFirst().getPrice(), is(equalTo(100.0)));
+        assertThat(rsiDailyClosePrice.getPrices().getFirst().getDate(), is(equalTo(date)));
     }
 
     @Test
@@ -30,32 +30,32 @@ class RsiDailyClosePriceTest {
         // Add initial price
         rsiDailyClosePrice.addPrice(date, 100.0);
         assertThat(rsiDailyClosePrice.getPrices(), hasSize(1));
-        assertThat(rsiDailyClosePrice.getPrices().get(0).getPrice(), is(equalTo(100.0)));
+        assertThat(rsiDailyClosePrice.getPrices().getFirst().getPrice(), is(equalTo(100.0)));
         
         // Update price for same date
         rsiDailyClosePrice.addPrice(date, 150.0);
         assertThat(rsiDailyClosePrice.getPrices(), hasSize(1));
-        assertThat(rsiDailyClosePrice.getPrices().get(0).getPrice(), is(equalTo(150.0)));
+        assertThat(rsiDailyClosePrice.getPrices().getFirst().getPrice(), is(equalTo(150.0)));
     }
 
     @Test
-    void testAddPrice_removeOldestWhenSizeExceeds14() {
+    void testAddPrice_removeOldestWhenSizeExceeds15() {
         RsiDailyClosePrice rsiDailyClosePrice = new RsiDailyClosePrice();
         
-        // Add 15 prices to trigger removal of oldest
-        for (int i = 0; i < 15; i++) {
-            rsiDailyClosePrice.addPrice(LocalDate.now().minusDays(14 - i), 100.0 + i);
+        // Add 16 prices to trigger removal of oldest
+        for (int i = 0; i < 16; i++) {
+            rsiDailyClosePrice.addPrice(LocalDate.now().minusDays(15 - i), 100.0 + i);
         }
         
-        // Should only have 14 prices (oldest removed)
-        assertThat(rsiDailyClosePrice.getPrices(), hasSize(14));
+        // Should only have 15 prices (oldest removed)
+        assertThat(rsiDailyClosePrice.getPrices(), hasSize(15));
         
         // Verify the oldest price was removed and newest is kept
         List<Double> priceValues = rsiDailyClosePrice.getPriceValues();
-        assertThat(priceValues, hasSize(14));
+        assertThat(priceValues, hasSize(15));
         // The first price (100.0) should be removed, so first value should be 101.0
-        assertThat(priceValues.get(0), is(equalTo(101.0)));
-        assertThat(priceValues.get(13), is(equalTo(114.0))); // Last price should be 114.0
+        assertThat(priceValues.getFirst(), is(equalTo(101.0)));
+        assertThat(priceValues.get(14), is(equalTo(115.0))); // Last price should be 115.0
     }
 
     @Test

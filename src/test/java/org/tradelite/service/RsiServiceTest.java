@@ -45,8 +45,9 @@ class RsiServiceTest {
 
     @Test
     void testAddPriceAndCalculateRsi_overbought() throws IOException {
-        for (int i = 0; i < 14; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
+        // Need 15 prices to calculate RSI (14 price changes)
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
         verify(telegramClient, times(1)).sendMessage(anyString());
@@ -89,6 +90,19 @@ class RsiServiceTest {
         
         // RSI should be between 0 and 100
         assertThat(rsi, is(both(greaterThanOrEqualTo(0.0)).and(lessThanOrEqualTo(100.0))));
+    }
+
+    @Test
+    void testCalculateRsi_insufficientPrices() {
+        // Test that RSI calculation throws exception with insufficient prices
+        java.util.List<Double> insufficientPrices = java.util.Arrays.asList(
+            100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0,
+            108.0, 114.0, 110.0, 116.0, 112.0, 118.0 // Only 14 prices
+        );
+        
+        assertThrows(IllegalArgumentException.class, () -> {
+            rsiService.calculateRsi(insufficientPrices);
+        });
     }
 
     @Test
