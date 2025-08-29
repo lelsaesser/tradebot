@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.contains;
 
 @ExtendWith(MockitoExtension.class)
 class RsiServiceTest {
@@ -40,7 +41,7 @@ class RsiServiceTest {
         new File(rsiDataFile).delete();
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
-        rsiService = new RsiService(telegramClient, objectMapper);
+        rsiService = spy(new RsiService(telegramClient, objectMapper));
     }
 
     @Test
@@ -51,6 +52,7 @@ class RsiServiceTest {
         }
 
         verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(rsiService, times(15)).savePriceHistory();
     }
 
     @Test
@@ -62,6 +64,7 @@ class RsiServiceTest {
 
         // Verify RSI calculation and notification for oversold (may be called multiple times as we add prices)
         verify(telegramClient, atLeastOnce()).sendMessage(contains("oversold"));
+        verify(rsiService, times(15)).savePriceHistory();
     }
 
     @Test

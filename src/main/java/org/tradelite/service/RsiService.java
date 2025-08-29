@@ -1,6 +1,7 @@
 package org.tradelite.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class RsiService {
     private final TelegramClient telegramClient;
     private final ObjectMapper objectMapper;
 
+    @Getter
     private Map<TickerSymbol, RsiDailyClosePrice> priceHistory = new HashMap<>();
 
     @Autowired
@@ -122,16 +124,12 @@ public class RsiService {
         }
     }
 
-    private void savePriceHistory() throws IOException {
+    protected void savePriceHistory() throws IOException {
         try {
             objectMapper.writeValue(new File(RSI_DATA_FILE), priceHistory);
         } catch (IOException e) {
             log.error("Error saving RSI data", e);
             throw e;
         }
-    }
-
-    protected Map<TickerSymbol, RsiDailyClosePrice> getPriceHistory() {
-        return priceHistory;
     }
 }
