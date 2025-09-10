@@ -25,7 +25,7 @@ public class TargetPriceProvider {
 
     public static final String FILE_PATH_STOCKS = "config/target-prices-stocks.json";
     public static final String FILE_PATH_COINS = "config/target-prices-coins.json";
-    public static final long IGNORE_DURATION_TTL_SECONDS = 3600L * 4; // 4 hours
+    public static final long IGNORE_DURATION_TTL_SECONDS = 3600L * 12; // 12 hours
 
     protected final Map<String, IgnoredSymbol> ignoredSymbols = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
