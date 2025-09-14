@@ -25,7 +25,8 @@ public class RsiDailyClosePrice {
             prices.add(newPrice);
         }
 
-        if (prices.size() > 15) {
+        // Keep the latest 200 prices for RSI calculation stability
+        if (prices.size() > 200) {
             prices.sort((p1, p2) -> p1.getDate().compareTo(p2.getDate()));
             prices.removeFirst();
         }

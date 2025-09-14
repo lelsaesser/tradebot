@@ -39,23 +39,23 @@ class RsiDailyClosePriceTest {
     }
 
     @Test
-    void testAddPrice_removeOldestWhenSizeExceeds15() {
+    void testAddPrice_removeOldestWhenSizeExceedsLimit() {
         RsiDailyClosePrice rsiDailyClosePrice = new RsiDailyClosePrice();
         
-        // Add 16 prices to trigger removal of oldest
-        for (int i = 0; i < 16; i++) {
-            rsiDailyClosePrice.addPrice(LocalDate.now().minusDays(15 - i), 100.0 + i);
+        // Add 201 prices to trigger removal of oldest
+        for (int i = 0; i < 201; i++) {
+            rsiDailyClosePrice.addPrice(LocalDate.now().minusDays(200 - i), 100.0 + i);
         }
         
-        // Should only have 15 prices (oldest removed)
-        assertThat(rsiDailyClosePrice.getPrices(), hasSize(15));
+        // Should only have 200 prices (oldest removed)
+        assertThat(rsiDailyClosePrice.getPrices(), hasSize(200));
         
         // Verify the oldest price was removed and newest is kept
         List<Double> priceValues = rsiDailyClosePrice.getPriceValues();
-        assertThat(priceValues, hasSize(15));
+        assertThat(priceValues, hasSize(200));
         // The first price (100.0) should be removed, so first value should be 101.0
         assertThat(priceValues.getFirst(), is(equalTo(101.0)));
-        assertThat(priceValues.get(14), is(equalTo(115.0))); // Last price should be 115.0
+        assertThat(priceValues.getLast(), is(equalTo(300.0)));
     }
 
     @Test
