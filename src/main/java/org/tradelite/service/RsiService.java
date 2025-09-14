@@ -53,20 +53,17 @@ public class RsiService {
 
     private boolean isPotentialMarketHoliday(RsiDailyClosePrice rsiDailyClosePrice, double newPrice, LocalDate newDate) {
         if (rsiDailyClosePrice.getPrices().isEmpty()) {
-            return false; // No previous data to compare
+            return false;
         }
-        
-        // Use getPriceValues() to ensure data is sorted, then get the most recent price entry
-        rsiDailyClosePrice.getPriceValues(); // This is expected to sort the prices list
-        var mostRecentPrice = rsiDailyClosePrice.getPrices().getLast();
-        
-        // Check if the new price is identical to the most recent price
-        // Use a small epsilon for double comparison to handle floating point precision
+
+        var prices = rsiDailyClosePrice.getPrices();
+        prices.sort((p1, p2) -> p2.getDate().compareTo(p1.getDate()));
+        var mostRecentPrice = prices.getFirst();
+
         double epsilon = 0.0001;
-        boolean pricesIdentical = Math.abs(newPrice - mostRecentPrice.getPrice()) < epsilon;
-        
-        // Only consider it a potential holiday if prices are identical, and it's not the same date
-        return pricesIdentical && !newDate.equals(mostRecentPrice.getDate());
+        boolean pricesAreIdentical = Math.abs(newPrice - mostRecentPrice.getPrice()) < epsilon;
+
+        return pricesAreIdentical && !newDate.isEqual(mostRecentPrice.getDate());
     }
 
     private void calculateAndNotifyRsi(TickerSymbol symbol, RsiDailyClosePrice rsiDailyClosePrice) {
@@ -87,45 +84,41 @@ public class RsiService {
     }
 
     protected double calculateRsi(List<Double> prices) {
-        if (prices.size() < RSI_PERIOD + 1) {
-            throw new IllegalArgumentException("Need at least " + (RSI_PERIOD + 1) + " prices to calculate RSI");
+        if (prices.size() < RSI_PERIOD) {
+            return 50; // Not enough data
         }
 
-        List<Double> gains = new ArrayList<>();
-        List<Double> losses = new ArrayList<>();
+        double avgGain = 0;
+        double avgLoss = 0;
 
-        // Calculate price changes
-        for (int i = 1; i < prices.size(); i++) {
+        // First RSI value
+        double firstChange = prices.get(1) - prices.get(0);
+        if (firstChange > 0) {
+            avgGain = firstChange;
+        } else {
+            avgLoss = -firstChange;
+        }
+
+        for (int i = 2; i < RSI_PERIOD; i++) {
             double change = prices.get(i) - prices.get(i - 1);
             if (change > 0) {
-                gains.add(change);
-                losses.add(0.0);
+                avgGain += change;
             } else {
-                gains.add(0.0);
-                losses.add(Math.abs(change));
+                avgLoss -= change;
             }
         }
 
-        // Calculate initial average gain and loss (simple average for first RSI_PERIOD)
-        double initialAvgGain = 0.0;
-        double initialAvgLoss = 0.0;
-        
-        for (int i = 0; i < RSI_PERIOD; i++) {
-            initialAvgGain += gains.get(i);
-            initialAvgLoss += losses.get(i);
-        }
-        
-        initialAvgGain /= RSI_PERIOD;
-        initialAvgLoss /= RSI_PERIOD;
+        avgGain /= RSI_PERIOD;
+        avgLoss /= RSI_PERIOD;
 
-        // Use Wilder's smoothing for subsequent calculations
-        double avgGain = initialAvgGain;
-        double avgLoss = initialAvgLoss;
-        
-        // Apply Wilder's smoothing for any additional periods beyond the initial 14
-        for (int i = RSI_PERIOD; i < gains.size(); i++) {
-            avgGain = ((avgGain * (RSI_PERIOD - 1)) + gains.get(i)) / RSI_PERIOD;
-            avgLoss = ((avgLoss * (RSI_PERIOD - 1)) + losses.get(i)) / RSI_PERIOD;
+        // Subsequent RSI values
+        for (int i = RSI_PERIOD; i < prices.size(); i++) {
+            double change = prices.get(i) - prices.get(i - 1);
+            double gain = change > 0 ? change : 0;
+            double loss = change < 0 ? -change : 0;
+
+            avgGain = (avgGain * (RSI_PERIOD - 1) + gain) / RSI_PERIOD;
+            avgLoss = (avgLoss * (RSI_PERIOD - 1) + loss) / RSI_PERIOD;
         }
 
         if (avgLoss == 0) {

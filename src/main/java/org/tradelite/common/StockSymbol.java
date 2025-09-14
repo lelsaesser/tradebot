@@ -33,8 +33,8 @@ public enum StockSymbol implements TickerSymbol {
     MP("MP"),
     APP("APP"),
     ASML("ASML"),
-    COST("COST"),
-    WMT("WMT"),
+//    COST("COST"),
+//    WMT("WMT"),
     SMCI("SMCI"),
     UNH("UNH"),
     BABA("BABA"),
@@ -42,6 +42,7 @@ public enum StockSymbol implements TickerSymbol {
     OSCR("OSCR"),
     HIMS("HIMS"),
     TSM("TSM"),
+    MU("MU"),
     NET("NET");
 
     private final String ticker;
