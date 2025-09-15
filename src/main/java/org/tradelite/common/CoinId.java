@@ -13,6 +13,7 @@ public enum CoinId implements TickerSymbol {
     HYPERLIQUID("hyperliquid"),
     SUI("sui"),
     POLKADOT("polkadot"),
+    DOGE("doge"),
     ETHEREUM("ethereum");
 
     private final String id;
