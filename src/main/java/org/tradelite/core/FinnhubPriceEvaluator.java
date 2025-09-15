@@ -39,7 +39,6 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             Optional<StockSymbol> ticker = StockSymbol.fromString(targetPrice.getSymbol());
             if (ticker.isEmpty()) {
                 log.warn("Target price symbol {} not found in StockSymbol enum", targetPrice.getSymbol());
-                telegramClient.sendMessage(targetPrice.getSymbol() + " not found in enum and is not monitored.");
                 continue;
             }
 
