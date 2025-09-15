@@ -172,7 +172,7 @@ class FinnhubPriceEvaluatorTest {
     }
 
     @Test
-    void evaluatePrice_invalidTickerSymbolInTargetPrice_sendsMessage() throws InterruptedException {
+    void evaluatePrice_invalidTickerSymbolInTargetPrice_doesNotSendMessage() throws InterruptedException {
         List<TargetPrice> targetPrices = List.of(
                 new TargetPrice("INVALID", 150.0, 160.0),
                 new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200)
@@ -189,7 +189,7 @@ class FinnhubPriceEvaluatorTest {
 
         verify(targetPriceProvider, times(1)).getStockTargetPrices();
         verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.GOOG);
-        verify(telegramClient, times(1)).sendMessage("INVALID not found in enum and is not monitored.");
+        verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
