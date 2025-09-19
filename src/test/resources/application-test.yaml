@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:sqlite::memory:testdb?cache=shared
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+        format_sql: false
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    org.hibernate: WARN
+    org.springframework: WARN
+    org.tradelite: INFO
