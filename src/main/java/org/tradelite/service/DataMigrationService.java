@@ -38,7 +38,7 @@ public class DataMigrationService {
     public void migrateJsonDataToDatabase() {
         File jsonFile = new File(RSI_DATA_FILE);
         
-        if (!jsonFile.exists()) {
+        if (!fileExists(jsonFile)) {
             log.info("No existing JSON data file found at {}, skipping migration", RSI_DATA_FILE);
             return;
         }
@@ -75,8 +75,15 @@ public class DataMigrationService {
             
         } catch (Exception e) {
             log.error("Error during data migration", e);
-            throw new RuntimeException("Failed to migrate JSON data to database", e);
+            throw new IllegalStateException("Failed to migrate JSON data to database", e);
         }
+    }
+    
+    /**
+     * Check if file exists - can be overridden for testing
+     */
+    protected boolean fileExists(File file) {
+        return file.exists();
     }
     
     /**

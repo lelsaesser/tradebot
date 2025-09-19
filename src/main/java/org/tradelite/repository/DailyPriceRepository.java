@@ -45,12 +45,6 @@ public interface DailyPriceRepository extends JpaRepository<DailyPrice, Long> {
      */
     long countBySymbol(String symbol);
     
-    /**
-     * Delete old prices beyond the most recent 200 for a symbol
-     */
-    @Query("DELETE FROM DailyPrice dp WHERE dp.symbol = :symbol AND dp.date < " +
-           "(SELECT MIN(sub.date) FROM (SELECT d.date FROM DailyPrice d WHERE d.symbol = :symbol ORDER BY d.date DESC LIMIT 200) sub)")
-    void deleteOldPricesForSymbol(@Param("symbol") String symbol);
     
     /**
      * Get all unique symbols that have price data
