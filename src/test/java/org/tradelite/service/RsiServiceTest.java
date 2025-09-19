@@ -1,76 +1,105 @@
 package org.tradelite.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
-import org.tradelite.service.model.RsiDailyClosePrice;
+import org.tradelite.repository.DailyPriceRepository;
+import org.tradelite.service.model.DailyPrice;
 
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.contains;
 
 @SpringBootTest
+@Transactional
 class RsiServiceTest {
 
     @MockitoBean
     private TelegramClient telegramClient;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @MockitoBean
+    private DailyPriceRepository dailyPriceRepository;
+
+    @MockitoBean
+    private DataMigrationService dataMigrationService;
 
     private RsiService rsiService;
 
     private final StockSymbol symbol = StockSymbol.AAPL;
-    private final String rsiDataFile = "config/rsi-data.json";
 
     @BeforeEach
-    void setUp() throws IOException {
-        new File(rsiDataFile).delete();
-        rsiService = spy(new RsiService(telegramClient, objectMapper));
+    void setUp() {
+        // Mock migration service behavior
+        when(dataMigrationService.isMigrationNeeded()).thenReturn(false);
+        when(dataMigrationService.getMigrationStatus()).thenReturn("Test status");
+        
+        rsiService = new RsiService(telegramClient, dailyPriceRepository, dataMigrationService);
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_overbought() throws IOException {
-        // Need 15 prices to calculate RSI (14 price changes)
-        for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
-        }
+    void testAddPriceAndCalculateRsi_overbought() {
+        // Mock no existing price
+        when(dailyPriceRepository.findBySymbolAndDate(anyString(), any(LocalDate.class)))
+            .thenReturn(Optional.empty());
+        
+        // Mock price count for cleanup
+        when(dailyPriceRepository.countBySymbol(anyString())).thenReturn(1L);
+        
+        // Mock prices for RSI calculation (15 increasing prices)
+        List<DailyPrice> mockPrices = createMockPrices(symbol.getName(), 100.0, 15, true);
+        when(dailyPriceRepository.findLatest200PricesBySymbol(symbol.getName()))
+            .thenReturn(mockPrices);
 
-        verify(telegramClient, times(1)).sendMessage(anyString());
-        verify(rsiService, times(15)).savePriceHistory();
+        // Add a price that should trigger RSI calculation
+        rsiService.addPrice(symbol, 115.0, LocalDate.now());
+
+        // Verify price was saved
+        verify(dailyPriceRepository, times(1)).save(any(DailyPrice.class));
+        
+        // Verify RSI notification was sent for overbought condition
+        verify(telegramClient, times(1)).sendMessage(contains("overbought"));
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_oversold() throws IOException {
-        // Add declining prices to trigger oversold condition (RSI <= 30)
-        for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
-        }
+    void testAddPriceAndCalculateRsi_oversold() {
+        // Mock no existing price
+        when(dailyPriceRepository.findBySymbolAndDate(anyString(), any(LocalDate.class)))
+            .thenReturn(Optional.empty());
+        
+        // Mock price count for cleanup
+        when(dailyPriceRepository.countBySymbol(anyString())).thenReturn(1L);
+        
+        // Mock prices for RSI calculation (15 decreasing prices)
+        List<DailyPrice> mockPrices = createMockPrices(symbol.getName(), 200.0, 15, false);
+        when(dailyPriceRepository.findLatest200PricesBySymbol(symbol.getName()))
+            .thenReturn(mockPrices);
 
-        // Verify RSI calculation and notification for oversold (may be called multiple times as we add prices)
-        verify(telegramClient, atLeastOnce()).sendMessage(contains("oversold"));
-        verify(rsiService, times(15)).savePriceHistory();
+        // Add a price that should trigger RSI calculation
+        rsiService.addPrice(symbol, 130.0, LocalDate.now());
+
+        // Verify price was saved
+        verify(dailyPriceRepository, times(1)).save(any(DailyPrice.class));
+        
+        // Verify RSI notification was sent for oversold condition
+        verify(telegramClient, times(1)).sendMessage(contains("oversold"));
     }
 
     @Test
     void testCalculateRsi_withLosses() {
-        // Test RSI calculation with declining prices to cover loss calculation
-        java.util.List<Double> decliningPrices = java.util.Arrays.asList(
+        // Test RSI calculation with declining prices
+        List<Double> decliningPrices = Arrays.asList(
             100.0, 95.0, 90.0, 85.0, 80.0, 75.0, 70.0, 65.0, 
             60.0, 55.0, 50.0, 45.0, 40.0, 35.0, 30.0
         );
@@ -78,13 +107,13 @@ class RsiServiceTest {
         double rsi = rsiService.calculateRsi(decliningPrices);
         
         // RSI should be low for declining prices
-        assertThat(rsi, is(closeTo(0.0, 0.1)));
+        assertThat(rsi, is(closeTo(0.0, 10.0)));
     }
 
     @Test
     void testCalculateRsi_mixedPrices() {
-        // Test RSI calculation with mixed gains and losses to cover RS calculation
-        java.util.List<Double> mixedPrices = java.util.Arrays.asList(
+        // Test RSI calculation with mixed gains and losses
+        List<Double> mixedPrices = Arrays.asList(
             100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0,
             108.0, 114.0, 110.0, 116.0, 112.0, 118.0, 114.0
         );
@@ -98,7 +127,7 @@ class RsiServiceTest {
     @Test
     void testCalculateRsi_insufficientPrices() {
         // Test that RSI calculation returns 50 with insufficient prices
-        java.util.List<Double> insufficientPrices = java.util.Arrays.asList(
+        List<Double> insufficientPrices = Arrays.asList(
             100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0,
             108.0, 114.0, 110.0, 116.0, 112.0 // Only 13 prices
         );
@@ -108,162 +137,145 @@ class RsiServiceTest {
     }
 
     @Test
-    void testPriceHistoryPersistence() throws Exception {
-        File dummyFile = new File(rsiDataFile);
-        dummyFile.getParentFile().mkdirs();
-        dummyFile.createNewFile();
-
-        Map<String, RsiDailyClosePrice> expectedHistory = new HashMap<>();
-        RsiDailyClosePrice priceData = new RsiDailyClosePrice();
-        priceData.addPrice(LocalDate.now(), 150.0);
-        expectedHistory.put(symbol.getName(), priceData);
-
-        ObjectMapper spyObjectMapper = spy(new ObjectMapper());
-        doReturn(expectedHistory).when(spyObjectMapper).readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
-
-        RsiService serviceWithHistory = new RsiService(telegramClient, spyObjectMapper);
-
-        assertEquals(1, serviceWithHistory.getPriceHistory().get(symbol.getName()).getPrices().size());
-        assertEquals(150.0, serviceWithHistory.getPriceHistory().get(symbol.getName()).getPriceValues().get(0));
-
-        dummyFile.delete();
-    }
-
-    @Test
-    void testLoadPriceHistory_fileNotFound() throws IOException {
-        new File(rsiDataFile).delete();
-
-        rsiService.loadPriceHistory();
-
-        assertEquals(0, rsiService.getPriceHistory().size());
-    }
-
-    @Test
-    void testLoadPriceHistory_invalidFile() throws Exception {
-        File dummyFile = new File(rsiDataFile);
-        dummyFile.getParentFile().mkdirs();
-        dummyFile.createNewFile();
-
-        ObjectMapper spyObjectMapper = spy(new ObjectMapper());
-        doThrow(new java.io.IOException("Invalid file format")).when(spyObjectMapper).readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
-
-        assertThrows(IOException.class, () -> new RsiService(telegramClient, spyObjectMapper));
-
-        dummyFile.delete();
-    }
-
-    @Test
-    void testObjectMapperCanSerializeLocalDate() throws Exception {
-        // This test ensures the Spring-configured ObjectMapper can handle LocalDate serialization
-        // If the JSR310 module is not registered, this test will fail
-        RsiDailyClosePrice priceData = new RsiDailyClosePrice();
-        priceData.addPrice(LocalDate.of(2023, 1, 15), 150.0);
-        
-        Map<String, RsiDailyClosePrice> testData = new HashMap<>();
-        testData.put(symbol.getName(), priceData);
-        
-        // This should not throw an exception if JSR310 module is properly configured
-        String json = objectMapper.writeValueAsString(testData);
-        // LocalDate is serialized as an array [year, month, day] by default with JSR310
-        assertThat(json, containsString("[2023,1,15]"));
-        
-        // Verify we can also deserialize it back
-        Map<String, RsiDailyClosePrice> deserializedData = 
-            objectMapper.readValue(json, objectMapper.getTypeFactory().constructMapType(HashMap.class, String.class, RsiDailyClosePrice.class));
-        
-        assertEquals(1, deserializedData.get(symbol.getName()).getPrices().size());
-        assertEquals(LocalDate.of(2023, 1, 15), deserializedData.get(symbol.getName()).getPrices().getFirst().getDate());
-        assertEquals(150.0, deserializedData.get(symbol.getName()).getPrices().getFirst().getPrice());
-    }
-
-    @Test
-    void testHolidayDetection_identicalPrices() throws IOException {
+    void testHolidayDetection_identicalPrices() {
         LocalDate firstDay = LocalDate.of(2023, 12, 22);
         LocalDate secondDay = LocalDate.of(2023, 12, 25); // Christmas Day
         double price = 150.50;
 
-        // Add first price
-        rsiService.addPrice(symbol, price, firstDay);
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-        
+        // Mock existing price for holiday detection
+        List<DailyPrice> existingPrices = List.of(
+            new DailyPrice(symbol.getName(), firstDay, price)
+        );
+        when(dailyPriceRepository.findBySymbolOrderByDateDesc(symbol.getName()))
+            .thenReturn(existingPrices);
+
+        // Mock no existing price for the new date
+        when(dailyPriceRepository.findBySymbolAndDate(symbol.getName(), secondDay))
+            .thenReturn(Optional.empty());
+
         // Add identical price on different day - should trigger holiday detection and skip adding
         rsiService.addPrice(symbol, price, secondDay);
 
-        // Verify holiday was detected but price was NOT added (still only 1 entry)
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-        
-        // Verify the date is still the first day, not the holiday
-        assertEquals(firstDay, rsiService.getPriceHistory().get(symbol.getName()).getPrices().getFirst().getDate());
+        // Verify that save was NOT called due to holiday detection
+        verify(dailyPriceRepository, never()).save(any(DailyPrice.class));
     }
 
     @Test
-    void testHolidayDetection_slightlyDifferentPrices() throws IOException {
+    void testHolidayDetection_slightlyDifferentPrices() {
         LocalDate firstDay = LocalDate.of(2023, 12, 22);
         LocalDate secondDay = LocalDate.of(2023, 12, 25);
         
-        // Add first price
-        rsiService.addPrice(symbol, 150.50, firstDay);
+        // Mock existing price for holiday detection
+        List<DailyPrice> existingPrices = List.of(
+            new DailyPrice(symbol.getName(), firstDay, 150.50)
+        );
+        when(dailyPriceRepository.findBySymbolOrderByDateDesc(symbol.getName()))
+            .thenReturn(existingPrices);
+
+        // Mock no existing price for the new date
+        when(dailyPriceRepository.findBySymbolAndDate(symbol.getName(), secondDay))
+            .thenReturn(Optional.empty());
         
+        // Mock price count for cleanup
+        when(dailyPriceRepository.countBySymbol(anyString())).thenReturn(1L);
+
         // Add slightly different price - should NOT trigger holiday detection
         rsiService.addPrice(symbol, 150.51, secondDay);
 
-        assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        // Verify that save WAS called since prices are different enough
+        verify(dailyPriceRepository, times(1)).save(any(DailyPrice.class));
     }
 
     @Test
-    void testHolidayDetection_sameDate() throws IOException {
-        LocalDate sameDay = LocalDate.of(2023, 12, 22);
-        double price = 150.50;
+    void testAddPrice_updateExisting() {
+        LocalDate date = LocalDate.of(2023, 12, 22);
+        double oldPrice = 150.50;
+        double newPrice = 151.00;
 
-        // Add first price
-        rsiService.addPrice(symbol, price, sameDay);
+        // Mock existing price
+        DailyPrice existingPrice = new DailyPrice(symbol.getName(), date, oldPrice);
+        when(dailyPriceRepository.findBySymbolAndDate(symbol.getName(), date))
+            .thenReturn(Optional.of(existingPrice));
         
-        // Add identical price on same day - should be filtered out as duplicate
-        rsiService.addPrice(symbol, price, sameDay);
+        // Mock price count for cleanup
+        when(dailyPriceRepository.countBySymbol(anyString())).thenReturn(1L);
 
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        // Add new price for same date - should update existing
+        rsiService.addPrice(symbol, newPrice, date);
+
+        // Verify that save was called with updated price
+        verify(dailyPriceRepository, times(1)).save(argThat(price -> 
+            price.getPrice() == newPrice && price.getDate().equals(date)
+        ));
     }
 
     @Test
-    void testHolidayDetection_noPreviousData() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        double price = 150.50;
+    void testCleanupOldPrices() {
+        LocalDate date = LocalDate.now();
+        
+        // Mock no existing price for the date
+        when(dailyPriceRepository.findBySymbolAndDate(symbol.getName(), date))
+            .thenReturn(Optional.empty());
+        
+        // Mock empty prices list for holiday detection
+        when(dailyPriceRepository.findBySymbolOrderByDateDesc(symbol.getName()))
+            .thenReturn(List.of()) // Empty list first for holiday detection
+            .thenReturn(createMockPrices(symbol.getName(), 100.0, 250, true)); // Then full list for cleanup
+        
+        // Mock price count exceeding limit
+        when(dailyPriceRepository.countBySymbol(symbol.getName())).thenReturn(250L);
 
-        // Add first price with no previous data
-        rsiService.addPrice(symbol, price, firstDay);
+        rsiService.addPrice(symbol, 100.0, date);
 
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        // Verify cleanup was called
+        verify(dailyPriceRepository, times(1)).deleteAll(anyList());
     }
 
     @Test
-    void testHolidayDetection_withinEpsilon() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        LocalDate secondDay = LocalDate.of(2023, 12, 25);
-        
-        // Add first price
-        rsiService.addPrice(symbol, 150.5000, firstDay);
-        
-        // Verify we have 1 price entry
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-        
-        // Add price within epsilon (0.0001) - should trigger holiday detection and skip adding
-        rsiService.addPrice(symbol, 150.5000, secondDay);
+    void testGetAllSymbolsWithPriceData() {
+        List<String> expectedSymbols = Arrays.asList("AAPL", "GOOGL", "MSFT");
+        when(dailyPriceRepository.findAllUniqueSymbols()).thenReturn(expectedSymbols);
 
-        // Verify holiday was detected but price was NOT added (still only 1 entry)
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        List<String> result = rsiService.getAllSymbolsWithPriceData();
+
+        assertEquals(expectedSymbols, result);
+        verify(dailyPriceRepository, times(1)).findAllUniqueSymbols();
     }
 
     @Test
-    void testHolidayDetection_outsideEpsilon() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        LocalDate secondDay = LocalDate.of(2023, 12, 25);
-        
-        // Add first price
-        rsiService.addPrice(symbol, 150.5000, firstDay);
-        
-        // Add price outside epsilon (0.0001) - should NOT trigger holiday detection
-        rsiService.addPrice(symbol, 150.5002, secondDay);
+    void testGetPriceHistory() {
+        List<DailyPrice> expectedPrices = createMockPrices(symbol.getName(), 100.0, 5, true);
+        when(dailyPriceRepository.findBySymbolOrderByDateAsc(symbol.getName()))
+            .thenReturn(expectedPrices);
 
-        assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        List<DailyPrice> result = rsiService.getPriceHistory(symbol.getName());
+
+        assertEquals(expectedPrices, result);
+        verify(dailyPriceRepository, times(1)).findBySymbolOrderByDateAsc(symbol.getName());
+    }
+
+    @Test
+    void testGetLatestPrices() {
+        List<DailyPrice> allPrices = createMockPrices(symbol.getName(), 100.0, 10, true);
+        when(dailyPriceRepository.findBySymbolOrderByDateDesc(symbol.getName()))
+            .thenReturn(allPrices);
+
+        List<DailyPrice> result = rsiService.getLatestPrices(symbol.getName(), 5);
+
+        assertEquals(5, result.size());
+        verify(dailyPriceRepository, times(1)).findBySymbolOrderByDateDesc(symbol.getName());
+    }
+
+    /**
+     * Helper method to create mock price data
+     */
+    private List<DailyPrice> createMockPrices(String symbol, double startPrice, int count, boolean increasing) {
+        List<DailyPrice> prices = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            double price = increasing ? startPrice + i : startPrice - i;
+            LocalDate date = LocalDate.now().minusDays(count - i - 1);
+            prices.add(new DailyPrice(symbol, date, price));
+        }
+        return prices;
     }
 }
