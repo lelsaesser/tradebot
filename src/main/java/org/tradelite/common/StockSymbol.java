@@ -47,6 +47,7 @@ public enum StockSymbol implements TickerSymbol {
     INTC("INTC"),
     PONY("PONY"),
     DELL("DELL"),
+    CRWV("CRWV"),
     NET("NET");
 
     private final String ticker;
