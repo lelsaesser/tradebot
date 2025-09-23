@@ -45,6 +45,8 @@ public enum StockSymbol implements TickerSymbol {
     MU("MU"),
     ORCL("ORCL"),
     INTC("INTC"),
+    PONY("PONY"),
+    DELL("DELL"),
     NET("NET");
 
     private final String ticker;
