@@ -8,7 +8,9 @@ This document covers the technologies used, development setup, technical constra
 - **Build Tool:** Maven
 
 ## Dependencies
-- **Spring Boot Starters:** web, validation, test
+- **Spring Boot Starters:** web, validation, test, data-jpa
+- **Database:** SQLite JDBC driver for embedded database storage
+- **Persistence:** Spring Data JPA with Hibernate ORM
 - **Lombok:** For reducing boilerplate code.
 - **Jackson:** For JSON serialization and deserialization.
 - **Testing:** JUnit 5, Mockito, Hamcrest
