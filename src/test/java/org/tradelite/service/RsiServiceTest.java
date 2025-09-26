@@ -63,6 +63,7 @@ class RsiServiceTest {
         }
 
         // Verify RSI calculation and notification for oversold (may be called multiple times as we add prices)
+        verify(telegramClient, atLeastOnce()).sendMessage(contains("🟢"));
         verify(telegramClient, atLeastOnce()).sendMessage(contains("oversold"));
         verify(rsiService, times(15)).savePriceHistory();
     }

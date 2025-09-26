@@ -76,10 +76,10 @@ public class RsiService {
 
         if (rsi >= 70) {
             log.info("RSI for {} is in overbought zone: {}", symbol, rsi);
-            telegramClient.sendMessage(String.format("RSI for %s is in overbought zone: %.2f", symbol, rsi));
+            telegramClient.sendMessage(String.format("🔴 RSI for %s is in overbought zone: %.2f", symbol, rsi));
         } else if (rsi <= 30) {
             log.info("RSI for {} is in oversold zone: {}", symbol, rsi);
-            telegramClient.sendMessage(String.format("RSI for %s is in oversold zone: %.2f", symbol, rsi));
+            telegramClient.sendMessage(String.format("🟢 RSI for %s is in oversold zone: %.2f", symbol, rsi));
         }
     }
 
