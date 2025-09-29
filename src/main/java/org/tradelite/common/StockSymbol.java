@@ -39,7 +39,7 @@ public enum StockSymbol implements TickerSymbol {
     UNH("UNH"),
     BABA("BABA"),
     TEM("TEM"),
-    OSCR("OSCR"),
+//    OSCR("OSCR"),
     HIMS("HIMS"),
     TSM("TSM"),
     MU("MU"),
