@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.common.CoinId;
+import org.tradelite.service.ApiRequestMeteringService;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.notNullValue;
@@ -26,11 +27,14 @@ class CoinGeckoClientTest {
     @Mock
     private RestTemplate restTemplate;
 
+    @Mock
+    private ApiRequestMeteringService meteringService;
+
     private CoinGeckoClient coinGeckoClient;
 
     @BeforeEach
     void setUp() {
-        coinGeckoClient = new CoinGeckoClient(restTemplate);
+        coinGeckoClient = new CoinGeckoClient(restTemplate, meteringService);
     }
 
     @Test

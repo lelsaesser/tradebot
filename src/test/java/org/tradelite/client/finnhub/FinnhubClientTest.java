@@ -14,6 +14,7 @@ import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
+import org.tradelite.service.ApiRequestMeteringService;
 
 import java.util.List;
 
@@ -30,11 +31,14 @@ class FinnhubClientTest {
     @Mock
     private RestTemplate restTemplate;
 
+    @Mock
+    private ApiRequestMeteringService meteringService;
+
     private FinnhubClient finnhubClient;
 
     @BeforeEach
     void setUp() {
-        finnhubClient = new FinnhubClient(restTemplate);
+        finnhubClient = new FinnhubClient(restTemplate, meteringService);
     }
 
     @Test
