@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 
 @Slf4j
@@ -23,10 +24,12 @@ public class FinnhubClient {
     private static final String API_KEY = System.getenv("FINNHUB_API_KEY");
 
     private final RestTemplate restTemplate;
+    private final ApiRequestMeteringService meteringService;
 
     @Autowired
-    public FinnhubClient(RestTemplate restTemplate) {
+    public FinnhubClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
         this.restTemplate = restTemplate;
+        this.meteringService = meteringService;
     }
 
     private String getApiUrl(String baseUrl, StockSymbol ticker) {
@@ -42,6 +45,7 @@ public class FinnhubClient {
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         try {
+            meteringService.incrementFinnhubRequests();
             ResponseEntity<PriceQuoteResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
             PriceQuoteResponse quote = response.getBody();
             if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
@@ -66,6 +70,7 @@ public class FinnhubClient {
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         try {
+            meteringService.incrementFinnhubRequests();
             ResponseEntity<InsiderTransactionResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
             return response.getBody();
         } catch (Exception e) {

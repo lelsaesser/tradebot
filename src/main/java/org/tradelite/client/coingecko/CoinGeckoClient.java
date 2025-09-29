@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.common.CoinId;
+import org.tradelite.service.ApiRequestMeteringService;
 
 @Slf4j
 @Component
@@ -20,10 +21,12 @@ public class CoinGeckoClient {
     private static final String API_KEY = System.getenv("COINGECKO_API_KEY");
 
     private final RestTemplate restTemplate;
+    private final ApiRequestMeteringService meteringService;
 
     @Autowired
-    public CoinGeckoClient(RestTemplate restTemplate) {
+    public CoinGeckoClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
         this.restTemplate = restTemplate;
+        this.meteringService = meteringService;
     }
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
@@ -37,6 +40,7 @@ public class CoinGeckoClient {
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         try {
+            meteringService.incrementCoingeckoRequests();
             ResponseEntity<CoinGeckoPriceResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity, CoinGeckoPriceResponse.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 CoinGeckoPriceResponse.CoinData data = response.getBody().getCoinData().get(coinId.getId());
