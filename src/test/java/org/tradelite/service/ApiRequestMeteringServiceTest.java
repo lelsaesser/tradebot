@@ -156,12 +156,12 @@ class ApiRequestMeteringServiceTest {
         Files.writeString(finnhubFile, finnhubContent);
         Files.writeString(coingeckoFile, coingeckoContent);
 
-        // Create new service instance (should reset to 0 for new month)
+        // Create new service instance (should preserve old counts until cron job resets)
         ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
 
-        // Verify it reset to 0 for the new month
-        assertEquals(0, newService.getFinnhubRequestCount());
-        assertEquals(0, newService.getCoingeckoRequestCount());
+        // Verify it loaded the counts from files (even though they're from previous month)
+        assertEquals(100, newService.getFinnhubRequestCount());
+        assertEquals(50, newService.getCoingeckoRequestCount());
     }
 
     @Test
@@ -321,67 +321,27 @@ class ApiRequestMeteringServiceTest {
     }
 
     @Test
-    void testMonthResetFunctionality() throws Exception {
-        Path configDir = tempDir.resolve("config");
-        Files.createDirectories(configDir);
-
-        // Create a service with some initial counts
-        ApiRequestMeteringService service = new ApiRequestMeteringService(configDir.toString());
-        
+    void testResetCounters() {
         // Add some counts
-        service.incrementFinnhubRequests();
-        service.incrementFinnhubRequests();
-        service.incrementCoingeckoRequests();
+        meteringService.incrementFinnhubRequests();
+        meteringService.incrementFinnhubRequests();
+        meteringService.incrementCoingeckoRequests();
         
-        assertEquals(2, service.getFinnhubRequestCount());
-        assertEquals(1, service.getCoingeckoRequestCount());
-
-        // Now we need to simulate a month change. We'll do this by creating a custom service
-        // that overrides the getCurrentMonth method to return a different month
-        TestApiRequestMeteringService testService = new TestApiRequestMeteringService(configDir.toString());
+        assertEquals(2, meteringService.getFinnhubRequestCount());
+        assertEquals(1, meteringService.getCoingeckoRequestCount());
         
-        // Set initial counts
-        testService.incrementFinnhubRequests();
-        testService.incrementCoingeckoRequests();
-        testService.incrementCoingeckoRequests();
+        // Reset counters
+        meteringService.resetCounters();
         
-        assertEquals(1, testService.getFinnhubRequestCount());
-        assertEquals(2, testService.getCoingeckoRequestCount());
-        
-        // Now simulate month change
-        testService.simulateMonthChange();
-        
-        // After month change, counters should be reset
-        assertEquals(0, testService.getFinnhubRequestCount());
-        assertEquals(0, testService.getCoingeckoRequestCount());
-        
-        // New increments should work normally
-        testService.incrementFinnhubRequests();
-        assertEquals(1, testService.getFinnhubRequestCount());
+        // Verify counters are reset
+        assertEquals(0, meteringService.getFinnhubRequestCount());
+        assertEquals(0, meteringService.getCoingeckoRequestCount());
     }
 
-    // Helper class to test month reset functionality
-    private static class TestApiRequestMeteringService extends ApiRequestMeteringService {
-        private final String originalMonth;
-        private boolean monthChanged = false;
-
-        public TestApiRequestMeteringService(String counterDir) {
-            super(counterDir);
-            this.originalMonth = super.getCurrentMonth();
-        }
-
-        @Override
-        protected String getCurrentMonth() {
-            if (monthChanged) {
-                return "2024-12"; // Different month to trigger reset
-            }
-            return originalMonth;
-        }
-
-        public void simulateMonthChange() {
-            monthChanged = true;
-            // Trigger the month check by calling any method that uses checkAndResetIfNewMonth
-            getFinnhubRequestCount();
-        }
+    @Test
+    void testGetCurrentMonth() {
+        String currentMonth = meteringService.getCurrentMonth();
+        String expectedMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        assertEquals(expectedMonth, currentMonth);
     }
 }

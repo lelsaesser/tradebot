@@ -13,6 +13,7 @@ import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
 import org.tradelite.core.RsiPriceFetcher;
+import org.tradelite.service.ApiRequestMeteringService;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -41,13 +42,16 @@ class SchedulerTest {
     private InsiderTracker insiderTracker;
     @Mock
     private RsiPriceFetcher rsiPriceFetcher;
+    @Mock
+    private ApiRequestMeteringService apiRequestMeteringService;
 
     private Scheduler scheduler;
 
     @BeforeEach
     void setUp() {
         scheduler = new Scheduler(finnhubPriceEvaluator, coinGeckoPriceEvaluator, targetPriceProvider,
-                telegramClient, telegramMessageProcessor, rootErrorHandler, insiderTracker, rsiPriceFetcher);
+                telegramClient, telegramMessageProcessor, rootErrorHandler, insiderTracker, rsiPriceFetcher,
+                apiRequestMeteringService);
     }
 
     @Test

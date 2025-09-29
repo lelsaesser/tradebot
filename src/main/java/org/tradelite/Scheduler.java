@@ -9,6 +9,7 @@ import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
+import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 
 import java.time.DayOfWeek;
@@ -29,6 +30,7 @@ public class Scheduler {
     private final RootErrorHandler rootErrorHandler;
     private final InsiderTracker insiderTracker;
     private final RsiPriceFetcher rsiPriceFetcher;
+    private final ApiRequestMeteringService apiRequestMeteringService;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -37,7 +39,8 @@ public class Scheduler {
     @Autowired
     Scheduler(FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
               TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor,
-              RootErrorHandler rootErrorHandler, InsiderTracker insiderTracker, RsiPriceFetcher rsiPriceFetcher) {
+              RootErrorHandler rootErrorHandler, InsiderTracker insiderTracker, RsiPriceFetcher rsiPriceFetcher,
+              ApiRequestMeteringService apiRequestMeteringService) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -46,6 +49,7 @@ public class Scheduler {
         this.telegramMessageProcessor = telegramMessageProcessor;
         this.rootErrorHandler = rootErrorHandler;
         this.insiderTracker = insiderTracker;
+        this.apiRequestMeteringService = apiRequestMeteringService;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -94,5 +98,34 @@ public class Scheduler {
         rootErrorHandler.run(insiderTracker::trackInsiderTransactions);
 
         log.info("Weekly insider trading report generated.");
+    }
+
+    @Scheduled(cron = "0 0 0 1 * *", zone = "UTC")
+    protected void monthlyApiUsageReport() {
+        rootErrorHandler.run(() -> {
+            int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
+            int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
+            
+            if (finnhubCount > 0 || coingeckoCount > 0) {
+                String previousMonth = apiRequestMeteringService.getCurrentMonth();
+                
+                String message = String.format("""
+                        📊 *Monthly API Usage Report - %s*
+                        "🔹 *Finnhub API*: %,d requests
+                        "🔹 *CoinGecko API*: %,d requests
+                        "🔹 *Total*: %,d requests""",
+                        previousMonth, finnhubCount, coingeckoCount, finnhubCount + coingeckoCount);
+                
+                telegramClient.sendMessage(message);
+                log.info("Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}", 
+                        previousMonth, finnhubCount, coingeckoCount);
+            } else {
+                log.info("No API requests recorded for the previous month, skipping report");
+            }
+            
+            apiRequestMeteringService.resetCounters();
+        });
+
+        log.info("Monthly API usage report completed.");
     }
 }
