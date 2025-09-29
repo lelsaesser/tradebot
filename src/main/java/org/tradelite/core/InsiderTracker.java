@@ -35,7 +35,11 @@ public class InsiderTracker {
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
 
         for (String symbolString : monitoredSymbols) {
-            StockSymbol stockSymbol = StockSymbol.fromString(symbolString).orElseThrow();
+            Optional<StockSymbol> stockSymbolOpt = StockSymbol.fromString(symbolString);
+            if (stockSymbolOpt.isEmpty()) {
+                continue;
+            }
+            StockSymbol stockSymbol = stockSymbolOpt.get();
 
             InsiderTransactionResponse response = finnhubClient.getInsiderTransactions(stockSymbol);
 

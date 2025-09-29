@@ -261,4 +261,38 @@ class InsiderTrackerTest {
         verify(telegramClient).sendMessage(anyString());
         verify(insiderPersistence).persistToFile(any(), anyString());
     }
+
+    @Test
+    void trackInsiderTransactions_withInvalidSymbols_shouldSkipInvalidSymbolsGracefully() {
+        List<TargetPrice> targetPrices = List.of(
+            new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0),
+            new TargetPrice("BLABLA", 915.0, 0.0), // Invalid symbol
+            new TargetPrice(StockSymbol.GOOG.getTicker(), 200.0, 400.0),
+            new TargetPrice("DUMMY", 84.0, 0.0)   // Invalid symbol
+        );
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+
+        InsiderTransactionResponse responseAAPL = new InsiderTransactionResponse(List.of(
+            new InsiderTransactionResponse.Transaction("Alice", 100, 5, "2023-10-02", "2023-10-01", "S", 10200.0)
+        ));
+        InsiderTransactionResponse responseGOOG = new InsiderTransactionResponse(List.of(
+            new InsiderTransactionResponse.Transaction("Bob", 100, 10, "2023-10-02", "2023-10-01", "P", 10200.0)
+        ));
+
+        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(responseAAPL);
+        when(finnhubClient.getInsiderTransactions(StockSymbol.GOOG)).thenReturn(responseGOOG);
+        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+
+        // This should not throw an exception despite invalid symbols
+        insiderTracker.trackInsiderTransactions();
+
+        // Verify that only valid symbols were processed (AAPL and GOOG)
+        verify(finnhubClient, times(1)).getInsiderTransactions(StockSymbol.AAPL);
+        verify(finnhubClient, times(1)).getInsiderTransactions(StockSymbol.GOOG);
+        verify(finnhubClient, times(2)).getInsiderTransactions(any(StockSymbol.class));
+
+        // Should still send report and persist data for valid symbols
+        verify(telegramClient).sendMessage(anyString());
+        verify(insiderPersistence).persistToFile(any(), anyString());
+    }
 }
