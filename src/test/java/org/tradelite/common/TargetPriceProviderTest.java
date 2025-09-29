@@ -169,18 +169,18 @@ class TargetPriceProviderTest {
 
     @Test
     void addSymbolToTargetPriceConfig_ok() {
-        AddCommand command = new AddCommand(CoinId.POLKADOT, 160.0, 200.0, SymbolType.CRYPTO);
+        AddCommand command = new AddCommand(CoinId.DOGE, 160.0, 200.0, SymbolType.CRYPTO);
 
         boolean result = targetPriceProvider.addSymbolToTargetPriceConfig(command, FILE_PATH);
 
         assertThat(result, is(true));
 
-        boolean found = fileContainsSymbol(CoinId.POLKADOT);
+        boolean found = fileContainsSymbol(CoinId.DOGE);
         assertThat(found, is(true));
 
         // Cleanup
-        targetPriceProvider.removeSymbolFromTargetPriceConfig(new RemoveCommand(CoinId.POLKADOT, SymbolType.CRYPTO), FILE_PATH);
-        found = fileContainsSymbol(CoinId.POLKADOT);
+        targetPriceProvider.removeSymbolFromTargetPriceConfig(new RemoveCommand(CoinId.DOGE, SymbolType.CRYPTO), FILE_PATH);
+        found = fileContainsSymbol(CoinId.DOGE);
         assertThat(found, is(false));
     }
 
@@ -233,14 +233,14 @@ class TargetPriceProviderTest {
 
     @Test
     void removeSymbolFromTargetPriceConfig_symbolNotPresent_nothingHappens() {
-        RemoveCommand command = new RemoveCommand(CoinId.POLKADOT, SymbolType.CRYPTO);
+        RemoveCommand command = new RemoveCommand(CoinId.DOGE, SymbolType.CRYPTO);
 
-        boolean found = fileContainsSymbol(CoinId.POLKADOT);
+        boolean found = fileContainsSymbol(CoinId.DOGE);
         assertThat(found, is(false));
 
         targetPriceProvider.removeSymbolFromTargetPriceConfig(command, FILE_PATH);
 
-        found = fileContainsSymbol(CoinId.POLKADOT);
+        found = fileContainsSymbol(CoinId.DOGE);
         assertThat(found, is(false));
     }
 
