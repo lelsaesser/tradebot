@@ -161,9 +161,9 @@ class TargetPriceProviderTest {
     void updateTargetPrice_exception() {
         String invalidFilePath = "invalid/path/target-prices.json";
 
-        assertThrows(IllegalStateException.class, () -> targetPriceProvider.updateTargetPrice(StockSymbol.UNH, 160.0, 200.0, invalidFilePath));
+        assertThrows(IllegalStateException.class, () -> targetPriceProvider.updateTargetPrice(StockSymbol.GOOG, 160.0, 200.0, invalidFilePath));
 
-        boolean found = fileContainsSymbol(StockSymbol.UNH);
+        boolean found = fileContainsSymbol(StockSymbol.GOOG);
         assertThat(found, is(false));
     }
 
