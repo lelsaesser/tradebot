@@ -59,8 +59,7 @@ public class Scheduler {
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
-        // TODO: Temporarily disabled - re-enable soon
-        // rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
+        rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
 
         log.info("Market monitoring round completed.");
     }
