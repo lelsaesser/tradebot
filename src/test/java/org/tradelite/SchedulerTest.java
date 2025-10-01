@@ -62,18 +62,17 @@ class SchedulerTest {
 
         scheduler.marketMonitoring();
 
-        // TODO: Temporarily disabled CoinGecko - adjust test expectations
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
+        verify(rootErrorHandler, times(2)).run(captor.capture());
 
-        captor.getValue().run();
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
-        // TODO: Temporarily disabled - re-enable soon
-        // verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
-        verify(coinGeckoPriceEvaluator, times(0)).evaluatePrice();
+        verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
     }
 
     @Test
@@ -83,13 +82,15 @@ class SchedulerTest {
 
         scheduler.marketMonitoring();
 
-        // TODO: Temporarily disabled CoinGecko - no calls expected now
-        verify(rootErrorHandler, times(0)).run(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+
+        captor.getValue().run();
 
         verify(finnhubPriceEvaluator, times(0)).evaluatePrice();
-        // TODO: Temporarily disabled - re-enable soon
-        // verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
-        verify(coinGeckoPriceEvaluator, times(0)).evaluatePrice();
+        verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
     }
 
     @Test
