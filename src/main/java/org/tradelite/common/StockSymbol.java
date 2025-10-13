@@ -35,16 +35,16 @@ public enum StockSymbol implements TickerSymbol {
     ASML("ASML", "ASML"),
     SMCI("Super Micro Computer", "SMCI"),
     BABA("Alibaba", "BABA"),
-    TEM("Telefônica Brasil", "TEM"),
+    TEM("Tempus AI", "TEM"),
     HIMS("Hims & Hers Health", "HIMS"),
     TSM("Taiwan Semiconductor Manufacturing", "TSM"),
     MU("Micron Technology", "MU"),
     ORCL("Oracle", "ORCL"),
     INTC("Intel", "INTC"),
     DELL("Dell", "DELL"),
-    CRWV("Crucible Acquisition", "CRWV"),
+    CRWV("CoreWeave", "CRWV"),
     IREN("Iris Energy", "IREN"),
-    NBIS("NioCorp Developments", "NBIS"),
+    NBIS("Nebius Group", "NBIS"),
     NET("Cloudflare", "NET");
 
 
