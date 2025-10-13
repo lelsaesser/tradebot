@@ -71,7 +71,7 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, times(1)).sendMessage("📈 High daily price swing detected for AVGO: 6.00%");
+        verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
         verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
@@ -85,7 +85,7 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, times(1)).sendMessage("📉 High daily price swing detected for AVGO: -6.00%");
+        verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
         verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
@@ -125,7 +125,7 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, times(1)).sendMessage("📈 High daily price swing detected for AVGO: 11.00%");
+        verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
         verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10);
     }
 

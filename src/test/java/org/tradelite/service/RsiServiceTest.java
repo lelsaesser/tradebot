@@ -51,7 +51,7 @@ class RsiServiceTest {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
-        verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(telegramClient, times(1)).sendMessage(contains(symbol.getDisplayName()));
         verify(rsiService, times(15)).savePriceHistory();
     }
 
@@ -65,6 +65,7 @@ class RsiServiceTest {
         // Verify RSI calculation and notification for oversold (may be called multiple times as we add prices)
         verify(telegramClient, atLeastOnce()).sendMessage(contains("🟢"));
         verify(telegramClient, atLeastOnce()).sendMessage(contains("oversold"));
+        verify(telegramClient, atLeastOnce()).sendMessage(contains(symbol.getDisplayName()));
         verify(rsiService, times(15)).savePriceHistory();
     }
 
