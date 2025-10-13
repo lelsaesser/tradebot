@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class InsiderPersistence {
@@ -41,7 +42,9 @@ public class InsiderPersistence {
             Map<String, Map<String, Integer>> map = objectMapper.readValue(file, new TypeReference<>() {});
 
             return map.entrySet().stream()
-                    .map(e -> new InsiderTransactionHistoric(StockSymbol.fromString(e.getKey()).orElseThrow(), e.getValue()))
+                    .map(e -> StockSymbol.fromString(e.getKey())
+                            .map(symbol -> new InsiderTransactionHistoric(symbol, e.getValue())))
+                    .flatMap(Optional::stream)
                     .toList();
 
         } catch (IOException | IllegalStateException e) {
