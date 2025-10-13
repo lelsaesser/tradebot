@@ -8,53 +8,51 @@ import java.util.Optional;
 
 @Getter
 public enum StockSymbol implements TickerSymbol {
-    AAPL("AAPL"),
-    MSFT("MSFT"),
-    GOOG("GOOG"),
-    AMZN("AMZN"),
-    TSLA("TSLA"),
-    META("META"),
-    NFLX("NFLX"),
-    NVDA("NVDA"),
-    AMD("AMD"),
-    COIN("COIN"),
-    MSTR("MSTR"),
-    RKLB("RKLB"),
-    UBER("UBER"),
-    PLTR("PLTR"),
-    SPOT("SPOT"),
-    HOOD("HOOD"),
-    AVGO("AVGO"),
-    AXON("AXON"),
-    CRWD("CRWD"),
-    OKTA("OKTA"),
-    GLXY("GLXY"),
-    PANW("PANW"),
-    MP("MP"),
-    APP("APP"),
-    ASML("ASML"),
-//    COST("COST"),
-//    WMT("WMT"),
-    SMCI("SMCI"),
-//    UNH("UNH"),
-    BABA("BABA"),
-    TEM("TEM"),
-//    OSCR("OSCR"),
-    HIMS("HIMS"),
-    TSM("TSM"),
-    MU("MU"),
-    ORCL("ORCL"),
-    INTC("INTC"),
-//   PONY("PONY"),
-    DELL("DELL"),
-    CRWV("CRWV"),
-    IREN("IREN"),
-    NBIS("NBIS"),
-    NET("NET");
+    AAPL("Apple", "AAPL"),
+    MSFT("Microsoft", "MSFT"),
+    GOOG("Google", "GOOG"),
+    AMZN("Amazon", "AMZN"),
+    TSLA("Tesla", "TSLA"),
+    META("Meta", "META"),
+    NFLX("Netflix", "NFLX"),
+    NVDA("Nvidia", "NVDA"),
+    AMD("AMD", "AMD"),
+    COIN("Coinbase", "COIN"),
+    MSTR("MicroStrategy", "MSTR"),
+    RKLB("Rocket Lab", "RKLB"),
+    UBER("Uber", "UBER"),
+    PLTR("Palantir", "PLTR"),
+    SPOT("Spotify", "SPOT"),
+    HOOD("Robinhood", "HOOD"),
+    AVGO("Broadcom", "AVGO"),
+    AXON("Axon", "AXON"),
+    CRWD("CrowdStrike", "CRWD"),
+    OKTA("Okta", "OKTA"),
+    GLXY("Galaxy Digital", "GLXY"),
+    PANW("Palo Alto Networks", "PANW"),
+    MP("MP Materials", "MP"),
+    APP("AppLovin", "APP"),
+    ASML("ASML", "ASML"),
+    SMCI("Super Micro Computer", "SMCI"),
+    BABA("Alibaba", "BABA"),
+    TEM("Tempus AI", "TEM"),
+    HIMS("Hims & Hers Health", "HIMS"),
+    TSM("Taiwan Semiconductor Manufacturing", "TSM"),
+    MU("Micron Technology", "MU"),
+    ORCL("Oracle", "ORCL"),
+    INTC("Intel", "INTC"),
+    DELL("Dell", "DELL"),
+    CRWV("CoreWeave", "CRWV"),
+    IREN("Iris Energy", "IREN"),
+    NBIS("Nebius Group", "NBIS"),
+    NET("Cloudflare", "NET");
 
+
+    private final String companyName;
     private final String ticker;
 
-    StockSymbol(String ticker) {
+    StockSymbol(String companyName, String ticker) {
+        this.companyName = companyName;
         this.ticker = ticker;
     }
 
@@ -71,6 +69,10 @@ public enum StockSymbol implements TickerSymbol {
     @Override
     public String getName() {
         return ticker;
+    }
+
+    public String getDisplayName() {
+        return String.format("%s (%s)", companyName, ticker);
     }
 
     @Override

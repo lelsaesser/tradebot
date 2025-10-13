@@ -6,8 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolType;
 import org.tradelite.common.TickerSymbol;
-import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
 import java.io.File;
@@ -73,13 +74,17 @@ public class RsiService {
         }
 
         double rsi = calculateRsi(rsiDailyClosePrice.getPriceValues());
+        String displayName = symbol.getName();
+        if (symbol.getSymbolType() == SymbolType.STOCK) {
+            displayName = ((StockSymbol) symbol).getDisplayName();
+        }
 
         if (rsi >= 70) {
-            log.info("RSI for {} is in overbought zone: {}", symbol, rsi);
-            telegramClient.sendMessage(String.format("🔴 RSI for %s is in overbought zone: %.2f", symbol, rsi));
+            log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
+            telegramClient.sendMessage(String.format("🔴 RSI for %s is in overbought zone: %.2f", displayName, rsi));
         } else if (rsi <= 30) {
-            log.info("RSI for {} is in oversold zone: {}", symbol, rsi);
-            telegramClient.sendMessage(String.format("🟢 RSI for %s is in oversold zone: %.2f", symbol, rsi));
+            log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
+            telegramClient.sendMessage(String.format("🟢 RSI for %s is in oversold zone: %.2f", displayName, rsi));
         }
     }
 

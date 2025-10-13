@@ -3,6 +3,8 @@ package org.tradelite.core;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.common.TickerSymbol;
 
@@ -16,13 +18,17 @@ public abstract class BasePriceEvaluator {
     public abstract int evaluatePrice() throws InterruptedException;
 
     protected void comparePrices(TickerSymbol ticker, double currentPrice, double targetPriceBuy, double targetPriceSell) {
+        String displayName = ticker.getName();
+        if (ticker.getSymbolType() == SymbolType.STOCK) {
+            displayName = ((StockSymbol) ticker).getDisplayName();
+        }
 
         if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
             if (targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.SELL_ALERT)) {
                 return;
             }
-            log.info("Potential sell opportunity for {}", ticker);
-            telegramClient.sendMessage("\uD83D\uDCB0 Potential sell opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
+            log.info("Potential sell opportunity for {}", displayName);
+            telegramClient.sendMessage("💰 Potential sell opportunity for " + displayName + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
             targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.SELL_ALERT);
         }
 
@@ -30,8 +36,8 @@ public abstract class BasePriceEvaluator {
             if (targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.BUY_ALERT)) {
                 return;
             }
-            log.info("Potential buy opportunity for {}", ticker);
-            telegramClient.sendMessage("\uD83D\uDE80 Potential buy opportunity for " + ticker + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
+            log.info("Potential buy opportunity for {}", displayName);
+            telegramClient.sendMessage("🚀 Potential buy opportunity for " + displayName + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
             targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.BUY_ALERT);
         }
     }

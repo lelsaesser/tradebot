@@ -3,24 +3,31 @@
 This document tracks the current work focus, recent changes, next steps, active decisions, important patterns, and project insights.
 
 ## Current Work Focus
-The current focus is on understanding the existing codebase and populating the Memory Bank with accurate information about the project.
+Fixed a critical bug in the weekly insider trading report that was causing `NoSuchElementException` when invalid stock symbols were present in the configuration.
 
 ## Recent Changes
-The Memory Bank files have been populated based on an analysis of the project's `pom.xml`, `Application.java`, and `Scheduler.java` files.
+- **Fixed InsiderTracker.java**: Replaced `StockSymbol.fromString(symbolString).orElseThrow()` with proper error handling that gracefully skips invalid symbols
+- **Added resilient error handling**: The system now continues processing valid symbols even when invalid ones are present in the configuration
+- **Added comprehensive test**: Created `trackInsiderTransactions_withInvalidSymbols_shouldSkipInvalidSymbolsGracefully()` test to verify the fix
 
 ## Next Steps
-- Review the implementation details of the core components.
-- Verify the logic within each scheduled task.
-- Implement the Telegram command processing logic.
-- Secure API keys and other sensitive information.
+- Monitor production logs to ensure the fix resolves the weekly report failures
+- Consider adding logging to track which symbols are being skipped
+- Review other parts of the codebase for similar patterns that might need resilient error handling
 
 ## Active Decisions
-The decision has been made to thoroughly document the existing project structure and functionality before making any changes or adding new features.
+- Chose to implement graceful error handling rather than trying to modify production configuration files
+- Decided to silently skip invalid symbols to maintain system stability while processing valid ones
 
 ## Important Patterns and Preferences
-- The project uses a scheduler-based approach to orchestrate tasks.
-- Components are loosely coupled using dependency injection.
-- Error handling is centralized in the `RootErrorHandler`.
+- The project uses a scheduler-based approach to orchestrate tasks
+- Components are loosely coupled using dependency injection
+- Error handling is centralized in the `RootErrorHandler`
+- **New pattern**: Graceful degradation when configuration contains invalid data - skip invalid entries and continue processing valid ones
 
 ## Learnings and Project Insights
-The project is a trading bot with a clear, modular structure. The use of Spring Boot and its scheduling features simplifies the orchestration of complex workflows. The `Scheduler.java` file provides a high-level overview of the application's capabilities.
+- The project is a trading bot with a clear, modular structure
+- The use of Spring Boot and its scheduling features simplifies the orchestration of complex workflows
+- **Critical insight**: Configuration files in production may contain symbols not defined in the enum, requiring resilient error handling
+- The `StockSymbol` enum acts as a whitelist - only symbols defined there can be processed for insider tracking
+- The system should be designed to handle configuration mismatches gracefully rather than failing completely
