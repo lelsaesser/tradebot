@@ -8,6 +8,7 @@ import java.util.Optional;
 
 @Getter
 public enum StockSymbol implements TickerSymbol {
+    // do not add special characters to the names, this causes parsing issues with the Telegram messages for some reason
     AAPL("Apple", "AAPL"),
     MSFT("Microsoft", "MSFT"),
     GOOG("Google", "GOOG"),
@@ -36,7 +37,7 @@ public enum StockSymbol implements TickerSymbol {
     SMCI("Super Micro Computer", "SMCI"),
     BABA("Alibaba", "BABA"),
     TEM("Tempus AI", "TEM"),
-    HIMS("Hims & Hers Health", "HIMS"),
+    HIMS("Hims and Hers Health", "HIMS"),
     TSM("Taiwan Semiconductor Manufacturing", "TSM"),
     MU("Micron Technology", "MU"),
     ORCL("Oracle", "ORCL"),
