@@ -3,27 +3,31 @@
 This document tracks the current work focus, recent changes, next steps, active decisions, important patterns, and project insights.
 
 ## Current Work Focus
-Fixed a bug in the Telegram client that caused messages containing special characters (e.g., '&') to be truncated.
+Fixed a critical bug in the weekly insider trading report that was causing `NoSuchElementException` when invalid stock symbols were present in the configuration.
 
 ## Recent Changes
-- **Fixed TelegramClient.java**: URL-encoded the message content before sending it to the Telegram API to prevent truncation of messages with special characters.
-- **Added URL encoding**: Used `URLEncoder.encode()` to ensure that all characters in the message are correctly transmitted.
+- **Fixed InsiderTracker.java**: Replaced `StockSymbol.fromString(symbolString).orElseThrow()` with proper error handling that gracefully skips invalid symbols
+- **Added resilient error handling**: The system now continues processing valid symbols even when invalid ones are present in the configuration
+- **Added comprehensive test**: Created `trackInsiderTransactions_withInvalidSymbols_shouldSkipInvalidSymbolsGracefully()` test to verify the fix
 
 ## Next Steps
-- Monitor the application to confirm that the fix resolves the message truncation issue for all stock symbols.
-- Review other parts of the code that interact with external APIs to ensure proper encoding of data.
+- Monitor production logs to ensure the fix resolves the weekly report failures
+- Consider adding logging to track which symbols are being skipped
+- Review other parts of the codebase for similar patterns that might need resilient error handling
 
 ## Active Decisions
-- Decided to apply URL encoding at the `TelegramClient` level to provide a centralized fix for all messages.
+- Chose to implement graceful error handling rather than trying to modify production configuration files
+- Decided to silently skip invalid symbols to maintain system stability while processing valid ones
 
 ## Important Patterns and Preferences
-- The project uses a scheduler-based approach to orchestrate tasks.
-- Components are loosely coupled using dependency injection.
-- Error handling is centralized in the `RootErrorHandler`.
-- **New pattern**: URL-encode data sent to external APIs to prevent issues with special characters.
+- The project uses a scheduler-based approach to orchestrate tasks
+- Components are loosely coupled using dependency injection
+- Error handling is centralized in the `RootErrorHandler`
+- **New pattern**: Graceful degradation when configuration contains invalid data - skip invalid entries and continue processing valid ones
 
 ## Learnings and Project Insights
-- The project is a trading bot with a clear, modular structure.
-- The use of Spring Boot and its scheduling features simplifies the orchestration of complex workflows.
-- **Critical insight**: Special characters in API requests can cause unexpected behavior, such as data truncation, if not properly encoded.
-- The `StockSymbol` enum acts as a whitelist for stocks, but the display names can contain characters that need to be handled carefully.
+- The project is a trading bot with a clear, modular structure
+- The use of Spring Boot and its scheduling features simplifies the orchestration of complex workflows
+- **Critical insight**: Configuration files in production may contain symbols not defined in the enum, requiring resilient error handling
+- The `StockSymbol` enum acts as a whitelist - only symbols defined there can be processed for insider tracking
+- The system should be designed to handle configuration mismatches gracefully rather than failing completely

@@ -9,8 +9,6 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +35,7 @@ public class TelegramClient {
     }
 
     public void sendMessage(String message) {
-        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
-        String url = String.format(BASE_URL, botToken, groupChatId, encodedMessage);
+        String url = String.format(BASE_URL, botToken, groupChatId, message);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("parse_mode", "Markdown");

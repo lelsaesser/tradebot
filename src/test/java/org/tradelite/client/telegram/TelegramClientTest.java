@@ -17,9 +17,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.tradelite.client.telegram.TelegramClient.BASE_URL;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-
 @ExtendWith(MockitoExtension.class)
 class TelegramClientTest {
 
@@ -36,8 +33,7 @@ class TelegramClientTest {
     @Test
     void sendMessage_success() {
         String message = "Test message";
-        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
-        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", encodedMessage);
+        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", message);
         when(restTemplate.exchange(
                 eq(expectedUrl),
                 eq(HttpMethod.POST),
@@ -53,8 +49,7 @@ class TelegramClientTest {
     @Test
     void sendMessage_failure() {
         String message = "Test message";
-        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
-        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", encodedMessage);
+        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", message);
         when(restTemplate.exchange(
                 eq(expectedUrl),
                 eq(HttpMethod.POST),
@@ -70,8 +65,7 @@ class TelegramClientTest {
     @Test
     void sendMessage_exception() {
         String message = "Test message";
-        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
-        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", encodedMessage);
+        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", message);
         when(restTemplate.exchange(
                 eq(expectedUrl),
                 eq(HttpMethod.POST),
