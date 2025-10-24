@@ -56,31 +56,11 @@ class SchedulerTest {
     }
 
     @Test
-    void marketMonitoring_marketOpen_shouldRun() throws Exception {
+    void stockMarketMonitoring_marketOpen_shouldRun() throws Exception {
         scheduler.dayOfWeek = DayOfWeek.MONDAY;
         scheduler.localTime = LocalTime.of(17, 0);
 
-        scheduler.marketMonitoring();
-
-        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).run(captor.capture());
-
-        for (ThrowingRunnable runnable : captor.getAllValues()) {
-            runnable.run();
-        }
-
-        verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
-        verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
-    }
-
-    @Test
-    void marketMonitoring_marketClosed_shouldOnlyRunCrypto() throws Exception {
-        scheduler.dayOfWeek = DayOfWeek.SATURDAY;
-        scheduler.localTime = LocalTime.of(17, 0);
-
-        scheduler.marketMonitoring();
+        scheduler.stockMarketMonitoring();
 
         verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
 
@@ -89,8 +69,35 @@ class SchedulerTest {
 
         captor.getValue().run();
 
-        verify(finnhubPriceEvaluator, times(0)).evaluatePrice();
+        verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
+        verify(coinGeckoPriceEvaluator, times(0)).evaluatePrice();
+    }
+
+    @Test
+    void stockMarketMonitoring_marketClosed_shouldNotRun() throws Exception {
+        scheduler.dayOfWeek = DayOfWeek.SATURDAY;
+        scheduler.localTime = LocalTime.of(17, 0);
+
+        scheduler.stockMarketMonitoring();
+
+        verify(rootErrorHandler, never()).run(any(ThrowingRunnable.class));
+        verify(finnhubPriceEvaluator, never()).evaluatePrice();
+        verify(coinGeckoPriceEvaluator, never()).evaluatePrice();
+    }
+
+    @Test
+    void cryptoMarketMonitoring_shouldRun() throws Exception {
+        scheduler.cryptoMarketMonitoring();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+
+        captor.getValue().run();
+
         verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
+        verify(finnhubPriceEvaluator, never()).evaluatePrice();
     }
 
     @Test

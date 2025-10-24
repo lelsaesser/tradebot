@@ -6,7 +6,7 @@ This document describes the system architecture, key technical decisions, design
 The application follows a modular, component-based architecture built on the Spring Framework. The core logic is orchestrated by a central `Scheduler` component that triggers various tasks at scheduled intervals.
 
 ## Key Components
-- **`Scheduler`:** The heart of the application, responsible for orchestrating all scheduled tasks.
+- **`Scheduler`:** The heart of the application, responsible for orchestrating all scheduled tasks. It includes separate methods for monitoring stock and crypto markets at different intervals.
 - **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) responsible for fetching and evaluating prices from different APIs.
 - **`RsiPriceFetcher`:** A component dedicated to fetching historical price data for RSI calculations.
 - **`InsiderTracker`:** A component for tracking and reporting insider trading activities.
