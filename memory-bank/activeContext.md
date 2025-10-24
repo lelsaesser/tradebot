@@ -3,17 +3,16 @@
 This document tracks the current work focus, recent changes, next steps, active decisions, important patterns, and project insights.
 
 ## Current Work Focus
-Fixed a critical bug in the weekly insider trading report that was causing `NoSuchElementException` when invalid stock symbols were present in the configuration.
+The scheduler has been updated to run cryptocurrency monitoring every 7 minutes, while stock monitoring remains at 5 minutes.
 
 ## Recent Changes
-- **Fixed InsiderTracker.java**: Replaced `StockSymbol.fromString(symbolString).orElseThrow()` with proper error handling that gracefully skips invalid symbols
-- **Added resilient error handling**: The system now continues processing valid symbols even when invalid ones are present in the configuration
-- **Added comprehensive test**: Created `trackInsiderTransactions_withInvalidSymbols_shouldSkipInvalidSymbolsGracefully()` test to verify the fix
+- **Separated Schedulers**: The combined market monitoring job was split into `stockMarketMonitoring` and `cryptoMarketMonitoring`.
+- **Updated Crypto Schedule**: The `cryptoMarketMonitoring` job is now scheduled to run every 7 minutes.
+- **Updated Tests**: The `SchedulerTest` class was updated to reflect the new scheduler methods.
 
 ## Next Steps
-- Monitor production logs to ensure the fix resolves the weekly report failures
-- Consider adding logging to track which symbols are being skipped
-- Review other parts of the codebase for similar patterns that might need resilient error handling
+- Monitor the application to ensure the schedulers are running at their new, correct intervals.
+- Update the system patterns to reflect the new scheduler structure.
 
 ## Active Decisions
 - Chose to implement graceful error handling rather than trying to modify production configuration files
