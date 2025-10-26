@@ -2,6 +2,7 @@ package org.tradelite.client.coingecko;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,43 +18,81 @@ import org.tradelite.service.ApiRequestMeteringService;
 @Component
 public class CoinGeckoClient {
 
-    private static final String BASE_URL = "https://api.coingecko.com/api/v3";
-    private static final String API_KEY = System.getenv("COINGECKO_API_KEY");
+    private final String baseUrl;
+    private final String apiKey;
 
     private final RestTemplate restTemplate;
     private final ApiRequestMeteringService meteringService;
 
     @Autowired
-    public CoinGeckoClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
+    public CoinGeckoClient(
+        RestTemplate restTemplate,
+        ApiRequestMeteringService meteringService,
+        @Value(
+            "${coingecko.base-url:https://api.coingecko.com/api/v3}"
+        ) String baseUrl,
+        @Value("${coingecko.api-key:#{null}}") String apiKey
+    ) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
+        this.baseUrl = baseUrl;
+        this.apiKey = apiKey;
     }
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
         String endpointUrl = "/simple/price";
-        String url = BASE_URL + endpointUrl + "?ids=" + coinId.getId() + "&vs_currencies=usd" + "&include_24hr_change=true";
+        String url =
+            baseUrl +
+            endpointUrl +
+            "?ids=" +
+            coinId.getId() +
+            "&vs_currencies=usd&include_24hr_change=true";
 
         HttpHeaders headers = new HttpHeaders();
-        headers.add("x-cg-demo-api-key", API_KEY);
+        if (apiKey != null && !apiKey.isBlank()) {
+            headers.add("x-cg-demo-api-key", apiKey);
+        }
         headers.set("Accept", "application/json");
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         try {
             meteringService.incrementCoingeckoRequests();
-            ResponseEntity<CoinGeckoPriceResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity, CoinGeckoPriceResponse.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                CoinGeckoPriceResponse.CoinData data = response.getBody().getCoinData().get(coinId.getId());
+            ResponseEntity<CoinGeckoPriceResponse> response =
+                restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    CoinGeckoPriceResponse.class
+                );
+            if (
+                response.getStatusCode().is2xxSuccessful() &&
+                response.getBody() != null
+            ) {
+                CoinGeckoPriceResponse.CoinData data = response
+                    .getBody()
+                    .getCoinData()
+                    .get(coinId.getId());
                 data.setCoinId(coinId);
                 return data;
             } else {
-                log.error("Failed to fetch coin price data for {}: {}", coinId.getId(), response.getStatusCode());
-                throw new IllegalStateException("Failed to fetch coin price data: " + response.getStatusCode());
+                log.error(
+                    "Failed to fetch coin price data for {}: {}",
+                    coinId.getId(),
+                    response.getStatusCode()
+                );
+                throw new IllegalStateException(
+                    "Failed to fetch coin price data: " +
+                        response.getStatusCode()
+                );
             }
         } catch (RestClientException e) {
-            log.error("Error fetching coin price data for {}: {}", coinId.getId(), e.getMessage());
+            log.error(
+                "Error fetching coin price data for {}: {}",
+                coinId.getId(),
+                e.getMessage()
+            );
             throw e;
         }
-
     }
 }

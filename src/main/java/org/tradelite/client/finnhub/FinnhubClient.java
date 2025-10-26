@@ -2,6 +2,7 @@ package org.tradelite.client.finnhub;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -20,20 +21,34 @@ import org.tradelite.utils.DateUtil;
 @Component
 public class FinnhubClient {
 
-    private static final String API_URL = "https://finnhub.io/api/v1";
-    private static final String API_KEY = System.getenv("FINNHUB_API_KEY");
+    private final String apiBaseUrl;
+    private final String apiKey;
 
     private final RestTemplate restTemplate;
     private final ApiRequestMeteringService meteringService;
 
     @Autowired
-    public FinnhubClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
+    public FinnhubClient(
+        RestTemplate restTemplate,
+        ApiRequestMeteringService meteringService,
+        @Value(
+            "${finnhub.base-url:https://finnhub.io/api/v1}"
+        ) String apiBaseUrl,
+        @Value("${finnhub.api-key:#{null}}") String apiKey
+    ) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
+        this.apiBaseUrl = apiBaseUrl;
+        this.apiKey = apiKey;
     }
 
-    private String getApiUrl(String baseUrl, StockSymbol ticker) {
-        return API_URL + String.format(baseUrl, ticker.getTicker()) + "&token=" + API_KEY;
+    private String getApiUrl(String pathTemplate, StockSymbol ticker) {
+        String url =
+            apiBaseUrl + String.format(pathTemplate, ticker.getTicker());
+        if (apiKey != null && !apiKey.isBlank()) {
+            url = url + (url.contains("?") ? "&" : "?") + "token=" + apiKey;
+        }
+        return url;
     }
 
     public PriceQuoteResponse getPriceQuote(StockSymbol ticker) {
@@ -42,14 +57,25 @@ public class FinnhubClient {
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         HttpHeaders headers = new HttpHeaders();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        HttpEntity<MultiValueMap<String, Object>> requestEntity =
+            new HttpEntity<>(body, headers);
 
         try {
             meteringService.incrementFinnhubRequests();
-            ResponseEntity<PriceQuoteResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
+            ResponseEntity<PriceQuoteResponse> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                requestEntity,
+                PriceQuoteResponse.class
+            );
             PriceQuoteResponse quote = response.getBody();
             if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
-                throw new IllegalStateException("Failed to fetch price quote for " + ticker.getTicker() + ": " + response.getStatusCode());
+                throw new IllegalStateException(
+                    "Failed to fetch price quote for " +
+                        ticker.getTicker() +
+                        ": " +
+                        response.getStatusCode()
+                );
             }
             quote.setStockSymbol(ticker);
             return quote;
@@ -59,7 +85,9 @@ public class FinnhubClient {
         }
     }
 
-    public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
+    public InsiderTransactionResponse getInsiderTransactions(
+        StockSymbol ticker
+    ) {
         String fromDate = DateUtil.getDateTwoMonthsAgo(null);
         String baseUrl = "/stock/insider-transactions?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
@@ -67,11 +95,18 @@ public class FinnhubClient {
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         HttpHeaders headers = new HttpHeaders();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        HttpEntity<MultiValueMap<String, Object>> requestEntity =
+            new HttpEntity<>(body, headers);
 
         try {
             meteringService.incrementFinnhubRequests();
-            ResponseEntity<InsiderTransactionResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
+            ResponseEntity<InsiderTransactionResponse> response =
+                restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    requestEntity,
+                    InsiderTransactionResponse.class
+                );
             return response.getBody();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
