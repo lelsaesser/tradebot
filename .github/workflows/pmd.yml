@@ -10,6 +10,9 @@ on:
 
 jobs:
   pmd:
+    permissions:
+      contents: read
+      security-events: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,4 +22,8 @@ jobs:
           distribution: temurin
           java-version: '23'
       - name: Run PMD via Maven
-        run: mvn -B -DskipTests pmd:check
+        run: mvn -B -DskipTests verify
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: target/pmd.sarif
