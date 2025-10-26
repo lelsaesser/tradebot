@@ -1,5 +1,13 @@
 package org.tradelite.core;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.aMapWithSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,38 +20,27 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.aMapWithSize;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
 
-    @Mock
-    private FinnhubClient finnhubClient;
-    @Mock
-    private TargetPriceProvider targetPriceProvider;
-    @Mock
-    private TelegramClient telegramClient;
+    @Mock private FinnhubClient finnhubClient;
+    @Mock private TargetPriceProvider targetPriceProvider;
+    @Mock private TelegramClient telegramClient;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
     @BeforeEach
     void setUp() {
-        finnhubPriceEvaluator = new FinnhubPriceEvaluator(finnhubClient, targetPriceProvider, telegramClient);
+        finnhubPriceEvaluator =
+                new FinnhubPriceEvaluator(finnhubClient, targetPriceProvider, telegramClient);
     }
 
     @Test
     void evaluatePrice() throws InterruptedException {
-        List<TargetPrice> targetPrices = List.of(
-                new TargetPrice(StockSymbol.AVGO.getTicker(), 150.0, 160.0),
-                new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200)
-        );
+        List<TargetPrice> targetPrices =
+                List.of(
+                        new TargetPrice(StockSymbol.AVGO.getTicker(), 150.0, 160.0),
+                        new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
@@ -67,12 +64,15 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(
+                        StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5))
+                .thenReturn(false);
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
+        verify(targetPriceProvider, times(1))
+                .addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test
@@ -81,12 +81,15 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(-6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(
+                        StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5))
+                .thenReturn(false);
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
+        verify(targetPriceProvider, times(1))
+                .addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test
@@ -107,12 +110,15 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(
+                        StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5))
+                .thenReturn(true);
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, never()).sendMessage(any());
-        verify(targetPriceProvider, never()).addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
+        verify(targetPriceProvider, never())
+                .addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
     }
 
     @Test
@@ -121,12 +127,15 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(11.0);
 
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10)).thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(
+                        StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10))
+                .thenReturn(false);
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10);
+        verify(targetPriceProvider, times(1))
+                .addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10);
     }
 
     @Test
@@ -135,12 +144,15 @@ class FinnhubPriceEvaluatorTest {
         priceQuoteResponse.setStockSymbol(StockSymbol.AVGO);
         priceQuoteResponse.setChangePercent(11.0);
 
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10)).thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(
+                        StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10))
+                .thenReturn(true);
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
         verify(telegramClient, never()).sendMessage(any());
-        verify(targetPriceProvider, never()).addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
+        verify(targetPriceProvider, never())
+                .addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
     }
 
     @Test
@@ -153,7 +165,8 @@ class FinnhubPriceEvaluatorTest {
 
         List<TargetPrice> targetPrices = new ArrayList<>();
         for (StockSymbol symbol : StockSymbol.getAll()) {
-            targetPrices.add(new TargetPrice(symbol.getTicker(), lastPrice - 1000, lastPrice + 1000));
+            targetPrices.add(
+                    new TargetPrice(symbol.getTicker(), lastPrice - 1000, lastPrice + 1000));
         }
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
@@ -172,11 +185,12 @@ class FinnhubPriceEvaluatorTest {
     }
 
     @Test
-    void evaluatePrice_invalidTickerSymbolInTargetPrice_doesNotSendMessage() throws InterruptedException {
-        List<TargetPrice> targetPrices = List.of(
-                new TargetPrice("INVALID", 150.0, 160.0),
-                new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200)
-        );
+    void evaluatePrice_invalidTickerSymbolInTargetPrice_doesNotSendMessage()
+            throws InterruptedException {
+        List<TargetPrice> targetPrices =
+                List.of(
+                        new TargetPrice("INVALID", 150.0, 160.0),
+                        new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
@@ -194,10 +208,10 @@ class FinnhubPriceEvaluatorTest {
 
     @Test
     void evaluatePrice_nullPriceQuote() throws InterruptedException {
-        List<TargetPrice> targetPrices = List.of(
-                new TargetPrice(StockSymbol.AVGO.getTicker(), 150.0, 160.0),
-                new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200)
-        );
+        List<TargetPrice> targetPrices =
+                List.of(
+                        new TargetPrice(StockSymbol.AVGO.getTicker(), 150.0, 160.0),
+                        new TargetPrice(StockSymbol.GOOG.getTicker(), 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
         when(finnhubClient.getPriceQuote(StockSymbol.AVGO)).thenReturn(null);
@@ -230,14 +244,16 @@ class FinnhubPriceEvaluatorTest {
 
     @Test
     void comparePrices_sellAlertIgnored() {
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.SELL_ALERT)).thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.SELL_ALERT))
+                .thenReturn(true);
         finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 200.0, 150.0, 180.0);
         verify(telegramClient, never()).sendMessage(any());
     }
 
     @Test
     void comparePrices_buyAlertIgnored() {
-        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.BUY_ALERT)).thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.BUY_ALERT))
+                .thenReturn(true);
         finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 100.0, 120.0, 150.0);
         verify(telegramClient, never()).sendMessage(any());
     }

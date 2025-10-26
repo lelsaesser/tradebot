@@ -1,5 +1,9 @@
 package org.tradelite.client.telegram;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,15 +14,10 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class RemoveCommandProcessorTest {
 
-    @Mock
-    private TargetPriceProvider targetPriceProvider;
+    @Mock private TargetPriceProvider targetPriceProvider;
 
     private RemoveCommandProcessor removeCommandProcessor;
 
@@ -51,8 +50,10 @@ class RemoveCommandProcessorTest {
 
         removeCommandProcessor.processCommand(command);
 
-        verify(targetPriceProvider, times(1)).removeSymbolFromTargetPriceConfig(command, TargetPriceProvider.FILE_PATH_STOCKS);
-        verify(targetPriceProvider, never()).removeSymbolFromTargetPriceConfig(any(), eq(TargetPriceProvider.FILE_PATH_COINS));
+        verify(targetPriceProvider, times(1))
+                .removeSymbolFromTargetPriceConfig(command, TargetPriceProvider.FILE_PATH_STOCKS);
+        verify(targetPriceProvider, never())
+                .removeSymbolFromTargetPriceConfig(any(), eq(TargetPriceProvider.FILE_PATH_COINS));
     }
 
     @Test
@@ -61,7 +62,9 @@ class RemoveCommandProcessorTest {
 
         removeCommandProcessor.processCommand(command);
 
-        verify(targetPriceProvider, times(1)).removeSymbolFromTargetPriceConfig(command, TargetPriceProvider.FILE_PATH_COINS);
-        verify(targetPriceProvider, never()).removeSymbolFromTargetPriceConfig(any(), eq(TargetPriceProvider.FILE_PATH_STOCKS));
+        verify(targetPriceProvider, times(1))
+                .removeSymbolFromTargetPriceConfig(command, TargetPriceProvider.FILE_PATH_COINS);
+        verify(targetPriceProvider, never())
+                .removeSymbolFromTargetPriceConfig(any(), eq(TargetPriceProvider.FILE_PATH_STOCKS));
     }
 }

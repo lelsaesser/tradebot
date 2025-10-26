@@ -8,6 +8,7 @@ public class TelegramUpdateResponse {
 
     @JsonProperty("update_id")
     private Long updateId;
+
     @JsonProperty("message")
     private TelegramMessage message;
 }

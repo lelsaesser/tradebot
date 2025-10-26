@@ -4,7 +4,6 @@ import lombok.Getter;
 
 @Getter
 public enum ShowCommandOptions {
-
     COINS("coins"),
     STOCKS("stocks"),
     ALL("all");

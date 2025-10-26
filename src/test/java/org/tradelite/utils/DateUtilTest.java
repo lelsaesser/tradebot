@@ -1,14 +1,13 @@
 package org.tradelite.utils;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.CoreMatchers.is;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class DateUtilTest {
 
@@ -25,7 +24,12 @@ class DateUtilTest {
     void getDateTwoMonthsAgo_defaultDate() {
         String result = DateUtil.getDateTwoMonthsAgo(null);
 
-        assertThat(result, is(LocalDate.now().minusMonths(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))));
+        assertThat(
+                result,
+                is(
+                        LocalDate.now()
+                                .minusMonths(2)
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))));
     }
 
     @Test
@@ -46,13 +50,13 @@ class DateUtilTest {
 
     private static Object[][] dayOfWeekProvider() {
         return new Object[][] {
-            { true, DayOfWeek.MONDAY },
-            { true, DayOfWeek.TUESDAY },
-            { true, DayOfWeek.WEDNESDAY },
-            { true, DayOfWeek.THURSDAY },
-            { true, DayOfWeek.FRIDAY },
-            { false, DayOfWeek.SATURDAY },
-            { false, DayOfWeek.SUNDAY }
+            {true, DayOfWeek.MONDAY},
+            {true, DayOfWeek.TUESDAY},
+            {true, DayOfWeek.WEDNESDAY},
+            {true, DayOfWeek.THURSDAY},
+            {true, DayOfWeek.FRIDAY},
+            {false, DayOfWeek.SATURDAY},
+            {false, DayOfWeek.SUNDAY}
         };
     }
 
@@ -106,8 +110,10 @@ class DateUtilTest {
         ZonedDateTime nowInCET = ZonedDateTime.now(cetZone);
         LocalTime currentTime = nowInCET.toLocalTime();
 
-        LocalTime start = ZonedDateTime.of(LocalDate.now(), LocalTime.of(22, 30), cetZone).toLocalTime();
-        LocalTime end = ZonedDateTime.of(LocalDate.now(), LocalTime.of(14, 55), cetZone).toLocalTime();
+        LocalTime start =
+                ZonedDateTime.of(LocalDate.now(), LocalTime.of(22, 30), cetZone).toLocalTime();
+        LocalTime end =
+                ZonedDateTime.of(LocalDate.now(), LocalTime.of(14, 55), cetZone).toLocalTime();
         boolean expected = currentTime.isAfter(start) || currentTime.isBefore(end);
         assertThat(marketClosed, is(expected));
     }

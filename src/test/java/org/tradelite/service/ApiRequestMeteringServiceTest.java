@@ -1,8 +1,6 @@
 package org.tradelite.service;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,13 +8,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ApiRequestMeteringServiceTest {
 
-    @TempDir
-    Path tempDir;
+    @TempDir Path tempDir;
 
     private ApiRequestMeteringService meteringService;
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -121,10 +119,14 @@ class ApiRequestMeteringServiceTest {
         Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
         Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
 
-        String finnhubContent = String.format("Month: %s%nCount: 5%nLast Updated: %s%n",
-                currentMonth, LocalDateTime.now());
-        String coingeckoContent = String.format("Month: %s%nCount: 3%nLast Updated: %s%n",
-                currentMonth, LocalDateTime.now());
+        String finnhubContent =
+                String.format(
+                        "Month: %s%nCount: 5%nLast Updated: %s%n",
+                        currentMonth, LocalDateTime.now());
+        String coingeckoContent =
+                String.format(
+                        "Month: %s%nCount: 3%nLast Updated: %s%n",
+                        currentMonth, LocalDateTime.now());
 
         Files.writeString(finnhubFile, finnhubContent);
         Files.writeString(coingeckoFile, coingeckoContent);
@@ -148,10 +150,12 @@ class ApiRequestMeteringServiceTest {
         Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
         Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
 
-        String finnhubContent = String.format("Month: %s%nCount: 100%nLast Updated: %s%n",
-                oldMonth, LocalDateTime.now());
-        String coingeckoContent = String.format("Month: %s%nCount: 50%nLast Updated: %s%n",
-                oldMonth, LocalDateTime.now());
+        String finnhubContent =
+                String.format(
+                        "Month: %s%nCount: 100%nLast Updated: %s%n", oldMonth, LocalDateTime.now());
+        String coingeckoContent =
+                String.format(
+                        "Month: %s%nCount: 50%nLast Updated: %s%n", oldMonth, LocalDateTime.now());
 
         Files.writeString(finnhubFile, finnhubContent);
         Files.writeString(coingeckoFile, coingeckoContent);
@@ -208,21 +212,21 @@ class ApiRequestMeteringServiceTest {
             Files.deleteIfExists(finnhubFile);
             Files.deleteIfExists(coingeckoFile);
         }
-        
+
         // Test the default constructor
         ApiRequestMeteringService defaultService = new ApiRequestMeteringService();
-        
+
         // Should start with 0 counts
         assertEquals(0, defaultService.getFinnhubRequestCount());
         assertEquals(0, defaultService.getCoingeckoRequestCount());
-        
+
         // Should be able to increment
         defaultService.incrementFinnhubRequests();
         defaultService.incrementCoingeckoRequests();
-        
+
         assertEquals(1, defaultService.getFinnhubRequestCount());
         assertEquals(1, defaultService.getCoingeckoRequestCount());
-        
+
         // Clean up after test
         Files.deleteIfExists(configDir.resolve("finnhub-monthly-requests.txt"));
         Files.deleteIfExists(configDir.resolve("coingecko-monthly-requests.txt"));
@@ -237,15 +241,17 @@ class ApiRequestMeteringServiceTest {
         // Create threads that increment counters concurrently
         for (int i = 0; i < numThreads; i++) {
             final int threadIndex = i;
-            threads[i] = new Thread(() -> {
-                for (int j = 0; j < incrementsPerThread; j++) {
-                    if (threadIndex % 2 == 0) {
-                        meteringService.incrementFinnhubRequests();
-                    } else {
-                        meteringService.incrementCoingeckoRequests();
-                    }
-                }
-            });
+            threads[i] =
+                    new Thread(
+                            () -> {
+                                for (int j = 0; j < incrementsPerThread; j++) {
+                                    if (threadIndex % 2 == 0) {
+                                        meteringService.incrementFinnhubRequests();
+                                    } else {
+                                        meteringService.incrementCoingeckoRequests();
+                                    }
+                                }
+                            });
         }
 
         // Start all threads
@@ -274,8 +280,10 @@ class ApiRequestMeteringServiceTest {
         // Create file with invalid count format
         Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
         String currentMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-        String invalidContent = String.format("Month: %s%nCount: invalid_number%nLast Updated: %s%n",
-                currentMonth, LocalDateTime.now());
+        String invalidContent =
+                String.format(
+                        "Month: %s%nCount: invalid_number%nLast Updated: %s%n",
+                        currentMonth, LocalDateTime.now());
         Files.writeString(finnhubFile, invalidContent);
 
         // Service should handle gracefully and start with 0
@@ -302,16 +310,17 @@ class ApiRequestMeteringServiceTest {
         // Create a read-only directory to trigger IOException
         Path configDir = tempDir.resolve("readonly-config");
         Files.createDirectories(configDir);
-        
+
         // Make directory read-only (this might not work on all systems, but it's worth trying)
         configDir.toFile().setReadOnly();
-        
+
         try {
-            ApiRequestMeteringService readOnlyService = new ApiRequestMeteringService(configDir.toString());
-            
+            ApiRequestMeteringService readOnlyService =
+                    new ApiRequestMeteringService(configDir.toString());
+
             // This should not throw an exception, but should log an error
             readOnlyService.incrementFinnhubRequests();
-            
+
             // Counter should still work in memory
             assertEquals(1, readOnlyService.getFinnhubRequestCount());
         } finally {
@@ -326,13 +335,13 @@ class ApiRequestMeteringServiceTest {
         meteringService.incrementFinnhubRequests();
         meteringService.incrementFinnhubRequests();
         meteringService.incrementCoingeckoRequests();
-        
+
         assertEquals(2, meteringService.getFinnhubRequestCount());
         assertEquals(1, meteringService.getCoingeckoRequestCount());
-        
+
         // Reset counters
         meteringService.resetCounters();
-        
+
         // Verify counters are reset
         assertEquals(0, meteringService.getFinnhubRequestCount());
         assertEquals(0, meteringService.getCoingeckoRequestCount());

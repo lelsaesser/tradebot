@@ -1,23 +1,21 @@
 package org.tradelite.client.telegram;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class TelegramMessageTrackerTest {
 
     private TelegramMessageTracker tracker;
 
-    @TempDir
-    Path tempDir;
+    @TempDir Path tempDir;
 
     private Path filePath;
 
@@ -41,18 +39,25 @@ class TelegramMessageTrackerTest {
 
     @Test
     void getLastProcessedMessageId_fileNotFound() {
-        assertThrows(IllegalStateException.class, () -> {
-            new TelegramMessageTracker(Path.of("non-existent-file")).getLastProcessedMessageId();
-        });
+        assertThrows(
+                IllegalStateException.class,
+                () -> {
+                    new TelegramMessageTracker(Path.of("non-existent-file"))
+                            .getLastProcessedMessageId();
+                });
     }
 
     @Test
     void setLastProcessedMessageId_ioException() {
-        assertThrows(IllegalStateException.class, () -> {
-            tracker.setLastProcessedMessageId(1L);
-            Files.setPosixFilePermissions(filePath, java.nio.file.attribute.PosixFilePermissions.fromString("r--r--r--"));
-            tracker.setLastProcessedMessageId(2L);
-        });
+        assertThrows(
+                IllegalStateException.class,
+                () -> {
+                    tracker.setLastProcessedMessageId(1L);
+                    Files.setPosixFilePermissions(
+                            filePath,
+                            java.nio.file.attribute.PosixFilePermissions.fromString("r--r--r--"));
+                    tracker.setLastProcessedMessageId(2L);
+                });
     }
 
     @Test

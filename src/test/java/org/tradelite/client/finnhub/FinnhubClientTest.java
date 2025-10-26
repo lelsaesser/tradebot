@@ -1,5 +1,13 @@
 package org.tradelite.client.finnhub;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,23 +24,12 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.service.ApiRequestMeteringService;
 
-import java.util.List;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class FinnhubClientTest {
 
-    @Mock
-    private RestTemplate restTemplate;
+    @Mock private RestTemplate restTemplate;
 
-    @Mock
-    private ApiRequestMeteringService meteringService;
+    @Mock private ApiRequestMeteringService meteringService;
 
     private FinnhubClient finnhubClient;
 
@@ -44,34 +41,44 @@ class FinnhubClientTest {
     @Test
     void getPriceQuote_no2xxResponse() {
 
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(PriceQuoteResponse.class)))
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class)))
                 .thenReturn(ResponseEntity.notFound().build());
 
-        assertThrows(IllegalStateException.class, () -> finnhubClient.getPriceQuote(StockSymbol.META));
+        assertThrows(
+                IllegalStateException.class, () -> finnhubClient.getPriceQuote(StockSymbol.META));
 
-        verify(restTemplate, times(1)).exchange(
-                anyString(),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(PriceQuoteResponse.class)
-        );
+        verify(restTemplate, times(1))
+                .exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class));
     }
 
     @Test
     void getPriceQuote_restClientException() {
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(PriceQuoteResponse.class)))
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class)))
                 .thenThrow(new RestClientException("Error fetching price quote"));
 
-        assertThrows(RestClientException.class, () -> finnhubClient.getPriceQuote(StockSymbol.META));
+        assertThrows(
+                RestClientException.class, () -> finnhubClient.getPriceQuote(StockSymbol.META));
 
         assertThat(StockSymbol.META.getSymbolType(), is(SymbolType.STOCK));
 
-        verify(restTemplate, times(1)).exchange(
-                anyString(),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(PriceQuoteResponse.class)
-        );
+        verify(restTemplate, times(1))
+                .exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class));
     }
 
     @Test
@@ -80,7 +87,11 @@ class FinnhubClientTest {
         response.setCurrentPrice(300.0);
         response.setStockSymbol(StockSymbol.META);
 
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(PriceQuoteResponse.class)))
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
         PriceQuoteResponse result = finnhubClient.getPriceQuote(StockSymbol.META);
@@ -90,21 +101,33 @@ class FinnhubClientTest {
         assertThat(result.getStockSymbol(), notNullValue());
         assertThat(result.getStockSymbol().getTicker(), is(StockSymbol.META.getTicker()));
 
-        verify(restTemplate, times(1)).exchange(
-                anyString(),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(PriceQuoteResponse.class)
-        );
+        verify(restTemplate, times(1))
+                .exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class));
     }
 
     @Test
     void getInsiderTransactions_ok() {
-        InsiderTransactionResponse response = new InsiderTransactionResponse(List.of(
-            new InsiderTransactionResponse.Transaction("Alice", 100, 5, "2023-10-02", "2023-10-01", "S", 10200.0)
-        ));
+        InsiderTransactionResponse response =
+                new InsiderTransactionResponse(
+                        List.of(
+                                new InsiderTransactionResponse.Transaction(
+                                        "Alice",
+                                        100,
+                                        5,
+                                        "2023-10-02",
+                                        "2023-10-01",
+                                        "S",
+                                        10200.0)));
 
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(InsiderTransactionResponse.class)))
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
         InsiderTransactionResponse result = finnhubClient.getInsiderTransactions(StockSymbol.META);
@@ -113,19 +136,23 @@ class FinnhubClientTest {
         assertThat(result.data().size(), is(1));
         assertThat(result.data().getFirst().transactionCode(), is("S"));
 
-        verify(restTemplate, times(1)).exchange(
-                anyString(),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(InsiderTransactionResponse.class)
-        );
+        verify(restTemplate, times(1))
+                .exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class));
     }
 
     @Test
     void getInsiderTransactions_noData() {
         InsiderTransactionResponse response = new InsiderTransactionResponse(List.of());
 
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(InsiderTransactionResponse.class)))
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
         InsiderTransactionResponse result = finnhubClient.getInsiderTransactions(StockSymbol.META);
@@ -133,26 +160,32 @@ class FinnhubClientTest {
         assertThat(result, notNullValue());
         assertThat(result.data().size(), is(0));
 
-        verify(restTemplate, times(1)).exchange(
-                anyString(),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(InsiderTransactionResponse.class)
-        );
+        verify(restTemplate, times(1))
+                .exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class));
     }
 
     @Test
     void getInsiderTransactions_restClientException() {
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(InsiderTransactionResponse.class)))
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class)))
                 .thenThrow(new RestClientException("Error fetching insider transactions"));
 
-        assertThrows(RestClientException.class, () -> finnhubClient.getInsiderTransactions(StockSymbol.META));
+        assertThrows(
+                RestClientException.class,
+                () -> finnhubClient.getInsiderTransactions(StockSymbol.META));
 
-        verify(restTemplate, times(1)).exchange(
-                anyString(),
-                eq(HttpMethod.GET),
-                any(HttpEntity.class),
-                eq(InsiderTransactionResponse.class)
-        );
+        verify(restTemplate, times(1))
+                .exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class));
     }
 }

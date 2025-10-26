@@ -1,14 +1,14 @@
 package org.tradelite.common;
 
-import lombok.Getter;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import lombok.Getter;
 
 @Getter
 public enum StockSymbol implements TickerSymbol {
-    // do not add special characters to the names, this causes parsing issues with the Telegram messages for some reason
+    // do not add special characters to the names, this causes parsing issues with the Telegram
+    // messages for some reason
     AAPL("Apple", "AAPL"),
     MSFT("Microsoft", "MSFT"),
     GOOG("Google", "GOOG"),
@@ -47,7 +47,6 @@ public enum StockSymbol implements TickerSymbol {
     IREN("Iris Energy", "IREN"),
     NBIS("Nebius Group", "NBIS"),
     NET("Cloudflare", "NET");
-
 
     private final String companyName;
     private final String ticker;

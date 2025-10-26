@@ -1,8 +1,5 @@
 package org.tradelite.service;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +7,8 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -56,15 +55,14 @@ public class ApiRequestMeteringService {
         return coingeckoCounter.get();
     }
 
-    /**
-     * Get the current month in YYYY-MM format
-     */
+    /** Get the current month in YYYY-MM format */
     public String getCurrentMonth() {
         return LocalDateTime.now().format(MONTH_FORMATTER);
     }
 
     public String getRequestCountSummary() {
-        return String.format("API Request Counts for %s - Finnhub: %d, CoinGecko: %d", 
+        return String.format(
+                "API Request Counts for %s - Finnhub: %d, CoinGecko: %d",
                 currentMonth, finnhubCounter.get(), coingeckoCounter.get());
     }
 
@@ -100,27 +98,32 @@ public class ApiRequestMeteringService {
 
     private int readCounterFromFile(String filename) throws IOException {
         Path filePath = Paths.get(counterDir, filename);
-        
+
         if (!Files.exists(filePath)) {
             // Create file with initial content if it doesn't exist
-            String initialContent = String.format("Month: %s%nCount: 0%nLast Updated: %s%n",
-                    currentMonth, LocalDateTime.now());
+            String initialContent =
+                    String.format(
+                            "Month: %s%nCount: 0%nLast Updated: %s%n",
+                            currentMonth, LocalDateTime.now());
             Files.writeString(filePath, initialContent);
             return 0;
         }
 
         String content = Files.readString(filePath);
         String[] lines = content.split("\n");
-        
+
         // Check if the file is for the current month
         if (lines.length >= 2) {
             String fileMonth = lines[0].replace("Month: ", "").trim();
             if (!fileMonth.equals(currentMonth)) {
                 // File is from a previous month, but don't reset automatically
                 // Let the cron job handle month transitions
-                log.info("Counter file {} is from previous month ({}), current count will be preserved until cron job resets", filename, fileMonth);
+                log.info(
+                        "Counter file {} is from previous month ({}), current count will be preserved until cron job resets",
+                        filename,
+                        fileMonth);
             }
-            
+
             // Extract count from second line
             String countLine = lines[1].replace("Count: ", "").trim();
             try {
@@ -130,15 +133,17 @@ public class ApiRequestMeteringService {
                 return 0;
             }
         }
-        
+
         return 0;
     }
 
     private void persistCounter(String filename, int count) {
         try {
             Path filePath = Paths.get(counterDir, filename);
-            String content = String.format("Month: %s%nCount: %d%nLast Updated: %s%n",
-                    currentMonth, count, LocalDateTime.now());
+            String content =
+                    String.format(
+                            "Month: %s%nCount: %d%nLast Updated: %s%n",
+                            currentMonth, count, LocalDateTime.now());
             Files.writeString(filePath, content);
         } catch (IOException e) {
             log.error("Failed to persist counter to file {}: {}", filename, e.getMessage());

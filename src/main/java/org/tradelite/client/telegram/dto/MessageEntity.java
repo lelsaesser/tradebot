@@ -8,8 +8,10 @@ public class MessageEntity {
 
     @JsonProperty("offset")
     private int offset;
+
     @JsonProperty("length")
     private int length;
+
     @JsonProperty("type")
     private String type;
 }
