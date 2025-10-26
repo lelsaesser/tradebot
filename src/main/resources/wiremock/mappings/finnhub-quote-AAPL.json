@@ -1,0 +1,30 @@
+{
+  "id": "finnhub-quote-AAPL",
+  "name": "Finnhub Quote AAPL",
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/quote",
+    "queryParameters": {
+      "symbol": {
+        "equalTo": "AAPL"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "c": 187.42,
+      "o": 186.00,
+      "h": 188.00,
+      "l": 185.50,
+      "d": 1.42,
+      "dp": 0.76,
+      "pc": 186.00
+    },
+    "transformers": []
+  },
+  "persistent": true
+}

@@ -1,0 +1,30 @@
+{
+  "id": "coingecko-simple-bitcoin",
+  "name": "CoinGecko Simple Price Bitcoin",
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v3/simple/price",
+    "queryParameters": {
+      "ids": {
+        "equalTo": "bitcoin"
+      },
+      "vs_currencies": {
+        "contains": "usd"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "bitcoin": {
+        "usd": 64000.12,
+        "usd_24h_change": 1.25
+      }
+    },
+    "transformers": []
+  },
+  "persistent": true
+}
