@@ -1,0 +1,43 @@
+# application-stub.yaml - loads when 'stub' profile active
+# Provides local WireMock base URLs to avoid real external API calls and API key usage.
+
+server:
+  port: 9090
+
+# Finnhub client stub configuration
+finnhub:
+  base-url: http://localhost:8089/api/v1
+  api-key: DUMMY
+
+# CoinGecko client stub configuration
+coingecko:
+  base-url: http://localhost:8089/api/v3
+  api-key: DUMMY
+
+# Telegram client stub configuration
+telegram:
+  base-url: http://localhost:8089
+
+# Dummy tokens overriding environment usage in stub mode (the client reads env vars; properties can still be mapped if you switch to @Value keys)
+TELEGRAM_BOT_TOKEN: DUMMY
+TELEGRAM_BOT_GROUP_CHAT_ID: DUMMY
+
+# Logging adjustments for stub mode
+logging:
+  level:
+    root: INFO
+    org.tradelite: DEBUG
+    com.github.tomakehurst.wiremock: INFO
+
+# Optional: reduce noise from Spring Web / Hibernate (uncomment if desired)
+#    org.springframework.web.client: WARN
+#    org.springframework.web.servlet: WARN
+
+# If you add security later, you can relax it only in stub profile here.
+# spring:
+#   security:
+#     user:
+#       name: stub
+#       password: stub
+
+# End of stub profile configuration
