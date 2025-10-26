@@ -28,10 +28,8 @@ public class CoinGeckoClient {
     public CoinGeckoClient(
         RestTemplate restTemplate,
         ApiRequestMeteringService meteringService,
-        @Value(
-            "${coingecko.base-url:https://api.coingecko.com/api/v3}"
-        ) String baseUrl,
-        @Value("${coingecko.api-key:#{null}}") String apiKey
+        @Value("${coingecko.base-url}") String baseUrl,
+        @Value("${coingecko.api-key}") String apiKey
     ) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;

@@ -17,10 +17,8 @@ coingecko:
 # Telegram client stub configuration
 telegram:
   base-url: http://localhost:8089
-
-# Dummy tokens overriding environment usage in stub mode (the client reads env vars; properties can still be mapped if you switch to @Value keys)
-TELEGRAM_BOT_TOKEN: DUMMY
-TELEGRAM_BOT_GROUP_CHAT_ID: DUMMY
+  bot-token: DUMMY
+  group-chat-id: DUMMY
 
 # Logging adjustments for stub mode
 logging:

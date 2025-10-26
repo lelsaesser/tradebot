@@ -25,9 +25,9 @@ public class TelegramClient {
     @Autowired
     public TelegramClient(
         RestTemplate restTemplate,
-        @Value("${TELEGRAM_BOT_TOKEN}") String botToken,
-        @Value("${TELEGRAM_BOT_GROUP_CHAT_ID}") String groupChatId,
-        @Value("${telegram.base-url:https://api.telegram.org}") String baseUrl
+        @Value("${telegram.bot-token}") String botToken,
+        @Value("${telegram.group-chat-id}") String groupChatId,
+        @Value("${telegram.base-url}") String baseUrl
     ) {
         this.restTemplate = restTemplate;
         this.botToken = botToken;

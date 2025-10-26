@@ -31,10 +31,8 @@ public class FinnhubClient {
     public FinnhubClient(
         RestTemplate restTemplate,
         ApiRequestMeteringService meteringService,
-        @Value(
-            "${finnhub.base-url:https://finnhub.io/api/v1}"
-        ) String apiBaseUrl,
-        @Value("${finnhub.api-key:#{null}}") String apiKey
+        @Value("${finnhub.base-url}") String apiBaseUrl,
+        @Value("${finnhub.api-key}") String apiKey
     ) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
