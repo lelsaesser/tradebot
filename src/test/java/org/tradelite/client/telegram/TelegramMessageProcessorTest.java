@@ -1,5 +1,14 @@
 package org.tradelite.client.telegram;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,36 +24,25 @@ import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TickerSymbol;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class TelegramMessageProcessorTest {
 
-    @Mock
-    private TelegramClient telegramClient;
-    @Mock
-    private TelegramCommandDispatcher commandDispatcher;
-    @Mock
-    private TelegramMessageTracker messageTracker;
+    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramCommandDispatcher commandDispatcher;
+    @Mock private TelegramMessageTracker messageTracker;
 
     private TelegramMessageProcessor messageProcessor;
 
     @BeforeEach
     void setUp() {
-        messageProcessor = new TelegramMessageProcessor(telegramClient, commandDispatcher, messageTracker);
+        messageProcessor =
+                new TelegramMessageProcessor(telegramClient, commandDispatcher, messageTracker);
     }
 
     @ParameterizedTest
     @MethodSource("validInputsProvider")
-    void buildSetCommand_validInputs_createsSetCommand(String subCommand, String symbol, double target) {
+    void buildSetCommand_validInputs_createsSetCommand(
+            String subCommand, String symbol, double target) {
         var command = messageProcessor.buildSetCommand(subCommand, symbol, target);
         assertThat(command.isPresent(), is(true));
         assertThat(command.get().getSubCommand(), is(subCommand));
@@ -59,13 +57,13 @@ class TelegramMessageProcessorTest {
                 Arguments.of("buy", "pltr", 80.0),
                 Arguments.of("sell", "aapl", 500.0),
                 Arguments.of("buy", "aapl", 0),
-                Arguments.of("sell", "aapl", 0)
-        );
+                Arguments.of("sell", "aapl", 0));
     }
 
     @ParameterizedTest
     @MethodSource("invalidInputsProvider")
-    void buildSetCommand_invalidInputs_returnsEmpty(String subCommand, String symbol, double target) {
+    void buildSetCommand_invalidInputs_returnsEmpty(
+            String subCommand, String symbol, double target) {
         var command = messageProcessor.buildSetCommand(subCommand, symbol, target);
         assertThat(command.isPresent(), is(false));
     }
@@ -78,7 +76,7 @@ class TelegramMessageProcessorTest {
                 Arguments.of("invalid", "bitcoin", 50000.0), // Invalid subCommand
                 Arguments.of("buy", "", 50000.0), // Empty symbol
                 Arguments.of("buy", "invalid_symbol", 50000.0) // Invalid symbol
-        );
+                );
     }
 
     @ParameterizedTest
@@ -101,8 +99,7 @@ class TelegramMessageProcessorTest {
                 Arguments.of("/Set buy pltr 80.0"),
                 Arguments.of("/sEt sell aapl 500.0"),
                 Arguments.of("/seT buy aapl 0"),
-                Arguments.of("/sET sell aapl 0")
-        );
+                Arguments.of("/sET sell aapl 0"));
     }
 
     @ParameterizedTest
@@ -125,8 +122,7 @@ class TelegramMessageProcessorTest {
                 Arguments.of("/show stocks"),
                 Arguments.of("/SHOW stocks"),
                 Arguments.of("/Show stocks"),
-                Arguments.of("/shOW stocks")
-        );
+                Arguments.of("/shOW stocks"));
     }
 
     @Test
@@ -183,7 +179,7 @@ class TelegramMessageProcessorTest {
                 Arguments.of("/add all bla"), // Not a valid add command
                 Arguments.of("/remove bla bla"), // Not a valid remove command
                 Arguments.of("/remove bit") // invalid symbol
-        );
+                );
     }
 
     @Test
@@ -243,15 +239,15 @@ class TelegramMessageProcessorTest {
 
     @ParameterizedTest
     @CsvSource({
-            "/add bitcoin 50000.0 60000.0 123",
-            "/add 123 50000.0 60000.0",
-            "/add bitcoin 60000.0",
-            "/add bitcoin _ 60000.0",
-            "/add bitcoin -1 60000.0",
-            "/add bitcoin -1 -60000.0",
-            "/add bitcoin abc -60000.0",
-            "/add bitcoin abc def",
-            "/add bitcoin 100 def",
+        "/add bitcoin 50000.0 60000.0 123",
+        "/add 123 50000.0 60000.0",
+        "/add bitcoin 60000.0",
+        "/add bitcoin _ 60000.0",
+        "/add bitcoin -1 60000.0",
+        "/add bitcoin -1 -60000.0",
+        "/add bitcoin abc -60000.0",
+        "/add bitcoin abc def",
+        "/add bitcoin 100 def",
     })
     void parseAddCommand_invalidInputs_returnsEmpty(String commandText) {
         Optional<AddCommand> command = messageProcessor.parseAddCommand(commandText);

@@ -1,8 +1,7 @@
 package org.tradelite.service.model;
 
-import lombok.Data;
-
 import java.time.LocalDate;
+import lombok.Data;
 
 @Data
 public class DailyPrice {

@@ -1,12 +1,12 @@
 package org.tradelite.client.telegram;
 
+import static org.tradelite.common.TargetPriceProvider.FILE_PATH_COINS;
+import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
-
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_COINS;
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
 
 @Component
 public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCommand> {
@@ -25,7 +25,8 @@ public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCo
 
     @Override
     public void processCommand(RemoveCommand command) {
-        String filePath = command.getSymbolType() == SymbolType.STOCK ? FILE_PATH_STOCKS : FILE_PATH_COINS;
+        String filePath =
+                command.getSymbolType() == SymbolType.STOCK ? FILE_PATH_STOCKS : FILE_PATH_COINS;
         targetPriceProvider.removeSymbolFromTargetPriceConfig(command, filePath);
     }
 }

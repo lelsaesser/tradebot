@@ -1,5 +1,6 @@
 package org.tradelite.core;
 
+import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -9,8 +10,6 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-
-import java.util.*;
 
 @Slf4j
 @Component
@@ -23,7 +22,10 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     protected final Map<StockSymbol, Double> lastPriceCache = new EnumMap<>(StockSymbol.class);
 
     @Autowired
-    public FinnhubPriceEvaluator(FinnhubClient finnhubClient, TargetPriceProvider targetPriceProvider, TelegramClient telegramClient) {
+    public FinnhubPriceEvaluator(
+            FinnhubClient finnhubClient,
+            TargetPriceProvider targetPriceProvider,
+            TelegramClient telegramClient) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
@@ -38,14 +40,18 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         for (TargetPrice targetPrice : targetPrices) {
             Optional<StockSymbol> ticker = StockSymbol.fromString(targetPrice.getSymbol());
             if (ticker.isEmpty()) {
-                log.warn("Target price symbol {} not found in StockSymbol enum", targetPrice.getSymbol());
+                log.warn(
+                        "Target price symbol {} not found in StockSymbol enum",
+                        targetPrice.getSymbol());
                 continue;
             }
 
             PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker.get());
 
             Double lastPrice = lastPriceCache.get(ticker.get());
-            if (priceQuote == null || (lastPrice != null && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
+            if (priceQuote == null
+                    || (lastPrice != null
+                            && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
                 continue;
             }
             lastPriceCache.put(ticker.get(), priceQuote.getCurrentPrice());
@@ -59,7 +65,11 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
             for (TargetPrice targetPrice : targetPrices) {
                 if (priceQuote.getStockSymbol().getTicker().equals(targetPrice.getSymbol())) {
-                    comparePrices(priceQuote.getStockSymbol(), priceQuote.getCurrentPrice(), targetPrice.getBuyTarget(), targetPrice.getSellTarget());
+                    comparePrices(
+                            priceQuote.getStockSymbol(),
+                            priceQuote.getCurrentPrice(),
+                            targetPrice.getBuyTarget(),
+                            targetPrice.getSellTarget());
                 }
             }
         }
@@ -76,12 +86,23 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
         int alertThreshold = (int) (absPercentChange / 5.0) * 5;
 
-        if (alertThreshold > 0 && !targetPriceProvider.isSymbolIgnored(priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
+        if (alertThreshold > 0
+                && !targetPriceProvider.isSymbolIgnored(
+                        priceQuote.getStockSymbol(),
+                        IgnoreReason.CHANGE_PERCENT_ALERT,
+                        alertThreshold)) {
             String displayName = priceQuote.getStockSymbol().getDisplayName();
             log.info("High price change detected for {}: {}%", displayName, percentChange);
             String emoji = percentChange > 0 ? "📈" : "📉";
-            telegramClient.sendMessage(emoji + " High daily price swing detected for " + displayName + ": " + String.format("%.2f", percentChange) + "%");
-            targetPriceProvider.addIgnoredSymbol(priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
+            telegramClient.sendMessage(
+                    emoji
+                            + " High daily price swing detected for "
+                            + displayName
+                            + ": "
+                            + String.format("%.2f", percentChange)
+                            + "%");
+            targetPriceProvider.addIgnoredSymbol(
+                    priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
         }
     }
 }

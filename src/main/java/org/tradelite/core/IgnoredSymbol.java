@@ -1,12 +1,11 @@
 package org.tradelite.core;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import org.tradelite.common.TickerSymbol;
-
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import org.tradelite.common.TickerSymbol;
 
 @Data
 @AllArgsConstructor

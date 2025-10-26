@@ -1,33 +1,28 @@
 package org.tradelite.client.telegram;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class TelegramCommandDispatcherTest {
 
-    @Mock
-    ShowCommandProcessor showCommandProcessor;
-    @Mock
-    SetCommandProcessor setCommandProcessor;
+    @Mock ShowCommandProcessor showCommandProcessor;
+    @Mock SetCommandProcessor setCommandProcessor;
 
     private TelegramCommandDispatcher dispatcher;
 
     @BeforeEach
     void setUp() {
-        List<TelegramCommandProcessor<? extends TelegramCommand>> processors = List.of(
-                showCommandProcessor,
-                setCommandProcessor
-        );
+        List<TelegramCommandProcessor<? extends TelegramCommand>> processors =
+                List.of(showCommandProcessor, setCommandProcessor);
         dispatcher = new TelegramCommandDispatcher(processors);
     }
 

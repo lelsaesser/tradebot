@@ -1,5 +1,11 @@
 package org.tradelite.core;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,35 +21,25 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
 
-import java.io.IOException;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class RsiPriceFetcherTest {
 
-    @Mock
-    private FinnhubClient finnhubClient;
+    @Mock private FinnhubClient finnhubClient;
 
-    @Mock
-    private CoinGeckoClient coinGeckoClient;
+    @Mock private CoinGeckoClient coinGeckoClient;
 
-    @Mock
-    private TargetPriceProvider targetPriceProvider;
+    @Mock private TargetPriceProvider targetPriceProvider;
 
-    @Mock
-    private RsiService rsiService;
+    @Mock private RsiService rsiService;
 
-    @InjectMocks
-    private RsiPriceFetcher rsiPriceFetcher;
+    @InjectMocks private RsiPriceFetcher rsiPriceFetcher;
 
     @Test
     void testFetchStockClosingPrices() throws IOException {
-        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(new PriceQuoteResponse());
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
+                .thenReturn(new PriceQuoteResponse());
 
         rsiPriceFetcher.fetchStockClosingPrices();
 
@@ -52,8 +48,10 @@ class RsiPriceFetcherTest {
 
     @Test
     void testFetchStockClosingPrices_exception() throws IOException {
-        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenThrow(new RuntimeException("API error"));
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
+                .thenThrow(new RuntimeException("API error"));
 
         assertThrows(RuntimeException.class, () -> rsiPriceFetcher.fetchStockClosingPrices());
 
@@ -62,7 +60,8 @@ class RsiPriceFetcherTest {
 
     @Test
     void testFetchCryptoClosingPrices() throws IOException {
-        when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
+        when(targetPriceProvider.getCoinTargetPrices())
+                .thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
         coinData.setUsd(50000);
         when(coinGeckoClient.getCoinPriceData(any(CoinId.class))).thenReturn(coinData);
@@ -74,7 +73,8 @@ class RsiPriceFetcherTest {
 
     @Test
     void testFetchCryptoClosingPrices_coinNotFound() throws IOException {
-        when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("not_a_coin", 100, 200)));
+        when(targetPriceProvider.getCoinTargetPrices())
+                .thenReturn(List.of(new TargetPrice("not_a_coin", 100, 200)));
 
         rsiPriceFetcher.fetchCryptoClosingPrices();
 

@@ -1,5 +1,8 @@
 package org.tradelite.core;
 
+import java.io.IOException;
+import java.time.LocalDate;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,10 +15,6 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
-
-import java.io.IOException;
-import java.time.LocalDate;
-import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -51,7 +50,8 @@ public class RsiPriceFetcher {
             try {
                 Optional<CoinId> coinId = CoinId.fromString(targetPrice.getSymbol());
                 if (coinId.isPresent()) {
-                    CoinGeckoPriceResponse.CoinData coinData = coinGeckoClient.getCoinPriceData(coinId.get());
+                    CoinGeckoPriceResponse.CoinData coinData =
+                            coinGeckoClient.getCoinPriceData(coinId.get());
                     rsiService.addPrice(coinId.get(), coinData.getUsd(), today);
                 }
             } catch (Exception e) {

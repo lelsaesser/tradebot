@@ -1,20 +1,18 @@
 package org.tradelite.service.model;
 
-import lombok.Data;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import lombok.Data;
 
 @Data
 public class RsiDailyClosePrice {
     private List<DailyPrice> prices = new ArrayList<>();
 
     public void addPrice(LocalDate date, double price) {
-        Optional<DailyPrice> existingPrice = prices.stream()
-                .filter(p -> p.getDate().equals(date))
-                .findFirst();
+        Optional<DailyPrice> existingPrice =
+                prices.stream().filter(p -> p.getDate().equals(date)).findFirst();
 
         if (existingPrice.isPresent()) {
             existingPrice.get().setPrice(price);

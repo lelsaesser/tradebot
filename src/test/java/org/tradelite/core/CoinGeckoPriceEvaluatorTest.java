@@ -1,5 +1,12 @@
 package org.tradelite.core;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.aMapWithSize;
+import static org.mockito.Mockito.*;
+
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,29 +19,21 @@ import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.aMapWithSize;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class CoinGeckoPriceEvaluatorTest {
 
-    @Mock
-    private CoinGeckoClient coinGeckoClient;
-    @Mock
-    private TargetPriceProvider targetPriceProvider;
-    @Mock
-    private TelegramClient telegramClient;
+    @Mock private CoinGeckoClient coinGeckoClient;
+    @Mock private TargetPriceProvider targetPriceProvider;
+    @Mock private TelegramClient telegramClient;
 
     private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
     @BeforeEach
     void setUp() {
-        coinGeckoPriceEvaluator = spy(new CoinGeckoPriceEvaluator(coinGeckoClient, targetPriceProvider, telegramClient));
+        coinGeckoPriceEvaluator =
+                spy(
+                        new CoinGeckoPriceEvaluator(
+                                coinGeckoClient, targetPriceProvider, telegramClient));
     }
 
     @Test
@@ -72,7 +71,6 @@ class CoinGeckoPriceEvaluatorTest {
         }
         coinGeckoPriceEvaluator.lastPriceCache.remove(CoinId.BITCOIN);
 
-
         List<TargetPrice> targetPrices = new ArrayList<>();
         targetPrices.add(new TargetPrice(CoinId.BITCOIN.getName(), 1000, 2000));
 
@@ -88,7 +86,8 @@ class CoinGeckoPriceEvaluatorTest {
 
         assertThat(coinDataSize, is(1));
         verify(coinGeckoClient, times(1)).getCoinPriceData(CoinId.BITCOIN);
-        verify(coinGeckoPriceEvaluator, times(1)).comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000, 2000);
+        verify(coinGeckoPriceEvaluator, times(1))
+                .comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000, 2000);
     }
 
     @Test
@@ -97,12 +96,15 @@ class CoinGeckoPriceEvaluatorTest {
         coinData.setCoinId(CoinId.BITCOIN);
         coinData.setUsd_24h_change(6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(
+                        CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5))
+                .thenReturn(false);
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
         verify(telegramClient, times(1)).sendMessage(anyString());
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
+        verify(targetPriceProvider, times(1))
+                .addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test
@@ -123,12 +125,15 @@ class CoinGeckoPriceEvaluatorTest {
         coinData.setCoinId(CoinId.BITCOIN);
         coinData.setUsd_24h_change(6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(
+                        CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5))
+                .thenReturn(true);
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
         verify(telegramClient, never()).sendMessage(anyString());
-        verify(targetPriceProvider, never()).addIgnoredSymbol(any(CoinId.class), any(IgnoreReason.class), anyInt());
+        verify(targetPriceProvider, never())
+                .addIgnoredSymbol(any(CoinId.class), any(IgnoreReason.class), anyInt());
     }
 
     @Test
@@ -146,12 +151,15 @@ class CoinGeckoPriceEvaluatorTest {
         coinData.setCoinId(CoinId.BITCOIN);
         coinData.setUsd_24h_change(-6.0);
 
-        when(targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5)).thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(
+                        CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5))
+                .thenReturn(false);
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
         verify(telegramClient, times(1)).sendMessage(anyString());
-        verify(targetPriceProvider, times(1)).addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
+        verify(targetPriceProvider, times(1))
+                .addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
 
     @Test
@@ -194,6 +202,7 @@ class CoinGeckoPriceEvaluatorTest {
 
         assertThat(coinDataSize, is(1));
         verify(coinGeckoClient, times(1)).getCoinPriceData(CoinId.BITCOIN);
-        verify(coinGeckoPriceEvaluator, times(1)).comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000, 2000);
+        verify(coinGeckoPriceEvaluator, times(1))
+                .comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000, 2000);
     }
 }

@@ -17,7 +17,11 @@ public abstract class BasePriceEvaluator {
 
     public abstract int evaluatePrice() throws InterruptedException;
 
-    protected void comparePrices(TickerSymbol ticker, double currentPrice, double targetPriceBuy, double targetPriceSell) {
+    protected void comparePrices(
+            TickerSymbol ticker,
+            double currentPrice,
+            double targetPriceBuy,
+            double targetPriceSell) {
         String displayName = ticker.getName();
         if (ticker.getSymbolType() == SymbolType.STOCK) {
             displayName = ((StockSymbol) ticker).getDisplayName();
@@ -28,7 +32,13 @@ public abstract class BasePriceEvaluator {
                 return;
             }
             log.info("Potential sell opportunity for {}", displayName);
-            telegramClient.sendMessage("💰 Potential sell opportunity for " + displayName + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceSell);
+            telegramClient.sendMessage(
+                    "💰 Potential sell opportunity for "
+                            + displayName
+                            + ". Current Price: "
+                            + currentPrice
+                            + ", Target Price: "
+                            + targetPriceSell);
             targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.SELL_ALERT);
         }
 
@@ -37,9 +47,14 @@ public abstract class BasePriceEvaluator {
                 return;
             }
             log.info("Potential buy opportunity for {}", displayName);
-            telegramClient.sendMessage("🚀 Potential buy opportunity for " + displayName + ". Current Price: " + currentPrice + ", Target Price: " + targetPriceBuy);
+            telegramClient.sendMessage(
+                    "🚀 Potential buy opportunity for "
+                            + displayName
+                            + ". Current Price: "
+                            + currentPrice
+                            + ", Target Price: "
+                            + targetPriceBuy);
             targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.BUY_ALERT);
         }
     }
-
 }

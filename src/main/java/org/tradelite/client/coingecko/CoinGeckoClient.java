@@ -31,7 +31,13 @@ public class CoinGeckoClient {
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
         String endpointUrl = "/simple/price";
-        String url = BASE_URL + endpointUrl + "?ids=" + coinId.getId() + "&vs_currencies=usd" + "&include_24hr_change=true";
+        String url =
+                BASE_URL
+                        + endpointUrl
+                        + "?ids="
+                        + coinId.getId()
+                        + "&vs_currencies=usd"
+                        + "&include_24hr_change=true";
 
         HttpHeaders headers = new HttpHeaders();
         headers.add("x-cg-demo-api-key", API_KEY);
@@ -41,19 +47,25 @@ public class CoinGeckoClient {
 
         try {
             meteringService.incrementCoingeckoRequests();
-            ResponseEntity<CoinGeckoPriceResponse> response = restTemplate.exchange(url, HttpMethod.GET, entity, CoinGeckoPriceResponse.class);
+            ResponseEntity<CoinGeckoPriceResponse> response =
+                    restTemplate.exchange(
+                            url, HttpMethod.GET, entity, CoinGeckoPriceResponse.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                CoinGeckoPriceResponse.CoinData data = response.getBody().getCoinData().get(coinId.getId());
+                CoinGeckoPriceResponse.CoinData data =
+                        response.getBody().getCoinData().get(coinId.getId());
                 data.setCoinId(coinId);
                 return data;
             } else {
-                log.error("Failed to fetch coin price data for {}: {}", coinId.getId(), response.getStatusCode());
-                throw new IllegalStateException("Failed to fetch coin price data: " + response.getStatusCode());
+                log.error(
+                        "Failed to fetch coin price data for {}: {}",
+                        coinId.getId(),
+                        response.getStatusCode());
+                throw new IllegalStateException(
+                        "Failed to fetch coin price data: " + response.getStatusCode());
             }
         } catch (RestClientException e) {
             log.error("Error fetching coin price data for {}: {}", coinId.getId(), e.getMessage());
             throw e;
         }
-
     }
 }

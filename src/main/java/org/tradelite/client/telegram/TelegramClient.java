@@ -1,5 +1,8 @@
 package org.tradelite.client.telegram;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,15 +12,12 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 @Slf4j
 @Component
 public class TelegramClient {
 
-    protected static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s";
+    protected static final String BASE_URL =
+            "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s";
 
     private final RestTemplate restTemplate;
     private final String botToken;
@@ -31,7 +31,6 @@ public class TelegramClient {
         this.restTemplate = restTemplate;
         this.botToken = botToken;
         this.groupChatId = groupChatId;
-
     }
 
     public void sendMessage(String message) {
@@ -45,7 +44,8 @@ public class TelegramClient {
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
         try {
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+            ResponseEntity<String> response =
+                    restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
             if (response.getStatusCode() == HttpStatus.OK) {
                 log.info("Message sent successfully");
             } else {
@@ -64,12 +64,13 @@ public class TelegramClient {
 
         try {
             log.info("Fetching chat updates");
-            ResponseEntity<TelegramUpdateResponseWrapper> response = restTemplate.exchange(url, HttpMethod.GET, entity, TelegramUpdateResponseWrapper.class);
+            ResponseEntity<TelegramUpdateResponseWrapper> response =
+                    restTemplate.exchange(
+                            url, HttpMethod.GET, entity, TelegramUpdateResponseWrapper.class);
             return response.getBody().getResult();
         } catch (Exception e) {
             log.error("Error fetching chat updates: {}", e.getMessage());
             throw new IllegalStateException("Error fetching chat updates: " + e.getMessage());
         }
     }
-
 }

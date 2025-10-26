@@ -1,16 +1,15 @@
 package org.tradelite.client.telegram;
 
+import static org.tradelite.common.TargetPriceProvider.FILE_PATH_COINS;
+import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
+
+import java.util.Objects;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPriceProvider;
-
-import java.util.Objects;
-import java.util.Optional;
-
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_COINS;
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
 
 @Component
 public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand> {
@@ -19,7 +18,8 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
     private final TelegramClient telegramClient;
 
     @Autowired
-    public SetCommandProcessor(TargetPriceProvider targetPriceProvider, TelegramClient telegramClient) {
+    public SetCommandProcessor(
+            TargetPriceProvider targetPriceProvider, TelegramClient telegramClient) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
     }
@@ -49,15 +49,24 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
 
         if (coinId.isPresent()) {
             displayName = coinId.get().getName();
-            targetPriceProvider.updateTargetPrice(coinId.get(), buyTarget, sellTarget, FILE_PATH_COINS);
+            targetPriceProvider.updateTargetPrice(
+                    coinId.get(), buyTarget, sellTarget, FILE_PATH_COINS);
         } else if (stockSymbol.isPresent()) {
             displayName = stockSymbol.get().getDisplayName();
-            targetPriceProvider.updateTargetPrice(stockSymbol.get(), buyTarget, sellTarget, FILE_PATH_STOCKS);
+            targetPriceProvider.updateTargetPrice(
+                    stockSymbol.get(), buyTarget, sellTarget, FILE_PATH_STOCKS);
         } else {
             throw new IllegalArgumentException("Invalid symbol: " + symbol);
         }
 
-        telegramClient.sendMessage("All set!\n" +
-                "Updated " + command.getSubCommand() + " price for " + displayName + " to " + command.getTarget() + ".");
+        telegramClient.sendMessage(
+                "All set!\n"
+                        + "Updated "
+                        + command.getSubCommand()
+                        + " price for "
+                        + displayName
+                        + " to "
+                        + command.getTarget()
+                        + ".");
     }
 }

@@ -17,3 +17,4 @@ This document covers the technologies used, development setup, technical constra
 - **Compiler:** `maven-compiler-plugin` configured for Java 23.
 - **Packaging:** `spring-boot-maven-plugin` for creating executable JARs.
 - **Code Coverage:** `jacoco-maven-plugin` is used to enforce a 98% instruction coverage ratio.
+- **Code Formatting:** `spotless-maven-plugin` with `google-java-format` is used to enforce a consistent code style.

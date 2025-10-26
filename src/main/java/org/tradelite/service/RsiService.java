@@ -1,6 +1,10 @@
 package org.tradelite.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.util.*;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,11 +14,6 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TickerSymbol;
 import org.tradelite.service.model.RsiDailyClosePrice;
-
-import java.io.File;
-import java.io.IOException;
-import java.time.LocalDate;
-import java.util.*;
 
 @Slf4j
 @Service
@@ -26,8 +25,7 @@ public class RsiService {
     private final TelegramClient telegramClient;
     private final ObjectMapper objectMapper;
 
-    @Getter
-    private Map<String, RsiDailyClosePrice> priceHistory = new HashMap<>();
+    @Getter private Map<String, RsiDailyClosePrice> priceHistory = new HashMap<>();
 
     @Autowired
     public RsiService(TelegramClient telegramClient, ObjectMapper objectMapper) throws IOException {
@@ -38,21 +36,26 @@ public class RsiService {
 
     public void addPrice(TickerSymbol symbol, double price, LocalDate date) throws IOException {
         String symbolKey = symbol.getName();
-        RsiDailyClosePrice rsiDailyClosePrice = priceHistory.getOrDefault(symbolKey, new RsiDailyClosePrice());
-        
+        RsiDailyClosePrice rsiDailyClosePrice =
+                priceHistory.getOrDefault(symbolKey, new RsiDailyClosePrice());
+
         if (isPotentialMarketHoliday(rsiDailyClosePrice, price, date)) {
-            log.info("Potential market holiday detected for {}: price {} on {} is identical to previous trading day. Skipping price update.", 
-                    symbol, price, date);
+            log.info(
+                    "Potential market holiday detected for {}: price {} on {} is identical to previous trading day. Skipping price update.",
+                    symbol,
+                    price,
+                    date);
             return;
         }
-        
+
         rsiDailyClosePrice.addPrice(date, price);
         priceHistory.put(symbolKey, rsiDailyClosePrice);
         savePriceHistory();
         calculateAndNotifyRsi(symbol, rsiDailyClosePrice);
     }
 
-    private boolean isPotentialMarketHoliday(RsiDailyClosePrice rsiDailyClosePrice, double newPrice, LocalDate newDate) {
+    private boolean isPotentialMarketHoliday(
+            RsiDailyClosePrice rsiDailyClosePrice, double newPrice, LocalDate newDate) {
         if (rsiDailyClosePrice.getPrices().isEmpty()) {
             return false;
         }
@@ -81,10 +84,12 @@ public class RsiService {
 
         if (rsi >= 70) {
             log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
-            telegramClient.sendMessage(String.format("🔴 RSI for %s is in overbought zone: %.2f", displayName, rsi));
+            telegramClient.sendMessage(
+                    String.format("🔴 RSI for %s is in overbought zone: %.2f", displayName, rsi));
         } else if (rsi <= 30) {
             log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
-            telegramClient.sendMessage(String.format("🟢 RSI for %s is in oversold zone: %.2f", displayName, rsi));
+            telegramClient.sendMessage(
+                    String.format("🟢 RSI for %s is in oversold zone: %.2f", displayName, rsi));
         }
     }
 
@@ -138,7 +143,15 @@ public class RsiService {
         try {
             File file = new File(RSI_DATA_FILE);
             if (file.exists()) {
-                priceHistory = objectMapper.readValue(file, objectMapper.getTypeFactory().constructMapType(HashMap.class, String.class, RsiDailyClosePrice.class));
+                priceHistory =
+                        objectMapper.readValue(
+                                file,
+                                objectMapper
+                                        .getTypeFactory()
+                                        .constructMapType(
+                                                HashMap.class,
+                                                String.class,
+                                                RsiDailyClosePrice.class));
             }
         } catch (IOException e) {
             log.error("Error loading RSI data", e);

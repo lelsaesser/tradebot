@@ -35,7 +35,9 @@ public class RootErrorHandler {
             message.append("*Type:* `").append(exceptionType).append("`\n");
 
             if (exceptionMessage != null && exceptionMessage.length() <= 100) {
-                message.append("*Message:* `").append(escapeMarkdown(exceptionMessage)).append("`\n");
+                message.append("*Message:* `")
+                        .append(escapeMarkdown(exceptionMessage))
+                        .append("`\n");
             }
 
             telegramClient.sendMessage(message.toString());
@@ -43,8 +45,7 @@ public class RootErrorHandler {
     }
 
     private String escapeMarkdown(String text) {
-        return text
-                .replace("_", "\\_")
+        return text.replace("_", "\\_")
                 .replace("*", "\\*")
                 .replace("[", "\\[")
                 .replace("]", "\\]")
@@ -63,5 +64,4 @@ public class RootErrorHandler {
                 .replace(".", "\\.")
                 .replace("!", "\\!");
     }
-
 }
