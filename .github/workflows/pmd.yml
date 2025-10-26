@@ -39,6 +39,6 @@ jobs:
           sourcePath: 'src/main/java'
           analyzeModifiedFilesOnly: false
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v2.0.0
         with:
           sarif_file: pmd-report.sarif
