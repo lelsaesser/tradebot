@@ -1,0 +1,39 @@
+{
+  "id": "telegram-sendMessage",
+  "name": "Telegram sendMessage success",
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/bot[^/]+/sendMessage",
+    "queryParameters": {
+      "chat_id": {
+        "matches": ".*"
+      },
+      "text": {
+        "matches": ".*"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "ok": true,
+      "result": {
+        "message_id": 123,
+        "chat": {
+          "id": 999999,
+          "type": "group",
+          "title": "Stub Chat"
+        },
+        "date": 1729900000,
+        "text": "{{request.query.text}}"
+      }
+    },
+    "transformers": [
+      "response-template"
+    ]
+  },
+  "persistent": true
+}

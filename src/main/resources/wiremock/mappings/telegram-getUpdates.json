@@ -1,0 +1,20 @@
+{
+  "id": "telegram-getUpdates",
+  "name": "Telegram getUpdates empty",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/bot[^/]+/getUpdates"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "ok": true,
+      "result": []
+    },
+    "transformers": []
+  },
+  "persistent": true
+}

@@ -8,11 +8,7 @@
     <artifactId>tradebots</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <properties>
-        <java.version>23</java.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
+    <!-- Spring Boot parent manages most dependency versions. This allows omission of explicit versions for starters and test libraries by leveraging the parent BOM for consistent alignment. -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -20,7 +16,20 @@
         <relativePath/>
     </parent>
 
+    <properties>
+        <!-- Java toolchain level; matches maven-compiler-plugin source/target and keeps language features consistent -->
+        <java.version>23</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Centralized versions for libs we pin explicitly (not managed by Spring Boot parent):
+             - Lombok: annotation processing; kept 'provided' to avoid runtime inclusion.
+             - WireMock: embedded server for local 'stub' profile; compile scope needed so config class can start it.
+        -->
+        <lombok.version>1.18.34</lombok.version>
+        <wiremock.version>3.3.1</wiremock.version>
+    </properties>
+
     <dependencies>
+        <!-- Application dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
@@ -33,51 +42,53 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+
+        <!-- Lombok (compile-time only).
+             Rationale: 'provided' scope prevents Lombok classes from ending up in the final artifact.
+             Annotation processor path configured in maven-compiler-plugin below ensures code generation still works.
+        -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.34</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
         </dependency>
 
-        <!-- TEST SCOPE -->
+        <!-- WireMock embedded server for local stub profile.
+             Rationale: Included in compile scope so Spring configuration class (WireMockConfig) can start a server when 'stub' profile is active.
+             Enables offline development without external API calls or API keys.
+             Using core 'wiremock' artifact (not standalone) to minimize transitive dependencies.
+        -->
         <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>5.20.0</version>
-            <scope>test</scope>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock</artifactId>
+            <version>${wiremock.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.20.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>6.0.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.hamcrest</groupId>
-            <artifactId>hamcrest</artifactId>
-            <version>3.0</version>
-            <scope>test</scope>
-        </dependency>
+
+        <!-- TEST SCOPE.
+             spring-boot-starter-test already brings JUnit Jupiter, Mockito, Hamcrest, AssertJ, JSON libs.
+             Removed explicit JUnit / Mockito / Hamcrest dependencies to rely on managed versions and reduce upgrade churn.
+             Vintage engine excluded to avoid loading JUnit 4.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <!-- Optional: exclude vintage engine if not needed -->
+                <exclusion>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
-
     </dependencies>
 
     <build>
         <plugins>
+            <!-- Java compilation with annotation processing for Lombok.
+                 Lombok annotation processor declared via annotationProcessorPaths so 'provided' scope remains appropriate.
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -95,11 +106,15 @@
                 </configuration>
             </plugin>
 
+            <!-- Spring Boot packaging / repackage -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
 
+            <!-- Code coverage (JaCoCo).
+                 High coverage threshold (98% INSTRUCTION) enforced in 'verify' phase; adjust <minimum> if needed.
+            -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -124,24 +139,22 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
-                                <rules>
-                                    <rule>
-                                        <element>BUNDLE</element>
-                                        <limits>
-                                            <limit>
-                                                <counter>INSTRUCTION</counter>
-                                                <value>COVEREDRATIO</value>
-                                                <minimum>0.98</minimum>
-                                            </limit>
-                                        </limits>
-                                    </rule>
-                                </rules>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.98</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-
-
         </plugins>
     </build>
 

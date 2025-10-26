@@ -1,2 +1,19 @@
 server:
   port: 9090
+
+# Finnhub API Configuration
+finnhub:
+  base-url: https://finnhub.io/api/v1
+  api-key: ${FINNHUB_API_KEY:}
+
+# CoinGecko API Configuration
+coingecko:
+  base-url: https://api.coingecko.com/api/v3
+  api-key: ${COINGECKO_API_KEY:}
+
+# Telegram API Configuration
+telegram:
+  base-url: https://api.telegram.org
+  bot-token: ${TELEGRAM_BOT_TOKEN}
+  group-chat-id: ${TELEGRAM_BOT_GROUP_CHAT_ID}
+
