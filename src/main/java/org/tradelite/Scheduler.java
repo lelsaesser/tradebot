@@ -68,7 +68,7 @@ public class Scheduler {
 
     @Scheduled(initialDelay = 0, fixedRate = 420000)
     protected void cryptoMarketMonitoring() {
-        // test
+        test
         // rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
         log.info("Crypto market monitoring round completed.");
     }
