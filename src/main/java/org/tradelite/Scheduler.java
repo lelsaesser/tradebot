@@ -59,7 +59,7 @@ public class Scheduler {
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     protected void stockMarketMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
-            rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+            // rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
@@ -68,7 +68,7 @@ public class Scheduler {
 
     @Scheduled(initialDelay = 0, fixedRate = 420000)
     protected void cryptoMarketMonitoring() {
-        test
+        // test
         // rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
         log.info("Crypto market monitoring round completed.");
     }
