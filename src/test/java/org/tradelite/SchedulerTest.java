@@ -83,21 +83,20 @@ class SchedulerTest {
         verify(coinGeckoPriceEvaluator, never()).evaluatePrice();
     }
 
-    // @Test
-    // void cryptoMarketMonitoring_shouldRun() throws Exception {
-    //     scheduler.cryptoMarketMonitoring();
+    @Test
+    void cryptoMarketMonitoring_shouldRun() throws Exception {
+        scheduler.cryptoMarketMonitoring();
 
-    //     verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
 
-    //     ArgumentCaptor<ThrowingRunnable> captor =
-    // ArgumentCaptor.forClass(ThrowingRunnable.class);
-    //     verify(rootErrorHandler, times(1)).run(captor.capture());
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
 
-    //     captor.getValue().run();
+        captor.getValue().run();
 
-    //     verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
-    //     verify(finnhubPriceEvaluator, never()).evaluatePrice();
-    // }
+        verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
+        verify(finnhubPriceEvaluator, never()).evaluatePrice();
+    }
 
     @Test
     void cleanupIgnoreSymbols_shouldRun() throws Exception {
