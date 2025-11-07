@@ -106,6 +106,17 @@ public class RsiService {
         rsiDailyClosePrice.setPreviousRsi(rsi);
     }
 
+    public Optional<Double> getCurrentRsi(TickerSymbol symbol) {
+        String symbolKey = symbol.getName();
+        RsiDailyClosePrice rsiDailyClosePrice = priceHistory.get(symbolKey);
+
+        if (rsiDailyClosePrice == null || rsiDailyClosePrice.getPrices().size() < RSI_PERIOD + 1) {
+            return Optional.empty();
+        }
+
+        return Optional.of(calculateRsi(rsiDailyClosePrice.getPriceValues()));
+    }
+
     protected double calculateRsi(List<Double> prices) {
         if (prices.size() < RSI_PERIOD) {
             return 50; // Not enough data
