@@ -300,4 +300,14 @@ class RsiServiceTest {
 
         assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
     }
+
+    @Test
+    void testRsiDiff_isCalculatedAndSent() throws IOException {
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(15 - i));
+        }
+        rsiService.getPriceHistory().get(symbol.getName()).setPreviousRsi(10);
+        rsiService.addPrice(symbol, 120, LocalDate.now());
+        verify(telegramClient, atLeastOnce()).sendMessage(contains("(-"));
+    }
 }

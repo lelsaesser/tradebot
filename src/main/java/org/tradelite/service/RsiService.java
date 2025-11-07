@@ -82,15 +82,28 @@ public class RsiService {
             displayName = ((StockSymbol) symbol).getDisplayName();
         }
 
+        double previousRsi = rsiDailyClosePrice.getPreviousRsi();
+        double rsiDiff = rsi - previousRsi;
+
+        String rsiDiffString = "";
+        if (previousRsi != 0) {
+            rsiDiffString = String.format("(%+.1f)", rsiDiff);
+        }
+
         if (rsi >= 70) {
             log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
             telegramClient.sendMessage(
-                    String.format("🔴 RSI for %s is in overbought zone: %.2f", displayName, rsi));
+                    String.format(
+                            "🔴 RSI for %s is in overbought zone: %.2f %s",
+                            displayName, rsi, rsiDiffString));
         } else if (rsi <= 30) {
             log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
             telegramClient.sendMessage(
-                    String.format("🟢 RSI for %s is in oversold zone: %.2f", displayName, rsi));
+                    String.format(
+                            "🟢 RSI for %s is in oversold zone: %.2f %s",
+                            displayName, rsi, rsiDiffString));
         }
+        rsiDailyClosePrice.setPreviousRsi(rsi);
     }
 
     protected double calculateRsi(List<Double> prices) {
