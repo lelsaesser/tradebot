@@ -9,6 +9,7 @@ import lombok.Data;
 @Data
 public class RsiDailyClosePrice {
     private List<DailyPrice> prices = new ArrayList<>();
+    private double previousRsi;
 
     public void addPrice(LocalDate date, double price) {
         Optional<DailyPrice> existingPrice =
