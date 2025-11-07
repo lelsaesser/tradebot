@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
@@ -309,5 +310,82 @@ class RsiServiceTest {
         rsiService.getPriceHistory().get(symbol.getName()).setPreviousRsi(10);
         rsiService.addPrice(symbol, 120, LocalDate.now());
         verify(telegramClient, atLeastOnce()).sendMessage(contains("(-"));
+    }
+
+    @Test
+    void testGetCurrentRsi_withSufficientData() throws IOException {
+        // Add 15 prices to have sufficient data for RSI calculation
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        assertThat(rsi.isPresent(), is(true));
+        assertThat(rsi.get(), is(both(greaterThanOrEqualTo(0.0)).and(lessThanOrEqualTo(100.0))));
+    }
+
+    @Test
+    void testGetCurrentRsi_withInsufficientData() throws IOException {
+        // Add only a few prices (less than RSI_PERIOD + 1 = 15)
+        for (int i = 0; i < 10; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
+        }
+
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        assertThat(rsi.isEmpty(), is(true));
+    }
+
+    @Test
+    void testGetCurrentRsi_noData() {
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        assertThat(rsi.isEmpty(), is(true));
+    }
+
+    @Test
+    void testCryptoSymbolDisplayName() throws IOException {
+        CoinId cryptoSymbol = CoinId.BITCOIN;
+
+        // Add 15 prices to trigger RSI calculation and notification
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(cryptoSymbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+
+        // Verify that crypto symbols use their name directly (no getDisplayName method)
+        verify(telegramClient, times(1)).sendMessage(contains(cryptoSymbol.getName()));
+        verify(telegramClient, times(1)).sendMessage(contains("bitcoin"));
+    }
+
+    @Test
+    void testSavePriceHistory_ioException() throws IOException {
+        ObjectMapper spyObjectMapper = spy(new ObjectMapper());
+        doThrow(new IOException("Write error"))
+                .when(spyObjectMapper)
+                .writeValue(any(File.class), any());
+
+        RsiService serviceWithFailingMapper = new RsiService(telegramClient, spyObjectMapper);
+
+        // Adding a price will trigger savePriceHistory, which should throw IOException
+        assertThrows(
+                IOException.class,
+                () -> {
+                    serviceWithFailingMapper.addPrice(symbol, 100.0, LocalDate.now());
+                });
+    }
+
+    @Test
+    void testCalculateRsi_averageLossZero() {
+        // Test the edge case where avgLoss becomes 0 (all gains, no losses)
+        java.util.List<Double> allGainsAfterInitial =
+                java.util.Arrays.asList(
+                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0,
+                        111.0, 112.0, 113.0, 114.0);
+
+        double rsi = rsiService.calculateRsi(allGainsAfterInitial);
+
+        // When avgLoss is 0, RSI should be 100
+        assertEquals(100.0, rsi, 0.001);
     }
 }
