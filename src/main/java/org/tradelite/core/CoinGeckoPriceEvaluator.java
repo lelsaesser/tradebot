@@ -18,8 +18,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
 
-    @Getter
-    protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
+    @Getter protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
 
     @Autowired
     public CoinGeckoPriceEvaluator(
