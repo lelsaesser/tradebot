@@ -13,7 +13,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.service.RsiService;
 
 @ExtendWith(MockitoExtension.class)
-public class RsiCommandProcessorTest {
+class RsiCommandProcessorTest {
 
     @Mock private RsiService rsiService;
 
@@ -22,22 +22,22 @@ public class RsiCommandProcessorTest {
     @InjectMocks private RsiCommandProcessor processor;
 
     @Test
-    public void shouldSendMessageWithRsiValueWhenFound() {
+    void shouldSendMessageWithRsiValueWhenFound() {
         RsiCommand command = new RsiCommand(StockSymbol.AAPL);
         when(rsiService.getCurrentRsi(StockSymbol.AAPL)).thenReturn(Optional.of(60.5));
 
         processor.processCommand(command);
 
-        verify(telegramClient).sendMessage("RSI for AAPL is 60.50");
+        verify(telegramClient).sendMessage("RSI for Apple (AAPL) is 60.50");
     }
 
     @Test
-    public void shouldSendMessageWithNotEnoughDataWhenRsiNotFound() {
+    void shouldSendMessageWithNotEnoughDataWhenRsiNotFound() {
         RsiCommand command = new RsiCommand(StockSymbol.AAPL);
         when(rsiService.getCurrentRsi(StockSymbol.AAPL)).thenReturn(Optional.empty());
 
         processor.processCommand(command);
 
-        verify(telegramClient).sendMessage("Not enough data to calculate RSI for AAPL");
+        verify(telegramClient).sendMessage("Not enough data to calculate RSI for Apple (AAPL)");
     }
 }

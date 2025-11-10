@@ -20,14 +20,14 @@ public class RsiCommandProcessor implements TelegramCommandProcessor<RsiCommand>
                             String message =
                                     String.format(
                                             "RSI for %s is %.2f",
-                                            command.getSymbol().getName(), rsi);
+                                            command.getSymbol().getDisplayName(), rsi);
                             telegramClient.sendMessage(message);
                         },
                         () -> {
                             String message =
                                     String.format(
                                             "Not enough data to calculate RSI for %s",
-                                            command.getSymbol().getName());
+                                            command.getSymbol().getDisplayName());
                             telegramClient.sendMessage(message);
                         });
     }
