@@ -9,10 +9,11 @@ The basic application structure is in place. The scheduler is configured to run 
 - Weekly insider trading reports.
 - Telegram message polling.
 - Cleanup of ignored symbols.
+- On-demand RSI requests via the `/rsi` Telegram command.
 
 ## What's Left to Build
 - The actual implementation of the logic within each scheduled task needs to be verified and potentially expanded.
-- The Telegram command processing logic needs to be fully implemented and tested.
+- The Telegram command processing logic for commands other than `/rsi` needs to be fully implemented and tested.
 - Comprehensive error handling and notification mechanisms need to be put in place.
 - The configuration for API keys and other sensitive data needs to be externalized and secured.
 

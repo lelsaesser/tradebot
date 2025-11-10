@@ -12,7 +12,13 @@ The scheduler has been updated to run cryptocurrency monitoring every 7 minutes,
 
 ## Next Steps
 - Monitor the application to ensure the schedulers are running at their new, correct intervals.
-- Update the system patterns to reflect the new scheduler structure.
+
+## Future Improvements
+- The `stockMarketMonitoring` scheduler should be updated to use a cron expression instead of a fixed-rate delay. This will provide more fine-grained control over when the job runs.
+- A new scheduler should be added to generate a weekly report of API usage, which will help monitor costs and stay within rate limits.
+- A mechanism to dynamically adjust the polling frequency of the schedulers based on market activity could be implemented to optimize resource usage.
+- The `TelegramCommandDispatcher` should be enhanced to support more complex command patterns and arguments.
+- A dashboard to visualize the bot's activity, including trades, alerts, and errors, would be a valuable addition.
 
 ## Active Decisions
 - Chose to implement graceful error handling rather than trying to modify production configuration files
