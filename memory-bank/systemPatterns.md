@@ -8,20 +8,24 @@ The application follows a modular, component-based architecture built on the Spr
 
 ## Key Components
 
--   **`Scheduler`:** The heart of the application, responsible for orchestrating all scheduled tasks. It has been updated to include separate, independently configurable schedulers for stock and crypto monitoring, allowing for more granular control over polling intervals.
--   **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) responsible for fetching and evaluating prices from different APIs. This design supports multiple data sources and can be extended to include others.
--   **`RsiPriceFetcher`:** A component dedicated to fetching historical price data for RSI calculations. This is a critical component for technical analysis.
--   **`InsiderTracker`:** A component for tracking and reporting insider trading activities. This provides valuable market insights.
--   **`TelegramClient` & `TelegramMessageProcessor`:** These components handle all interactions with the Telegram Bot API, from sending alerts to processing user commands.
--   **`TargetPriceProvider`:** Manages the list of symbols to be monitored, including those to be ignored. This allows for dynamic configuration of the bot's watchlist.
--   **`RootErrorHandler`:** A centralized error handler that wraps all scheduled tasks. This ensures that a failure in one task does not bring down the entire application.
--   **`RsiCommandProcessor`**: A component that handles the `/rsi` command from Telegram, which allows users to get the current RSI value for a given symbol.
+-   **`Scheduler`:** The heart of the application, orchestrating all scheduled tasks. Includes separate schedulers for stock and crypto monitoring with independent polling intervals.
+-   **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) responsible for fetching and evaluating prices from different APIs. Maintains in-memory caches of last fetched prices for real-time RSI calculations. This design supports multiple data sources and can be extended.
+-   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays, and sends Telegram notifications for overbought/oversold conditions. Integrates cached current prices for accurate on-demand RSI queries.
+-   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations. Critical for technical analysis.
+-   **`InsiderTracker`:** Tracks and reports insider trading activities, providing valuable market insights.
+-   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
+-   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
+-   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
+-   **`TargetPriceProvider`:** Manages the watchlist of symbols to be monitored, including those to be ignored. Allows dynamic configuration.
+-   **`RootErrorHandler`:** Centralized error handler wrapping all scheduled tasks. Ensures that failures in one task don't bring down the entire application.
 
 ## Design Patterns
 
--   **Command Pattern**: The Telegram command processing framework is a good example of the Command pattern. Each command (`/add`, `/remove`, `/rsi`, etc.) is encapsulated in its own class, and a dispatcher (`TelegramCommandDispatcher`) is responsible for routing the command to the appropriate processor.
--   **Dependency Injection:** Used extensively by Spring to manage component dependencies, promoting loose coupling and testability.
--   **Scheduler Pattern:** The `Scheduler` component uses the `@Scheduled` annotation to run tasks at fixed intervals or cron-based schedules. The recent refactoring split a single market monitoring job into `stockMarketMonitoring` and `cryptoMarketMonitoring`, each with its own schedule.
--   **Strategy Pattern:** The use of different `PriceEvaluator` implementations for different data sources (e.g., `FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) is a clear example of the Strategy pattern. This allows the price evaluation logic to be easily swapped or extended.
--   **Facade Pattern:** The `TelegramClient` can be seen as a facade that simplifies interaction with the more complex underlying Telegram Bot API.
--   **Singleton Pattern:** Spring beans are singletons by default, ensuring that there is only one instance of each component, which is appropriate for this application's architecture.
+-   **Command Pattern**: The Telegram command processing framework exemplifies the Command pattern. Each command (`/add`, `/remove`, `/rsi`, `/show`, etc.) is encapsulated in its own class (`RsiCommand`, `AddCommand`, etc.) with a corresponding processor (`RsiCommandProcessor`, `AddCommandProcessor`, etc.). The `TelegramCommandDispatcher` routes commands to appropriate processors via the `canProcess()` method.
+-   **Dependency Injection**: Used extensively by Spring to manage component dependencies, promoting loose coupling and testability. All major components are injected via constructor injection.
+-   **Scheduler Pattern**: The `Scheduler` component uses Spring's `@Scheduled` annotation to run tasks at fixed intervals. Separate schedulers exist for `stockMarketMonitoring`, `cryptoMarketMonitoring`, `dailyRsiFetching`, `weeklyInsiderReporting`, and `telegramMessagePolling`.
+-   **Strategy Pattern**: Different `PriceEvaluator` implementations for different data sources (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) demonstrate the Strategy pattern. This allows price evaluation logic to be easily swapped or extended.
+-   **Caching Pattern**: Price evaluators maintain `lastPriceCache` maps to store recently fetched prices. The `RsiService` leverages these caches via `getCurrentPriceFromCache()` for real-time RSI calculations.
+-   **Facade Pattern**: The `TelegramClient` serves as a facade, simplifying interaction with the complex underlying Telegram Bot API.
+-   **Template Method Pattern**: The `BasePriceEvaluator` abstract class provides common price evaluation logic, with specific implementations in `FinnhubPriceEvaluator` and `CoinGeckoPriceEvaluator`.
+-   **Singleton Pattern**: Spring beans are singletons by default, ensuring single instances of each component throughout the application lifecycle.

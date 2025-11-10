@@ -3,22 +3,27 @@
 This document tracks the current work focus, recent changes, next steps, active decisions, important patterns, and project insights.
 
 ## Current Work Focus
-The scheduler has been updated to run cryptocurrency monitoring every 7 minutes, while stock monitoring remains at 5 minutes.
+The RSI command feature has been fully implemented and enhanced with price caching capabilities. The system now supports on-demand RSI queries through the Telegram `/rsi` command.
 
 ## Recent Changes
-- **Separated Schedulers**: The combined market monitoring job was split into `stockMarketMonitoring` and `cryptoMarketMonitoring`.
-- **Updated Crypto Schedule**: The `cryptoMarketMonitoring` job is now scheduled to run every 7 minutes.
-- **Updated Tests**: The `SchedulerTest` class was updated to reflect the new scheduler methods.
+- **RSI Command Implementation**: Fully implemented the `/rsi` Telegram command for on-demand RSI queries
+- **RSI Price Caching**: Enhanced `RsiService` to use cached current prices from `FinnhubPriceEvaluator` and `CoinGeckoPriceEvaluator` for more accurate real-time RSI calculations
+- **RSI Trend Display**: Added RSI change indicators (e.g., `(+2.5)`) to Telegram notifications showing trend from previous calculation
+- **Code Coverage**: Increased test coverage to 99% instruction coverage requirement
+- **Code Formatting**: Integrated Spotless with Google Java Format (AOSP style) for consistent code formatting
+- **Crypto Market Monitoring**: Re-enabled crypto market monitoring in the scheduler
 
 ## Next Steps
-- Monitor the application to ensure the schedulers are running at their new, correct intervals.
+- Monitor RSI command usage and caching performance in production
+- Continue enhancing test coverage where needed
 
 ## Future Improvements
-- The `stockMarketMonitoring` scheduler should be updated to use a cron expression instead of a fixed-rate delay. This will provide more fine-grained control over when the job runs.
-- A new scheduler should be added to generate a weekly report of API usage, which will help monitor costs and stay within rate limits.
-- A mechanism to dynamically adjust the polling frequency of the schedulers based on market activity could be implemented to optimize resource usage.
-- The `TelegramCommandDispatcher` should be enhanced to support more complex command patterns and arguments.
-- A dashboard to visualize the bot's activity, including trades, alerts, and errors, would be a valuable addition.
+- The `stockMarketMonitoring` scheduler should be updated to use a cron expression instead of a fixed-rate delay for more fine-grained control
+- Add a weekly report scheduler for API usage monitoring to track costs and rate limits
+- Implement dynamic polling frequency adjustment based on market activity to optimize resource usage
+- Enhance `TelegramCommandDispatcher` to support more complex command patterns and arguments
+- Create a dashboard to visualize bot activity, including trades, alerts, and errors
+- Consider adding more Telegram commands (e.g., `/show` for watchlist, `/add` and `/remove` for symbol management)
 
 ## Active Decisions
 - Chose to implement graceful error handling rather than trying to modify production configuration files
@@ -28,11 +33,17 @@ The scheduler has been updated to run cryptocurrency monitoring every 7 minutes,
 - The project uses a scheduler-based approach to orchestrate tasks
 - Components are loosely coupled using dependency injection
 - Error handling is centralized in the `RootErrorHandler`
-- **New pattern**: Graceful degradation when configuration contains invalid data - skip invalid entries and continue processing valid ones
+- **Graceful degradation**: When configuration contains invalid data, skip invalid entries and continue processing valid ones
+- **Price caching**: Price evaluators maintain in-memory caches of last fetched prices for real-time calculations
+- **Market holiday detection**: System detects and skips duplicate prices on market holidays to maintain data integrity
+- **High code quality standards**: 99% code coverage requirement enforced via JaCoCo, consistent formatting via Spotless
 
 ## Learnings and Project Insights
-- The project is a trading bot with a clear, modular structure
-- The use of Spring Boot and its scheduling features simplifies the orchestration of complex workflows
-- **Critical insight**: Configuration files in production may contain symbols not defined in the enum, requiring resilient error handling
+- The project is a mature trading bot with a clear, modular structure
+- Spring Boot's scheduling features effectively orchestrate complex workflows
+- **Critical insight**: Configuration files in production may contain symbols not defined in enums, requiring resilient error handling
 - The `StockSymbol` enum acts as a whitelist - only symbols defined there can be processed for insider tracking
-- The system should be designed to handle configuration mismatches gracefully rather than failing completely
+- The system should handle configuration mismatches gracefully rather than failing completely
+- **RSI calculations benefit from real-time price data**: Using cached current prices alongside historical data provides more accurate on-demand RSI values
+- **Price data quality matters**: Market holiday detection prevents data pollution from duplicate prices
+- **Command pattern scales well**: The Telegram command dispatcher architecture easily accommodates new commands
