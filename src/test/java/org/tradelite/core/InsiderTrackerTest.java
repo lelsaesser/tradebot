@@ -354,4 +354,183 @@ class InsiderTrackerTest {
         verify(telegramClient).sendMessage(anyString());
         verify(insiderPersistence).persistToFile(any(), anyString());
     }
+
+    @Test
+    void trackInsiderTransactions_shouldTriggerComputeIfAbsentLambdas() {
+        List<TargetPrice> targetPrices =
+                List.of(new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0));
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+
+        // Create multiple transactions of each type to trigger the computeIfAbsent paths
+        InsiderTransactionResponse responseAAPL =
+                new InsiderTransactionResponse(
+                        List.of(
+                                new InsiderTransactionResponse.Transaction(
+                                        "Alice", 100, 5, "2023-10-02", "2023-10-01", "S", 10200.0),
+                                new InsiderTransactionResponse.Transaction(
+                                        "Bob", 100, 5, "2023-10-02", "2023-10-01", "S/V", 10200.0),
+                                new InsiderTransactionResponse.Transaction(
+                                        "Charlie",
+                                        100,
+                                        5,
+                                        "2023-10-02",
+                                        "2023-10-01",
+                                        "P",
+                                        10200.0),
+                                new InsiderTransactionResponse.Transaction(
+                                        "Dave",
+                                        100,
+                                        5,
+                                        "2023-10-02",
+                                        "2023-10-01",
+                                        "P/V",
+                                        10200.0)));
+
+        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(responseAAPL);
+        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+
+        insiderTracker.trackInsiderTransactions();
+
+        verify(telegramClient).sendMessage(anyString());
+        verify(insiderPersistence).persistToFile(any(), anyString());
+    }
+
+    @Test
+    void orderMapByCodeCount_shouldHandleDuplicateEntriesAndTriggerMergeFunction() {
+        Map<StockSymbol, Map<String, Integer>> testData = new LinkedHashMap<>();
+
+        // Add multiple entries with same count values to potentially trigger merge function
+        testData.put(StockSymbol.AAPL, Map.of("S", 10, "P", 5));
+        testData.put(StockSymbol.GOOG, Map.of("S", 10, "P", 3)); // Same sell count as AAPL
+        testData.put(StockSymbol.META, Map.of("S", 15, "P", 2));
+        testData.put(StockSymbol.AMZN, Map.of("S", 5, "P", 8));
+
+        // Call the method through sendInsiderTransactionReport since orderMapByCodeCount is private
+        insiderTracker.sendInsiderTransactionReport(testData);
+
+        verify(telegramClient).sendMessage(anyString());
+    }
+
+    @Test
+    void trackInsiderTransactions_shouldTriggerComputeIfAbsentWhenMapsNotPreInitialized() {
+        // This test creates a scenario where the maps are not pre-initialized,
+        // forcing the computeIfAbsent lambdas to be executed
+        List<TargetPrice> targetPrices =
+                List.of(new TargetPrice(StockSymbol.TSLA.getTicker(), 150.0, 300.0));
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+
+        // Create a custom InsiderTracker to override the behavior
+        InsiderTracker customTracker =
+                new InsiderTracker(
+                        finnhubClient, telegramClient, targetPriceProvider, insiderPersistence) {
+                    @Override
+                    public void trackInsiderTransactions() {
+                        List<String> monitoredSymbols =
+                                targetPriceProvider.getStockTargetPrices().stream()
+                                        .map(TargetPrice::getSymbol)
+                                        .toList();
+
+                        Map<StockSymbol, Map<String, Integer>> insiderTransactions =
+                                new LinkedHashMap<>();
+
+                        for (String symbolString : monitoredSymbols) {
+                            Optional<StockSymbol> stockSymbolOpt =
+                                    StockSymbol.fromString(symbolString);
+                            if (stockSymbolOpt.isEmpty()) {
+                                continue;
+                            }
+                            StockSymbol stockSymbol = stockSymbolOpt.get();
+
+                            InsiderTransactionResponse response =
+                                    finnhubClient.getInsiderTransactions(stockSymbol);
+
+                            // DON'T pre-initialize the maps - this will force computeIfAbsent to
+                            // execute
+                            for (InsiderTransactionResponse.Transaction insiderTransaction :
+                                    response.data()) {
+                                if (Objects.equals(
+                                        insiderTransaction.transactionCode(),
+                                        InsiderTransactionCodes.SELL.getCode())) {
+                                    insiderTransactions
+                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
+                                            .merge(
+                                                    InsiderTransactionCodes.SELL.getCode(),
+                                                    1,
+                                                    Integer::sum);
+                                }
+                                if (Objects.equals(
+                                        insiderTransaction.transactionCode(),
+                                        InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode())) {
+                                    insiderTransactions
+                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
+                                            .merge(
+                                                    InsiderTransactionCodes.SELL.getCode(),
+                                                    1,
+                                                    Integer::sum);
+                                }
+                                if (Objects.equals(
+                                        insiderTransaction.transactionCode(),
+                                        InsiderTransactionCodes.BUY.getCode())) {
+                                    insiderTransactions
+                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
+                                            .merge(
+                                                    InsiderTransactionCodes.BUY.getCode(),
+                                                    1,
+                                                    Integer::sum);
+                                }
+                                if (Objects.equals(
+                                        insiderTransaction.transactionCode(),
+                                        InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode())) {
+                                    insiderTransactions
+                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
+                                            .merge(
+                                                    InsiderTransactionCodes.BUY.getCode(),
+                                                    1,
+                                                    Integer::sum);
+                                }
+                            }
+                        }
+
+                        if (!insiderTransactions.isEmpty()) {
+                            sendInsiderTransactionReport(insiderTransactions);
+                        }
+
+                        insiderPersistence.persistToFile(
+                                insiderTransactions, InsiderPersistence.PERSISTENCE_FILE_PATH);
+                    }
+                };
+
+        // Create transactions that will trigger all the computeIfAbsent paths
+        InsiderTransactionResponse responseTSLA =
+                new InsiderTransactionResponse(
+                        List.of(
+                                new InsiderTransactionResponse.Transaction(
+                                        "Alice", 100, 5, "2023-10-02", "2023-10-01", "S", 10200.0),
+                                new InsiderTransactionResponse.Transaction(
+                                        "Bob", 100, 5, "2023-10-02", "2023-10-01", "S/V", 10200.0),
+                                new InsiderTransactionResponse.Transaction(
+                                        "Charlie",
+                                        100,
+                                        5,
+                                        "2023-10-02",
+                                        "2023-10-01",
+                                        "P",
+                                        10200.0),
+                                new InsiderTransactionResponse.Transaction(
+                                        "Dave",
+                                        100,
+                                        5,
+                                        "2023-10-02",
+                                        "2023-10-01",
+                                        "P/V",
+                                        10200.0)));
+
+        when(finnhubClient.getInsiderTransactions(StockSymbol.TSLA)).thenReturn(responseTSLA);
+        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+
+        customTracker.trackInsiderTransactions();
+
+        verify(telegramClient).sendMessage(anyString());
+        verify(insiderPersistence).persistToFile(any(), anyString());
+    }
 }

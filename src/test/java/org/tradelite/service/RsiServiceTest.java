@@ -20,13 +20,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.core.CoinGeckoPriceEvaluator;
+import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
 @SpringBootTest
 class RsiServiceTest {
 
     @MockitoBean private TelegramClient telegramClient;
+    @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
+    @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -38,7 +43,13 @@ class RsiServiceTest {
     @BeforeEach
     void setUp() throws IOException {
         new File(rsiDataFile).delete();
-        rsiService = spy(new RsiService(telegramClient, objectMapper));
+        rsiService =
+                spy(
+                        new RsiService(
+                                telegramClient,
+                                objectMapper,
+                                finnhubPriceEvaluator,
+                                coinGeckoPriceEvaluator));
     }
 
     @Test
@@ -135,7 +146,12 @@ class RsiServiceTest {
                 .when(spyObjectMapper)
                 .readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
 
-        RsiService serviceWithHistory = new RsiService(telegramClient, spyObjectMapper);
+        RsiService serviceWithHistory =
+                new RsiService(
+                        telegramClient,
+                        spyObjectMapper,
+                        finnhubPriceEvaluator,
+                        coinGeckoPriceEvaluator);
 
         assertEquals(
                 1, serviceWithHistory.getPriceHistory().get(symbol.getName()).getPrices().size());
@@ -166,7 +182,14 @@ class RsiServiceTest {
                 .when(spyObjectMapper)
                 .readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
 
-        assertThrows(IOException.class, () -> new RsiService(telegramClient, spyObjectMapper));
+        assertThrows(
+                IOException.class,
+                () ->
+                        new RsiService(
+                                telegramClient,
+                                spyObjectMapper,
+                                finnhubPriceEvaluator,
+                                coinGeckoPriceEvaluator));
 
         dummyFile.delete();
     }
@@ -309,5 +332,170 @@ class RsiServiceTest {
         rsiService.getPriceHistory().get(symbol.getName()).setPreviousRsi(10);
         rsiService.addPrice(symbol, 120, LocalDate.now());
         verify(telegramClient, atLeastOnce()).sendMessage(contains("(-"));
+    }
+
+    @Test
+    void testGetCurrentRsi_withSufficientData() throws IOException {
+        // Add 15 prices to have sufficient data for RSI calculation
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        assertThat(rsi.isPresent(), is(true));
+        assertThat(rsi.get(), is(both(greaterThanOrEqualTo(0.0)).and(lessThanOrEqualTo(100.0))));
+    }
+
+    @Test
+    void testGetCurrentRsi_withInsufficientData() throws IOException {
+        // Add only a few prices (less than RSI_PERIOD + 1 = 15)
+        for (int i = 0; i < 10; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
+        }
+
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        assertThat(rsi.isEmpty(), is(true));
+    }
+
+    @Test
+    void testGetCurrentRsi_noData() {
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        assertThat(rsi.isEmpty(), is(true));
+    }
+
+    @Test
+    void testCryptoSymbolDisplayName() throws IOException {
+        CoinId cryptoSymbol = CoinId.BITCOIN;
+
+        // Add 15 prices to trigger RSI calculation and notification
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(cryptoSymbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+
+        // Verify that crypto symbols use their name directly (no getDisplayName method)
+        verify(telegramClient, times(1)).sendMessage(contains(cryptoSymbol.getName()));
+        verify(telegramClient, times(1)).sendMessage(contains("bitcoin"));
+    }
+
+    @Test
+    void testSavePriceHistory_ioException() throws IOException {
+        ObjectMapper spyObjectMapper = spy(new ObjectMapper());
+        doThrow(new IOException("Write error"))
+                .when(spyObjectMapper)
+                .writeValue(any(File.class), any());
+
+        RsiService serviceWithFailingMapper =
+                new RsiService(
+                        telegramClient,
+                        spyObjectMapper,
+                        finnhubPriceEvaluator,
+                        coinGeckoPriceEvaluator);
+
+        // Adding a price will trigger savePriceHistory, which should throw IOException
+        assertThrows(
+                IOException.class,
+                () -> {
+                    serviceWithFailingMapper.addPrice(symbol, 100.0, LocalDate.now());
+                });
+    }
+
+    @Test
+    void testCalculateRsi_averageLossZero() {
+        // Test the edge case where avgLoss becomes 0 (all gains, no losses)
+        java.util.List<Double> allGainsAfterInitial =
+                java.util.Arrays.asList(
+                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0,
+                        111.0, 112.0, 113.0, 114.0);
+
+        double rsi = rsiService.calculateRsi(allGainsAfterInitial);
+
+        // When avgLoss is 0, RSI should be 100
+        assertEquals(100.0, rsi, 0.001);
+    }
+
+    @Test
+    void testGetCurrentPriceFromCache_stockSymbol() {
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(StockSymbol.AAPL, 150.0));
+
+        Double price = rsiService.getCurrentPriceFromCache(StockSymbol.AAPL);
+
+        assertEquals(150.0, price);
+    }
+
+    @Test
+    void testGetCurrentPriceFromCache_cryptoSymbol() {
+        when(coinGeckoPriceEvaluator.getLastPriceCache())
+                .thenReturn(Map.of(CoinId.BITCOIN, 50000.0));
+
+        Double price = rsiService.getCurrentPriceFromCache(CoinId.BITCOIN);
+
+        assertEquals(50000.0, price);
+    }
+
+    @Test
+    void testGetCurrentPriceFromCache_nullCaches() {
+        // Test that getCurrentPriceFromCache returns null when caches are empty
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
+        when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
+
+        Double stockPrice = rsiService.getCurrentPriceFromCache(StockSymbol.AAPL);
+        Double cryptoPrice = rsiService.getCurrentPriceFromCache(CoinId.BITCOIN);
+
+        assertThat(stockPrice, is(nullValue()));
+        assertThat(cryptoPrice, is(nullValue()));
+    }
+
+    @Test
+    void testGetCurrentRsi_withCurrentPriceFromCache() throws IOException {
+        // Set up historical data (14 prices)
+        for (int i = 0; i < 14; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
+        }
+
+        // Mock current price from cache
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(symbol, 125.0));
+
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        assertThat(rsi.isPresent(), is(true));
+        assertThat(rsi.get(), is(both(greaterThanOrEqualTo(0.0)).and(lessThanOrEqualTo(100.0))));
+    }
+
+    @Test
+    void testGetCurrentRsi_withCurrentPriceFromCache_crypto() throws IOException {
+        CoinId cryptoSymbol = CoinId.BITCOIN;
+
+        // Set up historical data (14 prices)
+        for (int i = 0; i < 14; i++) {
+            rsiService.addPrice(
+                    cryptoSymbol, 40000 + (i * 1000), LocalDate.now().minusDays(13 - i));
+        }
+
+        // Mock current price from cache
+        when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(cryptoSymbol, 55000.0));
+
+        var rsi = rsiService.getCurrentRsi(cryptoSymbol);
+
+        assertThat(rsi.isPresent(), is(true));
+        assertThat(rsi.get(), is(both(greaterThanOrEqualTo(0.0)).and(lessThanOrEqualTo(100.0))));
+    }
+
+    @Test
+    void testGetCurrentRsi_insufficientDataEvenWithCache() throws IOException {
+        // Set up only 10 historical prices (less than RSI_PERIOD)
+        for (int i = 0; i < 10; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
+        }
+
+        // Mock current price from cache
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(symbol, 125.0));
+
+        var rsi = rsiService.getCurrentRsi(symbol);
+
+        // Even with cached price, we still don't have enough data (only 11 total)
+        assertThat(rsi.isEmpty(), is(true));
     }
 }

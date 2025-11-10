@@ -81,4 +81,27 @@ class RsiPriceFetcherTest {
         verify(coinGeckoClient, never()).getCoinPriceData(any(CoinId.class));
         verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), any());
     }
+
+    @Test
+    void testFetchStockClosingPrices_invalidSymbol() throws IOException {
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(List.of(new TargetPrice("INVALID_SYMBOL", 100, 200)));
+
+        rsiPriceFetcher.fetchStockClosingPrices();
+
+        verify(finnhubClient, never()).getPriceQuote(any(StockSymbol.class));
+        verify(rsiService, never()).addPrice(any(StockSymbol.class), anyDouble(), any());
+    }
+
+    @Test
+    void testFetchCryptoClosingPrices_exception() throws IOException {
+        when(targetPriceProvider.getCoinTargetPrices())
+                .thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
+        when(coinGeckoClient.getCoinPriceData(any(CoinId.class)))
+                .thenThrow(new RuntimeException("Network error"));
+
+        assertThrows(RuntimeException.class, () -> rsiPriceFetcher.fetchCryptoClosingPrices());
+
+        verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), any());
+    }
 }

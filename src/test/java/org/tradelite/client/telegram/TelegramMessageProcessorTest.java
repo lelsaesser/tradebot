@@ -153,6 +153,20 @@ class TelegramMessageProcessorTest {
         assertThat(command.get(), is(instanceOf(RemoveCommand.class)));
     }
 
+    @Test
+    void parseMessage_validRsiCommand_returnsRsiCommand() {
+        String text = "/rsi bitcoin";
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(RsiCommand.class)));
+    }
+
     @ParameterizedTest
     @MethodSource("parseMessageInvalidInputsProvider")
     void parseMessage_invalidInputs_returnsEmpty(String text) {
@@ -227,6 +241,17 @@ class TelegramMessageProcessorTest {
     }
 
     @Test
+    void processUpdates_nullMessage_skipsProcessing() {
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(null);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        verify(commandDispatcher, never()).dispatch(any());
+        verify(messageTracker, never()).setLastProcessedMessageId(anyLong());
+    }
+
+    @Test
     void parseAddCommand_validInput_returnsAddCommand() {
         String messageText = "/add bitcoin 50000.0 60000.0";
         Optional<AddCommand> command = messageProcessor.parseAddCommand(messageText);
@@ -255,6 +280,21 @@ class TelegramMessageProcessorTest {
         assertThat(command.isPresent(), is(false));
 
         verify(commandDispatcher, never()).dispatch(any(AddCommand.class));
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "/rsi",
+        "/rsi bitcoin extra",
+        "/rsi invalid_symbol",
+    })
+    void parseRsiCommand_invalidInputs_returnsEmpty(String commandText) {
+        Optional<RsiCommand> command = messageProcessor.parseRsiCommand(commandText);
+
+        assertThat(command.isPresent(), is(false));
+
+        verify(commandDispatcher, never()).dispatch(any(RsiCommand.class));
         verify(telegramClient, times(1)).sendMessage(anyString());
     }
 
@@ -291,6 +331,19 @@ class TelegramMessageProcessorTest {
         String ticker = "";
         Optional<TickerSymbol> result = messageProcessor.parseTickerSymbol(ticker);
 
+        assertThat(result.isPresent(), is(false));
+    }
+
+    @Test
+    void parseTickerSymbol_nullTicker_returnsEmpty() {
+        Optional<TickerSymbol> result = messageProcessor.parseTickerSymbol(null);
+
+        assertThat(result.isPresent(), is(false));
+    }
+
+    @Test
+    void tryParseDouble_nullValue_returnsEmpty() {
+        Optional<Double> result = messageProcessor.tryParseDouble(null);
         assertThat(result.isPresent(), is(false));
     }
 }

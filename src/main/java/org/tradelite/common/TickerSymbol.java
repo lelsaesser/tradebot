@@ -5,4 +5,6 @@ public interface TickerSymbol {
     SymbolType getSymbolType();
 
     String getName();
+
+    String getDisplayName();
 }

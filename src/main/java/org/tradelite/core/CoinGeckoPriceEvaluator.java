@@ -1,6 +1,7 @@
 package org.tradelite.core;
 
 import java.util.*;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.coingecko.CoinGeckoClient;
@@ -17,7 +18,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
 
-    protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
+    @Getter protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
 
     @Autowired
     public CoinGeckoPriceEvaluator(

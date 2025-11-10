@@ -1,6 +1,7 @@
 package org.tradelite.core;
 
 import java.util.*;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
 
+    @Getter
     protected final Map<StockSymbol, Double> lastPriceCache = new EnumMap<>(StockSymbol.class);
 
     @Autowired

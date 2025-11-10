@@ -10,9 +10,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.core.CoinGeckoPriceEvaluator;
+import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
 @Slf4j
@@ -27,10 +30,20 @@ public class RsiService {
 
     @Getter private Map<String, RsiDailyClosePrice> priceHistory = new HashMap<>();
 
+    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+
     @Autowired
-    public RsiService(TelegramClient telegramClient, ObjectMapper objectMapper) throws IOException {
+    public RsiService(
+            TelegramClient telegramClient,
+            ObjectMapper objectMapper,
+            FinnhubPriceEvaluator finnhubPriceEvaluator,
+            CoinGeckoPriceEvaluator coinGeckoPriceEvaluator)
+            throws IOException {
         this.telegramClient = telegramClient;
         this.objectMapper = objectMapper;
+        this.finnhubPriceEvaluator = finnhubPriceEvaluator;
+        this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         loadPriceHistory();
     }
 
@@ -104,6 +117,43 @@ public class RsiService {
                             displayName, rsi, rsiDiffString));
         }
         rsiDailyClosePrice.setPreviousRsi(rsi);
+    }
+
+    public Optional<Double> getCurrentRsi(TickerSymbol symbol) {
+        String symbolKey = symbol.getName();
+        RsiDailyClosePrice rsiDailyClosePrice = priceHistory.get(symbolKey);
+
+        if (rsiDailyClosePrice == null || rsiDailyClosePrice.getPrices().size() < RSI_PERIOD) {
+            return Optional.empty();
+        }
+
+        List<Double> historicalPrices = new ArrayList<>(rsiDailyClosePrice.getPriceValues());
+        Double currentPrice = getCurrentPriceFromCache(symbol);
+        if (currentPrice != null) {
+            // Add the current price to get the most up-to-date RSI calculation
+            historicalPrices.add(currentPrice);
+            log.debug(
+                    "Using current price {} from cache for RSI calculation of {}",
+                    currentPrice,
+                    symbol.getName());
+        }
+
+        if (historicalPrices.size() < RSI_PERIOD + 1) {
+            return Optional.empty();
+        }
+
+        return Optional.of(calculateRsi(historicalPrices));
+    }
+
+    protected Double getCurrentPriceFromCache(TickerSymbol symbol) {
+        if (symbol.getSymbolType() == SymbolType.STOCK) {
+            StockSymbol stockSymbol = (StockSymbol) symbol;
+            return finnhubPriceEvaluator.getLastPriceCache().get(stockSymbol);
+        } else if (symbol.getSymbolType() == SymbolType.CRYPTO) {
+            CoinId coinId = (CoinId) symbol;
+            return coinGeckoPriceEvaluator.getLastPriceCache().get(coinId);
+        }
+        return null;
     }
 
     protected double calculateRsi(List<Double> prices) {

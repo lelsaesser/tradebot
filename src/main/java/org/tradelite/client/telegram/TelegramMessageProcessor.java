@@ -94,6 +94,12 @@ public class TelegramMessageProcessor {
                 log.info("Received remove command: {}", removeCommand.get());
                 return Optional.of(removeCommand.get());
             }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/rsi")) {
+            Optional<RsiCommand> rsiCommand = parseRsiCommand(messageText);
+            if (rsiCommand.isPresent()) {
+                log.info("Received rsi command: {}", rsiCommand.get());
+                return Optional.of(rsiCommand.get());
+            }
         }
         return Optional.empty();
     }
@@ -204,5 +210,22 @@ public class TelegramMessageProcessor {
             return Optional.of(stockSymbol.get());
         }
         return Optional.empty();
+    }
+
+    protected Optional<RsiCommand> parseRsiCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 2) {
+            telegramClient.sendMessage("Invalid command format. Use /rsi <symbol>");
+            return Optional.empty();
+        }
+
+        String symbol = parts[1];
+        Optional<TickerSymbol> tickerSymbol = parseTickerSymbol(symbol);
+        if (tickerSymbol.isEmpty()) {
+            telegramClient.sendMessage(ERROR_MSG_INVALID_SYMBOL);
+            return Optional.empty();
+        }
+
+        return Optional.of(new RsiCommand(tickerSymbol.get()));
     }
 }
