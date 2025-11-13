@@ -16,8 +16,7 @@ import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 @Component
 public class TelegramClient {
 
-    protected static final String BASE_URL =
-            "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s";
+    protected static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage";
 
     private final RestTemplate restTemplate;
     private final String botToken;
@@ -34,9 +33,11 @@ public class TelegramClient {
     }
 
     public void sendMessage(String message) {
-        String url = String.format(BASE_URL, botToken, groupChatId, message);
+        String url = String.format(BASE_URL, botToken);
 
         Map<String, Object> payload = new HashMap<>();
+        payload.put("chat_id", groupChatId);
+        payload.put("text", message);
         payload.put("parse_mode", "Markdown");
 
         HttpHeaders headers = new HttpHeaders();
