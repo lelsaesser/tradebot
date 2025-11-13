@@ -7,8 +7,6 @@ import lombok.Getter;
 
 @Getter
 public enum StockSymbol implements TickerSymbol {
-    // do not add special characters to the names, this causes parsing issues with the Telegram
-    // messages for some reason
     AAPL("Apple", "AAPL"),
     MSFT("Microsoft", "MSFT"),
     GOOG("Google", "GOOG"),
