@@ -61,7 +61,7 @@ class CoinGeckoClientTest {
     @Test
     void testGetCoinPriceData_no2xxResponse() {
         ResponseEntity<CoinGeckoPriceResponse> response =
-                new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+                ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 
         when(restTemplate.exchange(
                         anyString(),
