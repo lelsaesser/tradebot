@@ -6,27 +6,27 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.NotificationService;
 
 @Component
 public class InsiderTracker {
 
     private final FinnhubClient finnhubClient;
-    private final TelegramClient telegramClient;
+    private final NotificationService notificationService;
     private final TargetPriceProvider targetPriceProvider;
     private final InsiderPersistence insiderPersistence;
 
     @Autowired
     public InsiderTracker(
             FinnhubClient finnhubClient,
-            TelegramClient telegramClient,
+            NotificationService notificationService,
             TargetPriceProvider targetPriceProvider,
             InsiderPersistence insiderPersistence) {
         this.finnhubClient = finnhubClient;
-        this.telegramClient = telegramClient;
+        this.notificationService = notificationService;
         this.targetPriceProvider = targetPriceProvider;
         this.insiderPersistence = insiderPersistence;
     }
@@ -150,7 +150,7 @@ public class InsiderTracker {
         }
         report.append("```");
 
-        telegramClient.sendMessage(report.toString());
+        notificationService.sendNotification(report.toString());
     }
 
     protected Map<StockSymbol, Map<String, Integer>> enrichWithHistoricData(

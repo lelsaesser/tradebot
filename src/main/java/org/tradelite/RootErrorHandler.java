@@ -3,17 +3,17 @@ package org.tradelite;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.service.NotificationService;
 
 @Slf4j
 @Component
 public class RootErrorHandler {
 
-    private final TelegramClient telegramClient;
+    private final NotificationService notificationService;
 
     @Autowired
-    public RootErrorHandler(TelegramClient telegramClient) {
-        this.telegramClient = telegramClient;
+    public RootErrorHandler(NotificationService notificationService) {
+        this.notificationService = notificationService;
     }
 
     public void run(ThrowingRunnable body) {
@@ -23,7 +23,7 @@ public class RootErrorHandler {
             Thread.currentThread().interrupt();
             log.error("Operation was interrupted: {}", e.getMessage());
             String message = "⏸️ *Operation Interrupted!* Check application logs for details.";
-            telegramClient.sendMessage(message);
+            notificationService.sendNotification(message);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
 
@@ -40,7 +40,7 @@ public class RootErrorHandler {
                         .append("`\n");
             }
 
-            telegramClient.sendMessage(message.toString());
+            notificationService.sendNotification(message.toString());
         }
     }
 

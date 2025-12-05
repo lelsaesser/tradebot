@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.tradelite.client.discord.DiscordClient;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
@@ -29,7 +30,9 @@ import org.tradelite.service.model.RsiDailyClosePrice;
 @SpringBootTest
 class RsiServiceTest {
 
+    @MockitoBean private NotificationService notificationService;
     @MockitoBean private TelegramClient telegramClient;
+    @MockitoBean private DiscordClient discordClient;
     @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
     @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
@@ -46,7 +49,7 @@ class RsiServiceTest {
         rsiService =
                 spy(
                         new RsiService(
-                                telegramClient,
+                                notificationService,
                                 objectMapper,
                                 finnhubPriceEvaluator,
                                 coinGeckoPriceEvaluator));
@@ -59,7 +62,7 @@ class RsiServiceTest {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
-        verify(telegramClient, times(1)).sendMessage(contains(symbol.getDisplayName()));
+        verify(notificationService, times(1)).sendNotification(contains(symbol.getDisplayName()));
         verify(rsiService, times(15)).savePriceHistory();
     }
 
@@ -72,9 +75,10 @@ class RsiServiceTest {
 
         // Verify RSI calculation and notification for oversold (may be called multiple times as we
         // add prices)
-        verify(telegramClient, atLeastOnce()).sendMessage(contains("🟢"));
-        verify(telegramClient, atLeastOnce()).sendMessage(contains("oversold"));
-        verify(telegramClient, atLeastOnce()).sendMessage(contains(symbol.getDisplayName()));
+        verify(notificationService, atLeastOnce()).sendNotification(contains("🟢"));
+        verify(notificationService, atLeastOnce()).sendNotification(contains("oversold"));
+        verify(notificationService, atLeastOnce())
+                .sendNotification(contains(symbol.getDisplayName()));
         verify(rsiService, times(15)).savePriceHistory();
     }
 
@@ -148,7 +152,7 @@ class RsiServiceTest {
 
         RsiService serviceWithHistory =
                 new RsiService(
-                        telegramClient,
+                        notificationService,
                         spyObjectMapper,
                         finnhubPriceEvaluator,
                         coinGeckoPriceEvaluator);
@@ -186,7 +190,7 @@ class RsiServiceTest {
                 IOException.class,
                 () ->
                         new RsiService(
-                                telegramClient,
+                                notificationService,
                                 spyObjectMapper,
                                 finnhubPriceEvaluator,
                                 coinGeckoPriceEvaluator));
@@ -331,7 +335,7 @@ class RsiServiceTest {
         }
         rsiService.getPriceHistory().get(symbol.getName()).setPreviousRsi(10);
         rsiService.addPrice(symbol, 120, LocalDate.now());
-        verify(telegramClient, atLeastOnce()).sendMessage(contains("(-"));
+        verify(notificationService, atLeastOnce()).sendNotification(contains("(-"));
     }
 
     @Test
@@ -376,8 +380,8 @@ class RsiServiceTest {
         }
 
         // Verify that crypto symbols use their name directly (no getDisplayName method)
-        verify(telegramClient, times(1)).sendMessage(contains(cryptoSymbol.getName()));
-        verify(telegramClient, times(1)).sendMessage(contains("bitcoin"));
+        verify(notificationService, times(1)).sendNotification(contains(cryptoSymbol.getName()));
+        verify(notificationService, times(1)).sendNotification(contains("bitcoin"));
     }
 
     @Test
@@ -389,7 +393,7 @@ class RsiServiceTest {
 
         RsiService serviceWithFailingMapper =
                 new RsiService(
-                        telegramClient,
+                        notificationService,
                         spyObjectMapper,
                         finnhubPriceEvaluator,
                         coinGeckoPriceEvaluator);

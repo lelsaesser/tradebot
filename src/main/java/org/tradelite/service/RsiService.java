@@ -9,7 +9,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
@@ -25,7 +24,7 @@ public class RsiService {
     private static final int RSI_PERIOD = 14;
     private static final String RSI_DATA_FILE = "config/rsi-data.json";
 
-    private final TelegramClient telegramClient;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     @Getter private Map<String, RsiDailyClosePrice> priceHistory = new HashMap<>();
@@ -35,12 +34,12 @@ public class RsiService {
 
     @Autowired
     public RsiService(
-            TelegramClient telegramClient,
+            NotificationService notificationService,
             ObjectMapper objectMapper,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             CoinGeckoPriceEvaluator coinGeckoPriceEvaluator)
             throws IOException {
-        this.telegramClient = telegramClient;
+        this.notificationService = notificationService;
         this.objectMapper = objectMapper;
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
@@ -105,13 +104,13 @@ public class RsiService {
 
         if (rsi >= 70) {
             log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
-            telegramClient.sendMessage(
+            notificationService.sendNotification(
                     String.format(
                             "🔴 RSI for %s is in overbought zone: %.2f %s",
                             displayName, rsi, rsiDiffString));
         } else if (rsi <= 30) {
             log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
-            telegramClient.sendMessage(
+            notificationService.sendNotification(
                     String.format(
                             "🟢 RSI for %s is in oversold zone: %.2f %s",
                             displayName, rsi, rsiDiffString));

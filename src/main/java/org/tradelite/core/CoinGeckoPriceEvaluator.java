@@ -6,17 +6,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.NotificationService;
 
 @Component
 public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
     private final CoinGeckoClient coinGeckoClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final NotificationService notificationService;
 
     @Getter protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
 
@@ -24,11 +24,11 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     public CoinGeckoPriceEvaluator(
             CoinGeckoClient coinGeckoClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient) {
-        super(telegramClient, targetPriceProvider);
+            NotificationService notificationService) {
+        super(notificationService, targetPriceProvider);
         this.coinGeckoClient = coinGeckoClient;
         this.targetPriceProvider = targetPriceProvider;
-        this.telegramClient = telegramClient;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -83,7 +83,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
                 && !targetPriceProvider.isSymbolIgnored(
                         coinId, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
             String emoji = percentChange > 0 ? "📈" : "📉";
-            telegramClient.sendMessage(
+            notificationService.sendNotification(
                     emoji
                             + " High daily price swing detected for "
                             + coinId.getId()

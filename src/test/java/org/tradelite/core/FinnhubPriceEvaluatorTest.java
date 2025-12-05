@@ -15,24 +15,24 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.NotificationService;
 
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
 
     @Mock private FinnhubClient finnhubClient;
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private TelegramClient telegramClient;
+    @Mock private NotificationService notificationService;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
     @BeforeEach
     void setUp() {
         finnhubPriceEvaluator =
-                new FinnhubPriceEvaluator(finnhubClient, targetPriceProvider, telegramClient);
+                new FinnhubPriceEvaluator(finnhubClient, targetPriceProvider, notificationService);
     }
 
     @Test
@@ -54,7 +54,7 @@ class FinnhubPriceEvaluatorTest {
         verify(targetPriceProvider, times(1)).getStockTargetPrices();
         verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.AVGO);
         verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.GOOG);
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
 
@@ -70,7 +70,8 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
+        verify(notificationService, times(1))
+                .sendNotification(contains(StockSymbol.AVGO.getDisplayName()));
         verify(targetPriceProvider, times(1))
                 .addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
@@ -87,7 +88,8 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
+        verify(notificationService, times(1))
+                .sendNotification(contains(StockSymbol.AVGO.getDisplayName()));
         verify(targetPriceProvider, times(1))
                 .addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
@@ -100,7 +102,7 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
 
@@ -116,7 +118,7 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
         verify(targetPriceProvider, never())
                 .addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
     }
@@ -133,7 +135,8 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, times(1)).sendMessage(contains(StockSymbol.AVGO.getDisplayName()));
+        verify(notificationService, times(1))
+                .sendNotification(contains(StockSymbol.AVGO.getDisplayName()));
         verify(targetPriceProvider, times(1))
                 .addIgnoredSymbol(StockSymbol.AVGO, IgnoreReason.CHANGE_PERCENT_ALERT, 10);
     }
@@ -150,7 +153,7 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.evaluateHighPriceChange(priceQuoteResponse);
 
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
         verify(targetPriceProvider, never())
                 .addIgnoredSymbol(any(StockSymbol.class), any(IgnoreReason.class), anyInt());
     }
@@ -203,7 +206,7 @@ class FinnhubPriceEvaluatorTest {
 
         verify(targetPriceProvider, times(1)).getStockTargetPrices();
         verify(finnhubClient, times(1)).getPriceQuote(StockSymbol.GOOG);
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
     }
 
     @Test
@@ -233,13 +236,13 @@ class FinnhubPriceEvaluatorTest {
     @Test
     void comparePrices_zeroSellTarget() {
         finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 200.0, 150.0, 0.0);
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
     }
 
     @Test
     void comparePrices_zeroBuyTarget() {
         finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 100.0, 0.0, 150.0);
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
     }
 
     @Test
@@ -247,7 +250,7 @@ class FinnhubPriceEvaluatorTest {
         when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.SELL_ALERT))
                 .thenReturn(true);
         finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 200.0, 150.0, 180.0);
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
     }
 
     @Test
@@ -255,6 +258,6 @@ class FinnhubPriceEvaluatorTest {
         when(targetPriceProvider.isSymbolIgnored(StockSymbol.AVGO, IgnoreReason.BUY_ALERT))
                 .thenReturn(true);
         finnhubPriceEvaluator.comparePrices(StockSymbol.AVGO, 100.0, 120.0, 150.0);
-        verify(telegramClient, never()).sendMessage(any());
+        verify(notificationService, never()).sendNotification(any());
     }
 }

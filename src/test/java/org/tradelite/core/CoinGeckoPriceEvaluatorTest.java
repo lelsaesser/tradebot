@@ -14,17 +14,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.NotificationService;
 
 @ExtendWith(MockitoExtension.class)
 class CoinGeckoPriceEvaluatorTest {
 
     @Mock private CoinGeckoClient coinGeckoClient;
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private TelegramClient telegramClient;
+    @Mock private NotificationService notificationService;
 
     private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
@@ -33,7 +33,7 @@ class CoinGeckoPriceEvaluatorTest {
         coinGeckoPriceEvaluator =
                 spy(
                         new CoinGeckoPriceEvaluator(
-                                coinGeckoClient, targetPriceProvider, telegramClient));
+                                coinGeckoClient, targetPriceProvider, notificationService));
     }
 
     @Test
@@ -102,7 +102,7 @@ class CoinGeckoPriceEvaluatorTest {
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
-        verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(notificationService, times(1)).sendNotification(anyString());
         verify(targetPriceProvider, times(1))
                 .addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
@@ -115,7 +115,7 @@ class CoinGeckoPriceEvaluatorTest {
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
 
@@ -131,7 +131,7 @@ class CoinGeckoPriceEvaluatorTest {
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
         verify(targetPriceProvider, never())
                 .addIgnoredSymbol(any(CoinId.class), any(IgnoreReason.class), anyInt());
     }
@@ -157,7 +157,7 @@ class CoinGeckoPriceEvaluatorTest {
 
         coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
 
-        verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(notificationService, times(1)).sendNotification(anyString());
         verify(targetPriceProvider, times(1))
                 .addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.CHANGE_PERCENT_ALERT, 5);
     }
