@@ -8,15 +8,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.service.NotificationService;
 
 @ExtendWith(MockitoExtension.class)
 class BasePriceEvaluatorTest {
 
-    @Mock private TelegramClient telegramClient;
+    @Mock private NotificationService notificationService;
 
     @Mock private TargetPriceProvider targetPriceProvider;
 
@@ -31,8 +31,8 @@ class BasePriceEvaluatorTest {
 
     static class TestPriceEvaluator extends BasePriceEvaluator {
         public TestPriceEvaluator(
-                TelegramClient telegramClient, TargetPriceProvider targetPriceProvider) {
-            super(telegramClient, targetPriceProvider);
+                NotificationService notificationService, TargetPriceProvider targetPriceProvider) {
+            super(notificationService, targetPriceProvider);
         }
 
         @Override
@@ -48,7 +48,8 @@ class BasePriceEvaluatorTest {
 
         priceEvaluator.comparePrices(stockSymbol, 200, 100, 150);
 
-        verify(telegramClient).sendMessage(contains(((StockSymbol) stockSymbol).getDisplayName()));
+        verify(notificationService)
+                .sendNotification(contains(((StockSymbol) stockSymbol).getDisplayName()));
         verify(targetPriceProvider).addIgnoredSymbol(stockSymbol, IgnoreReason.SELL_ALERT);
     }
 
@@ -59,7 +60,8 @@ class BasePriceEvaluatorTest {
 
         priceEvaluator.comparePrices(stockSymbol, 50, 100, 200);
 
-        verify(telegramClient).sendMessage(contains(((StockSymbol) stockSymbol).getDisplayName()));
+        verify(notificationService)
+                .sendNotification(contains(((StockSymbol) stockSymbol).getDisplayName()));
         verify(targetPriceProvider).addIgnoredSymbol(stockSymbol, IgnoreReason.BUY_ALERT);
     }
 
@@ -70,7 +72,7 @@ class BasePriceEvaluatorTest {
 
         priceEvaluator.comparePrices(stockSymbol, 200, 100, 150);
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
 
@@ -81,7 +83,7 @@ class BasePriceEvaluatorTest {
 
         priceEvaluator.comparePrices(stockSymbol, 50, 100, 200);
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
 
@@ -89,7 +91,7 @@ class BasePriceEvaluatorTest {
     void testComparePrices_noAlert() {
         priceEvaluator.comparePrices(stockSymbol, 120, 100, 150);
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
 }

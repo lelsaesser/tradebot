@@ -15,16 +15,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.NotificationService;
 
 @ExtendWith(MockitoExtension.class)
 class InsiderTrackerTest {
 
     @Mock private FinnhubClient finnhubClient;
-    @Mock private TelegramClient telegramClient;
+    @Mock private NotificationService notificationService;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private InsiderPersistence insiderPersistence;
 
@@ -34,7 +34,10 @@ class InsiderTrackerTest {
     void setUp() {
         insiderTracker =
                 new InsiderTracker(
-                        finnhubClient, telegramClient, targetPriceProvider, insiderPersistence);
+                        finnhubClient,
+                        notificationService,
+                        targetPriceProvider,
+                        insiderPersistence);
     }
 
     @Test
@@ -131,10 +134,10 @@ class InsiderTrackerTest {
 
         ArgumentCaptor<String> reportCaptor = ArgumentCaptor.forClass(String.class);
         insiderTracker.trackInsiderTransactions();
-        verify(telegramClient).sendMessage(reportCaptor.capture());
+        verify(notificationService).sendNotification(reportCaptor.capture());
         String report = reportCaptor.getValue();
 
-        verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(notificationService, times(1)).sendNotification(anyString());
         verify(finnhubClient, times(5)).getInsiderTransactions(any(StockSymbol.class));
         verify(insiderPersistence, times(1)).readFromFile(anyString());
         verify(insiderPersistence, times(1)).persistToFile(any(), anyString());
@@ -181,7 +184,7 @@ class InsiderTrackerTest {
         insiderTracker.sendInsiderTransactionReport(insiderTransactions);
 
         ArgumentCaptor<String> reportCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(reportCaptor.capture());
+        verify(notificationService).sendNotification(reportCaptor.capture());
         String report = reportCaptor.getValue();
 
         String expectedReport =
@@ -266,7 +269,7 @@ class InsiderTrackerTest {
         insiderTracker.trackInsiderTransactions();
 
         verify(finnhubClient, never()).getInsiderTransactions(any());
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
         verify(insiderPersistence, never()).readFromFile(anyString());
     }
 
@@ -281,7 +284,7 @@ class InsiderTrackerTest {
 
         insiderTracker.trackInsiderTransactions();
 
-        verify(telegramClient).sendMessage(anyString());
+        verify(notificationService).sendNotification(anyString());
         verify(insiderPersistence).persistToFile(any(), anyString());
     }
 
@@ -306,7 +309,7 @@ class InsiderTrackerTest {
 
         insiderTracker.trackInsiderTransactions();
 
-        verify(telegramClient).sendMessage(anyString());
+        verify(notificationService).sendNotification(anyString());
         verify(insiderPersistence).persistToFile(any(), anyString());
     }
 
@@ -351,7 +354,7 @@ class InsiderTrackerTest {
         verify(finnhubClient, times(2)).getInsiderTransactions(any(StockSymbol.class));
 
         // Should still send report and persist data for valid symbols
-        verify(telegramClient).sendMessage(anyString());
+        verify(notificationService).sendNotification(anyString());
         verify(insiderPersistence).persistToFile(any(), anyString());
     }
 
@@ -391,7 +394,7 @@ class InsiderTrackerTest {
 
         insiderTracker.trackInsiderTransactions();
 
-        verify(telegramClient).sendMessage(anyString());
+        verify(notificationService).sendNotification(anyString());
         verify(insiderPersistence).persistToFile(any(), anyString());
     }
 
@@ -408,7 +411,7 @@ class InsiderTrackerTest {
         // Call the method through sendInsiderTransactionReport since orderMapByCodeCount is private
         insiderTracker.sendInsiderTransactionReport(testData);
 
-        verify(telegramClient).sendMessage(anyString());
+        verify(notificationService).sendNotification(anyString());
     }
 
     @Test
@@ -422,7 +425,10 @@ class InsiderTrackerTest {
         // Create a custom InsiderTracker to override the behavior
         InsiderTracker customTracker =
                 new InsiderTracker(
-                        finnhubClient, telegramClient, targetPriceProvider, insiderPersistence) {
+                        finnhubClient,
+                        notificationService,
+                        targetPriceProvider,
+                        insiderPersistence) {
                     @Override
                     public void trackInsiderTransactions() {
                         List<String> monitoredSymbols =
@@ -530,7 +536,7 @@ class InsiderTrackerTest {
 
         customTracker.trackInsiderTransactions();
 
-        verify(telegramClient).sendMessage(anyString());
+        verify(notificationService).sendNotification(anyString());
         verify(insiderPersistence).persistToFile(any(), anyString());
     }
 }
