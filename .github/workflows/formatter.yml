@@ -14,5 +14,6 @@ jobs:
         with:
           java-version: '23'
           distribution: 'temurin'
+          cache: 'maven'
       - name: Run Spotless
-        run: mvn spotless:check
+        run: mvn spotless:check --batch-mode --no-transfer-progress
