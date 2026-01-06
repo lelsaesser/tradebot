@@ -2,6 +2,7 @@ package org.tradelite.trading;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.tradelite.client.telegram.EnableCommandProcessor.FEATURE_DEMO_TRADING;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.config.ConfigurationService;
 import org.tradelite.trading.model.Portfolio;
 
 @ExtendWith(MockitoExtension.class)
@@ -19,6 +21,8 @@ class DemoTradingServiceTest {
     @Mock private PortfolioPersistence portfolioPersistence;
 
     @Mock private TelegramClient telegramClient;
+
+    @Mock private ConfigurationService configurationService;
 
     @InjectMocks private DemoTradingService demoTradingService;
 
@@ -31,6 +35,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeBuy_shouldPurchaseAndSendNotification() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         when(portfolioPersistence.loadPortfolio()).thenReturn(portfolio);
 
         demoTradingService.executeBuy(StockSymbol.AAPL, 150.0, "Target price reached");
@@ -44,6 +49,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeBuy_insufficientFunds_shouldNotifyFailure() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         Portfolio poorPortfolio = Portfolio.createInitial(10.0);
         when(portfolioPersistence.loadPortfolio()).thenReturn(poorPortfolio);
 
@@ -57,6 +63,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeBuy_persistenceThrowsException_shouldHandleGracefully() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         when(portfolioPersistence.loadPortfolio()).thenThrow(new RuntimeException("IO Error"));
 
         demoTradingService.executeBuy(StockSymbol.AAPL, 150.0, "Target price reached");
@@ -68,6 +75,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeSell_withPosition_shouldSellAndNotify() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         Portfolio withPosition = portfolio.buy("AAPL", 10.0, 140.0);
         when(portfolioPersistence.loadPortfolio()).thenReturn(withPosition);
 
@@ -82,6 +90,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeSell_noPosition_shouldNotExecute() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         when(portfolioPersistence.loadPortfolio()).thenReturn(portfolio);
 
         demoTradingService.executeSell(StockSymbol.AAPL, 160.0, "Target price reached");
@@ -94,6 +103,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeSell_persistenceThrowsException_shouldHandleGracefully() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         when(portfolioPersistence.loadPortfolio()).thenThrow(new RuntimeException("IO Error"));
 
         demoTradingService.executeSell(StockSymbol.AAPL, 160.0, "Target price reached");
@@ -115,6 +125,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeBuy_withProfit_shouldShowCorrectDetails() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         when(portfolioPersistence.loadPortfolio()).thenReturn(portfolio);
 
         demoTradingService.executeBuy(StockSymbol.AAPL, 200.0, "Buy signal");
@@ -126,6 +137,7 @@ class DemoTradingServiceTest {
 
     @Test
     void executeSell_withLoss_shouldShowNegativeProfit() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(true);
         Portfolio withPosition = portfolio.buy("AAPL", 10.0, 160.0);
         when(portfolioPersistence.loadPortfolio()).thenReturn(withPosition);
 
@@ -133,5 +145,29 @@ class DemoTradingServiceTest {
 
         verify(telegramClient, times(1)).sendMessage(contains("SELL"));
         verify(telegramClient, times(1)).sendMessage(contains("Profit/Loss"));
+    }
+
+    @Test
+    void executeBuy_whenDemoTradingDisabled_shouldNotExecute() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(false);
+
+        demoTradingService.executeBuy(StockSymbol.AAPL, 150.0, "Target price reached");
+
+        verify(configurationService, times(1)).isEnabled(FEATURE_DEMO_TRADING);
+        verify(portfolioPersistence, never()).loadPortfolio();
+        verify(portfolioPersistence, never()).savePortfolio(any());
+        verify(telegramClient, never()).sendMessage(any());
+    }
+
+    @Test
+    void executeSell_whenDemoTradingDisabled_shouldNotExecute() {
+        when(configurationService.isEnabled(FEATURE_DEMO_TRADING)).thenReturn(false);
+
+        demoTradingService.executeSell(StockSymbol.AAPL, 160.0, "Target price reached");
+
+        verify(configurationService, times(1)).isEnabled(FEATURE_DEMO_TRADING);
+        verify(portfolioPersistence, never()).loadPortfolio();
+        verify(portfolioPersistence, never()).savePortfolio(any());
+        verify(telegramClient, never()).sendMessage(any());
     }
 }

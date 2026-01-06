@@ -1,10 +1,13 @@
 package org.tradelite.trading;
 
+import static org.tradelite.client.telegram.EnableCommandProcessor.FEATURE_DEMO_TRADING;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.config.ConfigurationService;
 import org.tradelite.trading.model.Portfolio;
 import org.tradelite.trading.model.Position;
 import org.tradelite.trading.model.Transaction;
@@ -18,8 +21,13 @@ public class DemoTradingService {
 
     private final PortfolioPersistence portfolioPersistence;
     private final TelegramClient telegramClient;
+    private final ConfigurationService configurationService;
 
     public void executeBuy(TickerSymbol ticker, double currentPrice, String reason) {
+        if (!configurationService.isEnabled(FEATURE_DEMO_TRADING)) {
+            log.debug("Demo trading is disabled, skipping buy for {}", ticker.getName());
+            return;
+        }
         try {
             Portfolio portfolio = portfolioPersistence.loadPortfolio();
 
@@ -76,6 +84,10 @@ public class DemoTradingService {
     }
 
     public void executeSell(TickerSymbol ticker, double currentPrice, String reason) {
+        if (!configurationService.isEnabled(FEATURE_DEMO_TRADING)) {
+            log.debug("Demo trading is disabled, skipping sell for {}", ticker.getName());
+            return;
+        }
         try {
             Portfolio portfolio = portfolioPersistence.loadPortfolio();
 

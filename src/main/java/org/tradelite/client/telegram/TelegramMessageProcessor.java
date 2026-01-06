@@ -100,6 +100,18 @@ public class TelegramMessageProcessor {
                 log.info("Received rsi command: {}", rsiCommand.get());
                 return Optional.of(rsiCommand.get());
             }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/enable")) {
+            Optional<EnableCommand> enableCommand = parseEnableCommand(messageText);
+            if (enableCommand.isPresent()) {
+                log.info("Received enable command: {}", enableCommand.get());
+                return Optional.of(enableCommand.get());
+            }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/disable")) {
+            Optional<DisableCommand> disableCommand = parseDisableCommand(messageText);
+            if (disableCommand.isPresent()) {
+                log.info("Received disable command: {}", disableCommand.get());
+                return Optional.of(disableCommand.get());
+            }
         }
         return Optional.empty();
     }
@@ -227,5 +239,27 @@ public class TelegramMessageProcessor {
         }
 
         return Optional.of(new RsiCommand(tickerSymbol.get()));
+    }
+
+    protected Optional<EnableCommand> parseEnableCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 2) {
+            telegramClient.sendMessage("Invalid command format. Use /enable <feature>");
+            return Optional.empty();
+        }
+
+        String feature = parts[1];
+        return Optional.of(new EnableCommand(feature));
+    }
+
+    protected Optional<DisableCommand> parseDisableCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 2) {
+            telegramClient.sendMessage("Invalid command format. Use /disable <feature>");
+            return Optional.empty();
+        }
+
+        String feature = parts[1];
+        return Optional.of(new DisableCommand(feature));
     }
 }

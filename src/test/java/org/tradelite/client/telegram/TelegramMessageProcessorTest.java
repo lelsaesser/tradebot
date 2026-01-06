@@ -346,4 +346,69 @@ class TelegramMessageProcessorTest {
         Optional<Double> result = messageProcessor.tryParseDouble(null);
         assertThat(result.isPresent(), is(false));
     }
+
+    @Test
+    void parseMessage_validEnableCommand_returnsEnableCommand() {
+        String text = "/enable demotrading";
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(EnableCommand.class)));
+    }
+
+    @Test
+    void parseMessage_validDisableCommand_returnsDisableCommand() {
+        String text = "/disable demotrading";
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(DisableCommand.class)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "/enable",
+        "/enable feature extra",
+        "/disable",
+        "/disable feature extra",
+    })
+    void parseEnableDisableCommand_invalidFormat_returnsEmpty(String commandText) {
+        TelegramMessage message = new TelegramMessage();
+        message.setText(commandText);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(false));
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
+    @Test
+    void parseEnableCommand_validInput_returnsEnableCommand() {
+        String commandText = "/enable demotrading";
+        Optional<EnableCommand> command = messageProcessor.parseEnableCommand(commandText);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().feature(), is("demotrading"));
+    }
+
+    @Test
+    void parseDisableCommand_validInput_returnsDisableCommand() {
+        String commandText = "/disable demotrading";
+        Optional<DisableCommand> command = messageProcessor.parseDisableCommand(commandText);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().feature(), is("demotrading"));
+    }
 }
