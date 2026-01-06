@@ -7,6 +7,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.trading.DemoTradingService;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -14,6 +15,7 @@ public abstract class BasePriceEvaluator {
 
     private final TelegramClient telegramClient;
     private final TargetPriceProvider targetPriceProvider;
+    private final DemoTradingService demoTradingService;
 
     public abstract int evaluatePrice() throws InterruptedException;
 
@@ -32,6 +34,10 @@ public abstract class BasePriceEvaluator {
                 return;
             }
             log.info("Potential sell opportunity for {}", displayName);
+
+            String reason = "Target price reached: " + targetPriceSell;
+            demoTradingService.executeSell(ticker, currentPrice, reason);
+
             telegramClient.sendMessage(
                     "💰 Potential sell opportunity for "
                             + displayName
@@ -47,6 +53,10 @@ public abstract class BasePriceEvaluator {
                 return;
             }
             log.info("Potential buy opportunity for {}", displayName);
+
+            String reason = "Target price reached: " + targetPriceBuy;
+            demoTradingService.executeBuy(ticker, currentPrice, reason);
+
             telegramClient.sendMessage(
                     "🚀 Potential buy opportunity for "
                             + displayName

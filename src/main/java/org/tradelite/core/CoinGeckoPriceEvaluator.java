@@ -10,6 +10,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.trading.DemoTradingService;
 
 @Component
 public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
@@ -24,8 +25,9 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     public CoinGeckoPriceEvaluator(
             CoinGeckoClient coinGeckoClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient) {
-        super(telegramClient, targetPriceProvider);
+            TelegramClient telegramClient,
+            DemoTradingService demoTradingService) {
+        super(telegramClient, targetPriceProvider, demoTradingService);
         this.coinGeckoClient = coinGeckoClient;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;

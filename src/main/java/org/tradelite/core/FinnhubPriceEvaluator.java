@@ -11,6 +11,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.trading.DemoTradingService;
 
 @Slf4j
 @Component
@@ -27,8 +28,9 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     public FinnhubPriceEvaluator(
             FinnhubClient finnhubClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient) {
-        super(telegramClient, targetPriceProvider);
+            TelegramClient telegramClient,
+            DemoTradingService demoTradingService) {
+        super(telegramClient, targetPriceProvider, demoTradingService);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
