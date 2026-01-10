@@ -37,7 +37,7 @@ public enum StockSymbol implements TickerSymbol {
     TEM("Tempus AI", "TEM"),
     HIMS("Hims and Hers Health", "HIMS"),
     TSM("Taiwan Semiconductor Manufacturing", "TSM"),
-    MU("Micron Technology", "MU"),
+    MU("Western Digital", "WDC"),
     ORCL("Oracle", "ORCL"),
     INTC("Intel", "INTC"),
     DELL("Dell", "DELL"),
