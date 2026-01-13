@@ -9,18 +9,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.service.NotificationService;
 
 @ExtendWith(MockitoExtension.class)
 class RootErrorHandlerTest {
 
-    @Mock private TelegramClient telegramClient;
+    @Mock private NotificationService notificationService;
 
     private RootErrorHandler rootErrorHandler;
 
     @BeforeEach
     void setUp() {
-        rootErrorHandler = new RootErrorHandler(telegramClient);
+        rootErrorHandler = new RootErrorHandler(notificationService);
     }
 
     @Test
@@ -31,7 +31,7 @@ class RootErrorHandlerTest {
                 });
 
         String expectedMessage = "⏸️ *Operation Interrupted!* Check application logs for details.";
-        verify(telegramClient).sendMessage(expectedMessage);
+        verify(notificationService).sendNotification(expectedMessage);
     }
 
     @Test
@@ -40,7 +40,7 @@ class RootErrorHandlerTest {
                 () -> {
                     throw new RuntimeException("Test exception");
                 });
-        verify(telegramClient).sendMessage(anyString());
+        verify(notificationService).sendNotification(anyString());
     }
 
     @Test
@@ -50,6 +50,6 @@ class RootErrorHandlerTest {
                     // No exception thrown
                 });
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(notificationService, never()).sendNotification(anyString());
     }
 }

@@ -2,17 +2,17 @@ package org.tradelite.core;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.service.NotificationService;
 
 @Slf4j
 @RequiredArgsConstructor
 public abstract class BasePriceEvaluator {
 
-    private final TelegramClient telegramClient;
+    private final NotificationService notificationService;
     private final TargetPriceProvider targetPriceProvider;
 
     public abstract int evaluatePrice() throws InterruptedException;
@@ -32,7 +32,7 @@ public abstract class BasePriceEvaluator {
                 return;
             }
             log.info("Potential sell opportunity for {}", displayName);
-            telegramClient.sendMessage(
+            notificationService.sendNotification(
                     "💰 Potential sell opportunity for "
                             + displayName
                             + ". Current Price: "
@@ -47,7 +47,7 @@ public abstract class BasePriceEvaluator {
                 return;
             }
             log.info("Potential buy opportunity for {}", displayName);
-            telegramClient.sendMessage(
+            notificationService.sendNotification(
                     "🚀 Potential buy opportunity for "
                             + displayName
                             + ". Current Price: "

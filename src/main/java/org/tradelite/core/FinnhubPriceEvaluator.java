@@ -7,10 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
-import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.NotificationService;
 
 @Slf4j
 @Component
@@ -18,7 +18,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
     private final FinnhubClient finnhubClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final NotificationService notificationService;
 
     @Getter
     protected final Map<StockSymbol, Double> lastPriceCache = new EnumMap<>(StockSymbol.class);
@@ -27,11 +27,11 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     public FinnhubPriceEvaluator(
             FinnhubClient finnhubClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient) {
-        super(telegramClient, targetPriceProvider);
+            NotificationService notificationService) {
+        super(notificationService, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
-        this.telegramClient = telegramClient;
+        this.notificationService = notificationService;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
@@ -96,7 +96,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             String displayName = priceQuote.getStockSymbol().getDisplayName();
             log.info("High price change detected for {}: {}%", displayName, percentChange);
             String emoji = percentChange > 0 ? "📈" : "📉";
-            telegramClient.sendMessage(
+            notificationService.sendNotification(
                     emoji
                             + " High daily price swing detected for "
                             + displayName
