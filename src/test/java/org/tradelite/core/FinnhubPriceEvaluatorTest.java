@@ -19,6 +19,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.trading.DemoTradingService;
 
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
@@ -26,13 +27,15 @@ class FinnhubPriceEvaluatorTest {
     @Mock private FinnhubClient finnhubClient;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private TelegramClient telegramClient;
+    @Mock private DemoTradingService demoTradingService;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
     @BeforeEach
     void setUp() {
         finnhubPriceEvaluator =
-                new FinnhubPriceEvaluator(finnhubClient, targetPriceProvider, telegramClient);
+                new FinnhubPriceEvaluator(
+                        finnhubClient, targetPriceProvider, telegramClient, demoTradingService);
     }
 
     @Test
