@@ -26,7 +26,7 @@ class BasePriceEvaluatorTest {
 
     @BeforeEach
     void setUp() {
-        stockSymbol = StockSymbol.AAPL;
+        stockSymbol = new StockSymbol("AAPL", "Apple");
     }
 
     static class TestPriceEvaluator extends BasePriceEvaluator {
@@ -48,7 +48,7 @@ class BasePriceEvaluatorTest {
 
         priceEvaluator.comparePrices(stockSymbol, 200, 100, 150);
 
-        verify(telegramClient).sendMessage(contains(((StockSymbol) stockSymbol).getDisplayName()));
+        verify(telegramClient).sendMessage(contains(stockSymbol.getDisplayName()));
         verify(targetPriceProvider).addIgnoredSymbol(stockSymbol, IgnoreReason.SELL_ALERT);
     }
 
@@ -59,7 +59,7 @@ class BasePriceEvaluatorTest {
 
         priceEvaluator.comparePrices(stockSymbol, 50, 100, 200);
 
-        verify(telegramClient).sendMessage(contains(((StockSymbol) stockSymbol).getDisplayName()));
+        verify(telegramClient).sendMessage(contains(stockSymbol.getDisplayName()));
         verify(targetPriceProvider).addIgnoredSymbol(stockSymbol, IgnoreReason.BUY_ALERT);
     }
 

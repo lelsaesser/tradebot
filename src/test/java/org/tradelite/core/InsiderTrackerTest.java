@@ -31,21 +31,32 @@ class InsiderTrackerTest {
     private InsiderTracker insiderTracker;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws java.io.IOException {
         insiderTracker =
                 new InsiderTracker(
-                        finnhubClient, telegramClient, targetPriceProvider, insiderPersistence);
+                        finnhubClient,
+                        telegramClient,
+                        targetPriceProvider,
+                        insiderPersistence,
+                        new org.tradelite.service.StockSymbolRegistry(
+                                new org.tradelite.config.BeanConfig().objectMapper()));
     }
 
     @Test
     void trackInsiderTransactions_withHistoricData_shouldFetchAndSendReport() {
         List<TargetPrice> targetPrices =
                 List.of(
-                        new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0),
-                        new TargetPrice(StockSymbol.GOOG.getTicker(), 200.0, 400.0),
-                        new TargetPrice(StockSymbol.META.getTicker(), 200.0, 400.0),
-                        new TargetPrice(StockSymbol.AMZN.getTicker(), 100.0, 200.0),
-                        new TargetPrice(StockSymbol.NVDA.getTicker(), 100.0, 200.0));
+                        new TargetPrice(new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0),
+                        new TargetPrice(
+                                new StockSymbol("GOOG", "Google").getTicker(), 200.0, 400.0),
+                        new TargetPrice(
+                                new StockSymbol("META", "Meta Platforms").getTicker(),
+                                200.0,
+                                400.0),
+                        new TargetPrice(
+                                new StockSymbol("AMZN", "Amazon").getTicker(), 100.0, 200.0),
+                        new TargetPrice(
+                                new StockSymbol("NVDA", "Nvidia").getTicker(), 100.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
         InsiderTransactionResponse responseAAPL =
@@ -111,11 +122,16 @@ class InsiderTrackerTest {
                                         "Bob", 100, 20, "2023-10-02", "2023-10-01", "S", 10200.0)));
         InsiderTransactionResponse responseMETA = new InsiderTransactionResponse(List.of());
         InsiderTransactionResponse responseNVDA = new InsiderTransactionResponse(List.of());
-        when(finnhubClient.getInsiderTransactions(StockSymbol.META)).thenReturn(responseMETA);
-        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(responseAAPL);
-        when(finnhubClient.getInsiderTransactions(StockSymbol.GOOG)).thenReturn(responseGOOG);
-        when(finnhubClient.getInsiderTransactions(StockSymbol.AMZN)).thenReturn(responseAMZN);
-        when(finnhubClient.getInsiderTransactions(StockSymbol.NVDA)).thenReturn(responseNVDA);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("META", "Meta Platforms")))
+                .thenReturn(responseMETA);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
+                .thenReturn(responseAAPL);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("GOOG", "Google")))
+                .thenReturn(responseGOOG);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AMZN", "Amazon")))
+                .thenReturn(responseAMZN);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("NVDA", "Nvidia")))
+                .thenReturn(responseNVDA);
 
         Map<String, Integer> historicAAPL = Map.of("S", 42, "P", 10);
         Map<String, Integer> historicGOOG = Map.of("S", 2, "P", 5);
@@ -123,10 +139,14 @@ class InsiderTrackerTest {
         Map<String, Integer> historicNVDA = Map.of("S", 21, "P", 0);
         List<InsiderTransactionHistoric> historicData =
                 List.of(
-                        new InsiderTransactionHistoric(StockSymbol.AAPL, historicAAPL),
-                        new InsiderTransactionHistoric(StockSymbol.GOOG, historicGOOG),
-                        new InsiderTransactionHistoric(StockSymbol.AMZN, historicAMZN),
-                        new InsiderTransactionHistoric(StockSymbol.NVDA, historicNVDA));
+                        new InsiderTransactionHistoric(
+                                new StockSymbol("AAPL", "Apple"), historicAAPL),
+                        new InsiderTransactionHistoric(
+                                new StockSymbol("GOOG", "Google"), historicGOOG),
+                        new InsiderTransactionHistoric(
+                                new StockSymbol("AMZN", "Amazon"), historicAMZN),
+                        new InsiderTransactionHistoric(
+                                new StockSymbol("NVDA", "Nvidia"), historicNVDA));
         when(insiderPersistence.readFromFile(anyString())).thenReturn(historicData);
 
         ArgumentCaptor<String> reportCaptor = ArgumentCaptor.forClass(String.class);
@@ -168,14 +188,16 @@ class InsiderTrackerTest {
     void sendInsiderTransactionReport() {
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
         insiderTransactions.put(
-                StockSymbol.PLTR, Map.of("S", 10, "S_HISTORIC", 0, "P", 0, "P_HISTORIC", 0));
+                new StockSymbol("PLTR", "Palantir"),
+                Map.of("S", 10, "S_HISTORIC", 0, "P", 0, "P_HISTORIC", 0));
         insiderTransactions.put(
-                StockSymbol.GOOG,
+                new StockSymbol("GOOG", "Google"),
                 Map.of("S", 5, "S_HISTORIC", 10, "P", 3, "P_HISTORIC", 2, "P/V", 1));
         insiderTransactions.put(
-                StockSymbol.AAPL, Map.of("S", 40, "S_HISTORIC", 20, "P", 5, "P_HISTORIC", 0));
+                new StockSymbol("AAPL", "Apple"),
+                Map.of("S", 40, "S_HISTORIC", 20, "P", 5, "P_HISTORIC", 0));
         insiderTransactions.put(
-                StockSymbol.HOOD,
+                new StockSymbol("HOOD", "Robinhood"),
                 Map.of("S", 0, "S_HISTORIC", 15, "P", 43, "P_HISTORIC", 76, "P/V", 0, "S/V", 7));
 
         insiderTracker.sendInsiderTransactionReport(insiderTransactions);
@@ -209,8 +231,7 @@ class InsiderTrackerTest {
 
     @Test
     void enrichWithHistoricData_withHistoricNullValues() {
-        Map<StockSymbol, Map<String, Integer>> insiderTransactions =
-                new EnumMap<>(StockSymbol.class);
+        Map<StockSymbol, Map<String, Integer>> insiderTransactions = new HashMap<>();
 
         Map<String, Integer> aaplMap = new HashMap<>();
         aaplMap.put("S", 10);
@@ -224,26 +245,27 @@ class InsiderTrackerTest {
         metaMap.put("S", 0);
         metaMap.put("P", 0);
 
-        insiderTransactions.put(StockSymbol.AAPL, aaplMap);
-        insiderTransactions.put(StockSymbol.GOOG, googMap);
-        insiderTransactions.put(StockSymbol.META, metaMap);
+        insiderTransactions.put(new StockSymbol("AAPL", "Apple"), aaplMap);
+        insiderTransactions.put(new StockSymbol("GOOG", "Google"), googMap);
+        insiderTransactions.put(new StockSymbol("META", "Meta Platforms"), metaMap);
 
         List<InsiderTransactionHistoric> historicData = new ArrayList<>();
 
         Map<String, Integer> map1 = new HashMap<>();
         map1.put("S", null);
         map1.put("P", null);
-        historicData.add(new InsiderTransactionHistoric(StockSymbol.AAPL, map1));
+        historicData.add(new InsiderTransactionHistoric(new StockSymbol("AAPL", "Apple"), map1));
 
         Map<String, Integer> map2 = new HashMap<>();
         map2.put("S", null);
         map2.put("P", null);
-        historicData.add(new InsiderTransactionHistoric(StockSymbol.GOOG, map2));
+        historicData.add(new InsiderTransactionHistoric(new StockSymbol("GOOG", "Google"), map2));
 
         Map<String, Integer> map3 = new HashMap<>();
         map3.put("S", null);
         map3.put("P", null);
-        historicData.add(new InsiderTransactionHistoric(StockSymbol.META, map3));
+        historicData.add(
+                new InsiderTransactionHistoric(new StockSymbol("META", "Meta Platforms"), map3));
 
         when(insiderPersistence.readFromFile(InsiderPersistence.PERSISTENCE_FILE_PATH))
                 .thenReturn(historicData);
@@ -251,12 +273,16 @@ class InsiderTrackerTest {
         Map<StockSymbol, Map<String, Integer>> enrichedData =
                 insiderTracker.enrichWithHistoricData(insiderTransactions);
 
-        assertThat(enrichedData.get(StockSymbol.AAPL).get("S_HISTORIC"), is(0));
-        assertThat(enrichedData.get(StockSymbol.AAPL).get("P_HISTORIC"), is(0));
-        assertThat(enrichedData.get(StockSymbol.GOOG).get("S_HISTORIC"), is(0));
-        assertThat(enrichedData.get(StockSymbol.GOOG).get("P_HISTORIC"), is(0));
-        assertThat(enrichedData.get(StockSymbol.META).get("S_HISTORIC"), is(0));
-        assertThat(enrichedData.get(StockSymbol.META).get("P_HISTORIC"), is(0));
+        assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("S_HISTORIC"), is(0));
+        assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("P_HISTORIC"), is(0));
+        assertThat(enrichedData.get(new StockSymbol("GOOG", "Google")).get("S_HISTORIC"), is(0));
+        assertThat(enrichedData.get(new StockSymbol("GOOG", "Google")).get("P_HISTORIC"), is(0));
+        assertThat(
+                enrichedData.get(new StockSymbol("META", "Meta Platforms")).get("S_HISTORIC"),
+                is(0));
+        assertThat(
+                enrichedData.get(new StockSymbol("META", "Meta Platforms")).get("P_HISTORIC"),
+                is(0));
     }
 
     @Test
@@ -273,9 +299,11 @@ class InsiderTrackerTest {
     @Test
     void trackInsiderTransactions_emptyInsiderTransactions() {
         List<TargetPrice> targetPrices =
-                List.of(new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0));
+                List.of(
+                        new TargetPrice(
+                                new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL))
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
                 .thenReturn(new InsiderTransactionResponse(Collections.emptyList()));
         when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
 
@@ -288,7 +316,9 @@ class InsiderTrackerTest {
     @Test
     void trackInsiderTransactions_noHistoricData() {
         List<TargetPrice> targetPrices =
-                List.of(new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0));
+                List.of(
+                        new TargetPrice(
+                                new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
         InsiderTransactionResponse responseAAPL =
                 new InsiderTransactionResponse(
@@ -301,7 +331,8 @@ class InsiderTrackerTest {
                                         "2023-10-01",
                                         "S",
                                         10200.0)));
-        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(responseAAPL);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
+                .thenReturn(responseAAPL);
         when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
 
         insiderTracker.trackInsiderTransactions();
@@ -314,9 +345,10 @@ class InsiderTrackerTest {
     void trackInsiderTransactions_withInvalidSymbols_shouldSkipInvalidSymbolsGracefully() {
         List<TargetPrice> targetPrices =
                 List.of(
-                        new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0),
+                        new TargetPrice(new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0),
                         new TargetPrice("BLABLA", 915.0, 0.0), // Invalid symbol
-                        new TargetPrice(StockSymbol.GOOG.getTicker(), 200.0, 400.0),
+                        new TargetPrice(
+                                new StockSymbol("GOOG", "Google").getTicker(), 200.0, 400.0),
                         new TargetPrice("DUMMY", 84.0, 0.0) // Invalid symbol
                         );
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
@@ -338,16 +370,18 @@ class InsiderTrackerTest {
                                 new InsiderTransactionResponse.Transaction(
                                         "Bob", 100, 10, "2023-10-02", "2023-10-01", "P", 10200.0)));
 
-        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(responseAAPL);
-        when(finnhubClient.getInsiderTransactions(StockSymbol.GOOG)).thenReturn(responseGOOG);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
+                .thenReturn(responseAAPL);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("GOOG", "Google")))
+                .thenReturn(responseGOOG);
         when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
 
         // This should not throw an exception despite invalid symbols
         insiderTracker.trackInsiderTransactions();
 
         // Verify that only valid symbols were processed (AAPL and GOOG)
-        verify(finnhubClient, times(1)).getInsiderTransactions(StockSymbol.AAPL);
-        verify(finnhubClient, times(1)).getInsiderTransactions(StockSymbol.GOOG);
+        verify(finnhubClient, times(1)).getInsiderTransactions(new StockSymbol("AAPL", "Apple"));
+        verify(finnhubClient, times(1)).getInsiderTransactions(new StockSymbol("GOOG", "Google"));
         verify(finnhubClient, times(2)).getInsiderTransactions(any(StockSymbol.class));
 
         // Should still send report and persist data for valid symbols
@@ -358,7 +392,9 @@ class InsiderTrackerTest {
     @Test
     void trackInsiderTransactions_shouldTriggerComputeIfAbsentLambdas() {
         List<TargetPrice> targetPrices =
-                List.of(new TargetPrice(StockSymbol.AAPL.getTicker(), 150.0, 300.0));
+                List.of(
+                        new TargetPrice(
+                                new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
         // Create multiple transactions of each type to trigger the computeIfAbsent paths
@@ -386,7 +422,8 @@ class InsiderTrackerTest {
                                         "P/V",
                                         10200.0)));
 
-        when(finnhubClient.getInsiderTransactions(StockSymbol.AAPL)).thenReturn(responseAAPL);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
+                .thenReturn(responseAAPL);
         when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
 
         insiderTracker.trackInsiderTransactions();
@@ -400,10 +437,12 @@ class InsiderTrackerTest {
         Map<StockSymbol, Map<String, Integer>> testData = new LinkedHashMap<>();
 
         // Add multiple entries with same count values to potentially trigger merge function
-        testData.put(StockSymbol.AAPL, Map.of("S", 10, "P", 5));
-        testData.put(StockSymbol.GOOG, Map.of("S", 10, "P", 3)); // Same sell count as AAPL
-        testData.put(StockSymbol.META, Map.of("S", 15, "P", 2));
-        testData.put(StockSymbol.AMZN, Map.of("S", 5, "P", 8));
+        testData.put(new StockSymbol("AAPL", "Apple"), Map.of("S", 10, "P", 5));
+        testData.put(
+                new StockSymbol("GOOG", "Google"),
+                Map.of("S", 10, "P", 3)); // Same sell count as AAPL
+        testData.put(new StockSymbol("META", "Meta Platforms"), Map.of("S", 15, "P", 2));
+        testData.put(new StockSymbol("AMZN", "Amazon"), Map.of("S", 5, "P", 8));
 
         // Call the method through sendInsiderTransactionReport since orderMapByCodeCount is private
         insiderTracker.sendInsiderTransactionReport(testData);
@@ -412,17 +451,25 @@ class InsiderTrackerTest {
     }
 
     @Test
-    void trackInsiderTransactions_shouldTriggerComputeIfAbsentWhenMapsNotPreInitialized() {
+    void trackInsiderTransactions_shouldTriggerComputeIfAbsentWhenMapsNotPreInitialized()
+            throws java.io.IOException {
         // This test creates a scenario where the maps are not pre-initialized,
         // forcing the computeIfAbsent lambdas to be executed
         List<TargetPrice> targetPrices =
-                List.of(new TargetPrice(StockSymbol.TSLA.getTicker(), 150.0, 300.0));
+                List.of(
+                        new TargetPrice(
+                                new StockSymbol("TSLA", "Tesla").getTicker(), 150.0, 300.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
         // Create a custom InsiderTracker to override the behavior
         InsiderTracker customTracker =
                 new InsiderTracker(
-                        finnhubClient, telegramClient, targetPriceProvider, insiderPersistence) {
+                        finnhubClient,
+                        telegramClient,
+                        targetPriceProvider,
+                        insiderPersistence,
+                        new org.tradelite.service.StockSymbolRegistry(
+                                new org.tradelite.config.BeanConfig().objectMapper())) {
                     @Override
                     public void trackInsiderTransactions() {
                         List<String> monitoredSymbols =
@@ -435,10 +482,7 @@ class InsiderTrackerTest {
 
                         for (String symbolString : monitoredSymbols) {
                             Optional<StockSymbol> stockSymbolOpt =
-                                    StockSymbol.fromString(symbolString);
-                            if (stockSymbolOpt.isEmpty()) {
-                                continue;
-                            }
+                                    Optional.of(new StockSymbol(symbolString, "Test"));
                             StockSymbol stockSymbol = stockSymbolOpt.get();
 
                             InsiderTransactionResponse response =
@@ -525,7 +569,8 @@ class InsiderTrackerTest {
                                         "P/V",
                                         10200.0)));
 
-        when(finnhubClient.getInsiderTransactions(StockSymbol.TSLA)).thenReturn(responseTSLA);
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("TSLA", "Tesla")))
+                .thenReturn(responseTSLA);
         when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
 
         customTracker.trackInsiderTransactions();

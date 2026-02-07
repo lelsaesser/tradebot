@@ -1,6 +1,7 @@
 package org.tradelite.core;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.StockSymbolRegistry;
 
 @Slf4j
 @Component
@@ -19,19 +21,21 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final FinnhubClient finnhubClient;
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
+    private final StockSymbolRegistry stockSymbolRegistry;
 
-    @Getter
-    protected final Map<StockSymbol, Double> lastPriceCache = new EnumMap<>(StockSymbol.class);
+    @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
 
     @Autowired
     public FinnhubPriceEvaluator(
             FinnhubClient finnhubClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient) {
+            TelegramClient telegramClient,
+            StockSymbolRegistry stockSymbolRegistry) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
+        this.stockSymbolRegistry = stockSymbolRegistry;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
@@ -40,23 +44,23 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
 
         for (TargetPrice targetPrice : targetPrices) {
-            Optional<StockSymbol> ticker = StockSymbol.fromString(targetPrice.getSymbol());
+            Optional<StockSymbol> ticker = stockSymbolRegistry.fromString(targetPrice.getSymbol());
             if (ticker.isEmpty()) {
                 log.warn(
-                        "Target price symbol {} not found in StockSymbol enum",
+                        "Target price symbol {} not found in stock symbol registry",
                         targetPrice.getSymbol());
                 continue;
             }
 
             PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker.get());
 
-            Double lastPrice = lastPriceCache.get(ticker.get());
+            Double lastPrice = lastPriceCache.get(ticker.get().getTicker());
             if (priceQuote == null
                     || (lastPrice != null
                             && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
                 continue;
             }
-            lastPriceCache.put(ticker.get(), priceQuote.getCurrentPrice());
+            lastPriceCache.put(ticker.get().getTicker(), priceQuote.getCurrentPrice());
 
             finnhubData.add(priceQuote);
             Thread.sleep(100);

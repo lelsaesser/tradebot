@@ -37,7 +37,7 @@ class RsiServiceTest {
 
     private RsiService rsiService;
 
-    private final StockSymbol symbol = StockSymbol.AAPL;
+    private final StockSymbol symbol = new StockSymbol("AAPL", "Apple");
     private final String rsiDataFile = "config/rsi-data.json";
 
     @BeforeEach
@@ -157,7 +157,11 @@ class RsiServiceTest {
                 1, serviceWithHistory.getPriceHistory().get(symbol.getName()).getPrices().size());
         assertEquals(
                 150.0,
-                serviceWithHistory.getPriceHistory().get(symbol.getName()).getPriceValues().get(0));
+                serviceWithHistory
+                        .getPriceHistory()
+                        .get(symbol.getName())
+                        .getPriceValues()
+                        .getFirst());
 
         dummyFile.delete();
     }
@@ -397,9 +401,7 @@ class RsiServiceTest {
         // Adding a price will trigger savePriceHistory, which should throw IOException
         assertThrows(
                 IOException.class,
-                () -> {
-                    serviceWithFailingMapper.addPrice(symbol, 100.0, LocalDate.now());
-                });
+                () -> serviceWithFailingMapper.addPrice(symbol, 100.0, LocalDate.now()));
     }
 
     @Test
@@ -418,9 +420,9 @@ class RsiServiceTest {
 
     @Test
     void testGetCurrentPriceFromCache_stockSymbol() {
-        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(StockSymbol.AAPL, 150.0));
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 150.0));
 
-        Double price = rsiService.getCurrentPriceFromCache(StockSymbol.AAPL);
+        Double price = rsiService.getCurrentPriceFromCache(new StockSymbol("AAPL", "Apple"));
 
         assertEquals(150.0, price);
     }
@@ -441,7 +443,7 @@ class RsiServiceTest {
         when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
         when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
 
-        Double stockPrice = rsiService.getCurrentPriceFromCache(StockSymbol.AAPL);
+        Double stockPrice = rsiService.getCurrentPriceFromCache(new StockSymbol("AAPL", "Apple"));
         Double cryptoPrice = rsiService.getCurrentPriceFromCache(CoinId.BITCOIN);
 
         assertThat(stockPrice, is(nullValue()));
@@ -456,7 +458,7 @@ class RsiServiceTest {
         }
 
         // Mock current price from cache
-        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(symbol, 125.0));
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 125.0));
 
         var rsi = rsiService.getCurrentRsi(symbol);
 
@@ -491,7 +493,7 @@ class RsiServiceTest {
         }
 
         // Mock current price from cache
-        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(symbol, 125.0));
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 125.0));
 
         var rsi = rsiService.getCurrentRsi(symbol);
 

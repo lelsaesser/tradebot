@@ -12,8 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.AddCommand;
-import org.tradelite.client.telegram.RemoveCommand;
 import org.tradelite.core.IgnoreReason;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,33 +47,44 @@ class TargetPriceProviderTest {
 
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(1));
 
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
 
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
 
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.SELL_ALERT);
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.SELL_ALERT);
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
 
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
         assertThat(
                 targetPriceProvider.ignoredSymbols.get(CoinId.SOLANA.getName()).getIgnoreTimes(),
                 aMapWithSize(2));
         assertThat(
-                targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreTimes(),
+                targetPriceProvider
+                        .ignoredSymbols
+                        .get(new StockSymbol("AMZN", "Amazon").getName())
+                        .getIgnoreTimes(),
                 aMapWithSize(1));
 
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.BUY_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("AMZN", "Amazon"), IgnoreReason.BUY_ALERT);
         assertThat(
-                targetPriceProvider.ignoredSymbols.get(StockSymbol.AMZN.getName()).getIgnoreTimes(),
+                targetPriceProvider
+                        .ignoredSymbols
+                        .get(new StockSymbol("AMZN", "Amazon").getName())
+                        .getIgnoreTimes(),
                 aMapWithSize(2));
     }
 
     @Test
     void isSymbolIgnored() {
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
 
         assertThat(
                 targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.BUY_ALERT),
@@ -84,13 +93,16 @@ class TargetPriceProviderTest {
                 targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.SELL_ALERT),
                 is(false));
         assertThat(
-                targetPriceProvider.isSymbolIgnored(StockSymbol.AMZN, IgnoreReason.SELL_ALERT),
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT),
                 is(true));
         assertThat(
-                targetPriceProvider.isSymbolIgnored(StockSymbol.AMZN, IgnoreReason.BUY_ALERT),
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMZN", "Amazon"), IgnoreReason.BUY_ALERT),
                 is(false));
         assertThat(
-                targetPriceProvider.isSymbolIgnored(StockSymbol.AMD, IgnoreReason.BUY_ALERT),
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMD", "AMD"), IgnoreReason.BUY_ALERT),
                 is(false));
         assertThat(
                 targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.SELL_ALERT),
@@ -115,7 +127,8 @@ class TargetPriceProviderTest {
     @SuppressWarnings("java:S2925") // Sleep is used to test the cleanup functionality
     void cleanupIgnoreSymbols() throws InterruptedException {
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.AMZN, IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
 
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
         Thread.sleep(3000);
@@ -123,13 +136,16 @@ class TargetPriceProviderTest {
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(0));
 
         targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.BUY_ALERT);
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.META, IgnoreReason.SELL_ALERT);
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.PLTR, IgnoreReason.BUY_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("META", "Meta Platforms"), IgnoreReason.SELL_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("PLTR", "Palantir"), IgnoreReason.BUY_ALERT);
 
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(3));
         Thread.sleep(3500);
         targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.SELL_ALERT);
-        targetPriceProvider.addIgnoredSymbol(StockSymbol.META, IgnoreReason.BUY_ALERT);
+        targetPriceProvider.addIgnoredSymbol(
+                new StockSymbol("META", "Meta Platforms"), IgnoreReason.BUY_ALERT);
         targetPriceProvider.cleanupIgnoreSymbols(1L);
         assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
     }
@@ -188,17 +204,18 @@ class TargetPriceProviderTest {
                 IllegalStateException.class,
                 () ->
                         targetPriceProvider.updateTargetPrice(
-                                StockSymbol.GOOG, 160.0, 200.0, invalidFilePath));
+                                new StockSymbol("GOOG", "Google"), 160.0, 200.0, invalidFilePath));
 
-        boolean found = fileContainsSymbol(StockSymbol.GOOG);
+        boolean found = fileContainsSymbol(new StockSymbol("GOOG", "Google"));
         assertThat(found, is(false));
     }
 
     @Test
-    void addSymbolToTargetPriceConfig_ok() {
-        AddCommand command = new AddCommand(CoinId.DOGE, 160.0, 200.0, SymbolType.CRYPTO);
+    void addTargetPrice_ok() {
+        String ticker = CoinId.DOGE.getName();
+        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
 
-        boolean result = targetPriceProvider.addSymbolToTargetPriceConfig(command, FILE_PATH);
+        boolean result = targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH);
 
         assertThat(result, is(true));
 
@@ -206,20 +223,20 @@ class TargetPriceProviderTest {
         assertThat(found, is(true));
 
         // Cleanup
-        targetPriceProvider.removeSymbolFromTargetPriceConfig(
-                new RemoveCommand(CoinId.DOGE, SymbolType.CRYPTO), FILE_PATH);
+        targetPriceProvider.removeSymbolFromTargetPrices(ticker, FILE_PATH);
         found = fileContainsSymbol(CoinId.DOGE);
         assertThat(found, is(false));
     }
 
     @Test
-    void addSymbolToTargetPriceConfig_symbolAlreadyExists_nothingAdded() {
-        AddCommand command = new AddCommand(CoinId.SOLANA, 160.0, 200.0, SymbolType.CRYPTO);
+    void addTargetPrice_symbolAlreadyExists_nothingAdded() {
+        String ticker = CoinId.SOLANA.getName();
 
         boolean found = fileContainsSymbol(CoinId.SOLANA);
         assertThat(found, is(true));
 
-        boolean result = targetPriceProvider.addSymbolToTargetPriceConfig(command, FILE_PATH);
+        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
+        boolean result = targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH);
 
         assertThat(result, is(false));
 
@@ -228,61 +245,61 @@ class TargetPriceProviderTest {
     }
 
     @Test
-    void addSymbolToTargetPriceConfig_exception_nothingAdded() {
-        AddCommand command = new AddCommand(StockSymbol.AMZN, 160.0, 200.0, SymbolType.STOCK);
+    void addTargetPrice_exception_nothingAdded() {
+        String ticker = new StockSymbol("AMZN", "Amazon").getTicker();
 
         // Simulate an exception by providing an invalid file path
         String invalidFilePath = "invalid/path/target-prices.json";
-        boolean result = targetPriceProvider.addSymbolToTargetPriceConfig(command, invalidFilePath);
+        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
+        boolean result = targetPriceProvider.addTargetPrice(targetPrice, invalidFilePath);
 
         assertThat(result, is(false));
 
         // Ensure the symbol was not added to the original file
-        boolean found = fileContainsSymbol(StockSymbol.AMZN);
+        boolean found = fileContainsSymbol(new StockSymbol("AMZN", "Amazon"));
         assertThat(found, is(false));
     }
 
     @Test
-    void removeSymbolFromTargetPriceConfig_symbolPresent_isRemoved() {
-        RemoveCommand command = new RemoveCommand(CoinId.SOLANA, SymbolType.CRYPTO);
+    void removeSymbolFromTargetPrices_symbolPresent_isRemoved() {
+        String ticker = CoinId.SOLANA.getName();
 
         boolean found = fileContainsSymbol(CoinId.SOLANA);
         assertThat(found, is(true));
 
-        targetPriceProvider.removeSymbolFromTargetPriceConfig(command, FILE_PATH);
+        targetPriceProvider.removeSymbolFromTargetPrices(ticker, FILE_PATH);
 
         found = fileContainsSymbol(CoinId.SOLANA);
         assertThat(found, is(false));
 
         // cleanup: add it back for other tests
-        AddCommand addCommand = new AddCommand(CoinId.SOLANA, 160.0, 200.0, SymbolType.CRYPTO);
-        targetPriceProvider.addSymbolToTargetPriceConfig(addCommand, FILE_PATH);
+        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
+        targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH);
     }
 
     @Test
-    void removeSymbolFromTargetPriceConfig_symbolNotPresent_nothingHappens() {
-        RemoveCommand command = new RemoveCommand(CoinId.DOGE, SymbolType.CRYPTO);
+    void removeSymbolFromTargetPrices_symbolNotPresent_nothingHappens() {
+        String ticker = CoinId.DOGE.getName();
 
         boolean found = fileContainsSymbol(CoinId.DOGE);
         assertThat(found, is(false));
 
-        targetPriceProvider.removeSymbolFromTargetPriceConfig(command, FILE_PATH);
+        targetPriceProvider.removeSymbolFromTargetPrices(ticker, FILE_PATH);
 
         found = fileContainsSymbol(CoinId.DOGE);
         assertThat(found, is(false));
     }
 
     @Test
-    void removeSymbolFromTargetPriceConfig_exception_nothingHappens() {
-        RemoveCommand command = new RemoveCommand(CoinId.BITCOIN, SymbolType.CRYPTO);
+    void removeSymbolFromTargetPrices_exception_nothingHappens() {
+        String ticker = CoinId.BITCOIN.getName();
 
         // Simulate an exception by providing an invalid file path
         String invalidFilePath = "invalid/path/target-prices.json";
-        assertThrows(
-                IllegalStateException.class,
-                () ->
-                        targetPriceProvider.removeSymbolFromTargetPriceConfig(
-                                command, invalidFilePath));
+        boolean result = targetPriceProvider.removeSymbolFromTargetPrices(ticker, invalidFilePath);
+
+        // Method returns false on error (doesn't throw)
+        assertThat(result, is(false));
 
         // Ensure the symbol was not removed from the original file
         boolean found = fileContainsSymbol(CoinId.BITCOIN);

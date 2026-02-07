@@ -49,7 +49,8 @@ class FinnhubClientTest {
                 .thenReturn(ResponseEntity.notFound().build());
 
         assertThrows(
-                IllegalStateException.class, () -> finnhubClient.getPriceQuote(StockSymbol.META));
+                IllegalStateException.class,
+                () -> finnhubClient.getPriceQuote(new StockSymbol("META", "Meta Platforms")));
 
         verify(restTemplate, times(1))
                 .exchange(
@@ -69,9 +70,10 @@ class FinnhubClientTest {
                 .thenThrow(new RestClientException("Error fetching price quote"));
 
         assertThrows(
-                RestClientException.class, () -> finnhubClient.getPriceQuote(StockSymbol.META));
+                RestClientException.class,
+                () -> finnhubClient.getPriceQuote(new StockSymbol("META", "Meta Platforms")));
 
-        assertThat(StockSymbol.META.getSymbolType(), is(SymbolType.STOCK));
+        assertThat(new StockSymbol("META", "Meta Platforms").getSymbolType(), is(SymbolType.STOCK));
 
         verify(restTemplate, times(1))
                 .exchange(
@@ -85,7 +87,7 @@ class FinnhubClientTest {
     void getPriceQuote_ok() {
         PriceQuoteResponse response = new PriceQuoteResponse();
         response.setCurrentPrice(300.0);
-        response.setStockSymbol(StockSymbol.META);
+        response.setStockSymbol(new StockSymbol("META", "Meta Platforms"));
 
         when(restTemplate.exchange(
                         anyString(),
@@ -94,12 +96,15 @@ class FinnhubClientTest {
                         eq(PriceQuoteResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
-        PriceQuoteResponse result = finnhubClient.getPriceQuote(StockSymbol.META);
+        PriceQuoteResponse result =
+                finnhubClient.getPriceQuote(new StockSymbol("META", "Meta Platforms"));
 
         assertThat(result, notNullValue());
         assertThat(result.getCurrentPrice(), is(300.0));
         assertThat(result.getStockSymbol(), notNullValue());
-        assertThat(result.getStockSymbol().getTicker(), is(StockSymbol.META.getTicker()));
+        assertThat(
+                result.getStockSymbol().getTicker(),
+                is(new StockSymbol("META", "Meta Platforms").getTicker()));
 
         verify(restTemplate, times(1))
                 .exchange(
@@ -130,7 +135,8 @@ class FinnhubClientTest {
                         eq(InsiderTransactionResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
-        InsiderTransactionResponse result = finnhubClient.getInsiderTransactions(StockSymbol.META);
+        InsiderTransactionResponse result =
+                finnhubClient.getInsiderTransactions(new StockSymbol("META", "Meta Platforms"));
 
         assertThat(result, notNullValue());
         assertThat(result.data().size(), is(1));
@@ -155,7 +161,8 @@ class FinnhubClientTest {
                         eq(InsiderTransactionResponse.class)))
                 .thenReturn(ResponseEntity.ok(response));
 
-        InsiderTransactionResponse result = finnhubClient.getInsiderTransactions(StockSymbol.META);
+        InsiderTransactionResponse result =
+                finnhubClient.getInsiderTransactions(new StockSymbol("META", "Meta Platforms"));
 
         assertThat(result, notNullValue());
         assertThat(result.data().size(), is(0));
@@ -179,7 +186,9 @@ class FinnhubClientTest {
 
         assertThrows(
                 RestClientException.class,
-                () -> finnhubClient.getInsiderTransactions(StockSymbol.META));
+                () ->
+                        finnhubClient.getInsiderTransactions(
+                                new StockSymbol("META", "Meta Platforms")));
 
         verify(restTemplate, times(1))
                 .exchange(
