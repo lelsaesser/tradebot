@@ -32,12 +32,16 @@ class RsiPriceFetcherTest {
 
     @Mock private RsiService rsiService;
 
+    @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
+
     @InjectMocks private RsiPriceFetcher rsiPriceFetcher;
 
     @Test
     void testFetchStockClosingPrices() throws IOException {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
+        when(stockSymbolRegistry.fromString("AAPL"))
+                .thenReturn(java.util.Optional.of(new StockSymbol("AAPL", "Apple")));
         when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
                 .thenReturn(new PriceQuoteResponse());
 
@@ -50,6 +54,8 @@ class RsiPriceFetcherTest {
     void testFetchStockClosingPrices_exception() throws IOException {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
+        when(stockSymbolRegistry.fromString("AAPL"))
+                .thenReturn(java.util.Optional.of(new StockSymbol("AAPL", "Apple")));
         when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
                 .thenThrow(new RuntimeException("API error"));
 
@@ -86,6 +92,8 @@ class RsiPriceFetcherTest {
     void testFetchStockClosingPrices_invalidSymbol() throws IOException {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("INVALID_SYMBOL", 100, 200)));
+        when(stockSymbolRegistry.fromString("INVALID_SYMBOL"))
+                .thenReturn(java.util.Optional.empty());
 
         rsiPriceFetcher.fetchStockClosingPrices();
 

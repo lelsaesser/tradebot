@@ -92,7 +92,7 @@ public class RsiService {
         double rsi = calculateRsi(rsiDailyClosePrice.getPriceValues());
         String displayName = symbol.getName();
         if (symbol.getSymbolType() == SymbolType.STOCK) {
-            displayName = ((StockSymbol) symbol).getDisplayName();
+            displayName = symbol.getDisplayName();
         }
 
         double previousRsi = rsiDailyClosePrice.getPreviousRsi();
@@ -147,13 +147,32 @@ public class RsiService {
 
     protected Double getCurrentPriceFromCache(TickerSymbol symbol) {
         if (symbol.getSymbolType() == SymbolType.STOCK) {
-            StockSymbol stockSymbol = (StockSymbol) symbol;
-            return finnhubPriceEvaluator.getLastPriceCache().get(stockSymbol);
+            return finnhubPriceEvaluator.getLastPriceCache().get(symbol.getName());
         } else if (symbol.getSymbolType() == SymbolType.CRYPTO) {
             CoinId coinId = (CoinId) symbol;
             return coinGeckoPriceEvaluator.getLastPriceCache().get(coinId);
         }
         return null;
+    }
+
+    public synchronized boolean removeSymbolRsiData(String symbolKey) {
+        if (symbolKey == null || symbolKey.isEmpty()) {
+            return false;
+        }
+
+        boolean removed = priceHistory.remove(symbolKey) != null;
+        if (removed) {
+            try {
+                savePriceHistory();
+                log.info("Removed RSI data for symbol: {}", symbolKey);
+                return true;
+            } catch (IOException e) {
+                log.error("Failed to save RSI data after removing symbol: {}", symbolKey, e);
+                return false;
+            }
+        }
+
+        return false;
     }
 
     protected double calculateRsi(List<Double> prices) {

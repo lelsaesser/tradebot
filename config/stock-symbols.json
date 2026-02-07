@@ -1,0 +1,115 @@
+[ {
+  "ticker" : "AAPL",
+  "displayName" : "Apple"
+}, {
+  "ticker" : "MSFT",
+  "displayName" : "Microsoft"
+}, {
+  "ticker" : "GOOG",
+  "displayName" : "Google"
+}, {
+  "ticker" : "AMZN",
+  "displayName" : "Amazon"
+}, {
+  "ticker" : "TSLA",
+  "displayName" : "Tesla"
+}, {
+  "ticker" : "META",
+  "displayName" : "Meta"
+}, {
+  "ticker" : "NFLX",
+  "displayName" : "Netflix"
+}, {
+  "ticker" : "NVDA",
+  "displayName" : "Nvidia"
+}, {
+  "ticker" : "AMD",
+  "displayName" : "AMD"
+}, {
+  "ticker" : "COIN",
+  "displayName" : "Coinbase"
+}, {
+  "ticker" : "MSTR",
+  "displayName" : "MicroStrategy"
+}, {
+  "ticker" : "RKLB",
+  "displayName" : "Rocket Lab"
+}, {
+  "ticker" : "UBER",
+  "displayName" : "Uber"
+}, {
+  "ticker" : "PLTR",
+  "displayName" : "Palantir"
+}, {
+  "ticker" : "SPOT",
+  "displayName" : "Spotify"
+}, {
+  "ticker" : "HOOD",
+  "displayName" : "Robinhood"
+}, {
+  "ticker" : "AVGO",
+  "displayName" : "Broadcom"
+}, {
+  "ticker" : "AXON",
+  "displayName" : "Axon"
+}, {
+  "ticker" : "CRWD",
+  "displayName" : "CrowdStrike"
+}, {
+  "ticker" : "OKTA",
+  "displayName" : "Okta"
+}, {
+  "ticker" : "GLXY",
+  "displayName" : "Galaxy Digital"
+}, {
+  "ticker" : "PANW",
+  "displayName" : "Palo Alto Networks"
+}, {
+  "ticker" : "MP",
+  "displayName" : "MP Materials"
+}, {
+  "ticker" : "APP",
+  "displayName" : "AppLovin"
+}, {
+  "ticker" : "ASML",
+  "displayName" : "ASML"
+}, {
+  "ticker" : "SMCI",
+  "displayName" : "Super Micro Computer"
+}, {
+  "ticker" : "BABA",
+  "displayName" : "Alibaba"
+}, {
+  "ticker" : "TEM",
+  "displayName" : "Tempus AI"
+}, {
+  "ticker" : "HIMS",
+  "displayName" : "Hims and Hers Health"
+}, {
+  "ticker" : "TSM",
+  "displayName" : "Taiwan Semiconductor Manufacturing"
+}, {
+  "ticker" : "MU",
+  "displayName" : "Western Digital"
+}, {
+  "ticker" : "ORCL",
+  "displayName" : "Oracle"
+}, {
+  "ticker" : "INTC",
+  "displayName" : "Intel"
+}, {
+  "ticker" : "DELL",
+  "displayName" : "Dell"
+}, {
+  "ticker" : "CRWV",
+  "displayName" : "CoreWeave"
+}, {
+  "ticker" : "IREN",
+  "displayName" : "Iris Energy"
+}, {
+  "ticker" : "NBIS",
+  "displayName" : "Nebius Group"
+}, {
+  "ticker" : "NET",
+  "displayName" : "Cloudflare"
+} ]

@@ -12,8 +12,9 @@ class PriceQuoteResponseTest {
     @Test
     void testGettersAndSetters() {
         PriceQuoteResponse response = new PriceQuoteResponse();
+        StockSymbol metaSymbol = new StockSymbol("META", "Meta Platforms");
 
-        response.setStockSymbol(StockSymbol.META);
+        response.setStockSymbol(metaSymbol);
         response.setCurrentPrice(123.45);
         response.setDailyOpen(120.00);
         response.setDailyHigh(125.00);
@@ -22,7 +23,7 @@ class PriceQuoteResponseTest {
         response.setChangePercent(2.87);
         response.setPreviousClose(120.00);
 
-        assertThat(response.getStockSymbol(), is(StockSymbol.META));
+        assertThat(response.getStockSymbol(), is(metaSymbol));
         assertThat(response.getCurrentPrice(), is(123.45));
         assertThat(response.getDailyOpen(), is(120.00));
         assertThat(response.getDailyHigh(), is(125.00));
@@ -35,7 +36,8 @@ class PriceQuoteResponseTest {
     @Test
     void isValid_valid() {
         PriceQuoteResponse dto = new PriceQuoteResponse();
-        dto.setStockSymbol(StockSymbol.META);
+        StockSymbol metaSymbol = new StockSymbol("META", "Meta Platforms");
+        dto.setStockSymbol(metaSymbol);
         dto.setCurrentPrice(123.45);
 
         assertTrue(dto.isValid());
@@ -44,7 +46,8 @@ class PriceQuoteResponseTest {
     @Test
     void isValid_invalid_negativePrice() {
         PriceQuoteResponse dto = new PriceQuoteResponse();
-        dto.setStockSymbol(StockSymbol.AVGO);
+        StockSymbol avgoSymbol = new StockSymbol("AVGO", "Broadcom");
+        dto.setStockSymbol(avgoSymbol);
         dto.setCurrentPrice(-1.0);
 
         assertFalse(dto.isValid());

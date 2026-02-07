@@ -10,6 +10,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.service.StockSymbolRegistry;
 
 @Component
 public class InsiderTracker {
@@ -18,17 +19,20 @@ public class InsiderTracker {
     private final TelegramClient telegramClient;
     private final TargetPriceProvider targetPriceProvider;
     private final InsiderPersistence insiderPersistence;
+    private final StockSymbolRegistry stockSymbolRegistry;
 
     @Autowired
     public InsiderTracker(
             FinnhubClient finnhubClient,
             TelegramClient telegramClient,
             TargetPriceProvider targetPriceProvider,
-            InsiderPersistence insiderPersistence) {
+            InsiderPersistence insiderPersistence,
+            StockSymbolRegistry stockSymbolRegistry) {
         this.finnhubClient = finnhubClient;
         this.telegramClient = telegramClient;
         this.targetPriceProvider = targetPriceProvider;
         this.insiderPersistence = insiderPersistence;
+        this.stockSymbolRegistry = stockSymbolRegistry;
     }
 
     public void trackInsiderTransactions() {
@@ -40,7 +44,7 @@ public class InsiderTracker {
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
 
         for (String symbolString : monitoredSymbols) {
-            Optional<StockSymbol> stockSymbolOpt = StockSymbol.fromString(symbolString);
+            Optional<StockSymbol> stockSymbolOpt = stockSymbolRegistry.fromString(symbolString);
             if (stockSymbolOpt.isEmpty()) {
                 continue;
             }

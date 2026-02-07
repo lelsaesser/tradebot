@@ -23,8 +23,9 @@ class RsiCommandProcessorTest {
 
     @Test
     void shouldSendMessageWithRsiValueWhenFound() {
-        RsiCommand command = new RsiCommand(StockSymbol.AAPL);
-        when(rsiService.getCurrentRsi(StockSymbol.AAPL)).thenReturn(Optional.of(60.5));
+        StockSymbol aaplSymbol = new StockSymbol("AAPL", "Apple");
+        RsiCommand command = new RsiCommand(aaplSymbol);
+        when(rsiService.getCurrentRsi(aaplSymbol)).thenReturn(Optional.of(60.5));
 
         processor.processCommand(command);
 
@@ -33,8 +34,9 @@ class RsiCommandProcessorTest {
 
     @Test
     void shouldSendMessageWithNotEnoughDataWhenRsiNotFound() {
-        RsiCommand command = new RsiCommand(StockSymbol.AAPL);
-        when(rsiService.getCurrentRsi(StockSymbol.AAPL)).thenReturn(Optional.empty());
+        StockSymbol aaplSymbol = new StockSymbol("AAPL", "Apple");
+        RsiCommand command = new RsiCommand(aaplSymbol);
+        when(rsiService.getCurrentRsi(aaplSymbol)).thenReturn(Optional.empty());
 
         processor.processCommand(command);
 

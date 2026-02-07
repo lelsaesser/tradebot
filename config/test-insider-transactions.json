@@ -1,11 +1,11 @@
 {
+  "AVGO" : {
+    "S_HISTORIC" : 300
+  },
   "AAPL" : {
     "S_HISTORIC" : 100
   },
   "GOOG" : {
     "S_HISTORIC" : 200
-  },
-  "AVGO" : {
-    "S_HISTORIC" : 300
   }
 }

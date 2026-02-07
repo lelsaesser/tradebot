@@ -4,13 +4,15 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.EnumMap;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.config.BeanConfig;
+import org.tradelite.service.StockSymbolRegistry;
 
 class InsiderPersistenceTest {
 
@@ -19,17 +21,23 @@ class InsiderPersistenceTest {
     private InsiderPersistence insiderPersistence;
 
     @BeforeEach
-    void setUp() {
-        insiderPersistence = new InsiderPersistence(new BeanConfig().objectMapper());
+    void setUp() throws IOException {
+        insiderPersistence =
+                new InsiderPersistence(
+                        new BeanConfig().objectMapper(),
+                        new StockSymbolRegistry(
+                                new BeanConfig().objectMapper()));
     }
 
     @Test
     void persistToFile_readFromFile_ok() {
-        Map<StockSymbol, Map<String, Integer>> transactions = new EnumMap<>(StockSymbol.class);
+        Map<StockSymbol, Map<String, Integer>> transactions = new HashMap<>();
         transactions.put(
-                StockSymbol.AAPL, Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 100));
+                new StockSymbol("AAPL", "Apple"),
+                Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 100));
         transactions.put(
-                StockSymbol.GOOG, Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 200));
+                new StockSymbol("GOOG", "Google"),
+                Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 200));
 
         insiderPersistence.persistToFile(transactions, TEST_FILE_PATH);
 
@@ -39,7 +47,8 @@ class InsiderPersistenceTest {
         assertThat(historicData.size(), is(2));
 
         transactions.put(
-                StockSymbol.AVGO, Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 300));
+                new StockSymbol("AVGO", "Broadcom"),
+                Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 300));
 
         insiderPersistence.persistToFile(transactions, TEST_FILE_PATH);
 
@@ -51,9 +60,10 @@ class InsiderPersistenceTest {
 
     @Test
     void persistToFile_exception() {
-        Map<StockSymbol, Map<String, Integer>> transactions = new EnumMap<>(StockSymbol.class);
+        Map<StockSymbol, Map<String, Integer>> transactions = new HashMap<>();
         transactions.put(
-                StockSymbol.AAPL, Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 100));
+                new StockSymbol("AAPL", "Apple"),
+                Map.of(InsiderTransactionCodes.SELL_HISTORIC.getCode(), 100));
 
         String invalidFilePath = "invalid/path/insider-transactions.json";
 
