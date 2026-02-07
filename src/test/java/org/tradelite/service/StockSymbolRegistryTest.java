@@ -3,22 +3,28 @@ package org.tradelite.service;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.tradelite.common.StockSymbol;
 
 class StockSymbolRegistryTest {
 
     private StockSymbolRegistry stockSymbolRegistry;
+    private ObjectMapper objectMapper;
+
+    @TempDir File tempDir;
 
     @BeforeEach
     void setUp() throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper = new ObjectMapper();
         stockSymbolRegistry = new StockSymbolRegistry(objectMapper);
     }
 
@@ -102,5 +108,93 @@ class StockSymbolRegistryTest {
     void removeSymbol_nullOrEmpty_returnsFalse() {
         assertFalse(stockSymbolRegistry.removeSymbol(null));
         assertFalse(stockSymbolRegistry.removeSymbol(""));
+    }
+
+    @Test
+    void fromString_caseInsensitive_findsSymbol() {
+        Optional<StockSymbol> result = stockSymbolRegistry.fromString("aapl");
+
+        assertTrue(result.isPresent());
+        assertThat(result.get().getTicker(), is("AAPL"));
+    }
+
+    @Test
+    void addSymbol_convertsToUpperCase() {
+        boolean result = stockSymbolRegistry.addSymbol("test", "Test Company");
+
+        assertTrue(result);
+        Optional<StockSymbol> added = stockSymbolRegistry.fromString("TEST");
+        assertTrue(added.isPresent());
+        assertThat(added.get().getTicker(), is("TEST"));
+
+        // Cleanup
+        stockSymbolRegistry.removeSymbol("TEST");
+    }
+
+    @Test
+    void addSymbol_duplicateCaseInsensitive_returnsFalse() {
+        boolean result = stockSymbolRegistry.addSymbol("aapl", "Apple");
+
+        assertFalse(result);
+    }
+
+    @Test
+    void removeSymbol_caseInsensitive_returnsTrue() {
+        stockSymbolRegistry.addSymbol("TEST", "Test Company");
+
+        boolean result = stockSymbolRegistry.removeSymbol("test");
+
+        assertTrue(result);
+        assertTrue(stockSymbolRegistry.fromString("TEST").isEmpty());
+    }
+
+    @Test
+    void stockSymbolEntry_defaultConstructor_createsInstance() {
+        StockSymbolRegistry.StockSymbolEntry entry = new StockSymbolRegistry.StockSymbolEntry();
+
+        assertNotNull(entry);
+        assertNull(entry.getTicker());
+        assertNull(entry.getDisplayName());
+    }
+
+    @Test
+    void stockSymbolEntry_parameterizedConstructor_setsValues() {
+        StockSymbolRegistry.StockSymbolEntry entry =
+                new StockSymbolRegistry.StockSymbolEntry("AAPL", "Apple Inc");
+
+        assertNotNull(entry);
+        assertThat(entry.getTicker(), is("AAPL"));
+        assertThat(entry.getDisplayName(), is("Apple Inc"));
+    }
+
+    @Test
+    void stockSymbolEntry_setters_updateValues() {
+        StockSymbolRegistry.StockSymbolEntry entry = new StockSymbolRegistry.StockSymbolEntry();
+
+        entry.setTicker("MSFT");
+        entry.setDisplayName("Microsoft");
+
+        assertThat(entry.getTicker(), is("MSFT"));
+        assertThat(entry.getDisplayName(), is("Microsoft"));
+    }
+
+    @Test
+    void loadStockSymbols_invalidFile_throwsIOException() throws Exception {
+        ObjectMapper mockMapper = mock(ObjectMapper.class);
+        when(mockMapper.readValue(
+                        any(java.io.InputStream.class),
+                        any(com.fasterxml.jackson.core.type.TypeReference.class)))
+                .thenThrow(new IOException("Test exception"));
+
+        assertThrows(IOException.class, () -> new StockSymbolRegistry(mockMapper));
+    }
+
+    @Test
+    void getAll_returnsNewListEachTime() {
+        List<StockSymbol> list1 = stockSymbolRegistry.getAll();
+        List<StockSymbol> list2 = stockSymbolRegistry.getAll();
+
+        assertNotSame(list1, list2);
+        assertEquals(list1.size(), list2.size());
     }
 }
