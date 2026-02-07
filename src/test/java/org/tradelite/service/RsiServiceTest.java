@@ -157,7 +157,11 @@ class RsiServiceTest {
                 1, serviceWithHistory.getPriceHistory().get(symbol.getName()).getPrices().size());
         assertEquals(
                 150.0,
-                serviceWithHistory.getPriceHistory().get(symbol.getName()).getPriceValues().getFirst());
+                serviceWithHistory
+                        .getPriceHistory()
+                        .get(symbol.getName())
+                        .getPriceValues()
+                        .getFirst());
 
         dummyFile.delete();
     }

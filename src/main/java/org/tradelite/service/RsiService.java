@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.CoinId;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TickerSymbol;
 import org.tradelite.core.CoinGeckoPriceEvaluator;

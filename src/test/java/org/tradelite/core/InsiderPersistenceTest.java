@@ -25,8 +25,7 @@ class InsiderPersistenceTest {
         insiderPersistence =
                 new InsiderPersistence(
                         new BeanConfig().objectMapper(),
-                        new StockSymbolRegistry(
-                                new BeanConfig().objectMapper()));
+                        new StockSymbolRegistry(new BeanConfig().objectMapper()));
     }
 
     @Test

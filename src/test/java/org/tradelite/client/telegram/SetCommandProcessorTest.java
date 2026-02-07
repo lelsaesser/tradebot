@@ -83,8 +83,7 @@ class SetCommandProcessorTest {
         when(stockSymbolRegistry.fromString("INVALID_SYMBOL")).thenReturn(Optional.empty());
 
         assertThrows(
-                IllegalArgumentException.class,
-                () -> setCommandProcessor.processCommand(command));
+                IllegalArgumentException.class, () -> setCommandProcessor.processCommand(command));
 
         verify(targetPriceProvider, never())
                 .updateTargetPrice(any(), anyDouble(), anyDouble(), anyString());
@@ -95,8 +94,7 @@ class SetCommandProcessorTest {
         SetCommand command = new SetCommand("invalid", "BITCOIN", 50000.0);
 
         assertThrows(
-                IllegalArgumentException.class,
-                () -> setCommandProcessor.processCommand(command));
+                IllegalArgumentException.class, () -> setCommandProcessor.processCommand(command));
 
         verify(targetPriceProvider, never())
                 .updateTargetPrice(any(), anyDouble(), anyDouble(), anyString());
