@@ -5,7 +5,6 @@ import static org.hamcrest.Matchers.*;
 
 import java.math.BigDecimal;
 import java.util.Objects;
-
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
@@ -120,7 +119,8 @@ class FinvizClientTest {
                 "<html><body><table><tr><td><span class=\"color-text is-positive\">5.25%</span></td></tr></table></body></html>";
         Document doc = Jsoup.parse(html);
 
-        BigDecimal result = finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
+        BigDecimal result =
+                finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
 
         assertThat(result, is(new BigDecimal("5.25")));
     }
@@ -131,7 +131,8 @@ class FinvizClientTest {
                 "<html><body><table><tr><td><span class=\"color-text is-negative\">-3.75%</span></td></tr></table></body></html>";
         Document doc = Jsoup.parse(html);
 
-        BigDecimal result = finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
+        BigDecimal result =
+                finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
 
         assertThat(result, is(new BigDecimal("-3.75")));
     }
@@ -141,7 +142,8 @@ class FinvizClientTest {
         String html = "<html><body><table><tr><td><span></span></td></tr></table></body></html>";
         Document doc = Jsoup.parse(html);
 
-        BigDecimal result = finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
+        BigDecimal result =
+                finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
 
         assertThat(result, is(BigDecimal.ZERO));
     }
@@ -151,7 +153,8 @@ class FinvizClientTest {
         String html = "<html><body><table><tr><td>7.50%</td></tr></table></body></html>";
         Document doc = Jsoup.parse(html);
 
-        BigDecimal result = finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
+        BigDecimal result =
+                finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
 
         assertThat(result, is(new BigDecimal("7.50")));
     }
@@ -162,7 +165,8 @@ class FinvizClientTest {
                 "<html><body><table><tr><td><span>1,234.56%</span></td></tr></table></body></html>";
         Document doc = Jsoup.parse(html);
 
-        BigDecimal result = finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
+        BigDecimal result =
+                finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
 
         assertThat(result, is(new BigDecimal("1234.56")));
     }
@@ -172,7 +176,8 @@ class FinvizClientTest {
         String html = "<html><body><table><tr><td></td></tr></table></body></html>";
         Document doc = Jsoup.parse(html);
 
-        BigDecimal result = finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
+        BigDecimal result =
+                finvizClient.parsePercentage(Objects.requireNonNull(doc.select("td").first()));
 
         assertThat(result, is(BigDecimal.ZERO));
     }

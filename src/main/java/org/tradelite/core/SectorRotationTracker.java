@@ -49,8 +49,7 @@ public class SectorRotationTracker {
                 persistence.getTopPerformers(5, PerformancePeriod.DAILY);
         for (int i = 0; i < topDaily.size(); i++) {
             IndustryPerformance p = topDaily.get(i);
-            report.append(
-                    String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
+            report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
         report.append("\n*❄️ Bottom 5 Daily Performers:*\n");
@@ -58,8 +57,7 @@ public class SectorRotationTracker {
                 persistence.getBottomPerformers(5, PerformancePeriod.DAILY);
         for (int i = 0; i < bottomDaily.size(); i++) {
             IndustryPerformance p = bottomDaily.get(i);
-            report.append(
-                    String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
+            report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
         report.append("\n*📈 Top 5 Weekly Performers:*\n");
@@ -67,9 +65,7 @@ public class SectorRotationTracker {
                 persistence.getTopPerformers(5, PerformancePeriod.WEEKLY);
         for (int i = 0; i < topWeekly.size(); i++) {
             IndustryPerformance p = topWeekly.get(i);
-            report.append(
-                    String.format(
-                            DATE_PATTERN, i + 1, p.name(), p.perfWeek().doubleValue()));
+            report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.perfWeek().doubleValue()));
         }
 
         report.append("\n*📉 Bottom 5 Weekly Performers:*\n");
@@ -77,9 +73,7 @@ public class SectorRotationTracker {
                 persistence.getBottomPerformers(5, PerformancePeriod.WEEKLY);
         for (int i = 0; i < bottomWeekly.size(); i++) {
             IndustryPerformance p = bottomWeekly.get(i);
-            report.append(
-                    String.format(
-                            DATE_PATTERN, i + 1, p.name(), p.perfWeek().doubleValue()));
+            report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.perfWeek().doubleValue()));
         }
 
         telegramClient.sendMessage(report.toString());
@@ -94,8 +88,7 @@ public class SectorRotationTracker {
                 persistence.getTopPerformers(10, PerformancePeriod.DAILY);
         for (int i = 0; i < topDaily.size(); i++) {
             IndustryPerformance p = topDaily.get(i);
-            report.append(
-                    String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
+            report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
         report.append("\n*❄️ Bottom 10 Daily Performers:*\n");
@@ -103,8 +96,7 @@ public class SectorRotationTracker {
                 persistence.getBottomPerformers(10, PerformancePeriod.DAILY);
         for (int i = 0; i < bottomDaily.size(); i++) {
             IndustryPerformance p = bottomDaily.get(i);
-            report.append(
-                    String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
+            report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
         return report.toString();

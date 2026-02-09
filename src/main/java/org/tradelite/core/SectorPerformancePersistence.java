@@ -48,8 +48,7 @@ public class SectorPerformancePersistence {
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(
-                    file, new TypeReference<List<SectorPerformanceSnapshot>>() {});
+            return objectMapper.readValue(file, new TypeReference<>() {});
         } catch (IOException e) {
             log.warn("Failed to load sector performance history: {}", e.getMessage());
             return new ArrayList<>();

@@ -21,11 +21,10 @@ class SectorPerformancePersistenceTest {
 
     private static final String TEST_FILE_PATH = "config/sector-performance.json";
     private SectorPerformancePersistence persistence;
-    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         persistence = new SectorPerformancePersistence(objectMapper);
     }
