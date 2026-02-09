@@ -1,185 +1,147 @@
 # Active Context
 
 ## Current Work Focus
-✅ **COMPLETED**: Dynamic stock symbol management via Telegram commands (`/add` and `/remove`)
-- Full implementation complete with all 270 tests passing
-- Build successful - production ready
+✅ **COMPLETED**: Sector Rotation Tracking Feature (February 9, 2026)
+- Web scraper for FinViz industry performance data
+- Daily scheduled task to fetch and store data
+- Telegram notifications for top/bottom performers
+- All 330 tests passing, build successful
 
 ## Recent Changes (February 2026)
 
-### Major Architecture Changes - COMPLETED
+### Sector Rotation Tracking - COMPLETED
+
+1. **FinViz Web Scraper** ✅
+   - Created `FinvizClient` using JSoup for HTML parsing
+   - Scrapes industry performance data from https://finviz.com/groups.ashx?g=industry&v=140
+   - Parses performance metrics: daily change, weekly, monthly, quarterly, half-year, yearly, YTD
+   - No browser automation needed (pure HTTP + HTML parsing)
+
+2. **Data Persistence** ✅
+   - `SectorPerformancePersistence` stores snapshots in `config/sector-performance.json`
+   - Historical data maintained for trend analysis
+   - Methods for top/bottom performers by period (daily, weekly, monthly, quarterly, yearly)
+
+3. **Automated Tracking** ✅
+   - `SectorRotationTracker` orchestrates fetch → store → report workflow
+   - Sends daily Telegram report with top 5 gainers and losers
+   - Scheduled daily at 10:30 PM ET (after US market close) on weekdays
+
+4. **New Files Created** ✅
+   - `src/main/java/org/tradelite/client/finviz/FinvizClient.java`
+   - `src/main/java/org/tradelite/client/finviz/dto/IndustryPerformance.java`
+   - `src/main/java/org/tradelite/core/SectorPerformanceSnapshot.java`
+   - `src/main/java/org/tradelite/core/SectorPerformancePersistence.java`
+   - `src/main/java/org/tradelite/core/SectorRotationTracker.java`
+   - `src/test/java/org/tradelite/client/finviz/FinvizClientTest.java`
+   - `src/test/java/org/tradelite/core/SectorPerformancePersistenceTest.java`
+   - `src/test/java/org/tradelite/core/SectorRotationTrackerTest.java`
+
+5. **Modified Files** ✅
+   - `pom.xml` - Added JSoup 1.18.3 dependency
+   - `Scheduler.java` - Added dailySectorRotationTracking() method
+   - `SchedulerTest.java` - Updated with SectorRotationTracker mock
+   - `BeanConfig.java` - Registered new beans
+
+### Previous: Dynamic Stock Symbol Management - COMPLETED
 
 1. **StockSymbol Refactoring**: Converted from enum to regular class ✅
-   - Created `StockSymbolRegistry` service for dynamic symbol management
-   - Added JSON persistence in `config/stock-symbols.json`
-   - Maintains ticker and company display name
-   - Thread-safe with ConcurrentHashMap
+2. **New Telegram Commands**: `/add TICKER Display_Name` and `/remove TICKER` ✅
+3. **StockSymbolRegistry**: Dynamic symbol management with JSON persistence ✅
 
-2. **New Telegram Commands Implementation** ✅
-   - `/add TICKER Display_Name` - Adds new stock symbol dynamically
-   - `/remove TICKER` - Removes symbol and all associated data (target prices, RSI history)
-   - Underscore in display name replaced with space (e.g., `Coherent_Corp` → "Coherent Corp")
-   - Both commands default buy/sell targets to 0
+## Testing Summary
 
-3. **Cache Structure Update** ✅
-   - `FinnhubPriceEvaluator`: Changed from `EnumMap` to `HashMap<String, PriceQuoteResponse>`
-   - Necessary to support dynamic symbol additions
-   - Uses ticker string as key
-
-### Implementation Summary
-
-#### New Files Created
-- `src/main/java/org/tradelite/service/StockSymbolRegistry.java` - Symbol registry service
-- `src/main/java/org/tradelite/client/telegram/AddCommand.java` - Add command model
-- `src/main/java/org/tradelite/client/telegram/AddCommandProcessor.java` - Add command handler
-- `src/main/java/org/tradelite/client/telegram/RemoveCommand.java` - Remove command model
-- `src/main/java/org/tradelite/client/telegram/RemoveCommandProcessor.java` - Remove command handler
-- `config/stock-symbols.json` - Persistent storage for 38 stock symbols
-- `src/test/java/org/tradelite/service/StockSymbolRegistryTest.java` - Test coverage
-- `src/test/java/org/tradelite/client/telegram/AddCommandProcessorTest.java` - Test coverage
-- `src/test/java/org/tradelite/client/telegram/RemoveCommandProcessorTest.java` - Test coverage
-
-#### Modified Core Components (14 files)
-- `StockSymbol.java` - Now a regular class with ticker/displayName properties
-- `TargetPriceProvider.java` - Added `addTargetPrice()`, `removeSymbolFromTargetPrices()` methods
-- `RsiService.java` - Added `removeSymbolData()` method for cleanup
-- `FinnhubPriceEvaluator.java` - HashMap cache, injected StockSymbolRegistry
-- `SetCommandProcessor.java` - Uses StockSymbolRegistry for validation
-- `RsiPriceFetcher.java` - Uses StockSymbolRegistry for validation
-- `InsiderTracker.java` - Uses StockSymbolRegistry for symbol lookups
-- `InsiderPersistence.java` - Uses StockSymbolRegistry for symbol lookups
-- `TelegramMessageProcessor.java` - Injected StockSymbolRegistry, updated parseTickerSymbol()
-- `BeanConfig.java` - Registered StockSymbolRegistry bean
-- `TelegramCommandDispatcher.java` - Registered new command processors
-
-#### Updated Test Files (14 files)
-- All tests updated to use StockSymbolRegistry mocks
-- Fixed constructor injection issues
-- Updated to handle new StockSymbol class structure
-- All 270 tests passing ✅
-
-## Testing Commands
-
-### Add New Stock Symbol
-```bash
-/add COHR Coherent_Corp
-# Response: "Stock symbol COHR (Coherent Corp) added successfully with targets: Buy=0.0, Sell=0.0"
-```
-
-### Remove Stock Symbol
-```bash
-/remove COHR
-# Response: "Stock symbol COHR removed successfully"
-# Cleanup includes: stock-symbols.json, target-prices-stocks.json, RSI historical data
-```
-
-### Set Targets (Works with Dynamic Symbols)
-```bash
-/set buy COHR 150.0
-/set sell COHR 200.0
-```
+- **Total Tests**: 330 ✅
+- **Build Status**: SUCCESS ✅
+- New sector rotation tests: 22 tests across 3 test files
 
 ## Active Decisions and Considerations
 
-### Symbol Management Strategy
-- **Dynamic Registry**: StockSymbolRegistry loads from JSON, allows runtime modifications
-- **Persistence**: Changes immediately written to config/stock-symbols.json
-- **Backward Compatibility**: Existing commands work with both old hardcoded symbols and new dynamic ones
-- **Pre-configured Symbols**: 38 stock symbols included in initial config
+### Sector Rotation Architecture
+- **JSoup over Playwright**: Simpler, faster, no browser dependencies
+- **JSON Persistence**: Consistent with other config files pattern
+- **No Telegram Command**: Scheduler-only, no manual trigger needed
+- **Historical Storage**: Full snapshots stored for future trend analysis
 
-### Error Handling
-- **Rollback Support**: If target price addition fails, symbol is removed from registry
-- **Validation**: Checks for duplicates, null/empty values, symbol existence
-- **User Feedback**: Clear Telegram messages for success/failure cases
-- **Graceful Degradation**: Invalid symbols logged as warnings, not errors
+### Data Model
+```java
+record IndustryPerformance(
+    String name,
+    BigDecimal perfWeek,
+    BigDecimal perfMonth, 
+    BigDecimal perfQuarter,
+    BigDecimal perfHalf,
+    BigDecimal perfYear,
+    BigDecimal perfYtd,
+    BigDecimal change  // daily change
+)
+```
 
-### Data Cleanup
-- **Complete Removal**: `/remove` command deletes:
-  1. Symbol from stock-symbols.json
-  2. Target prices from target-prices-stocks.json  
-  3. RSI historical data via RsiService.removeSymbolData()
+### Telegram Report Format
+```
+📊 *Daily Sector Performance Report*
+📅 2026-02-09
 
-### Thread Safety
-- StockSymbolRegistry uses ConcurrentHashMap for thread-safe operations
-- File writes synchronized in TargetPriceProvider
-- Atomic operations for symbol addition/removal
+📈 *Top 5 Daily Gainers:*
+1. Technology: +5.25%
+2. Healthcare: +3.50%
+...
+
+📉 *Bottom 5 Daily Losers:*
+1. Energy: -4.20%
+2. Financials: -2.80%
+...
+
+📈 *Top 5 Weekly Gainers:*
+...
+```
 
 ## Important Patterns and Preferences
 
-### Dependency Injection Pattern
-All components using StockSymbol lookups now inject `StockSymbolRegistry`:
+### Web Scraping Pattern (FinViz)
 ```java
-@Autowired
-public MyClass(StockSymbolRegistry stockSymbolRegistry) {
-    this.stockSymbolRegistry = stockSymbolRegistry;
+Document doc = Jsoup.connect(url)
+    .userAgent("Mozilla/5.0...")
+    .timeout(10000)
+    .get();
+Elements rows = doc.select("table.table-light tr");
+```
+
+### Persistence Pattern (Sector Data)
+```java
+// Save snapshot
+persistence.saveSnapshot(new SectorPerformanceSnapshot(
+    LocalDate.now(), performances));
+
+// Get top performers
+List<IndustryPerformance> top = persistence.getTopPerformersByWeek(5);
+```
+
+### Scheduled Task Pattern
+```java
+@Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
+public void dailySectorRotationTracking() {
+    rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
 }
 ```
 
-### Symbol Lookup Pattern
-```java
-Optional<StockSymbol> symbol = stockSymbolRegistry.fromString("AAPL");
-if (symbol.isPresent()) {
-    StockSymbol stock = symbol.get();
-    // Use stock.getTicker(), stock.getDisplayName()
-} else {
-    // Handle invalid symbol
-}
-```
-
-### Cache Management Pattern
-FinnhubPriceEvaluator cache uses ticker string as key:
-```java
-Map<String, PriceQuoteResponse> lastPriceCache = new HashMap<>();
-lastPriceCache.put(symbol.getTicker(), response);
-```
-
-### Command Processing Pattern
-1. Parse command in TelegramMessageProcessor
-2. Create Command object (AddCommand, RemoveCommand)
-3. Dispatch to CommandProcessor
-4. Processor validates and executes
-5. Send feedback to user via TelegramClient
-
-## Project Insights
-
-### Test Coverage
-- **Total Tests**: 270 ✅
-- **Test Coverage**: 97% (down from 99% due to new code)
-- **Build Status**: SUCCESS ✅
-- Mock-heavy approach for external dependencies
-
-### Code Quality
-- Using Spotless formatter (run `mvn spotless:apply`)
-- Lombok for boilerplate reduction (@Data, @RequiredArgsConstructor, @Slf4j)
-- Clear separation of concerns (service layer, persistence, API clients)
-- Comprehensive error handling and logging
-
-### Telegram Bot Architecture
-- **Command Pattern**: Each command has dedicated Command class and CommandProcessor
-- **Dispatcher**: TelegramCommandDispatcher routes to appropriate processor
-- **Parser**: TelegramMessageProcessor handles message parsing
-- **Validation**: Symbol validation via StockSymbolRegistry
-- **Persistence**: Immediate file writes for reliability
-
-### Configuration Files
+## Configuration Files
 - `config/stock-symbols.json` - Stock symbol registry (38 symbols)
 - `config/target-prices-stocks.json` - Stock target prices
 - `config/target-prices-coins.json` - Crypto target prices
-- All configs support hot-reload via file watching
+- `config/sector-performance.json` - Sector performance history (NEW)
+- `config/insider-transactions.json` - Insider trading data
 
 ## Next Iteration Opportunities
 
-### Future Enhancements (Not Required Now)
-- Bulk import/export of stock symbols
-- Symbol search/autocomplete
-- Historical symbol tracking (when added/removed)
-- Symbol categories/tagging
-- Validation against external APIs (verify ticker exists)
-- Rate limiting for add/remove operations
-- Undo functionality for accidental removals
+### Sector Rotation Enhancements (Future)
+- Trend analysis over multiple weeks
+- Sector rotation alerts (big changes)
+- Historical comparison reports
+- Sector heatmap visualization
+- Correlation with market indices
 
-### Performance Optimizations (If Needed)
-- Batch file writes if adding many symbols
-- Cache invalidation strategies
-- Lazy loading of symbol registry
-- Periodic registry refresh from file
+### General Enhancements
+- Bulk import/export of stock symbols
+- Rate limiting for API calls
+- Performance optimizations
