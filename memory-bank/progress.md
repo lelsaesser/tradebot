@@ -9,13 +9,14 @@
 - RSI calculation and monitoring
 - Insider transaction tracking
 - Message tracking to avoid duplicate processing
+- **Sector rotation tracking** ✅ **NEW - Feb 9, 2026**
 
 ### Telegram Commands ✅
 - `/set buy/sell <symbol> <price>` - Set target prices
 - `/show stocks/coins/all` - Display monitored symbols
 - `/rsi <symbol>` - Show RSI value for a symbol
-- `/add <TICKER> <Display_Name>` - Add stock symbol dynamically ✅ **NEW - Feb 2026**
-- `/remove <TICKER>` - Remove symbol and all data ✅ **NEW - Feb 2026**
+- `/add <TICKER> <Display_Name>` - Add stock symbol dynamically ✅
+- `/remove <TICKER>` - Remove symbol and all data ✅
 
 ### Data Persistence ✅
 - JSON-based storage for target prices (stocks and coins)
@@ -24,203 +25,153 @@
 - Insider transaction history
 - API request metering for rate limiting
 - Last processed message ID tracking
+- **Sector performance history** (config/sector-performance.json) ✅ **NEW**
 
 ### Monitoring & Alerts ✅
 - Scheduled price checks for stocks and cryptocurrencies
 - Alert thresholds with ignore mechanisms to prevent spam
 - RSI alerts when values cross 30 (oversold) or 70 (overbought)
 - Weekly insider transaction reports
+- **Daily sector performance reports** ✅ **NEW**
 
-## Recent Milestone: Dynamic Symbol Management ✅ COMPLETE
+## Recent Milestone: Sector Rotation Tracking ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All 270 tests passing, build successful
+**Status**: ✅ **PRODUCTION READY** - All 330 tests passing, build successful
 
-### Implementation Complete (February 2026)
+### Implementation Complete (February 9, 2026)
 
-#### Core Architecture
-- ✅ Created StockSymbolRegistry service with JSON persistence
-- ✅ Added config/stock-symbols.json with 38 pre-configured stock symbols
-- ✅ Converted StockSymbol from enum to regular class (ticker + displayName)
-- ✅ Thread-safe implementation using ConcurrentHashMap
-- ✅ Updated FinnhubPriceEvaluator cache (EnumMap → HashMap<String, PriceQuoteResponse>)
+#### FinViz Web Scraper
+- ✅ Created `FinvizClient` using JSoup for HTML parsing
+- ✅ Scrapes data from https://finviz.com/groups.ashx?g=industry&v=140
+- ✅ Parses: daily change, weekly, monthly, quarterly, half-year, yearly, YTD
+- ✅ Browser-agnostic (pure HTTP + HTML parsing)
 
-#### Command Implementation
-- ✅ `/add TICKER Display_Name` command
-  - Format: `/add COHR Coherent_Corp` (underscore replaced with space)
-  - Default buy/sell targets set to 0.0
-  - Rollback support if target price addition fails
-  - Validates for duplicates and empty values
-  
-- ✅ `/remove TICKER` command
-  - Removes from stock-symbols.json
-  - Deletes from target-prices-stocks.json
-  - Cleans up RSI historical data via RsiService.removeSymbolData()
-  - Complete data cleanup across all systems
+#### Data Persistence Layer
+- ✅ `SectorPerformancePersistence` - JSON file storage
+- ✅ Stores snapshots in `config/sector-performance.json`
+- ✅ Methods for top/bottom performers by period
+- ✅ Historical data maintained for trend analysis
 
-#### Service Layer Updates
-- ✅ RsiService.removeSymbolData() - RSI historical data cleanup
-- ✅ TargetPriceProvider.addTargetPrice() - Add new target prices
-- ✅ TargetPriceProvider.removeSymbolFromTargetPrices() - Remove target prices
-- ✅ StockSymbolRegistry.addSymbol() - Add to registry
-- ✅ StockSymbolRegistry.removeSymbol() - Remove from registry
-- ✅ StockSymbolRegistry.fromString() - Lookup validation
+#### Automated Tracking
+- ✅ `SectorRotationTracker` orchestrates workflow
+- ✅ Scheduled daily at 10:30 PM ET (after US market close)
+- ✅ Runs weekdays only (MON-FRI)
+- ✅ Sends Telegram report with top 5 gainers/losers
 
-#### Component Updates (14 Files)
-All components updated to use StockSymbolRegistry:
-- ✅ FinnhubPriceEvaluator
-- ✅ RsiPriceFetcher
-- ✅ InsiderTracker
-- ✅ InsiderPersistence
-- ✅ SetCommandProcessor
-- ✅ TelegramMessageProcessor
-- ✅ AddCommandProcessor (new)
-- ✅ RemoveCommandProcessor (new)
-- ✅ TelegramCommandDispatcher
-- ✅ BeanConfig
+#### New Files Created
+- `src/main/java/org/tradelite/client/finviz/FinvizClient.java`
+- `src/main/java/org/tradelite/client/finviz/dto/IndustryPerformance.java`
+- `src/main/java/org/tradelite/core/SectorPerformanceSnapshot.java`
+- `src/main/java/org/tradelite/core/SectorPerformancePersistence.java`
+- `src/main/java/org/tradelite/core/SectorRotationTracker.java`
+- `src/test/java/org/tradelite/client/finviz/FinvizClientTest.java`
+- `src/test/java/org/tradelite/core/SectorPerformancePersistenceTest.java`
+- `src/test/java/org/tradelite/core/SectorRotationTrackerTest.java`
 
-#### Test Suite Complete (14 Test Files Updated)
-- ✅ StockSymbolRegistryTest
-- ✅ AddCommandProcessorTest
-- ✅ RemoveCommandProcessorTest
-- ✅ SetCommandProcessorTest
-- ✅ RsiCommandProcessorTest
-- ✅ TelegramMessageProcessorTest
-- ✅ BasePriceEvaluatorTest
-- ✅ PriceQuoteResponseTest
-- ✅ RsiServiceTest
-- ✅ FinnhubClientTest
-- ✅ FinnhubPriceEvaluatorTest
-- ✅ InsiderTrackerTest
-- ✅ InsiderPersistenceTest
-- ✅ TargetPriceProviderTest
+#### Modified Files
+- `pom.xml` - Added JSoup 1.18.3 dependency
+- `Scheduler.java` - Added dailySectorRotationTracking() method
+- `SchedulerTest.java` - Updated with SectorRotationTracker mock
+- `BeanConfig.java` - Registered new beans
 
 ### Build Status ✅
 ```
-Tests run: 270, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 330, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
-### Code Quality Metrics
-- **Test Coverage**: 97% (down from 99% due to new code additions)
-- **Build Status**: ✅ SUCCESS
-- **Tests Passing**: ✅ 270/270
-- **Code Formatting**: ✅ Spotless applied
-- **Error Handling**: ✅ Comprehensive with rollback support
+## Previous Milestone: Dynamic Symbol Management ✅ COMPLETE
+
+### Implementation Complete (February 2026)
+- ✅ Created StockSymbolRegistry service with JSON persistence
+- ✅ Converted StockSymbol from enum to regular class
+- ✅ `/add TICKER Display_Name` command
+- ✅ `/remove TICKER` command with complete cleanup
+- ✅ All 270 tests passing at that time
 
 ## Test Coverage Status
 
 ### Current Coverage
 - Target: 99% line coverage
 - Current: 97% line coverage
-- Status: ✅ Acceptable (new code added, will improve with usage)
+- Status: ✅ Acceptable
 - All critical paths covered with tests
 
-### All Test Files Status
-- ✅ All 270 tests passing
+### Test Metrics
+- ✅ Total tests: 330
+- ✅ New tests added: 22 (sector rotation)
 - ✅ No compilation errors
 - ✅ Integration tests validated
-- ✅ Mock coverage complete
 
 ## Technical Debt
 
 ### Documentation ✅
 - ✅ Memory bank updated with complete implementation details
-- ✅ Command usage documented in activeContext.md
 - ✅ Architecture decisions documented
 - ✅ Testing patterns documented
 
 ### Code Quality ✅
 - ✅ Spotless formatter applied to all files
-- ✅ Proper error handling in all commands
-- ✅ Rollback mechanisms implemented and tested
-- ✅ Thread safety verified (ConcurrentHashMap usage)
+- ✅ Proper error handling in all components
+- ✅ Thread safety verified
 - ✅ Comprehensive logging added
 
 ## Future Enhancements
 
-### Short Term (Optional)
-1. Increase test coverage back to 99% with edge case tests
-2. Add /list command to show all registered symbols
-3. Command to update display name without removing
-4. Bulk import/export of symbols via file upload
+### Sector Rotation (Future)
+- Trend analysis over multiple weeks
+- Sector rotation alerts (big changes)
+- Historical comparison reports
+- Sector heatmap visualization
+- Correlation with market indices
 
-### Medium Term (Optional)
-1. Symbol validation against external APIs (verify ticker exists)
-2. Symbol categories/tagging (e.g., tech, healthcare)
-3. Historical tracking of when symbols were added/removed
-4. Rate limiting for add/remove operations
-5. Undo functionality for accidental removals
-
-### Long Term (Optional)
-1. Web UI for symbol management
-2. Symbol search/autocomplete functionality
-3. Integration with additional data sources
-4. Historical price chart generation
-5. Symbol watchlist management
+### General (Future)
+- Bulk import/export of stock symbols
+- Rate limiting for API calls
+- Performance optimizations
+- Web UI for management
 
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: February 7, 2026
+- Date: February 9, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
 
 ### Pre-Deployment Checklist
-- ✅ All tests passing (270/270)
+- ✅ All tests passing (330/330)
 - ✅ Build successful
 - ✅ Code coverage acceptable (97%)
 - ✅ Documentation updated
 - ✅ Code formatted with Spotless
 - ✅ Error handling verified
-- ✅ Rollback mechanisms tested
 
-## Performance Metrics
+## Configuration Files Summary
 
-### API Rate Limiting ✅
-- Finnhub: Metered and persisted
-- CoinGecko: Metered and persisted
-- No issues with current usage patterns
+| File | Purpose |
+|------|---------|
+| `config/stock-symbols.json` | Stock symbol registry (38 symbols) |
+| `config/target-prices-stocks.json` | Stock target prices |
+| `config/target-prices-coins.json` | Crypto target prices |
+| `config/sector-performance.json` | Sector performance history **NEW** |
+| `config/insider-transactions.json` | Insider trading data |
+| `config/finnhub-monthly-requests.txt` | API metering |
+| `config/coingecko-monthly-requests.txt` | API metering |
 
-### Bot Responsiveness ✅
-- Commands processed immediately
-- Scheduled tasks running as expected
-- No significant latency issues
-- Symbol registry loads in ~50ms
+## Dependencies Added
 
-### Resource Usage ✅
-- Memory: ConcurrentHashMap efficient for symbol storage
-- Disk: JSON files small (~5KB for 38 symbols)
-- CPU: Minimal overhead for symbol lookups
+| Dependency | Version | Purpose |
+|------------|---------|---------|
+| JSoup | 1.18.3 | HTML parsing for FinViz scraping **NEW** |
 
-## Team Notes
+## Scheduled Tasks Summary
 
-### Development Patterns
-- Always run `mvn spotless:apply` before committing
-- Maintain test coverage above 95%
-- Use StockSymbolRegistry for all symbol lookups
-- Mock external dependencies in tests
-- Clear error messages for user-facing features
-- Implement rollback for data modifications
-
-### Recent Learnings
-- Dynamic symbol management requires careful cache management
-- Test updates extensive when refactoring core classes
-- Rollback mechanisms essential for data integrity
-- JSON persistence simple but requires careful file handling
-- Thread safety critical for concurrent operations
-- Lenient mocking helps with test maintenance
-
-### Architecture Decisions
-1. **StockSymbol as Class**: Chosen over enum for dynamic flexibility
-2. **JSON Persistence**: Simple, human-readable, easy to backup/restore
-3. **ConcurrentHashMap**: Thread-safe without external synchronization
-4. **Rollback Support**: Ensures data consistency on failures
-5. **StockSymbolRegistry Pattern**: Central authority for symbol validation
-
-### Best Practices Established
-- Validate inputs at command processor level
-- Provide clear user feedback for all operations
-- Log warnings for invalid states, errors for failures
-- Test with mocks for all external dependencies
-- Use Optional for nullable symbol lookups
-- Maintain backwards compatibility where possible
+| Task | Schedule | Description |
+|------|----------|-------------|
+| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock price monitoring |
+| cryptoMarketMonitoring | Every 5 min (24/7) | Crypto price monitoring |
+| rsiStockMonitoring | Daily 16:30 ET (Mon-Fri) | RSI calculation for stocks |
+| rsiCryptoMonitoring | Daily 00:05 ET | RSI calculation for crypto |
+| weeklyInsiderTradingReport | Weekly Fri 17:00 ET | Insider transaction report |
+| monthlyApiUsageReport | Monthly 1st, 00:30 | API usage statistics |
+| **dailySectorRotationTracking** | Daily 22:30 ET (Mon-Fri) | Sector performance report **NEW** |
