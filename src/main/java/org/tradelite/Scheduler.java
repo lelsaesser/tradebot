@@ -30,6 +30,7 @@ public class Scheduler {
     private final InsiderTracker insiderTracker;
     private final RsiPriceFetcher rsiPriceFetcher;
     private final ApiRequestMeteringService apiRequestMeteringService;
+    private final SectorRotationTracker sectorRotationTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -44,7 +45,8 @@ public class Scheduler {
             RootErrorHandler rootErrorHandler,
             InsiderTracker insiderTracker,
             RsiPriceFetcher rsiPriceFetcher,
-            ApiRequestMeteringService apiRequestMeteringService) {
+            ApiRequestMeteringService apiRequestMeteringService,
+            SectorRotationTracker sectorRotationTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -54,6 +56,7 @@ public class Scheduler {
         this.rootErrorHandler = rootErrorHandler;
         this.insiderTracker = insiderTracker;
         this.apiRequestMeteringService = apiRequestMeteringService;
+        this.sectorRotationTracker = sectorRotationTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -107,6 +110,13 @@ public class Scheduler {
         rootErrorHandler.run(insiderTracker::trackInsiderTransactions);
 
         log.info("Weekly insider trading report generated.");
+    }
+
+    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
+    protected void dailySectorRotationTracking() {
+        rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
+
+        log.info("Daily sector rotation tracking completed.");
     }
 
     @Scheduled(cron = "0 0 0 1 * *", zone = "UTC")

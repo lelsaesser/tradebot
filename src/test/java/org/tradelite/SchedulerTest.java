@@ -21,6 +21,7 @@ import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
 import org.tradelite.core.RsiPriceFetcher;
+import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +36,7 @@ class SchedulerTest {
     @Mock private InsiderTracker insiderTracker;
     @Mock private RsiPriceFetcher rsiPriceFetcher;
     @Mock private ApiRequestMeteringService apiRequestMeteringService;
+    @Mock private SectorRotationTracker sectorRotationTracker;
 
     private Scheduler scheduler;
 
@@ -50,7 +52,8 @@ class SchedulerTest {
                         rootErrorHandler,
                         insiderTracker,
                         rsiPriceFetcher,
-                        apiRequestMeteringService);
+                        apiRequestMeteringService,
+                        sectorRotationTracker);
     }
 
     @Test
@@ -280,5 +283,18 @@ class SchedulerTest {
         assertTrue(sentMessage.contains("🔹 *Total*: 50 requests"));
 
         verify(apiRequestMeteringService, times(1)).resetCounters();
+    }
+
+    @Test
+    void dailySectorRotationTracking_shouldFetchSectorPerformance() throws Exception {
+        scheduler.dailySectorRotationTracking();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(sectorRotationTracker, times(1)).fetchAndStoreDailyPerformance();
     }
 }
