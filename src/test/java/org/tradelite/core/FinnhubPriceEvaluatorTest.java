@@ -14,7 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -24,7 +24,7 @@ class FinnhubPriceEvaluatorTest {
 
     @Mock private FinnhubClient finnhubClient;
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
     @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;

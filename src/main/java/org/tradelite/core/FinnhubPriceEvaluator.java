@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -20,7 +20,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
     private final FinnhubClient finnhubClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
 
     @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
@@ -29,7 +29,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     public FinnhubPriceEvaluator(
             FinnhubClient finnhubClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             StockSymbolRegistry stockSymbolRegistry) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;

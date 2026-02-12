@@ -3,16 +3,16 @@ package org.tradelite;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 
 @Slf4j
 @Component
 public class RootErrorHandler {
 
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
 
     @Autowired
-    public RootErrorHandler(TelegramClient telegramClient) {
+    public RootErrorHandler(TelegramGateway telegramClient) {
         this.telegramClient = telegramClient;
     }
 

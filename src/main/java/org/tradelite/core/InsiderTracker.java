@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -16,7 +16,7 @@ import org.tradelite.service.StockSymbolRegistry;
 public class InsiderTracker {
 
     private final FinnhubClient finnhubClient;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final TargetPriceProvider targetPriceProvider;
     private final InsiderPersistence insiderPersistence;
     private final StockSymbolRegistry stockSymbolRegistry;
@@ -24,7 +24,7 @@ public class InsiderTracker {
     @Autowired
     public InsiderTracker(
             FinnhubClient finnhubClient,
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             TargetPriceProvider targetPriceProvider,
             InsiderPersistence insiderPersistence,
             StockSymbolRegistry stockSymbolRegistry) {

@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -16,7 +16,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
     private final CoinGeckoClient coinGeckoClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
 
     @Getter protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
 
@@ -24,7 +24,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     public CoinGeckoPriceEvaluator(
             CoinGeckoClient coinGeckoClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient) {
+            TelegramGateway telegramClient) {
         super(telegramClient, targetPriceProvider);
         this.coinGeckoClient = coinGeckoClient;
         this.targetPriceProvider = targetPriceProvider;

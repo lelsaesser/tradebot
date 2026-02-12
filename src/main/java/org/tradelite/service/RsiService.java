@@ -9,7 +9,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TickerSymbol;
@@ -24,7 +24,7 @@ public class RsiService {
     private static final int RSI_PERIOD = 14;
     private static final String RSI_DATA_FILE = "config/rsi-data.json";
 
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final ObjectMapper objectMapper;
 
     @Getter private Map<String, RsiDailyClosePrice> priceHistory = new HashMap<>();
@@ -34,7 +34,7 @@ public class RsiService {
 
     @Autowired
     public RsiService(
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             ObjectMapper objectMapper,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             CoinGeckoPriceEvaluator coinGeckoPriceEvaluator)

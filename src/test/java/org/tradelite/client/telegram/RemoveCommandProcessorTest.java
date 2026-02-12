@@ -20,7 +20,7 @@ import org.tradelite.service.StockSymbolRegistry;
 class RemoveCommandProcessorTest {
 
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
     @Mock private StockSymbolRegistry stockSymbolRegistry;
     @Mock private RsiService rsiService;
 

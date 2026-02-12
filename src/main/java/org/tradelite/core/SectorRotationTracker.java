@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finviz.FinvizClient;
 import org.tradelite.client.finviz.dto.IndustryPerformance;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.core.SectorPerformancePersistence.PerformancePeriod;
 
 @Slf4j
@@ -20,7 +20,7 @@ public class SectorRotationTracker {
 
     private final FinvizClient finvizClient;
     private final SectorPerformancePersistence persistence;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
 
     public void fetchAndStoreDailyPerformance() {
         try {

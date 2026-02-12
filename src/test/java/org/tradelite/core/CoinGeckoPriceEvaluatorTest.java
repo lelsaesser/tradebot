@@ -14,7 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -24,7 +24,7 @@ class CoinGeckoPriceEvaluatorTest {
 
     @Mock private CoinGeckoClient coinGeckoClient;
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
 
     private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 

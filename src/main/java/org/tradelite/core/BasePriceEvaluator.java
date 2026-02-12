@@ -2,7 +2,7 @@ package org.tradelite.core;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
@@ -12,7 +12,7 @@ import org.tradelite.common.TickerSymbol;
 @RequiredArgsConstructor
 public abstract class BasePriceEvaluator {
 
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final TargetPriceProvider targetPriceProvider;
 
     public abstract int evaluatePrice() throws InterruptedException;

@@ -16,13 +16,13 @@ import org.tradelite.service.StockSymbolRegistry;
 public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand> {
 
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
 
     @Autowired
     public SetCommandProcessor(
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             StockSymbolRegistry stockSymbolRegistry) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;

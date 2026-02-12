@@ -17,7 +17,7 @@ class RsiCommandProcessorTest {
 
     @Mock private RsiService rsiService;
 
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
 
     @InjectMocks private RsiCommandProcessor processor;
 
