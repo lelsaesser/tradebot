@@ -14,7 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
@@ -30,7 +30,7 @@ class SchedulerTest {
     @Mock private FinnhubPriceEvaluator finnhubPriceEvaluator;
     @Mock private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
     @Mock private TelegramMessageProcessor telegramMessageProcessor;
     @Mock private RootErrorHandler rootErrorHandler;
     @Mock private InsiderTracker insiderTracker;
@@ -296,5 +296,18 @@ class SchedulerTest {
         captor.getValue().run();
 
         verify(sectorRotationTracker, times(1)).fetchAndStoreDailyPerformance();
+    }
+
+    @Test
+    void manualStockMarketMonitoring_shouldRunRegardlessOfMarketHours() throws Exception {
+        scheduler.manualStockMarketMonitoring();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
     }
 }
