@@ -1,2 +1,9 @@
 server:
   port: 9090
+
+tradebot:
+  api:
+    fixture-fallback-enabled: false
+    fixture-base-path: config/dev-fixtures
+  telegram:
+    local-sink-file: config/dev-telegram-messages.log

@@ -26,3 +26,6 @@ replay_pid*
 /target/
 setup_env.sh
 deploy.sh
+.env
+.env.local
+config/dev-telegram-messages.log
