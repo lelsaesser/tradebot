@@ -4,3 +4,7 @@ server:
 tradebot:
   database:
     path: data/tradebot.db
+  api:
+    fixture-base-path: config/dev-fixtures
+  telegram:
+    local-sink-file: config/dev-telegram-messages.log
