@@ -16,14 +16,14 @@ public class TelegramMessageProcessor {
     private static final String ERROR_MSG_INVALID_SYMBOL =
             "Invalid symbol. Please provide a valid symbol.";
 
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final TelegramCommandDispatcher telegramCommandDispatcher;
     private final TelegramMessageTracker telegramMessageTracker;
     private final org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
 
     @Autowired
     public TelegramMessageProcessor(
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             TelegramCommandDispatcher telegramCommandDispatcher,
             TelegramMessageTracker telegramMessageTracker,
             org.tradelite.service.StockSymbolRegistry stockSymbolRegistry) {

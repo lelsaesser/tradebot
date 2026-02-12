@@ -6,17 +6,19 @@ import java.util.Map;
 import java.util.OptionalLong;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.telegram.dto.TelegramSendMessageResponse;
+import org.tradelite.config.TradebotTelegramProperties;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 
 @Slf4j
 @Component
-public class TelegramClient {
+@Profile("prod")
+public class TelegramClient implements TelegramGateway {
 
     protected static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage";
     protected static final String DELETE_URL = "https://api.telegram.org/bot%s/deleteMessage";
@@ -28,13 +30,13 @@ public class TelegramClient {
     @Autowired
     public TelegramClient(
             RestTemplate restTemplate,
-            @Value("${TELEGRAM_BOT_TOKEN}") String botToken,
-            @Value("${TELEGRAM_BOT_GROUP_CHAT_ID}") String groupChatId) {
+            TradebotTelegramProperties telegramProperties) {
         this.restTemplate = restTemplate;
-        this.botToken = botToken;
-        this.groupChatId = groupChatId;
+        this.botToken = telegramProperties.getBotToken();
+        this.groupChatId = telegramProperties.getGroupChatId();
     }
 
+    @Override
     public void sendMessage(String message) {
         sendMessageAndReturnId(message);
     }
@@ -103,6 +105,7 @@ public class TelegramClient {
         }
     }
 
+    @Override
     public List<TelegramUpdateResponse> getChatUpdates() {
         String url = String.format("https://api.telegram.org/bot%s/getUpdates", botToken);
         HttpHeaders headers = new HttpHeaders();

@@ -26,7 +26,7 @@ import org.tradelite.common.TickerSymbol;
 @ExtendWith(MockitoExtension.class)
 class TelegramMessageProcessorTest {
 
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
     @Mock private TelegramCommandDispatcher commandDispatcher;
     @Mock private TelegramMessageTracker messageTracker;
     @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;

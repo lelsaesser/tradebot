@@ -11,11 +11,11 @@ public class ShowCommandProcessor implements TelegramCommandProcessor<ShowComman
 
     private String errorMessage = "";
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
 
     @Autowired
     public ShowCommandProcessor(
-            TargetPriceProvider targetPriceProvider, TelegramClient telegramClient) {
+            TargetPriceProvider targetPriceProvider, TelegramGateway telegramClient) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
     }

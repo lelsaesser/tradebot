@@ -15,7 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -24,7 +24,7 @@ import org.tradelite.common.TargetPriceProvider;
 class InsiderTrackerTest {
 
     @Mock private FinnhubClient finnhubClient;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private InsiderPersistence insiderPersistence;
 
