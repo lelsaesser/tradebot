@@ -1,6 +1,5 @@
 package org.tradelite.client.finnhub;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -13,30 +12,45 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.config.TradebotApiProperties;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 
-@Slf4j
 @Component
 public class FinnhubClient {
 
     private static final String API_URL = "https://finnhub.io/api/v1";
-    private static final String API_KEY = System.getenv("FINNHUB_API_KEY");
 
     private final RestTemplate restTemplate;
     private final ApiRequestMeteringService meteringService;
+    private final TradebotApiProperties apiProperties;
+    private final FinnhubFallbackStrategy fallbackStrategy;
 
     @Autowired
-    public FinnhubClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
+    public FinnhubClient(
+            RestTemplate restTemplate,
+            ApiRequestMeteringService meteringService,
+            TradebotApiProperties apiProperties,
+            FinnhubFallbackStrategy fallbackStrategy) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
+        this.apiProperties = apiProperties;
+        this.fallbackStrategy = fallbackStrategy;
     }
 
     private String getApiUrl(String baseUrl, StockSymbol ticker) {
-        return API_URL + String.format(baseUrl, ticker.getTicker()) + "&token=" + API_KEY;
+        return API_URL
+                + String.format(baseUrl, ticker.getTicker())
+                + "&token="
+                + apiProperties.getFinnhubKey();
     }
 
     public PriceQuoteResponse getPriceQuote(StockSymbol ticker) {
+        if (apiProperties.getFinnhubKey() == null || apiProperties.getFinnhubKey().isBlank()) {
+            return fallbackStrategy.onQuoteFailure(
+                    ticker, new IllegalStateException("FINNHUB key not configured"));
+        }
+
         String baseUrl = "/quote?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
 
@@ -51,21 +65,27 @@ public class FinnhubClient {
                             url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
             PriceQuoteResponse quote = response.getBody();
             if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
-                throw new IllegalStateException(
-                        "Failed to fetch price quote for "
-                                + ticker.getTicker()
-                                + ": "
-                                + response.getStatusCode());
+                return fallbackStrategy.onQuoteFailure(
+                        ticker,
+                        new IllegalStateException(
+                                "Failed to fetch price quote for "
+                                        + ticker.getTicker()
+                                        + ": "
+                                        + response.getStatusCode()));
             }
             quote.setStockSymbol(ticker);
             return quote;
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            throw e;
+            return fallbackStrategy.onQuoteFailure(ticker, e);
         }
     }
 
     public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
+        if (apiProperties.getFinnhubKey() == null || apiProperties.getFinnhubKey().isBlank()) {
+            return fallbackStrategy.onInsiderFailure(
+                    ticker, new IllegalStateException("FINNHUB key not configured"));
+        }
+
         String fromDate = DateUtil.getDateTwoMonthsAgo(null);
         String baseUrl = "/stock/insider-transactions?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
@@ -80,10 +100,19 @@ public class FinnhubClient {
             ResponseEntity<InsiderTransactionResponse> response =
                     restTemplate.exchange(
                             url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
-            return response.getBody();
+            InsiderTransactionResponse responseBody = response.getBody();
+            if (responseBody == null || !response.getStatusCode().is2xxSuccessful()) {
+                return fallbackStrategy.onInsiderFailure(
+                        ticker,
+                        new IllegalStateException(
+                                "Failed to fetch insider transactions for "
+                                        + ticker.getTicker()
+                                        + ": "
+                                        + response.getStatusCode()));
+            }
+            return responseBody;
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            throw e;
+            return fallbackStrategy.onInsiderFailure(ticker, e);
         }
     }
 }

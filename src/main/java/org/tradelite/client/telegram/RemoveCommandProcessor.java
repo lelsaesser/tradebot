@@ -12,14 +12,14 @@ import org.tradelite.service.StockSymbolRegistry;
 public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCommand> {
 
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
     private final RsiService rsiService;
 
     @Autowired
     public RemoveCommandProcessor(
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             StockSymbolRegistry stockSymbolRegistry,
             RsiService rsiService) {
         this.targetPriceProvider = targetPriceProvider;

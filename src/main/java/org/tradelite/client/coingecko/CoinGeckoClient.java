@@ -1,6 +1,5 @@
 package org.tradelite.client.coingecko;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -11,25 +10,37 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.common.CoinId;
+import org.tradelite.config.TradebotApiProperties;
 import org.tradelite.service.ApiRequestMeteringService;
 
-@Slf4j
 @Component
 public class CoinGeckoClient {
 
     private static final String BASE_URL = "https://api.coingecko.com/api/v3";
-    private static final String API_KEY = System.getenv("COINGECKO_API_KEY");
 
     private final RestTemplate restTemplate;
     private final ApiRequestMeteringService meteringService;
+    private final TradebotApiProperties apiProperties;
+    private final CoinGeckoFallbackStrategy fallbackStrategy;
 
     @Autowired
-    public CoinGeckoClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
+    public CoinGeckoClient(
+            RestTemplate restTemplate,
+            ApiRequestMeteringService meteringService,
+            TradebotApiProperties apiProperties,
+            CoinGeckoFallbackStrategy fallbackStrategy) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
+        this.apiProperties = apiProperties;
+        this.fallbackStrategy = fallbackStrategy;
     }
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
+        if (apiProperties.getCoingeckoKey() == null || apiProperties.getCoingeckoKey().isBlank()) {
+            return fallbackStrategy.onPriceFailure(
+                    coinId, new IllegalStateException("COINGECKO key not configured"));
+        }
+
         String endpointUrl = "/simple/price";
         String url =
                 BASE_URL
@@ -40,7 +51,7 @@ public class CoinGeckoClient {
                         + "&include_24hr_change=true";
 
         HttpHeaders headers = new HttpHeaders();
-        headers.add("x-cg-demo-api-key", API_KEY);
+        headers.add("x-cg-demo-api-key", apiProperties.getCoingeckoKey());
         headers.set("Accept", "application/json");
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -53,19 +64,22 @@ public class CoinGeckoClient {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 CoinGeckoPriceResponse.CoinData data =
                         response.getBody().getCoinData().get(coinId.getId());
+                if (data == null) {
+                    return fallbackStrategy.onPriceFailure(
+                            coinId,
+                            new IllegalStateException(
+                                    "CoinGecko response missing payload for " + coinId.getId()));
+                }
                 data.setCoinId(coinId);
                 return data;
             } else {
-                log.error(
-                        "Failed to fetch coin price data for {}: {}",
-                        coinId.getId(),
-                        response.getStatusCode());
-                throw new IllegalStateException(
-                        "Failed to fetch coin price data: " + response.getStatusCode());
+                return fallbackStrategy.onPriceFailure(
+                        coinId,
+                        new IllegalStateException(
+                                "Failed to fetch coin price data: " + response.getStatusCode()));
             }
         } catch (RestClientException e) {
-            log.error("Error fetching coin price data for {}: {}", coinId.getId(), e.getMessage());
-            throw e;
+            return fallbackStrategy.onPriceFailure(coinId, e);
         }
     }
 }

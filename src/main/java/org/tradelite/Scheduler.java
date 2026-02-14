@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
@@ -24,7 +24,7 @@ public class Scheduler {
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final TelegramMessageProcessor telegramMessageProcessor;
     private final RootErrorHandler rootErrorHandler;
     private final InsiderTracker insiderTracker;
@@ -40,7 +40,7 @@ public class Scheduler {
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             TelegramMessageProcessor telegramMessageProcessor,
             RootErrorHandler rootErrorHandler,
             InsiderTracker insiderTracker,
@@ -60,7 +60,7 @@ public class Scheduler {
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
-    protected void stockMarketMonitoring() {
+    public void stockMarketMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
         } else {
@@ -70,27 +70,27 @@ public class Scheduler {
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 420000)
-    protected void cryptoMarketMonitoring() {
+    public void cryptoMarketMonitoring() {
         rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
         log.info("Crypto market monitoring round completed.");
     }
 
     @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
-    protected void rsiStockMonitoring() {
+    public void rsiStockMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchStockClosingPrices);
 
         log.info("RSI daily stock price data fetch completed.");
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
-    protected void rsiCryptoMonitoring() {
+    public void rsiCryptoMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchCryptoClosingPrices);
 
         log.info("RSI daily crypto price data fetch completed.");
     }
 
     @Scheduled(fixedRate = 600000)
-    protected void cleanupIgnoreSymbols() {
+    public void cleanupIgnoreSymbols() {
         rootErrorHandler.run(
                 () -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
 
@@ -98,7 +98,7 @@ public class Scheduler {
     }
 
     @Scheduled(fixedRate = 60000)
-    protected void pollTelegramChatUpdates() {
+    public void pollTelegramChatUpdates() {
         List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
         rootErrorHandler.run(() -> telegramMessageProcessor.processUpdates(chatUpdates));
 
@@ -106,21 +106,21 @@ public class Scheduler {
     }
 
     @Scheduled(cron = "0 0 12 ? * SAT", zone = "CET")
-    protected void weeklyInsiderTradingReport() {
+    public void weeklyInsiderTradingReport() {
         rootErrorHandler.run(insiderTracker::trackInsiderTransactions);
 
         log.info("Weekly insider trading report generated.");
     }
 
     @Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
-    protected void dailySectorRotationTracking() {
+    public void dailySectorRotationTracking() {
         rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
 
         log.info("Daily sector rotation tracking completed.");
     }
 
     @Scheduled(cron = "0 0 0 1 * *", zone = "UTC")
-    protected void monthlyApiUsageReport() {
+    public void monthlyApiUsageReport() {
         rootErrorHandler.run(
                 () -> {
                     int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
@@ -156,5 +156,10 @@ public class Scheduler {
                 });
 
         log.info("Monthly API usage report completed.");
+    }
+
+    public void manualStockMarketMonitoring() {
+        rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+        log.info("Manual stock market monitoring completed.");
     }
 }

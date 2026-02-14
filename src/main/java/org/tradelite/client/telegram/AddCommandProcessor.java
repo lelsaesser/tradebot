@@ -20,7 +20,7 @@ import org.tradelite.service.StockSymbolRegistry;
 public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand> {
 
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
     private final FinnhubClient finnhubClient;
     private final CoinGeckoClient coinGeckoClient;
@@ -28,7 +28,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     @Autowired
     public AddCommandProcessor(
             TargetPriceProvider targetPriceProvider,
-            TelegramClient telegramClient,
+            TelegramGateway telegramClient,
             StockSymbolRegistry stockSymbolRegistry,
             FinnhubClient finnhubClient,
             CoinGeckoClient coinGeckoClient) {

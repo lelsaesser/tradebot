@@ -14,7 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.finviz.FinvizClient;
 import org.tradelite.client.finviz.dto.IndustryPerformance;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.core.SectorPerformancePersistence.PerformancePeriod;
 
 @ExtendWith(MockitoExtension.class)
@@ -22,7 +22,7 @@ class SectorRotationTrackerTest {
 
     @Mock private FinvizClient finvizClient;
     @Mock private SectorPerformancePersistence persistence;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
 
     private SectorRotationTracker tracker;
 

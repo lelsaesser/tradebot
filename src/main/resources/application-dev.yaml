@@ -1,0 +1,11 @@
+spring:
+  task:
+    scheduling:
+      enabled: false
+
+tradebot:
+  api:
+    finnhub-key: ${FINNHUB_DEV_API_KEY:}
+    coingecko-key: ${COINGECKO_DEV_API_KEY:}
+  telegram:
+    local-sink-file: config/dev-telegram-messages.log

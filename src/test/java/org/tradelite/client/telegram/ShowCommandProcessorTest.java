@@ -19,7 +19,7 @@ import org.tradelite.common.TargetPriceProvider;
 class ShowCommandProcessorTest {
 
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
 
     private ShowCommandProcessor showCommandProcessor;
 

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
@@ -29,7 +29,7 @@ import org.tradelite.service.model.RsiDailyClosePrice;
 @SpringBootTest
 class RsiServiceTest {
 
-    @MockitoBean private TelegramClient telegramClient;
+    @MockitoBean private TelegramGateway telegramClient;
     @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
     @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
