@@ -7,7 +7,6 @@ public class TradebotApiProperties {
 
     private String finnhubKey;
     private String coingeckoKey;
-    private boolean fixtureFallbackEnabled = false;
     private String fixtureBasePath = "config/dev-fixtures";
 
     public String getFinnhubKey() {
@@ -24,14 +23,6 @@ public class TradebotApiProperties {
 
     public void setCoingeckoKey(String coingeckoKey) {
         this.coingeckoKey = coingeckoKey;
-    }
-
-    public boolean isFixtureFallbackEnabled() {
-        return fixtureFallbackEnabled;
-    }
-
-    public void setFixtureFallbackEnabled(boolean fixtureFallbackEnabled) {
-        this.fixtureFallbackEnabled = fixtureFallbackEnabled;
     }
 
     public String getFixtureBasePath() {
