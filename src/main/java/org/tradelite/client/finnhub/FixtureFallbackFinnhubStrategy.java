@@ -56,7 +56,8 @@ public class FixtureFallbackFinnhubStrategy implements FinnhubFallbackStrategy {
             Class<T> type,
             Exception cause,
             Function<T, T> mapper) {
-        Path symbolPath = Path.of(apiProperties.getFixtureBasePath(), subPath, symbolOrId + ".json");
+        Path symbolPath =
+                Path.of(apiProperties.getFixtureBasePath(), subPath, symbolOrId + ".json");
         Path defaultPath = Path.of(apiProperties.getFixtureBasePath(), subPath, "default.json");
         Path selectedPath = Files.exists(symbolPath) ? symbolPath : defaultPath;
 

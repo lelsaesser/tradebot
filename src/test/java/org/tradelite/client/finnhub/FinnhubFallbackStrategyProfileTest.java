@@ -12,10 +12,11 @@ import org.tradelite.config.TradebotApiProperties;
 class FinnhubFallbackStrategyProfileTest {
 
     private final ApplicationContextRunner contextRunner =
-            new ApplicationContextRunner().withUserConfiguration(
-                    FinnhubSupportConfig.class,
-                    NoFallbackFinnhubStrategy.class,
-                    FixtureFallbackFinnhubStrategy.class);
+            new ApplicationContextRunner()
+                    .withUserConfiguration(
+                            FinnhubSupportConfig.class,
+                            NoFallbackFinnhubStrategy.class,
+                            FixtureFallbackFinnhubStrategy.class);
 
     @Test
     void devProfile_usesFixtureFallbackStrategy() {
