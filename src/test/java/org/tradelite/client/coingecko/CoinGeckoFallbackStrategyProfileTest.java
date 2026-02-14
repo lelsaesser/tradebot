@@ -12,10 +12,11 @@ import org.tradelite.config.TradebotApiProperties;
 class CoinGeckoFallbackStrategyProfileTest {
 
     private final ApplicationContextRunner contextRunner =
-            new ApplicationContextRunner().withUserConfiguration(
-                    CoinGeckoSupportConfig.class,
-                    NoFallbackCoinGeckoStrategy.class,
-                    FixtureFallbackCoinGeckoStrategy.class);
+            new ApplicationContextRunner()
+                    .withUserConfiguration(
+                            CoinGeckoSupportConfig.class,
+                            NoFallbackCoinGeckoStrategy.class,
+                            FixtureFallbackCoinGeckoStrategy.class);
 
     @Test
     void devProfile_usesFixtureFallbackStrategy() {

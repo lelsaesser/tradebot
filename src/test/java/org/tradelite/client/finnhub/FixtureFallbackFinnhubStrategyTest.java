@@ -20,8 +20,10 @@ class FixtureFallbackFinnhubStrategyTest {
         Path base = Files.createTempDirectory("finnhub-fixture");
         Path quoteDir = base.resolve("finnhub/quote");
         Files.createDirectories(quoteDir);
-        Files.writeString(quoteDir.resolve("META.json"), "{" +
-                "\"c\":120.0,\"o\":119.0,\"h\":121.0,\"l\":118.0,\"d\":1.0,\"dp\":1.0,\"pc\":119.0}");
+        Files.writeString(
+                quoteDir.resolve("META.json"),
+                "{"
+                        + "\"c\":120.0,\"o\":119.0,\"h\":121.0,\"l\":118.0,\"d\":1.0,\"dp\":1.0,\"pc\":119.0}");
 
         TradebotApiProperties properties = new TradebotApiProperties();
         properties.setFixtureBasePath(base.toString());
@@ -40,8 +42,10 @@ class FixtureFallbackFinnhubStrategyTest {
         Path base = Files.createTempDirectory("finnhub-fixture-default");
         Path quoteDir = base.resolve("finnhub/quote");
         Files.createDirectories(quoteDir);
-        Files.writeString(quoteDir.resolve("default.json"), "{" +
-                "\"c\":99.0,\"o\":98.0,\"h\":100.0,\"l\":97.0,\"d\":1.0,\"dp\":1.0,\"pc\":98.0}");
+        Files.writeString(
+                quoteDir.resolve("default.json"),
+                "{"
+                        + "\"c\":99.0,\"o\":98.0,\"h\":100.0,\"l\":97.0,\"d\":1.0,\"dp\":1.0,\"pc\":98.0}");
 
         TradebotApiProperties properties = new TradebotApiProperties();
         properties.setFixtureBasePath(base.toString());
@@ -49,7 +53,8 @@ class FixtureFallbackFinnhubStrategyTest {
                 new FixtureFallbackFinnhubStrategy(properties, new ObjectMapper());
 
         PriceQuoteResponse result =
-                strategy.onQuoteFailure(new StockSymbol("AAPL", "Apple"), new RuntimeException("x"));
+                strategy.onQuoteFailure(
+                        new StockSymbol("AAPL", "Apple"), new RuntimeException("x"));
 
         assertThat(result.getCurrentPrice(), is(99.0));
     }
@@ -85,7 +90,8 @@ class FixtureFallbackFinnhubStrategyTest {
                 new FixtureFallbackFinnhubStrategy(properties, new ObjectMapper());
 
         InsiderTransactionResponse result =
-                strategy.onInsiderFailure(new StockSymbol("META", "Meta"), new RuntimeException("x"));
+                strategy.onInsiderFailure(
+                        new StockSymbol("META", "Meta"), new RuntimeException("x"));
 
         assertThat(result.data().size(), is(1));
     }

@@ -9,10 +9,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.tradelite.config.TradebotApiProperties;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.config.TradebotApiProperties;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 

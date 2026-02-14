@@ -9,9 +9,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-import org.tradelite.config.TradebotTelegramProperties;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
+import org.tradelite.config.TradebotTelegramProperties;
 
 @Slf4j
 @Component
@@ -26,8 +26,7 @@ public class TelegramClient implements TelegramGateway {
 
     @Autowired
     public TelegramClient(
-            RestTemplate restTemplate,
-            TradebotTelegramProperties telegramProperties) {
+            RestTemplate restTemplate, TradebotTelegramProperties telegramProperties) {
         this.restTemplate = restTemplate;
         this.botToken = telegramProperties.getBotToken();
         this.groupChatId = telegramProperties.getGroupChatId();

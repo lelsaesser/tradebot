@@ -28,13 +28,18 @@ public class FixtureFallbackCoinGeckoStrategy implements CoinGeckoFallbackStrate
     @Override
     public CoinGeckoPriceResponse.CoinData onPriceFailure(CoinId coinId, Exception cause) {
         Path coinPath =
-                Path.of(apiProperties.getFixtureBasePath(), "coingecko/price", coinId.getId() + ".json");
-        Path defaultPath = Path.of(apiProperties.getFixtureBasePath(), "coingecko/price", "default.json");
+                Path.of(
+                        apiProperties.getFixtureBasePath(),
+                        "coingecko/price",
+                        coinId.getId() + ".json");
+        Path defaultPath =
+                Path.of(apiProperties.getFixtureBasePath(), "coingecko/price", "default.json");
         Path selectedPath = Files.exists(coinPath) ? coinPath : defaultPath;
 
         try {
             CoinGeckoPriceResponse.CoinData fixture =
-                    objectMapper.readValue(selectedPath.toFile(), CoinGeckoPriceResponse.CoinData.class);
+                    objectMapper.readValue(
+                            selectedPath.toFile(), CoinGeckoPriceResponse.CoinData.class);
             fixture.setCoinId(coinId);
 
             if (!Files.exists(coinPath)) {

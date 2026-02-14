@@ -37,7 +37,8 @@ class FinnhubClientTest {
     void setUp() {
         properties = new TradebotApiProperties();
         properties.setFinnhubKey("test-key");
-        finnhubClient = new FinnhubClient(restTemplate, meteringService, properties, fallbackStrategy);
+        finnhubClient =
+                new FinnhubClient(restTemplate, meteringService, properties, fallbackStrategy);
     }
 
     @Test
@@ -74,7 +75,8 @@ class FinnhubClientTest {
                         any(HttpEntity.class),
                         eq(PriceQuoteResponse.class)))
                 .thenReturn(ResponseEntity.notFound().build());
-        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class))).thenReturn(fallback);
+        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class)))
+                .thenReturn(fallback);
 
         PriceQuoteResponse result = finnhubClient.getPriceQuote(ticker);
 
@@ -95,7 +97,8 @@ class FinnhubClientTest {
                         any(HttpEntity.class),
                         eq(PriceQuoteResponse.class)))
                 .thenThrow(new RestClientException("Error fetching price quote"));
-        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class))).thenReturn(fallback);
+        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class)))
+                .thenReturn(fallback);
 
         PriceQuoteResponse result = finnhubClient.getPriceQuote(ticker);
 
@@ -111,7 +114,8 @@ class FinnhubClientTest {
         PriceQuoteResponse fallback = new PriceQuoteResponse();
         fallback.setCurrentPrice(99.0);
         fallback.setStockSymbol(ticker);
-        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class))).thenReturn(fallback);
+        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class)))
+                .thenReturn(fallback);
 
         PriceQuoteResponse result = finnhubClient.getPriceQuote(ticker);
 
@@ -126,7 +130,13 @@ class FinnhubClientTest {
                 new InsiderTransactionResponse(
                         List.of(
                                 new InsiderTransactionResponse.Transaction(
-                                        "Alice", 100, 5, "2023-10-02", "2023-10-01", "S", 10200.0)));
+                                        "Alice",
+                                        100,
+                                        5,
+                                        "2023-10-02",
+                                        "2023-10-01",
+                                        "S",
+                                        10200.0)));
 
         when(restTemplate.exchange(
                         anyString(),
@@ -154,7 +164,8 @@ class FinnhubClientTest {
                         any(HttpEntity.class),
                         eq(InsiderTransactionResponse.class)))
                 .thenThrow(new RestClientException("Error fetching insider transactions"));
-        when(fallbackStrategy.onInsiderFailure(eq(ticker), any(Exception.class))).thenReturn(fallback);
+        when(fallbackStrategy.onInsiderFailure(eq(ticker), any(Exception.class)))
+                .thenReturn(fallback);
 
         InsiderTransactionResponse result = finnhubClient.getInsiderTransactions(ticker);
 

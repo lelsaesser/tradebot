@@ -23,6 +23,8 @@ class NoFallbackFinnhubStrategyTest {
 
         assertThrows(
                 IllegalStateException.class,
-                () -> strategy.onInsiderFailure(new StockSymbol("META", "Meta"), new Exception("x")));
+                () ->
+                        strategy.onInsiderFailure(
+                                new StockSymbol("META", "Meta"), new Exception("x")));
     }
 }

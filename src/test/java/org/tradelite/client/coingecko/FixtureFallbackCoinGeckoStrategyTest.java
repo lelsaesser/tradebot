@@ -19,7 +19,8 @@ class FixtureFallbackCoinGeckoStrategyTest {
         Path base = Files.createTempDirectory("coingecko-fixture");
         Path priceDir = base.resolve("coingecko/price");
         Files.createDirectories(priceDir);
-        Files.writeString(priceDir.resolve("bitcoin.json"), "{\"usd\":456.0,\"usd_24h_change\":1.5}");
+        Files.writeString(
+                priceDir.resolve("bitcoin.json"), "{\"usd\":456.0,\"usd_24h_change\":1.5}");
 
         TradebotApiProperties properties = new TradebotApiProperties();
         properties.setFixtureBasePath(base.toString());
@@ -38,7 +39,8 @@ class FixtureFallbackCoinGeckoStrategyTest {
         Path base = Files.createTempDirectory("coingecko-fixture-default");
         Path priceDir = base.resolve("coingecko/price");
         Files.createDirectories(priceDir);
-        Files.writeString(priceDir.resolve("default.json"), "{\"usd\":123.0,\"usd_24h_change\":0.1}");
+        Files.writeString(
+                priceDir.resolve("default.json"), "{\"usd\":123.0,\"usd_24h_change\":0.1}");
 
         TradebotApiProperties properties = new TradebotApiProperties();
         properties.setFixtureBasePath(base.toString());

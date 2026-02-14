@@ -36,7 +36,8 @@ class CoinGeckoClientTest {
     void setUp() {
         properties = new TradebotApiProperties();
         properties.setCoingeckoKey("test-key");
-        coinGeckoClient = new CoinGeckoClient(restTemplate, meteringService, properties, fallbackStrategy);
+        coinGeckoClient =
+                new CoinGeckoClient(restTemplate, meteringService, properties, fallbackStrategy);
     }
 
     @Test
