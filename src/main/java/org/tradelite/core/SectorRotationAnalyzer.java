@@ -68,8 +68,8 @@ public class SectorRotationAnalyzer {
             RotationSignal signal = evaluateSignal(current, zScoreWeekly, zScoreMonthly);
             if (signal != null) {
                 signals.add(signal);
-                log.info(
-                        "Detected {} signal for {}: zWeekly={}, zMonthly={}",
+                log.debug(
+                        "Detected {} signal for {}: zWeekly={:.2f}, zMonthly={:.2f}",
                         signal.signalType(),
                         signal.sectorName(),
                         zScoreWeekly,
@@ -96,8 +96,8 @@ public class SectorRotationAnalyzer {
         // Collect all historical values for each sector
         for (SectorPerformanceSnapshot snapshot : history) {
             for (IndustryPerformance perf : snapshot.performances()) {
-                weeklyValues.computeIfAbsent(perf.name(), _ -> new ArrayList<>());
-                monthlyValues.computeIfAbsent(perf.name(), _ -> new ArrayList<>());
+                weeklyValues.computeIfAbsent(perf.name(), k -> new ArrayList<>());
+                monthlyValues.computeIfAbsent(perf.name(), k -> new ArrayList<>());
 
                 if (perf.perfWeek() != null) {
                     weeklyValues.get(perf.name()).add(perf.perfWeek().doubleValue());
@@ -120,18 +120,8 @@ public class SectorRotationAnalyzer {
             double monthlyMean = calculateMean(monthly);
             double monthlyStdDev = calculateStdDev(monthly, monthlyMean);
 
-            int weeklySize;
-            int monthlySize;
-            if (weekly == null) {
-                weeklySize = 0;
-            } else {
-                weeklySize = weekly.size();
-            }
-            if (monthly == null) {
-                monthlySize = 0;
-            } else {
-                monthlySize = monthly.size();
-            }
+            int weeklySize = weekly == null ? 0 : weekly.size();
+            int monthlySize = monthly == null ? 0 : monthly.size();
 
             stats.put(
                     sectorName,

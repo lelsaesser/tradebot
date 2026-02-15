@@ -9,7 +9,8 @@
 - RSI calculation and monitoring
 - Insider transaction tracking
 - Message tracking to avoid duplicate processing
-- **Sector rotation tracking** ✅ **NEW - Feb 9, 2026**
+- **Sector rotation tracking** ✅ (Feb 9, 2026)
+- **Sector rotation detection algorithm** ✅ **NEW - Feb 15, 2026**
 
 ### Telegram Commands ✅
 - `/set buy/sell <symbol> <price>` - Set target prices
@@ -25,18 +26,67 @@
 - Insider transaction history
 - API request metering for rate limiting
 - Last processed message ID tracking
-- **Sector performance history** (config/sector-performance.json) ✅ **NEW**
+- Sector performance history (config/sector-performance.json)
 
 ### Monitoring & Alerts ✅
 - Scheduled price checks for stocks and cryptocurrencies
 - Alert thresholds with ignore mechanisms to prevent spam
 - RSI alerts when values cross 30 (oversold) or 70 (overbought)
 - Weekly insider transaction reports
-- **Daily sector performance reports** ✅ **NEW**
+- Daily sector performance reports
+- **Sector rotation alerts (Z-Score based)** ✅ **NEW**
 
-## Recent Milestone: Sector Rotation Tracking ✅ COMPLETE
+## Latest Milestone: Sector Rotation Detection Algorithm ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All 330 tests passing, build successful
+**Status**: ✅ **PRODUCTION READY** - All 347 tests passing, build successful
+
+### Implementation Complete (February 15, 2026)
+
+#### Algorithm Overview
+- **Z-Score Based Statistical Analysis**: Adaptive thresholds that adjust to market volatility
+- **High Confidence Alerts Only**: Both weekly and monthly z-scores must exceed 2.0
+- **Same-Direction Requirement**: Prevents false positives from diverging signals
+- **Minimum History**: Requires at least 5 historical snapshots for reliability
+
+#### New Components Created
+- `RotationSignal.java` - Record for detected rotation signals
+  - SignalType: ROTATING_IN or ROTATING_OUT
+  - Confidence levels: HIGH, MEDIUM, LOW
+  - Z-scores for weekly and monthly performance
+- `SectorRotationAnalyzer.java` - Core analysis component
+  - Calculates historical mean and standard deviation
+  - Computes z-scores: (current_value - mean) / std_dev
+  - Filters for high-confidence signals only
+
+#### Files Modified
+- `SectorRotationTracker.java` - Added analyzer integration
+  - `analyzeAndSendRotationAlerts()` method
+  - Telegram alert formatting
+- `SectorRotationTrackerTest.java` - Added 5 new tests
+
+#### Alert Message Format
+```
+🚨 *SECTOR ROTATION ALERT*
+
+*💰 Money Flowing INTO:*
+• *Technology*
+  Weekly: +15.00% (z=2.5) | Monthly: +25.00% (z=3.0)
+
+*💸 Money Flowing OUT OF:*
+• *Energy*
+  Weekly: -12.00% (z=-2.8) | Monthly: -18.00% (z=-3.2)
+
+_Based on Z-Score analysis (>2σ deviation)_
+```
+
+### Build Status ✅
+```
+Tests run: 347, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+All coverage checks have been met.
+```
+
+## Previous Milestone: Sector Rotation Tracking Base ✅ COMPLETE
 
 ### Implementation Complete (February 9, 2026)
 
@@ -58,28 +108,6 @@
 - ✅ Runs weekdays only (MON-FRI)
 - ✅ Sends Telegram report with top 5 gainers/losers
 
-#### New Files Created
-- `src/main/java/org/tradelite/client/finviz/FinvizClient.java`
-- `src/main/java/org/tradelite/client/finviz/dto/IndustryPerformance.java`
-- `src/main/java/org/tradelite/core/SectorPerformanceSnapshot.java`
-- `src/main/java/org/tradelite/core/SectorPerformancePersistence.java`
-- `src/main/java/org/tradelite/core/SectorRotationTracker.java`
-- `src/test/java/org/tradelite/client/finviz/FinvizClientTest.java`
-- `src/test/java/org/tradelite/core/SectorPerformancePersistenceTest.java`
-- `src/test/java/org/tradelite/core/SectorRotationTrackerTest.java`
-
-#### Modified Files
-- `pom.xml` - Added JSoup 1.18.3 dependency
-- `Scheduler.java` - Added dailySectorRotationTracking() method
-- `SchedulerTest.java` - Updated with SectorRotationTracker mock
-- `BeanConfig.java` - Registered new beans
-
-### Build Status ✅
-```
-Tests run: 330, Failures: 0, Errors: 0, Skipped: 0
-BUILD SUCCESS
-```
-
 ## Previous Milestone: Dynamic Symbol Management ✅ COMPLETE
 
 ### Implementation Complete (February 2026)
@@ -87,7 +115,6 @@ BUILD SUCCESS
 - ✅ Converted StockSymbol from enum to regular class
 - ✅ `/add TICKER Display_Name` command
 - ✅ `/remove TICKER` command with complete cleanup
-- ✅ All 270 tests passing at that time
 
 ## Test Coverage Status
 
@@ -98,8 +125,8 @@ BUILD SUCCESS
 - All critical paths covered with tests
 
 ### Test Metrics
-- ✅ Total tests: 330
-- ✅ New tests added: 22 (sector rotation)
+- ✅ Total tests: 347 (increased from 330)
+- ✅ New tests added: 17 (12 analyzer + 5 tracker)
 - ✅ No compilation errors
 - ✅ Integration tests validated
 
@@ -108,22 +135,22 @@ BUILD SUCCESS
 ### Documentation ✅
 - ✅ Memory bank updated with complete implementation details
 - ✅ Architecture decisions documented
-- ✅ Testing patterns documented
+- ✅ Algorithm design documented
 
 ### Code Quality ✅
 - ✅ Spotless formatter applied to all files
 - ✅ Proper error handling in all components
-- ✅ Thread safety verified
+- ✅ Defensive coding patterns applied (NPE prevention)
 - ✅ Comprehensive logging added
 
 ## Future Enhancements
 
 ### Sector Rotation (Future)
-- Trend analysis over multiple weeks
-- Sector rotation alerts (big changes)
-- Historical comparison reports
-- Sector heatmap visualization
-- Correlation with market indices
+- Add MEDIUM confidence alerts option (configurable)
+- Momentum scoring (rate of change in z-scores)
+- Multi-week trend confirmation
+- Sector correlation analysis
+- Historical backtesting of signals
 
 ### General (Future)
 - Bulk import/export of stock symbols
@@ -134,12 +161,12 @@ BUILD SUCCESS
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: February 9, 2026
+- Date: February 15, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
 
 ### Pre-Deployment Checklist
-- ✅ All tests passing (330/330)
+- ✅ All tests passing (347/347)
 - ✅ Build successful
 - ✅ Code coverage acceptable (97%)
 - ✅ Documentation updated
@@ -153,7 +180,7 @@ BUILD SUCCESS
 | `config/stock-symbols.json` | Stock symbol registry (38 symbols) |
 | `config/target-prices-stocks.json` | Stock target prices |
 | `config/target-prices-coins.json` | Crypto target prices |
-| `config/sector-performance.json` | Sector performance history **NEW** |
+| `config/sector-performance.json` | Sector performance history |
 | `config/insider-transactions.json` | Insider trading data |
 | `config/finnhub-monthly-requests.txt` | API metering |
 | `config/coingecko-monthly-requests.txt` | API metering |
@@ -162,7 +189,7 @@ BUILD SUCCESS
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| JSoup | 1.18.3 | HTML parsing for FinViz scraping **NEW** |
+| JSoup | 1.18.3 | HTML parsing for FinViz scraping |
 
 ## Scheduled Tasks Summary
 
@@ -174,4 +201,14 @@ BUILD SUCCESS
 | rsiCryptoMonitoring | Daily 00:05 ET | RSI calculation for crypto |
 | weeklyInsiderTradingReport | Weekly Fri 17:00 ET | Insider transaction report |
 | monthlyApiUsageReport | Monthly 1st, 00:30 | API usage statistics |
-| **dailySectorRotationTracking** | Daily 22:30 ET (Mon-Fri) | Sector performance report **NEW** |
+| dailySectorRotationTracking | Daily 22:30 ET (Mon-Fri) | Sector performance report + rotation alerts |
+
+## Core Components Summary
+
+| Component | Purpose |
+|-----------|---------|
+| `FinvizClient` | Web scraper for industry performance data |
+| `SectorPerformancePersistence` | JSON storage for sector data |
+| `SectorRotationTracker` | Orchestrates fetch → store → analyze → alert |
+| `SectorRotationAnalyzer` | Z-Score based rotation detection **NEW** |
+| `RotationSignal` | Data model for rotation alerts **NEW** |

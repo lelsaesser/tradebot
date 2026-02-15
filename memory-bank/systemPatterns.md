@@ -13,7 +13,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays, and sends Telegram notifications for overbought/oversold conditions. Integrates cached current prices for accurate on-demand RSI queries.
 -   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations. Critical for technical analysis.
 -   **`InsiderTracker`:** Tracks and reports insider trading activities, providing valuable market insights.
--   **`SectorRotationTracker`:** **NEW** - Tracks industry sector performance from FinViz. Fetches daily performance data and sends reports on top/bottom performers.
+-   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz. Fetches daily performance data, sends reports on top/bottom performers, and triggers rotation analysis.
+-   **`SectorRotationAnalyzer`:** **NEW** - Statistical analysis component that detects sector rotation signals using Z-Score analysis. Calculates historical mean/standard deviation and identifies sectors with >2σ deviation.
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
@@ -126,6 +127,40 @@ public void someTask() {
 ```
 
 This ensures failures are logged but don't crash the application.
+
+## Z-Score Statistical Analysis Pattern (Sector Rotation)
+
+The `SectorRotationAnalyzer` uses Z-Score analysis for early rotation detection:
+
+```java
+// Calculate z-score: (current_value - mean) / std_dev
+double zScoreWeekly = calculateZScore(current.perfWeek(), stats.weeklyMean, stats.weeklyStdDev);
+double zScoreMonthly = calculateZScore(current.perfMonth(), stats.monthlyMean, stats.monthlyStdDev);
+
+// Only generate HIGH confidence signals (>2σ)
+if (absZWeekly >= 2.0 && absZMonthly >= 2.0) {
+    // Both weekly and monthly significantly deviate from historical norm
+    // Requires same direction (both positive or both negative)
+}
+```
+
+**Algorithm Properties:**
+- **Adaptive Thresholds**: Z-scores auto-adjust to market volatility
+- **Conservative Alerts**: Only HIGH confidence signals (>2σ) to minimize false positives
+- **Dual Timeframe**: Requires both weekly AND monthly confirmation
+- **Same-Direction Requirement**: Prevents false positives from diverging signals
+- **Minimum History**: Requires 5+ snapshots for reliable statistics
+
+**Data Flow:**
+```
+SectorPerformancePersistence.loadHistory()
+    → SectorRotationAnalyzer.analyzeRotations()
+        → Calculate historical mean/stdDev per sector
+        → Compute z-scores for current performance
+        → Filter for HIGH confidence signals
+    → SectorRotationTracker.analyzeAndSendRotationAlerts()
+        → Format and send Telegram alerts
+```
 
 ## Testing Patterns
 
