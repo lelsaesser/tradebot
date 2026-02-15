@@ -68,8 +68,8 @@ public class SectorRotationAnalyzer {
             RotationSignal signal = evaluateSignal(current, zScoreWeekly, zScoreMonthly);
             if (signal != null) {
                 signals.add(signal);
-                log.debug(
-                        "Detected {} signal for {}: zWeekly={:.2f}, zMonthly={:.2f}",
+                log.info(
+                        "Detected {} signal for {}: zWeekly={}, zMonthly={}",
                         signal.signalType(),
                         signal.sectorName(),
                         zScoreWeekly,
@@ -96,8 +96,8 @@ public class SectorRotationAnalyzer {
         // Collect all historical values for each sector
         for (SectorPerformanceSnapshot snapshot : history) {
             for (IndustryPerformance perf : snapshot.performances()) {
-                weeklyValues.computeIfAbsent(perf.name(), k -> new ArrayList<>());
-                monthlyValues.computeIfAbsent(perf.name(), k -> new ArrayList<>());
+                weeklyValues.computeIfAbsent(perf.name(), _ -> new ArrayList<>());
+                monthlyValues.computeIfAbsent(perf.name(), _ -> new ArrayList<>());
 
                 if (perf.perfWeek() != null) {
                     weeklyValues.get(perf.name()).add(perf.perfWeek().doubleValue());

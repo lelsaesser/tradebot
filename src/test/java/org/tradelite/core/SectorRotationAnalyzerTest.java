@@ -69,9 +69,9 @@ class SectorRotationAnalyzerTest {
         List<RotationSignal> signals = analyzer.analyzeRotations(history);
 
         assertThat(signals, hasSize(1));
-        assertThat(signals.get(0).sectorName(), is("Tech"));
-        assertThat(signals.get(0).signalType(), is(RotationSignal.SignalType.ROTATING_IN));
-        assertThat(signals.get(0).confidence(), is(RotationSignal.Confidence.HIGH));
+        assertThat(signals.getFirst().sectorName(), is("Tech"));
+        assertThat(signals.getFirst().signalType(), is(RotationSignal.SignalType.ROTATING_IN));
+        assertThat(signals.getFirst().confidence(), is(RotationSignal.Confidence.HIGH));
     }
 
     @Test
@@ -89,9 +89,9 @@ class SectorRotationAnalyzerTest {
         List<RotationSignal> signals = analyzer.analyzeRotations(history);
 
         assertThat(signals, hasSize(1));
-        assertThat(signals.get(0).sectorName(), is("Energy"));
-        assertThat(signals.get(0).signalType(), is(RotationSignal.SignalType.ROTATING_OUT));
-        assertThat(signals.get(0).confidence(), is(RotationSignal.Confidence.HIGH));
+        assertThat(signals.getFirst().sectorName(), is("Energy"));
+        assertThat(signals.getFirst().signalType(), is(RotationSignal.SignalType.ROTATING_OUT));
+        assertThat(signals.getFirst().confidence(), is(RotationSignal.Confidence.HIGH));
     }
 
     @Test
@@ -200,7 +200,7 @@ class SectorRotationAnalyzerTest {
         List<RotationSignal> signals = analyzer.analyzeRotations(history);
 
         assertThat(signals, hasSize(1));
-        RotationSignal signal = signals.get(0);
+        RotationSignal signal = signals.getFirst();
         assertThat(signal.weeklyPerformance(), is(new BigDecimal("20.0")));
         assertThat(signal.monthlyPerformance(), is(new BigDecimal("40.0")));
         assertThat(signal.zScoreWeekly(), is(greaterThan(2.0)));
