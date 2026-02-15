@@ -1,145 +1,144 @@
 # Active Context
 
 ## Current Work Focus
-✅ **COMPLETED**: Sector Rotation Tracking Feature (February 9, 2026)
-- Web scraper for FinViz industry performance data
-- Daily scheduled task to fetch and store data
-- Telegram notifications for top/bottom performers
-- All 330 tests passing, build successful
+✅ **COMPLETED**: Sector Rotation Detection Algorithm (February 15, 2026)
+- Z-Score based statistical analysis for early rotation detection
+- High-confidence alerts (>2 standard deviations)
+- Telegram notifications for money flow signals
+- All 347 tests passing, build successful
 
 ## Recent Changes (February 2026)
 
-### Sector Rotation Tracking - COMPLETED
+### Sector Rotation Detection Algorithm - COMPLETED (Feb 15, 2026)
+
+1. **RotationSignal Record** ✅
+   - `SignalType`: ROTATING_IN (money flowing in) or ROTATING_OUT (money flowing out)
+   - `Confidence`: HIGH (both weekly/monthly > 2σ), MEDIUM, LOW
+   - Includes z-scores for weekly and monthly performance
+
+2. **SectorRotationAnalyzer** ✅
+   - Z-Score statistical analysis: `(current_value - mean) / std_dev`
+   - Calculates historical mean and standard deviation for each sector
+   - Only generates HIGH confidence signals (both weekly and monthly z-scores > 2.0)
+   - Requires same-direction z-scores (no diverging signals)
+   - Minimum 5 historical snapshots required for reliable analysis
+
+3. **SectorRotationTracker Updates** ✅
+   - Added `analyzeAndSendRotationAlerts()` method
+   - Telegram alert format with "Money Flowing INTO" and "Money Flowing OUT OF" sections
+   - Z-score values included in alerts
+   - Integrated with daily fetch workflow
+
+4. **New Files Created** ✅
+   - `src/main/java/org/tradelite/core/RotationSignal.java`
+   - `src/main/java/org/tradelite/core/SectorRotationAnalyzer.java`
+   - `src/test/java/org/tradelite/core/SectorRotationAnalyzerTest.java`
+
+5. **Modified Files** ✅
+   - `SectorRotationTracker.java` - Added analyzer integration and alert methods
+   - `SectorRotationTrackerTest.java` - Added 5 new tests for rotation alerts
+
+### Alert Message Format
+```
+🚨 *SECTOR ROTATION ALERT*
+
+*💰 Money Flowing INTO:*
+• *Technology*
+  Weekly: +15.00% (z=2.5) | Monthly: +25.00% (z=3.0)
+
+*💸 Money Flowing OUT OF:*
+• *Energy*
+  Weekly: -12.00% (z=-2.8) | Monthly: -18.00% (z=-3.2)
+
+_Based on Z-Score analysis (>2σ deviation)_
+```
+
+### Previous: Sector Rotation Tracking Base - COMPLETED (Feb 9, 2026)
 
 1. **FinViz Web Scraper** ✅
    - Created `FinvizClient` using JSoup for HTML parsing
-   - Scrapes industry performance data from https://finviz.com/groups.ashx?g=industry&v=140
-   - Parses performance metrics: daily change, weekly, monthly, quarterly, half-year, yearly, YTD
+   - Scrapes industry performance data from FinViz
    - No browser automation needed (pure HTTP + HTML parsing)
 
 2. **Data Persistence** ✅
-   - `SectorPerformancePersistence` stores snapshots in `config/sector-performance.json`
+   - `SectorPerformancePersistence` stores snapshots in JSON
    - Historical data maintained for trend analysis
-   - Methods for top/bottom performers by period (daily, weekly, monthly, quarterly, yearly)
 
 3. **Automated Tracking** ✅
-   - `SectorRotationTracker` orchestrates fetch → store → report workflow
+   - Scheduled daily at 10:30 PM ET (after US market close)
    - Sends daily Telegram report with top 5 gainers and losers
-   - Scheduled daily at 10:30 PM ET (after US market close) on weekdays
-
-4. **New Files Created** ✅
-   - `src/main/java/org/tradelite/client/finviz/FinvizClient.java`
-   - `src/main/java/org/tradelite/client/finviz/dto/IndustryPerformance.java`
-   - `src/main/java/org/tradelite/core/SectorPerformanceSnapshot.java`
-   - `src/main/java/org/tradelite/core/SectorPerformancePersistence.java`
-   - `src/main/java/org/tradelite/core/SectorRotationTracker.java`
-   - `src/test/java/org/tradelite/client/finviz/FinvizClientTest.java`
-   - `src/test/java/org/tradelite/core/SectorPerformancePersistenceTest.java`
-   - `src/test/java/org/tradelite/core/SectorRotationTrackerTest.java`
-
-5. **Modified Files** ✅
-   - `pom.xml` - Added JSoup 1.18.3 dependency
-   - `Scheduler.java` - Added dailySectorRotationTracking() method
-   - `SchedulerTest.java` - Updated with SectorRotationTracker mock
-   - `BeanConfig.java` - Registered new beans
-
-### Previous: Dynamic Stock Symbol Management - COMPLETED
-
-1. **StockSymbol Refactoring**: Converted from enum to regular class ✅
-2. **New Telegram Commands**: `/add TICKER Display_Name` and `/remove TICKER` ✅
-3. **StockSymbolRegistry**: Dynamic symbol management with JSON persistence ✅
 
 ## Testing Summary
 
-- **Total Tests**: 330 ✅
+- **Total Tests**: 347 ✅ (increased from 330)
+- **New Tests Added**: 17 (12 SectorRotationAnalyzerTest + 5 SectorRotationTrackerTest)
 - **Build Status**: SUCCESS ✅
-- New sector rotation tests: 22 tests across 3 test files
+- **Coverage**: All checks met ✅
 
 ## Active Decisions and Considerations
 
-### Sector Rotation Architecture
-- **JSoup over Playwright**: Simpler, faster, no browser dependencies
-- **JSON Persistence**: Consistent with other config files pattern
-- **No Telegram Command**: Scheduler-only, no manual trigger needed
-- **Historical Storage**: Full snapshots stored for future trend analysis
+### Algorithm Design Decisions
+- **Z-Score over Moving Averages**: Provides adaptive thresholds that adjust to market volatility
+- **Conservative Approach**: Only HIGH confidence signals (>2σ) to minimize false positives
+- **Dual Timeframe**: Requires both weekly AND monthly z-scores to confirm rotation
+- **Same-Direction Requirement**: No alerts for diverging weekly/monthly signals
 
-### Data Model
+### Detection Thresholds
 ```java
-record IndustryPerformance(
-    String name,
-    BigDecimal perfWeek,
-    BigDecimal perfMonth, 
-    BigDecimal perfQuarter,
-    BigDecimal perfHalf,
-    BigDecimal perfYear,
-    BigDecimal perfYtd,
-    BigDecimal change  // daily change
-)
+HIGH_CONFIDENCE_THRESHOLD = 2.0   // 2 standard deviations
+MEDIUM_CONFIDENCE_THRESHOLD = 1.5 // 1.5 standard deviations
+MIN_HISTORY_SIZE = 5              // Minimum snapshots needed
 ```
 
-### Telegram Report Format
+### Data Flow
 ```
-📊 *Daily Sector Performance Report*
-📅 2026-02-09
-
-📈 *Top 5 Daily Gainers:*
-1. Technology: +5.25%
-2. Healthcare: +3.50%
-...
-
-📉 *Bottom 5 Daily Losers:*
-1. Energy: -4.20%
-2. Financials: -2.80%
-...
-
-📈 *Top 5 Weekly Gainers:*
-...
+FinvizClient -> SectorPerformancePersistence -> SectorRotationAnalyzer -> TelegramClient
+     |                    |                            |
+  Fetch data         Store snapshot              Analyze z-scores
+                                                      |
+                                              Generate RotationSignal
+                                                      |
+                                              Send Telegram alerts
 ```
 
 ## Important Patterns and Preferences
 
-### Web Scraping Pattern (FinViz)
+### Z-Score Calculation Pattern
 ```java
-Document doc = Jsoup.connect(url)
-    .userAgent("Mozilla/5.0...")
-    .timeout(10000)
-    .get();
-Elements rows = doc.select("table.table-light tr");
+double zScore = (currentValue - historicalMean) / stdDev;
+// Positive z-score = outperforming historical norm
+// Negative z-score = underperforming historical norm
 ```
 
-### Persistence Pattern (Sector Data)
+### Rotation Signal Generation
 ```java
-// Save snapshot
-persistence.saveSnapshot(new SectorPerformanceSnapshot(
-    LocalDate.now(), performances));
-
-// Get top performers
-List<IndustryPerformance> top = persistence.getTopPerformersByWeek(5);
+// Only generate signal if:
+// 1. Both z-scores have same direction (both positive or both negative)
+// 2. Both z-scores exceed HIGH_CONFIDENCE_THRESHOLD (2.0)
+// 3. Sector has enough historical data (>= 5 snapshots)
 ```
 
-### Scheduled Task Pattern
+### Defensive Coding Pattern (NPE Prevention)
 ```java
-@Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
-public void dailySectorRotationTracking() {
-    rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
-}
+int weeklySize = weekly == null ? 0 : weekly.size();
+int monthlySize = monthly == null ? 0 : monthly.size();
 ```
 
 ## Configuration Files
 - `config/stock-symbols.json` - Stock symbol registry (38 symbols)
 - `config/target-prices-stocks.json` - Stock target prices
 - `config/target-prices-coins.json` - Crypto target prices
-- `config/sector-performance.json` - Sector performance history (NEW)
+- `config/sector-performance.json` - Sector performance history
 - `config/insider-transactions.json` - Insider trading data
 
 ## Next Iteration Opportunities
 
 ### Sector Rotation Enhancements (Future)
-- Trend analysis over multiple weeks
-- Sector rotation alerts (big changes)
-- Historical comparison reports
-- Sector heatmap visualization
-- Correlation with market indices
+- Add MEDIUM confidence alerts option (configurable)
+- Momentum scoring (rate of change in z-scores)
+- Multi-week trend confirmation
+- Sector correlation analysis
+- Historical backtesting of signals
 
 ### General Enhancements
 - Bulk import/export of stock symbols
