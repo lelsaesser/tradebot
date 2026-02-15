@@ -21,20 +21,28 @@ import org.tradelite.core.SectorPerformancePersistence.PerformancePeriod;
 class SectorRotationTrackerTest {
 
     @Mock private FinvizClient finvizClient;
+
     @Mock private SectorPerformancePersistence persistence;
+
+    @Mock private SectorRotationAnalyzer rotationAnalyzer;
+
     @Mock private TelegramClient telegramClient;
 
     private SectorRotationTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new SectorRotationTracker(finvizClient, persistence, telegramClient);
+        tracker =
+                new SectorRotationTracker(
+                        finvizClient, persistence, rotationAnalyzer, telegramClient);
     }
 
     @Test
     void fetchAndStoreDailyPerformance_shouldFetchAndSaveData() throws IOException {
         List<IndustryPerformance> performances = createTestPerformances();
         when(finvizClient.fetchIndustryPerformance()).thenReturn(performances);
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(List.of());
 
         tracker.fetchAndStoreDailyPerformance();
 
@@ -71,10 +79,24 @@ class SectorRotationTrackerTest {
         when(persistence.getBottomPerformers(5, PerformancePeriod.DAILY)).thenReturn(performances);
         when(persistence.getTopPerformers(5, PerformancePeriod.WEEKLY)).thenReturn(performances);
         when(persistence.getBottomPerformers(5, PerformancePeriod.WEEKLY)).thenReturn(performances);
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(List.of());
 
         tracker.fetchAndStoreDailyPerformance();
 
         verify(telegramClient).sendMessage(contains("Daily Sector Rotation Report"));
+    }
+
+    @Test
+    void fetchAndStoreDailyPerformance_shouldAnalyzeRotations() throws IOException {
+        List<IndustryPerformance> performances = createTestPerformances();
+        when(finvizClient.fetchIndustryPerformance()).thenReturn(performances);
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(List.of());
+
+        tracker.fetchAndStoreDailyPerformance();
+
+        verify(rotationAnalyzer).analyzeRotations(any());
     }
 
     @Test
@@ -163,6 +185,116 @@ class SectorRotationTrackerTest {
         tracker.sendDailySummary();
 
         verify(telegramClient).sendMessage(anyString());
+    }
+
+    @Test
+    void analyzeAndSendRotationAlerts_shouldNotSendWhenNoSignals() {
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(List.of());
+
+        tracker.analyzeAndSendRotationAlerts();
+
+        verify(telegramClient, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void analyzeAndSendRotationAlerts_shouldSendAlertForRotatingInSignals() {
+        List<RotationSignal> signals =
+                List.of(
+                        new RotationSignal(
+                                "Technology",
+                                RotationSignal.SignalType.ROTATING_IN,
+                                new BigDecimal("15.0"),
+                                new BigDecimal("25.0"),
+                                2.5,
+                                3.0,
+                                RotationSignal.Confidence.HIGH));
+
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(signals);
+
+        tracker.analyzeAndSendRotationAlerts();
+
+        verify(telegramClient).sendMessage(contains("SECTOR ROTATION ALERT"));
+        verify(telegramClient).sendMessage(contains("Money Flowing INTO"));
+        verify(telegramClient).sendMessage(contains("Technology"));
+    }
+
+    @Test
+    void analyzeAndSendRotationAlerts_shouldSendAlertForRotatingOutSignals() {
+        List<RotationSignal> signals =
+                List.of(
+                        new RotationSignal(
+                                "Energy",
+                                RotationSignal.SignalType.ROTATING_OUT,
+                                new BigDecimal("-12.0"),
+                                new BigDecimal("-18.0"),
+                                -2.8,
+                                -3.2,
+                                RotationSignal.Confidence.HIGH));
+
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(signals);
+
+        tracker.analyzeAndSendRotationAlerts();
+
+        verify(telegramClient).sendMessage(contains("SECTOR ROTATION ALERT"));
+        verify(telegramClient).sendMessage(contains("Money Flowing OUT OF"));
+        verify(telegramClient).sendMessage(contains("Energy"));
+    }
+
+    @Test
+    void analyzeAndSendRotationAlerts_shouldHandleMixedSignals() {
+        List<RotationSignal> signals =
+                List.of(
+                        new RotationSignal(
+                                "Technology",
+                                RotationSignal.SignalType.ROTATING_IN,
+                                new BigDecimal("15.0"),
+                                new BigDecimal("25.0"),
+                                2.5,
+                                3.0,
+                                RotationSignal.Confidence.HIGH),
+                        new RotationSignal(
+                                "Energy",
+                                RotationSignal.SignalType.ROTATING_OUT,
+                                new BigDecimal("-12.0"),
+                                new BigDecimal("-18.0"),
+                                -2.8,
+                                -3.2,
+                                RotationSignal.Confidence.HIGH));
+
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(signals);
+
+        tracker.analyzeAndSendRotationAlerts();
+
+        verify(telegramClient).sendMessage(contains("Money Flowing INTO"));
+        verify(telegramClient).sendMessage(contains("Money Flowing OUT OF"));
+        verify(telegramClient).sendMessage(contains("Technology"));
+        verify(telegramClient).sendMessage(contains("Energy"));
+    }
+
+    @Test
+    void analyzeAndSendRotationAlerts_shouldIncludeZScoresInMessage() {
+        List<RotationSignal> signals =
+                List.of(
+                        new RotationSignal(
+                                "Finance",
+                                RotationSignal.SignalType.ROTATING_IN,
+                                new BigDecimal("10.5"),
+                                new BigDecimal("20.3"),
+                                2.1,
+                                2.4,
+                                RotationSignal.Confidence.HIGH));
+
+        when(persistence.loadHistory()).thenReturn(List.of());
+        when(rotationAnalyzer.analyzeRotations(any())).thenReturn(signals);
+
+        tracker.analyzeAndSendRotationAlerts();
+
+        verify(telegramClient).sendMessage(contains("z="));
+        verify(telegramClient).sendMessage(contains("Z-Score analysis"));
     }
 
     private List<IndustryPerformance> createTestPerformances() {
