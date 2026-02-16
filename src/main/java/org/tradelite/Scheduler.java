@@ -14,6 +14,7 @@ import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
+import org.tradelite.core.RelativeStrengthTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 
@@ -31,6 +32,7 @@ public class Scheduler {
     private final RsiPriceFetcher rsiPriceFetcher;
     private final ApiRequestMeteringService apiRequestMeteringService;
     private final SectorRotationTracker sectorRotationTracker;
+    private final RelativeStrengthTracker relativeStrengthTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -46,7 +48,8 @@ public class Scheduler {
             InsiderTracker insiderTracker,
             RsiPriceFetcher rsiPriceFetcher,
             ApiRequestMeteringService apiRequestMeteringService,
-            SectorRotationTracker sectorRotationTracker) {
+            SectorRotationTracker sectorRotationTracker,
+            RelativeStrengthTracker relativeStrengthTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -57,6 +60,7 @@ public class Scheduler {
         this.insiderTracker = insiderTracker;
         this.apiRequestMeteringService = apiRequestMeteringService;
         this.sectorRotationTracker = sectorRotationTracker;
+        this.relativeStrengthTracker = relativeStrengthTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -78,8 +82,11 @@ public class Scheduler {
     @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
     protected void rsiStockMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchStockClosingPrices);
-
         log.info("RSI daily stock price data fetch completed.");
+
+        // Run RS analysis after RSI data is fetched (both use same price data)
+        rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);
+        log.info("Relative strength vs SPY analysis completed.");
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
