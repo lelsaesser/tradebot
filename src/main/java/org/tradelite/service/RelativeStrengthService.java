@@ -168,7 +168,7 @@ public class RelativeStrengthService {
         if (crossoverUp) {
             double percentageDiff = ((currentRs - currentEma) / currentEma) * 100;
             log.info(
-                    "RS crossover UP for {}: RS={:.4f}, EMA={:.4f} (+{:.2f}%)",
+                    "RS crossover UP for {}: RS={:.4f}, EMA={} (+{}%)",
                     symbol, currentRs, currentEma, percentageDiff);
             return Optional.of(
                     new RelativeStrengthSignal(
@@ -183,7 +183,7 @@ public class RelativeStrengthService {
         if (crossoverDown) {
             double percentageDiff = ((currentRs - currentEma) / currentEma) * 100;
             log.info(
-                    "RS crossover DOWN for {}: RS={:.4f}, EMA={:.4f} ({:.2f}%)",
+                    "RS crossover DOWN for {}: RS={}, EMA={} ({}%)",
                     symbol, currentRs, currentEma, percentageDiff);
             return Optional.of(
                     new RelativeStrengthSignal(

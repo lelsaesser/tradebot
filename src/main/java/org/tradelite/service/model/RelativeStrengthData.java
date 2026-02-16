@@ -3,6 +3,7 @@ package org.tradelite.service.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import lombok.Data;
@@ -47,7 +48,7 @@ public class RelativeStrengthData {
 
         // Keep the latest 200 RS values
         if (rsHistory.size() > 200) {
-            rsHistory.sort((p1, p2) -> p1.getDate().compareTo(p2.getDate()));
+            rsHistory.sort(Comparator.comparing(DailyPrice::getDate));
             rsHistory.removeFirst();
         }
     }
@@ -59,7 +60,7 @@ public class RelativeStrengthData {
      */
     @JsonIgnore
     public List<Double> getRsValues() {
-        rsHistory.sort((p1, p2) -> p1.getDate().compareTo(p2.getDate()));
+        rsHistory.sort(Comparator.comparing(DailyPrice::getDate));
         List<Double> rsValues = new ArrayList<>();
         for (DailyPrice price : rsHistory) {
             rsValues.add(price.getPrice());

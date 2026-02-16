@@ -35,11 +35,11 @@ class RelativeStrengthServiceTest {
     private RelativeStrengthService relativeStrengthService;
 
     private final String rsDataFile = "config/rs-data.json";
-    private final String rsiDataFile = "config/rsi-data.json";
 
     @BeforeEach
     void setUp() throws IOException {
         new File(rsDataFile).delete();
+        String rsiDataFile = "config/rsi-data.json";
         new File(rsiDataFile).delete();
         rsiService =
                 new RsiService(
@@ -115,7 +115,7 @@ class RelativeStrengthServiceTest {
         for (int i = 0; i < 60; i++) {
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("NVDA", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
                     .addPrice(LocalDate.now().minusDays(59 - i), 500.0 + i);
         }
 
@@ -132,11 +132,11 @@ class RelativeStrengthServiceTest {
             LocalDate date = LocalDate.now().minusDays(29 - i);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("SPY", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 500.0);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("NVDA", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 600.0);
         }
 
@@ -153,11 +153,11 @@ class RelativeStrengthServiceTest {
             LocalDate date = LocalDate.now().minusDays(59 - i);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("SPY", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 500.0);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("NVDA", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 600.0);
         }
 
@@ -179,12 +179,12 @@ class RelativeStrengthServiceTest {
             LocalDate date = LocalDate.now().minusDays(60 - i);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("SPY", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 500.0);
             // Stock starts weak relative to SPY
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("NVDA", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 400.0 + (i < 55 ? 0 : i * 5));
         }
 
@@ -217,11 +217,11 @@ class RelativeStrengthServiceTest {
             LocalDate date = LocalDate.now().minusDays(60 - i);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("SPY", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 500.0);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("NVDA", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 600.0);
         }
 
@@ -253,11 +253,11 @@ class RelativeStrengthServiceTest {
             LocalDate date = LocalDate.now().minusDays(59 - i);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("SPY", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 500.0);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("NVDA", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 600.0);
         }
         relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
@@ -280,11 +280,11 @@ class RelativeStrengthServiceTest {
             LocalDate date = LocalDate.now().minusDays(59 - i);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("SPY", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 500.0);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("NVDA", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 600.0);
         }
 
@@ -317,11 +317,11 @@ class RelativeStrengthServiceTest {
             LocalDate date = LocalDate.now().minusDays(59 - i);
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("SPY", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 400.0); // SPY at 400
             rsiService
                     .getPriceHistory()
-                    .computeIfAbsent("AAPL", k -> new RsiDailyClosePrice())
+                    .computeIfAbsent("AAPL", _ -> new RsiDailyClosePrice())
                     .addPrice(date, 200.0); // AAPL at 200
         }
 
