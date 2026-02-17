@@ -37,7 +37,7 @@ class RsiPriceFetcherTest {
     @InjectMocks private RsiPriceFetcher rsiPriceFetcher;
 
     @Test
-    void testFetchStockClosingPrices() throws IOException {
+    void testFetchStockClosingPrices() throws IOException, InterruptedException {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
         when(stockSymbolRegistry.fromString("AAPL"))
@@ -89,7 +89,7 @@ class RsiPriceFetcherTest {
     }
 
     @Test
-    void testFetchStockClosingPrices_invalidSymbol() throws IOException {
+    void testFetchStockClosingPrices_invalidSymbol() throws IOException, InterruptedException {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("INVALID_SYMBOL", 100, 200)));
         when(stockSymbolRegistry.fromString("INVALID_SYMBOL"))
