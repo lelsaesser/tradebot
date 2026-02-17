@@ -28,7 +28,7 @@ public class RsiPriceFetcher {
     private final RsiService rsiService;
     private final StockSymbolRegistry stockSymbolRegistry;
 
-    public void fetchStockClosingPrices() throws IOException {
+    public void fetchStockClosingPrices() throws IOException, InterruptedException {
         LocalDate today = LocalDate.now();
 
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
@@ -39,6 +39,9 @@ public class RsiPriceFetcher {
                     PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(stockSymbol.get());
                     rsiService.addPrice(stockSymbol.get(), priceQuote.getCurrentPrice(), today);
                 }
+                // prevent 60 requests/minute Finnhub API limit by sleeping for 1 second between
+                // requests
+                Thread.sleep(1000);
             } catch (Exception e) {
                 log.error("Error fetching stock price for RSI", e);
                 throw e;

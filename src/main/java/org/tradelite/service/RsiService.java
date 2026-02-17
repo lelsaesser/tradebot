@@ -131,7 +131,7 @@ public class RsiService {
         if (currentPrice != null) {
             // Add the current price to get the most up-to-date RSI calculation
             historicalPrices.add(currentPrice);
-            log.debug(
+            log.info(
                     "Using current price {} from cache for RSI calculation of {}",
                     currentPrice,
                     symbol.getName());

@@ -68,7 +68,7 @@ public class SectorRotationAnalyzer {
             RotationSignal signal = evaluateSignal(current, zScoreWeekly, zScoreMonthly);
             if (signal != null) {
                 signals.add(signal);
-                log.debug(
+                log.info(
                         "Detected {} signal for {}: zWeekly={:.2f}, zMonthly={:.2f}",
                         signal.signalType(),
                         signal.sectorName(),

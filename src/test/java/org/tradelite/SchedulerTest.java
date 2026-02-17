@@ -20,6 +20,7 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
+import org.tradelite.core.RelativeStrengthTracker;
 import org.tradelite.core.RsiPriceFetcher;
 import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.service.ApiRequestMeteringService;
@@ -37,6 +38,7 @@ class SchedulerTest {
     @Mock private RsiPriceFetcher rsiPriceFetcher;
     @Mock private ApiRequestMeteringService apiRequestMeteringService;
     @Mock private SectorRotationTracker sectorRotationTracker;
+    @Mock private RelativeStrengthTracker relativeStrengthTracker;
 
     private Scheduler scheduler;
 
@@ -53,7 +55,8 @@ class SchedulerTest {
                         insiderTracker,
                         rsiPriceFetcher,
                         apiRequestMeteringService,
-                        sectorRotationTracker);
+                        sectorRotationTracker,
+                        relativeStrengthTracker);
     }
 
     @Test
@@ -144,16 +147,22 @@ class SchedulerTest {
     }
 
     @Test
-    void rsiStockMonitoring_shouldFetchStockPrices() throws Exception {
+    void rsiStockMonitoring_shouldFetchStockPricesAndAnalyzeRS() throws Exception {
         scheduler.rsiStockMonitoring();
 
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        // Verify rootErrorHandler.run is called twice (once for RSI, once for RS)
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
+        verify(rootErrorHandler, times(2)).run(captor.capture());
+
+        // Execute both captured runnables
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(rsiPriceFetcher, times(1)).fetchStockClosingPrices();
+        verify(relativeStrengthTracker, times(1)).analyzeAndSendAlerts();
     }
 
     @Test
