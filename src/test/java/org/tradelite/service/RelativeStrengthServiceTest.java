@@ -311,6 +311,97 @@ class RelativeStrengthServiceTest {
     }
 
     @Test
+    void testLoadRsHistory_existingFile() throws IOException {
+        // First, create and save RS data
+        for (int i = 0; i < 60; i++) {
+            LocalDate date = LocalDate.now().minusDays(59 - i);
+            rsiService
+                    .getPriceHistory()
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
+                    .addPrice(date, 500.0);
+            rsiService
+                    .getPriceHistory()
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
+                    .addPrice(date, 600.0);
+        }
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+        relativeStrengthService.saveRsHistory();
+
+        // Verify file exists
+        File rsFile = new File(rsDataFile);
+        assertThat(rsFile.exists(), is(true));
+
+        // Create a new service that should load from the file
+        RelativeStrengthService newService = new RelativeStrengthService(objectMapper, rsiService);
+
+        // Verify data was loaded
+        assertThat(newService.getRsHistory().containsKey("NVDA"), is(true));
+        assertThat(newService.getRsHistory().get("NVDA").isInitialized(), is(true));
+
+        // Cleanup
+        rsFile.delete();
+    }
+
+    @Test
+    void testGetCurrentRsAndEma_withInsufficientHistory() {
+        // Add only 30 days of data (less than 50 required for EMA)
+        for (int i = 0; i < 30; i++) {
+            LocalDate date = LocalDate.now().minusDays(29 - i);
+            rsiService
+                    .getPriceHistory()
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
+                    .addPrice(date, 500.0);
+            rsiService
+                    .getPriceHistory()
+                    .computeIfAbsent("MSFT", _ -> new RsiDailyClosePrice())
+                    .addPrice(date, 300.0);
+        }
+
+        // Calculate RS to populate history (even though insufficient for EMA)
+        relativeStrengthService.calculateRelativeStrength("MSFT", "Microsoft");
+
+        // Should return empty because insufficient history for EMA
+        Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("MSFT");
+
+        assertThat(rsAndEma.isEmpty(), is(true));
+    }
+
+    @Test
+    void testCalculateRelativeStrength_noCrossover() {
+        // Set up initial state
+        for (int i = 0; i < 60; i++) {
+            LocalDate date = LocalDate.now().minusDays(60 - i);
+            rsiService
+                    .getPriceHistory()
+                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
+                    .addPrice(date, 500.0);
+            rsiService
+                    .getPriceHistory()
+                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
+                    .addPrice(date, 600.0);
+        }
+
+        // First calculation to initialize
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        // Manually set previous state where RS was above EMA and still is
+        var rsData = relativeStrengthService.getRsHistory().get("NVDA");
+        rsData.setPreviousRs(1.25); // Above EMA
+        rsData.setPreviousEma(1.2); // EMA lower than RS
+
+        // Add new data point where RS is still above EMA (no crossover)
+        LocalDate today = LocalDate.now();
+        rsiService.getPriceHistory().get("SPY").addPrice(today, 500.0);
+        rsiService.getPriceHistory().get("NVDA").addPrice(today, 610.0); // RS = 1.22, still above
+
+        Optional<RelativeStrengthSignal> signal =
+                relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        // No crossover because RS stayed above EMA
+        assertThat(signal.isEmpty(), is(true));
+    }
+
+    @Test
     void testRsCalculation_correctRatio() {
         // Add aligned price data
         for (int i = 0; i < 60; i++) {
