@@ -24,7 +24,7 @@ class RelativeStrengthDataTest {
 
         List<Double> rsValues = rsData.getRsValues();
         assertThat(rsValues.size(), is(1));
-        assertThat(rsValues.get(0), is(1.25));
+        assertThat(rsValues.getFirst(), is(1.25));
     }
 
     @Test
@@ -36,7 +36,7 @@ class RelativeStrengthDataTest {
 
         List<Double> rsValues = rsData.getRsValues();
         assertThat(rsValues.size(), is(1));
-        assertThat(rsValues.get(0), is(1.50)); // Should have updated value
+        assertThat(rsValues.getFirst(), is(1.50)); // Should have updated value
     }
 
     @Test
@@ -70,7 +70,7 @@ class RelativeStrengthDataTest {
         // Should keep the most recent 200 values
         List<Double> rsValues = rsData.getRsValues();
         // First value should be from day 10 (index 10)
-        assertThat(rsValues.get(0), is(closeTo(1.10, 0.001)));
+        assertThat(rsValues.getFirst(), is(closeTo(1.10, 0.001)));
         // Last value should be from day 209
         assertThat(rsValues.get(199), is(closeTo(3.09, 0.001)));
     }
