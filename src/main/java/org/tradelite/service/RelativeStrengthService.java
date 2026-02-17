@@ -71,7 +71,7 @@ public class RelativeStrengthService {
         RsiDailyClosePrice spyPriceData = priceHistory.get(BENCHMARK_SYMBOL);
 
         if (stockPriceData == null || spyPriceData == null) {
-            log.debug(
+            log.info(
                     "Insufficient price data for RS calculation. Stock={}, SPY={}",
                     stockPriceData != null,
                     spyPriceData != null);
@@ -105,7 +105,7 @@ public class RelativeStrengthService {
         // Check if we have enough data for EMA calculation
         List<Double> rsValues = rsData.getRsValues();
         if (rsValues.size() < MIN_HISTORY_SIZE) {
-            log.debug(
+            log.info(
                     "Insufficient RS history for {}: {} values (need {})",
                     symbol,
                     rsValues.size(),
@@ -148,7 +148,7 @@ public class RelativeStrengthService {
 
         // Skip if not initialized (first calculation)
         if (!rsData.isInitialized()) {
-            log.debug("First RS calculation for {}, no crossover detection yet", symbol);
+            log.info("First RS calculation for {}, no crossover detection yet", symbol);
             return Optional.empty();
         }
 
