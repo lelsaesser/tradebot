@@ -1,2 +1,6 @@
 server:
   port: 9090
+
+tradebot:
+  database:
+    path: data/tradebot.db

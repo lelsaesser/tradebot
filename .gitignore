@@ -26,3 +26,7 @@ replay_pid*
 /target/
 setup_env.sh
 deploy.sh
+
+# SQLite database
+/data/
+*.db

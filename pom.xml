@@ -47,6 +47,11 @@
             <artifactId>jsoup</artifactId>
             <version>1.22.1</version>
         </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.51.2.0</version>
+        </dependency>
 
         <!-- TEST SCOPE -->
         <dependency>

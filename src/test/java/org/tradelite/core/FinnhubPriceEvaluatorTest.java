@@ -18,6 +18,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.PriceQuoteRepository;
 
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
@@ -26,6 +27,7 @@ class FinnhubPriceEvaluatorTest {
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private TelegramClient telegramClient;
     @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
+    @Mock private PriceQuoteRepository priceQuoteRepository;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
@@ -33,7 +35,11 @@ class FinnhubPriceEvaluatorTest {
     void setUp() {
         finnhubPriceEvaluator =
                 new FinnhubPriceEvaluator(
-                        finnhubClient, targetPriceProvider, telegramClient, stockSymbolRegistry);
+                        finnhubClient,
+                        targetPriceProvider,
+                        telegramClient,
+                        stockSymbolRegistry,
+                        priceQuoteRepository);
     }
 
     @Test
@@ -279,5 +285,42 @@ class FinnhubPriceEvaluatorTest {
         finnhubPriceEvaluator.comparePrices(
                 new StockSymbol("AVGO", "Broadcom"), 100.0, 120.0, 150.0);
         verify(telegramClient, never()).sendMessage(any());
+    }
+
+    @Test
+    void evaluatePrice_savesPriceQuoteToRepository() throws InterruptedException {
+        StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
+        List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+        when(stockSymbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
+
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(testSymbol);
+        priceQuoteResponse.setCurrentPrice(175.0);
+        priceQuoteResponse.setChangePercent(1.5);
+        when(finnhubClient.getPriceQuote(testSymbol)).thenReturn(priceQuoteResponse);
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        verify(priceQuoteRepository, times(1)).save(priceQuoteResponse);
+    }
+
+    @Test
+    void evaluatePrice_doesNotSavePriceQuoteWhenPriceUnchanged() throws InterruptedException {
+        StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
+        finnhubPriceEvaluator.lastPriceCache.put("AAPL", 175.0);
+
+        List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+        when(stockSymbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
+
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(testSymbol);
+        priceQuoteResponse.setCurrentPrice(175.0);
+        when(finnhubClient.getPriceQuote(testSymbol)).thenReturn(priceQuoteResponse);
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        verify(priceQuoteRepository, never()).save(any());
     }
 }
