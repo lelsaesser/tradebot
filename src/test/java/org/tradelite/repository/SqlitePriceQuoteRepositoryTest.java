@@ -2,12 +2,17 @@ package org.tradelite.repository;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -185,6 +190,94 @@ class SqlitePriceQuoteRepositoryTest {
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
         assertThat(results.getFirst().getTimestamp(), greaterThanOrEqualTo(beforeSave));
         assertThat(results.getFirst().getTimestamp(), lessThanOrEqualTo(afterSave));
+    }
+
+    @Test
+    void constructor_throwsExceptionOnSchemaInitFailure() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        assertThrows(
+                IllegalStateException.class, () -> new SqlitePriceQuoteRepository(mockDataSource));
+    }
+
+    @Test
+    void save_throwsExceptionOnDatabaseError() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        Connection mockConnection = mock(Connection.class);
+
+        // First call for schema init succeeds
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createStatement())
+                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
+
+        SqlitePriceQuoteRepository repoWithMock = new SqlitePriceQuoteRepository(mockDataSource);
+
+        // Second call for save fails
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        PriceQuoteResponse priceQuote = createPriceQuote("AAPL", 175.50);
+        assertThrows(IllegalStateException.class, () -> repoWithMock.save(priceQuote));
+    }
+
+    @Test
+    void findBySymbol_throwsExceptionOnDatabaseError() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        Connection mockConnection = mock(Connection.class);
+
+        // First call for schema init succeeds
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createStatement())
+                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
+
+        SqlitePriceQuoteRepository repoWithMock = new SqlitePriceQuoteRepository(mockDataSource);
+
+        // Second call for findBySymbol fails
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        assertThrows(IllegalStateException.class, () -> repoWithMock.findBySymbol("AAPL"));
+    }
+
+    @Test
+    void findBySymbolAndDate_throwsExceptionOnDatabaseError() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        Connection mockConnection = mock(Connection.class);
+
+        // First call for schema init succeeds
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createStatement())
+                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
+
+        SqlitePriceQuoteRepository repoWithMock = new SqlitePriceQuoteRepository(mockDataSource);
+
+        // Second call for findBySymbolAndDate fails
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        LocalDate today = LocalDate.now();
+        assertThrows(
+                IllegalStateException.class, () -> repoWithMock.findBySymbolAndDate("AAPL", today));
+    }
+
+    @Test
+    void findBySymbolAndDateRange_throwsExceptionOnDatabaseError() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        Connection mockConnection = mock(Connection.class);
+
+        // First call for schema init succeeds
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createStatement())
+                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
+
+        SqlitePriceQuoteRepository repoWithMock = new SqlitePriceQuoteRepository(mockDataSource);
+
+        // Second call for findBySymbolAndDateRange fails
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        LocalDate startDate = LocalDate.now().minusDays(1);
+        LocalDate endDate = LocalDate.now();
+        assertThrows(
+                IllegalStateException.class,
+                () -> repoWithMock.findBySymbolAndDateRange("AAPL", startDate, endDate));
     }
 
     private PriceQuoteResponse createPriceQuote(String symbol, double price) {
