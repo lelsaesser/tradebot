@@ -11,6 +11,7 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.tradelite.common.FeatureToggle;
 
 @Slf4j
 @Service
@@ -33,6 +34,10 @@ public class FeatureToggleService {
     public FeatureToggleService(ObjectMapper objectMapper, String filePath) {
         this.objectMapper = objectMapper;
         this.filePath = filePath;
+    }
+
+    public boolean isEnabled(FeatureToggle feature) {
+        return isEnabled(feature.getKey());
     }
 
     public boolean isEnabled(String featureName) {

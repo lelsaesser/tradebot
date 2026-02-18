@@ -12,6 +12,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.tradelite.common.FeatureToggle;
 
 class FeatureToggleServiceTest {
 
@@ -193,6 +194,20 @@ class FeatureToggleServiceTest {
         FeatureToggleService defaultService = new FeatureToggleService(objectMapper);
 
         assertThat(defaultService.isEnabled("nonExistent"), is(false));
+    }
+
+    @Test
+    void isEnabled_withEnum_returnsCorrectValue() throws IOException {
+        writeToggles(Map.of(FeatureToggle.FINNHUB_PRICE_COLLECTION.getKey(), true));
+
+        assertThat(service.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION), is(true));
+    }
+
+    @Test
+    void isEnabled_withEnum_returnsFalseWhenDisabled() throws IOException {
+        writeToggles(Map.of(FeatureToggle.FINNHUB_PRICE_COLLECTION.getKey(), false));
+
+        assertThat(service.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION), is(false));
     }
 
     private void writeToggles(Map<String, Boolean> toggles) throws IOException {
