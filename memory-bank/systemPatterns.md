@@ -35,7 +35,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`InsiderPersistence`:** Stores historical insider transaction data.
 -   **`SectorPerformancePersistence`:** Stores daily sector performance snapshots for trend analysis.
 -   **`TelegramMessageTracker`:** Tracks last processed message ID to avoid duplicates.
--   **`SqlitePriceQuoteRepository`:** **NEW** - SQLite-based storage for historical Finnhub price quotes.
+-   **`SqlitePriceQuoteRepository`:** SQLite-based storage for historical Finnhub price quotes.
+-   **`FeatureToggleService`:** **NEW** - Runtime feature flag management with JSON persistence and caching.
 
 ## Design Patterns
 
@@ -44,7 +45,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **Dependency Injection**: Used extensively by Spring to manage component dependencies, promoting loose coupling and testability. All major components are injected via constructor injection.
 -   **Scheduler Pattern**: The `Scheduler` component uses Spring's `@Scheduled` annotation to run tasks at fixed intervals. Separate schedulers exist for `stockMarketMonitoring`, `cryptoMarketMonitoring`, `dailyRsiFetching`, `weeklyInsiderReporting`, `telegramMessagePolling`, and `dailySectorRotationTracking`.
 -   **Strategy Pattern**: Different `PriceEvaluator` implementations for different data sources (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) demonstrate the Strategy pattern. This allows price evaluation logic to be easily swapped or extended.
--   **Caching Pattern**: Price evaluators maintain `lastPriceCache` maps to store recently fetched prices. The `RsiService` leverages these caches via `getCurrentPriceFromCache()` for real-time RSI calculations.
+-   **Caching Pattern**: Price evaluators maintain `lastPriceCache` maps to store recently fetched prices. The `RsiService` leverages these caches via `getCurrentPriceFromCache()` for real-time RSI calculations. The `FeatureToggleService` uses a time-based cache with 3-minute TTL for feature toggles.
 -   **Facade Pattern**: The `TelegramClient` serves as a facade, simplifying interaction with the complex underlying Telegram Bot API.
 -   **Template Method Pattern**: The `BasePriceEvaluator` abstract class provides common price evaluation logic, with specific implementations in `FinnhubPriceEvaluator` and `CoinGeckoPriceEvaluator`.
 -   **Singleton Pattern**: Spring beans are singletons by default, ensuring single instances of each component throughout the application lifecycle.
@@ -224,5 +225,6 @@ if (absZWeekly >= 2.0 && absZMonthly >= 2.0) {
 - **Mock-based testing**: All external dependencies are mocked using Mockito
 - **Argument Captors**: Used to verify complex method arguments
 - **Temp Files**: `@TempDir` for testing file persistence
-- **In-Memory SQLite**: **NEW** Unique temp DB files per test with UUID naming
+- **In-Memory SQLite**: Unique temp DB files per test with UUID naming
+- **Configurable File Paths**: Constructor injection for file paths enables temp directory usage in tests (e.g., `FeatureToggleService`)
 - **WireMock**: For HTTP client testing (optional)

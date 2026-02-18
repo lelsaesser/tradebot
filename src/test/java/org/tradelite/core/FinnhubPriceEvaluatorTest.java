@@ -15,10 +15,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.FeatureToggleService;
 
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
@@ -28,6 +30,7 @@ class FinnhubPriceEvaluatorTest {
     @Mock private TelegramClient telegramClient;
     @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
     @Mock private PriceQuoteRepository priceQuoteRepository;
+    @Mock private FeatureToggleService featureToggleService;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
@@ -39,7 +42,8 @@ class FinnhubPriceEvaluatorTest {
                         targetPriceProvider,
                         telegramClient,
                         stockSymbolRegistry,
-                        priceQuoteRepository);
+                        priceQuoteRepository,
+                        featureToggleService);
     }
 
     @Test
@@ -288,11 +292,13 @@ class FinnhubPriceEvaluatorTest {
     }
 
     @Test
-    void evaluatePrice_savesPriceQuoteToRepository() throws InterruptedException {
+    void evaluatePrice_savesPriceQuoteToRepository_whenToggleEnabled() throws InterruptedException {
         StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
         when(stockSymbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
+        when(featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION))
+                .thenReturn(true);
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
         priceQuoteResponse.setStockSymbol(testSymbol);
@@ -303,6 +309,26 @@ class FinnhubPriceEvaluatorTest {
         finnhubPriceEvaluator.evaluatePrice();
 
         verify(priceQuoteRepository, times(1)).save(priceQuoteResponse);
+    }
+
+    @Test
+    void evaluatePrice_doesNotSavePriceQuote_whenToggleDisabled() throws InterruptedException {
+        StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
+        List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+        when(stockSymbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
+        when(featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION))
+                .thenReturn(false);
+
+        PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
+        priceQuoteResponse.setStockSymbol(testSymbol);
+        priceQuoteResponse.setCurrentPrice(175.0);
+        priceQuoteResponse.setChangePercent(1.5);
+        when(finnhubClient.getPriceQuote(testSymbol)).thenReturn(priceQuoteResponse);
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        verify(priceQuoteRepository, never()).save(any());
     }
 
     @Test
