@@ -20,8 +20,6 @@ import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 @Repository
 public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
 
-    private static final ZoneId NEW_YORK_ZONE = ZoneId.of("America/New_York");
-
     private final DataSource dataSource;
 
     @Autowired
@@ -137,8 +135,8 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
 
     @Override
     public List<PriceQuoteEntity> findBySymbolAndDate(String symbol, LocalDate date) {
-        long startOfDay = date.atStartOfDay(NEW_YORK_ZONE).toEpochSecond();
-        long endOfDay = date.plusDays(1).atStartOfDay(NEW_YORK_ZONE).toEpochSecond();
+        long startOfDay = date.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+        long endOfDay = date.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
 
         return findBySymbolAndTimestampRange(symbol, startOfDay, endOfDay);
     }
@@ -146,8 +144,8 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
     @Override
     public List<PriceQuoteEntity> findBySymbolAndDateRange(
             String symbol, LocalDate startDate, LocalDate endDate) {
-        long startTimestamp = startDate.atStartOfDay(NEW_YORK_ZONE).toEpochSecond();
-        long endTimestamp = endDate.plusDays(1).atStartOfDay(NEW_YORK_ZONE).toEpochSecond();
+        long startTimestamp = startDate.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+        long endTimestamp = endDate.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
 
         return findBySymbolAndTimestampRange(symbol, startTimestamp, endTimestamp);
     }

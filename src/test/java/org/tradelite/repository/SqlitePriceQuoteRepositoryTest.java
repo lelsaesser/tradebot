@@ -128,7 +128,7 @@ class SqlitePriceQuoteRepositoryTest {
     void findBySymbolAndDate_returnsQuotesForSpecificDate() {
         repository.save(createPriceQuote("AAPL", 175.50));
 
-        LocalDate today = LocalDate.now(ZoneId.of("America/New_York"));
+        LocalDate today = LocalDate.now(ZoneId.of("UTC"));
         List<PriceQuoteEntity> results = repository.findBySymbolAndDate("AAPL", today);
 
         assertThat(results, hasSize(1));
@@ -139,7 +139,7 @@ class SqlitePriceQuoteRepositoryTest {
     void findBySymbolAndDate_returnsEmptyForDifferentDate() {
         repository.save(createPriceQuote("AAPL", 175.50));
 
-        LocalDate yesterday = LocalDate.now(ZoneId.of("America/New_York")).minusDays(1);
+        LocalDate yesterday = LocalDate.now(ZoneId.of("UTC")).minusDays(1);
         List<PriceQuoteEntity> results = repository.findBySymbolAndDate("AAPL", yesterday);
 
         assertThat(results, is(empty()));
@@ -149,7 +149,7 @@ class SqlitePriceQuoteRepositoryTest {
     void findBySymbolAndDateRange_returnsQuotesInRange() {
         repository.save(createPriceQuote("AAPL", 175.50));
 
-        LocalDate today = LocalDate.now(ZoneId.of("America/New_York"));
+        LocalDate today = LocalDate.now(ZoneId.of("UTC"));
         LocalDate startDate = today.minusDays(1);
         LocalDate endDate = today.plusDays(1);
 
@@ -163,8 +163,8 @@ class SqlitePriceQuoteRepositoryTest {
     void findBySymbolAndDateRange_returnsEmptyForOutOfRangeDate() {
         repository.save(createPriceQuote("AAPL", 175.50));
 
-        LocalDate startDate = LocalDate.now(ZoneId.of("America/New_York")).minusDays(10);
-        LocalDate endDate = LocalDate.now(ZoneId.of("America/New_York")).minusDays(5);
+        LocalDate startDate = LocalDate.now(ZoneId.of("UTC")).minusDays(10);
+        LocalDate endDate = LocalDate.now(ZoneId.of("UTC")).minusDays(5);
 
         List<PriceQuoteEntity> results =
                 repository.findBySymbolAndDateRange("AAPL", startDate, endDate);
