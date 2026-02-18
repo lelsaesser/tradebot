@@ -46,8 +46,8 @@ class SqlitePriceQuoteRepositoryTest {
 
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
         assertThat(results, hasSize(1));
-        assertThat(results.get(0).getSymbol(), is("AAPL"));
-        assertThat(results.get(0).getCurrentPrice(), is(175.50));
+        assertThat(results.getFirst().getSymbol(), is("AAPL"));
+        assertThat(results.getFirst().getCurrentPrice(), is(175.50));
     }
 
     @Test
@@ -66,7 +66,7 @@ class SqlitePriceQuoteRepositoryTest {
 
         List<PriceQuoteEntity> results = repository.findBySymbol("GOOG");
         assertThat(results, hasSize(1));
-        PriceQuoteEntity entity = results.get(0);
+        PriceQuoteEntity entity = results.getFirst();
         assertThat(entity.getDailyOpen(), is(148.00));
         assertThat(entity.getDailyHigh(), is(152.50));
         assertThat(entity.getDailyLow(), is(147.50));
@@ -102,7 +102,7 @@ class SqlitePriceQuoteRepositoryTest {
 
         List<PriceQuoteEntity> results = repository.findBySymbol("GOOG");
         assertThat(results, hasSize(1));
-        assertThat(results.get(0).getSymbol(), is("GOOG"));
+        assertThat(results.getFirst().getSymbol(), is("GOOG"));
     }
 
     @Test
@@ -127,7 +127,7 @@ class SqlitePriceQuoteRepositoryTest {
         List<PriceQuoteEntity> results = repository.findBySymbolAndDate("AAPL", today);
 
         assertThat(results, hasSize(1));
-        assertThat(results.get(0).getSymbol(), is("AAPL"));
+        assertThat(results.getFirst().getSymbol(), is("AAPL"));
     }
 
     @Test
@@ -172,8 +172,8 @@ class SqlitePriceQuoteRepositoryTest {
         repository.save(createPriceQuote("AAPL", 175.50));
 
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
-        assertThat(results.get(0).getId(), is(notNullValue()));
-        assertThat(results.get(0).getId(), greaterThan(0L));
+        assertThat(results.getFirst().getId(), is(notNullValue()));
+        assertThat(results.getFirst().getId(), greaterThan(0L));
     }
 
     @Test
@@ -183,8 +183,8 @@ class SqlitePriceQuoteRepositoryTest {
         long afterSave = System.currentTimeMillis() / 1000 + 1;
 
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
-        assertThat(results.get(0).getTimestamp(), greaterThanOrEqualTo(beforeSave));
-        assertThat(results.get(0).getTimestamp(), lessThanOrEqualTo(afterSave));
+        assertThat(results.getFirst().getTimestamp(), greaterThanOrEqualTo(beforeSave));
+        assertThat(results.getFirst().getTimestamp(), lessThanOrEqualTo(afterSave));
     }
 
     private PriceQuoteResponse createPriceQuote(String symbol, double price) {
