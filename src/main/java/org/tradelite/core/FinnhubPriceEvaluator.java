@@ -12,6 +12,7 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.StockSymbolRegistry;
 
 @Slf4j
@@ -22,6 +23,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
+    private final PriceQuoteRepository priceQuoteRepository;
 
     @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
 
@@ -30,12 +32,14 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             FinnhubClient finnhubClient,
             TargetPriceProvider targetPriceProvider,
             TelegramClient telegramClient,
-            StockSymbolRegistry stockSymbolRegistry) {
+            StockSymbolRegistry stockSymbolRegistry,
+            PriceQuoteRepository priceQuoteRepository) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.stockSymbolRegistry = stockSymbolRegistry;
+        this.priceQuoteRepository = priceQuoteRepository;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
@@ -61,6 +65,9 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
                 continue;
             }
             lastPriceCache.put(ticker.get().getTicker(), priceQuote.getCurrentPrice());
+
+            // Persist price quote to SQLite for historical data collection
+            priceQuoteRepository.save(priceQuote);
 
             finnhubData.add(priceQuote);
             Thread.sleep(100);
