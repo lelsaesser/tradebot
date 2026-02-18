@@ -1,128 +1,95 @@
 # Active Context
 
 ## Current Work Focus
-✅ **COMPLETED**: Sector Rotation Detection Algorithm (February 15, 2026)
-- Z-Score based statistical analysis for early rotation detection
-- High-confidence alerts (>2 standard deviations)
-- Telegram notifications for money flow signals
-- All 347 tests passing, build successful
+✅ **COMPLETED**: SQLite Integration for Historical Price Data (February 18, 2026)
+- SQLite database for persisting Finnhub price quotes
+- Repository pattern with auto-schema initialization
+- UTC timestamps for best practice storage
+- Integrated with FinnhubPriceEvaluator - every price fetch is stored
+- All 407 tests passing, build successful
 
 ## Recent Changes (February 2026)
 
-### Sector Rotation Detection Algorithm - COMPLETED (Feb 15, 2026)
+### SQLite Historical Price Data - COMPLETED (Feb 18, 2026)
 
-1. **RotationSignal Record** ✅
-   - `SignalType`: ROTATING_IN (money flowing in) or ROTATING_OUT (money flowing out)
-   - `Confidence`: HIGH (both weekly/monthly > 2σ), MEDIUM, LOW
-   - Includes z-scores for weekly and monthly performance
+1. **New Repository Layer** ✅
+   - `PriceQuoteRepository` interface - defines persistence contract
+   - `SqlitePriceQuoteRepository` implementation with JDBC
+   - `PriceQuoteEntity` - entity class for stored quotes
 
-2. **SectorRotationAnalyzer** ✅
-   - Z-Score statistical analysis: `(current_value - mean) / std_dev`
-   - Calculates historical mean and standard deviation for each sector
-   - Only generates HIGH confidence signals (both weekly and monthly z-scores > 2.0)
-   - Requires same-direction z-scores (no diverging signals)
-   - Minimum 5 historical snapshots required for reliable analysis
+2. **Database Schema** ✅
+   ```sql
+   CREATE TABLE finnhub_price_quotes (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       symbol TEXT NOT NULL,
+       timestamp INTEGER NOT NULL,  -- UTC epoch seconds
+       current_price REAL NOT NULL,
+       daily_open REAL,
+       daily_high REAL,
+       daily_low REAL,
+       change_amount REAL,
+       change_percent REAL,
+       previous_close REAL,
+       UNIQUE(symbol, timestamp)
+   )
+   ```
+   - **Indexes**: symbol, timestamp, composite (symbol, timestamp)
+   - **Table naming**: `finnhub_price_quotes` for future extensibility (CoinGecko, etc.)
 
-3. **SectorRotationTracker Updates** ✅
-   - Added `analyzeAndSendRotationAlerts()` method
-   - Telegram alert format with "Money Flowing INTO" and "Money Flowing OUT OF" sections
-   - Z-score values included in alerts
-   - Integrated with daily fetch workflow
+3. **Best Practices Applied** ✅
+   - **UTC timestamps**: Epoch seconds are inherently UTC, queries use UTC timezone
+   - **Java naming conventions**: No "I" prefix for interfaces (PriceQuoteRepository, not IPriceQuoteRepository)
+   - **Auto-schema initialization**: Table and indexes created on repository instantiation
+   - **Source-specific table naming**: Allows future `coingecko_price_quotes` table
 
-4. **New Files Created** ✅
-   - `src/main/java/org/tradelite/core/RotationSignal.java`
-   - `src/main/java/org/tradelite/core/SectorRotationAnalyzer.java`
-   - `src/test/java/org/tradelite/core/SectorRotationAnalyzerTest.java`
+4. **Integration** ✅
+   - `FinnhubPriceEvaluator` saves every price quote to SQLite
+   - Runs during stock market monitoring (every 5 min, 9:30-16:00 ET)
+   - Data stored in `data/tradebot.db`
 
-5. **Modified Files** ✅
-   - `SectorRotationTracker.java` - Added analyzer integration and alert methods
-   - `SectorRotationTrackerTest.java` - Added 5 new tests for rotation alerts
+5. **New Files Created** ✅
+   - `src/main/java/org/tradelite/repository/PriceQuoteEntity.java`
+   - `src/main/java/org/tradelite/repository/PriceQuoteRepository.java`
+   - `src/main/java/org/tradelite/repository/SqlitePriceQuoteRepository.java`
+   - `src/test/java/org/tradelite/repository/SqlitePriceQuoteRepositoryTest.java`
 
-### Alert Message Format
-```
-🚨 *SECTOR ROTATION ALERT*
+6. **Modified Files** ✅
+   - `pom.xml` - Added SQLite JDBC driver (org.xerial:sqlite-jdbc:3.49.0.0)
+   - `src/main/java/org/tradelite/config/BeanConfig.java` - Added DataSource bean
+   - `src/main/resources/application.yaml` - Added database.path config
+   - `src/main/java/org/tradelite/core/FinnhubPriceEvaluator.java` - Repository integration
+   - `src/test/java/org/tradelite/core/FinnhubPriceEvaluatorTest.java` - Repository mock
+   - `.gitignore` - Added `/data/` and `*.db`
 
-*💰 Money Flowing INTO:*
-• *Technology*
-  Weekly: +15.00% (z=2.5) | Monthly: +25.00% (z=3.0)
+### Previous: Relative Strength vs SPY - COMPLETED (Feb 16, 2026)
+- TradingView-style RS indicator comparing stocks to SPY benchmark
+- 50-period EMA crossover detection for alerts
+- Daily analysis after RSI stock price collection
 
-*💸 Money Flowing OUT OF:*
-• *Energy*
-  Weekly: -12.00% (z=-2.8) | Monthly: -18.00% (z=-3.2)
-
-_Based on Z-Score analysis (>2σ deviation)_
-```
-
-### Previous: Sector Rotation Tracking Base - COMPLETED (Feb 9, 2026)
-
-1. **FinViz Web Scraper** ✅
-   - Created `FinvizClient` using JSoup for HTML parsing
-   - Scrapes industry performance data from FinViz
-   - No browser automation needed (pure HTTP + HTML parsing)
-
-2. **Data Persistence** ✅
-   - `SectorPerformancePersistence` stores snapshots in JSON
-   - Historical data maintained for trend analysis
-
-3. **Automated Tracking** ✅
-   - Scheduled daily at 10:30 PM ET (after US market close)
-   - Sends daily Telegram report with top 5 gainers and losers
+### Previous: Sector Rotation Detection - COMPLETED (Feb 15, 2026)
+- Z-Score based statistical analysis for early rotation detection
+- High-confidence alerts (>2 standard deviations)
 
 ## Testing Summary
 
-- **Total Tests**: 347 ✅ (increased from 330)
-- **New Tests Added**: 17 (12 SectorRotationAnalyzerTest + 5 SectorRotationTrackerTest)
+- **Total Tests**: 407 ✅ (increased from 347)
+- **New Tests Added**: 17 (SqlitePriceQuoteRepositoryTest)
 - **Build Status**: SUCCESS ✅
-- **Coverage**: All checks met ✅
+- **Coverage**: All checks met (≥97%) ✅
 
 ## Active Decisions and Considerations
 
-### Algorithm Design Decisions
-- **Z-Score over Moving Averages**: Provides adaptive thresholds that adjust to market volatility
-- **Conservative Approach**: Only HIGH confidence signals (>2σ) to minimize false positives
-- **Dual Timeframe**: Requires both weekly AND monthly z-scores to confirm rotation
-- **Same-Direction Requirement**: No alerts for diverging weekly/monthly signals
+### SQLite Design Decisions
+- **UTC for storage**: Epoch seconds are timezone-agnostic, queries use UTC
+- **Table per data source**: `finnhub_price_quotes` naming allows future tables
+- **Auto-initialization**: Schema created on first use, no migration tool needed yet
+- **UNIQUE constraint**: (symbol, timestamp) prevents duplicate entries
 
-### Detection Thresholds
-```java
-HIGH_CONFIDENCE_THRESHOLD = 2.0   // 2 standard deviations
-MEDIUM_CONFIDENCE_THRESHOLD = 1.5 // 1.5 standard deviations
-MIN_HISTORY_SIZE = 5              // Minimum snapshots needed
-```
-
-### Data Flow
-```
-FinvizClient -> SectorPerformancePersistence -> SectorRotationAnalyzer -> TelegramClient
-     |                    |                            |
-  Fetch data         Store snapshot              Analyze z-scores
-                                                      |
-                                              Generate RotationSignal
-                                                      |
-                                              Send Telegram alerts
-```
-
-## Important Patterns and Preferences
-
-### Z-Score Calculation Pattern
-```java
-double zScore = (currentValue - historicalMean) / stdDev;
-// Positive z-score = outperforming historical norm
-// Negative z-score = underperforming historical norm
-```
-
-### Rotation Signal Generation
-```java
-// Only generate signal if:
-// 1. Both z-scores have same direction (both positive or both negative)
-// 2. Both z-scores exceed HIGH_CONFIDENCE_THRESHOLD (2.0)
-// 3. Sector has enough historical data (>= 5 snapshots)
-```
-
-### Defensive Coding Pattern (NPE Prevention)
-```java
-int weeklySize = weekly == null ? 0 : weekly.size();
-int monthlySize = monthly == null ? 0 : monthly.size();
-```
+### Future Use Cases for Historical Data
+- Technical indicators requiring historical prices (MACD, Bollinger Bands, etc.)
+- Backtesting trading strategies
+- Price pattern analysis
+- Correlation studies between symbols
 
 ## Configuration Files
 - `config/stock-symbols.json` - Stock symbol registry (38 symbols)
@@ -130,17 +97,18 @@ int monthlySize = monthly == null ? 0 : monthly.size();
 - `config/target-prices-coins.json` - Crypto target prices
 - `config/sector-performance.json` - Sector performance history
 - `config/insider-transactions.json` - Insider trading data
+- `data/tradebot.db` - **NEW** SQLite database for price history
 
 ## Next Iteration Opportunities
 
-### Sector Rotation Enhancements (Future)
-- Add MEDIUM confidence alerts option (configurable)
-- Momentum scoring (rate of change in z-scores)
-- Multi-week trend confirmation
-- Sector correlation analysis
-- Historical backtesting of signals
+### SQLite Enhancements (Future PRs)
+- Migrate existing JSON persistence to SQLite
+- Add CoinGecko price persistence (coingecko_price_quotes table)
+- Implement data retention/cleanup policies
+- Add aggregate queries for analysis (daily OHLC, averages, etc.)
+- Query endpoints via Telegram commands
 
-### General Enhancements
-- Bulk import/export of stock symbols
-- Rate limiting for API calls
-- Performance optimizations
+### Technical Analysis (Future)
+- Historical price-based indicators
+- Price pattern recognition
+- Volatility analysis using stored data

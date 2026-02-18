@@ -14,7 +14,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations. Critical for technical analysis.
 -   **`InsiderTracker`:** Tracks and reports insider trading activities, providing valuable market insights.
 -   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz. Fetches daily performance data, sends reports on top/bottom performers, and triggers rotation analysis.
--   **`SectorRotationAnalyzer`:** **NEW** - Statistical analysis component that detects sector rotation signals using Z-Score analysis. Calculates historical mean/standard deviation and identifies sectors with >2σ deviation.
+-   **`SectorRotationAnalyzer`:** Statistical analysis component that detects sector rotation signals using Z-Score analysis. Calculates historical mean/standard deviation and identifies sectors with >2σ deviation.
+-   **`RelativeStrengthTracker`:** Tracks stock performance relative to SPY benchmark using 50-period EMA crossover detection.
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
@@ -25,18 +26,20 @@ The application follows a modular, component-based architecture built on the Spr
 
 -   **`FinnhubClient`:** Interacts with Finnhub API for stock prices and insider transactions.
 -   **`CoinGeckoClient`:** Interacts with CoinGecko API for cryptocurrency prices.
--   **`FinvizClient`:** **NEW** - Web scraper using JSoup to fetch industry performance data from FinViz. No API key required.
+-   **`FinvizClient`:** Web scraper using JSoup to fetch industry performance data from FinViz. No API key required.
 
 ## Data Persistence Components
 
 -   **`TargetPriceProvider`:** JSON-based storage for buy/sell target prices.
 -   **`StockSymbolRegistry`:** Dynamic stock symbol management with JSON persistence.
 -   **`InsiderPersistence`:** Stores historical insider transaction data.
--   **`SectorPerformancePersistence`:** **NEW** - Stores daily sector performance snapshots for trend analysis.
+-   **`SectorPerformancePersistence`:** Stores daily sector performance snapshots for trend analysis.
 -   **`TelegramMessageTracker`:** Tracks last processed message ID to avoid duplicates.
+-   **`SqlitePriceQuoteRepository`:** **NEW** - SQLite-based storage for historical Finnhub price quotes.
 
 ## Design Patterns
 
+-   **Repository Pattern (NEW):** The data persistence layer uses the Repository pattern with interface-implementation separation. `PriceQuoteRepository` defines the contract, `SqlitePriceQuoteRepository` provides SQLite implementation. This allows easy swapping of database backends.
 -   **Command Pattern**: The Telegram command processing framework exemplifies the Command pattern. Each command (`/add`, `/remove`, `/rsi`, `/show`, etc.) is encapsulated in its own class (`RsiCommand`, `AddCommand`, etc.) with a corresponding processor (`RsiCommandProcessor`, `AddCommandProcessor`, etc.). The `TelegramCommandDispatcher` routes commands to appropriate processors via the `canProcess()` method.
 -   **Dependency Injection**: Used extensively by Spring to manage component dependencies, promoting loose coupling and testability. All major components are injected via constructor injection.
 -   **Scheduler Pattern**: The `Scheduler` component uses Spring's `@Scheduled` annotation to run tasks at fixed intervals. Separate schedulers exist for `stockMarketMonitoring`, `cryptoMarketMonitoring`, `dailyRsiFetching`, `weeklyInsiderReporting`, `telegramMessagePolling`, and `dailySectorRotationTracking`.
@@ -50,13 +53,13 @@ The application follows a modular, component-based architecture built on the Spr
 
 | Task | Schedule | Zone | Description |
 |------|----------|------|-------------|
-| `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock price monitoring |
+| `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock price monitoring + **SQLite storage** |
 | `cryptoMarketMonitoring` | Every 5 min | UTC | 24/7 crypto monitoring |
-| `rsiStockMonitoring` | Daily 16:30 (Mon-Fri) | America/New_York | Stock RSI calculations |
+| `rsiStockMonitoring` | Daily 16:30 (Mon-Fri) | America/New_York | Stock RSI + RS analysis |
 | `rsiCryptoMonitoring` | Daily 00:05 | America/New_York | Crypto RSI calculations |
 | `weeklyInsiderTradingReport` | Weekly Fri 17:00 | America/New_York | Insider transactions |
 | `monthlyApiUsageReport` | Monthly 1st, 00:30 | UTC | API usage statistics |
-| `dailySectorRotationTracking` | Daily 22:30 (Mon-Fri) | America/New_York | **NEW** Sector performance |
+| `dailySectorRotationTracking` | Daily 22:30 (Mon-Fri) | America/New_York | Sector performance + rotation alerts |
 | `telegramMessagePolling` | Every 5 seconds | UTC | Process Telegram commands |
 
 ## Component Relationships
@@ -64,11 +67,14 @@ The application follows a modular, component-based architecture built on the Spr
 ```
 Scheduler
 ├── FinnhubPriceEvaluator → FinnhubClient → Finnhub API
+│   └── SqlitePriceQuoteRepository → SQLite DB (NEW)
 ├── CoinGeckoPriceEvaluator → CoinGeckoClient → CoinGecko API
 ├── RsiService → RsiPriceFetcher → Price APIs
+│   └── RelativeStrengthTracker → RelativeStrengthService
 ├── InsiderTracker → InsiderPersistence → JSON file
-├── SectorRotationTracker → FinvizClient → FinViz website (NEW)
-│   └── SectorPerformancePersistence → JSON file
+├── SectorRotationTracker → FinvizClient → FinViz website
+│   ├── SectorPerformancePersistence → JSON file
+│   └── SectorRotationAnalyzer
 └── TelegramMessageProcessor → TelegramClient → Telegram API
     └── TelegramCommandDispatcher
         ├── AddCommandProcessor
@@ -77,6 +83,68 @@ Scheduler
         ├── ShowCommandProcessor
         └── RsiCommandProcessor
 ```
+
+## SQLite Repository Pattern (NEW)
+
+The `SqlitePriceQuoteRepository` implements the Repository pattern for price quote persistence:
+
+### Interface Definition
+```java
+public interface PriceQuoteRepository {
+    void save(PriceQuoteResponse priceQuote);
+    List<PriceQuoteEntity> findBySymbol(String symbol);
+    List<PriceQuoteEntity> findBySymbolAndDate(String symbol, LocalDate date);
+    List<PriceQuoteEntity> findBySymbolAndDateRange(String symbol, LocalDate startDate, LocalDate endDate);
+}
+```
+
+### Auto-Initialization Pattern
+```java
+public SqlitePriceQuoteRepository(DataSource dataSource) {
+    this.dataSource = dataSource;
+    initializeSchema();  // Creates table and indexes on construction
+}
+
+private void initializeSchema() {
+    String createTableSql = """
+        CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            ...
+            UNIQUE(symbol, timestamp)
+        )
+        """;
+    // Execute DDL statements
+}
+```
+
+### UTC Timestamp Best Practice
+```java
+// Storage: Use UTC epoch seconds
+long timestamp = Instant.now().getEpochSecond();
+
+// Query: Convert dates using UTC timezone
+long startOfDay = date.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+```
+
+### Integration with FinnhubPriceEvaluator
+```java
+@Override
+protected void processValidPriceQuote(PriceQuoteResponse priceQuote) {
+    // Store in SQLite for historical analysis
+    priceQuoteRepository.save(priceQuote);
+    
+    // Existing price evaluation logic
+    super.processValidPriceQuote(priceQuote);
+}
+```
+
+**Benefits:**
+- Historical data for technical analysis
+- Foundation for future indicators (MACD, Bollinger Bands)
+- Enables backtesting capabilities
+- Clear separation of concerns (interface vs implementation)
 
 ## Web Scraping Pattern (FinViz)
 
@@ -151,20 +219,10 @@ if (absZWeekly >= 2.0 && absZMonthly >= 2.0) {
 - **Same-Direction Requirement**: Prevents false positives from diverging signals
 - **Minimum History**: Requires 5+ snapshots for reliable statistics
 
-**Data Flow:**
-```
-SectorPerformancePersistence.loadHistory()
-    → SectorRotationAnalyzer.analyzeRotations()
-        → Calculate historical mean/stdDev per sector
-        → Compute z-scores for current performance
-        → Filter for HIGH confidence signals
-    → SectorRotationTracker.analyzeAndSendRotationAlerts()
-        → Format and send Telegram alerts
-```
-
 ## Testing Patterns
 
 - **Mock-based testing**: All external dependencies are mocked using Mockito
 - **Argument Captors**: Used to verify complex method arguments
 - **Temp Files**: `@TempDir` for testing file persistence
+- **In-Memory SQLite**: **NEW** Unique temp DB files per test with UUID naming
 - **WireMock**: For HTTP client testing (optional)
