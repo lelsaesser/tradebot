@@ -74,7 +74,8 @@ This document covers the technologies used, development setup, technical constra
 | `config/finnhub-monthly-requests.txt` | Text | API metering |
 | `config/coingecko-monthly-requests.txt` | Text | API metering |
 | `config/tg-last-processed-message-id.txt` | Text | Telegram message tracking |
-| `data/tradebot.db` | SQLite | **NEW** Historical price data |
+| `config/feature-toggles.json` | JSON | **NEW** Runtime feature flags |
+| `data/tradebot.db` | SQLite | Historical price data |
 
 ## Project Structure
 
@@ -110,7 +111,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** 407
+- **Total Tests:** 424
 
 ### Testing Libraries
 ```xml
@@ -131,8 +132,9 @@ src/main/java/org/tradelite/
 - **Mocking:** External dependencies mocked with Mockito
 - **Argument Captors:** For verifying complex method arguments
 - **Temp Files:** `@TempDir` for file persistence tests
+- **Configurable File Paths:** Constructor injection for file paths enables temp directory usage in tests
 - **HTML Mocking:** JSoup document creation for web scraping tests
-- **In-Memory SQLite:** **NEW** Unique temp DB files per test to avoid conflicts
+- **In-Memory SQLite:** Unique temp DB files per test to avoid conflicts
 
 ## Web Scraping with JSoup
 

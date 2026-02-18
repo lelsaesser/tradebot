@@ -1,8 +1,55 @@
 # Progress Tracking
 
-## Latest Milestone: SQLite Integration for Historical Price Data ✅ COMPLETE
+## Latest Milestone: Feature Toggle System ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All 407 tests passing, build successful
+**Status**: ✅ **PRODUCTION READY** - All 424 tests passing, build successful
+
+### Implementation Complete (February 18, 2026)
+
+#### Feature Overview
+- **Runtime Feature Toggles**: Enable/disable features without restart
+- **JSON Configuration**: Simple `config/feature-toggles.json` file
+- **3-Minute Cache**: Balance between responsiveness and performance
+- **Fail-Safe Design**: Unknown toggles default to false
+
+#### New Components Created
+- `FeatureToggleService.java` - Main service with `isEnabled(String)` API
+  - Reads from `config/feature-toggles.json`
+  - Thread-safe synchronized cache refresh
+  - Configurable file path for testability
+- `FeatureToggleServiceTest.java` - 17 comprehensive unit tests
+  - Tests for enabled/disabled/unknown features
+  - Cache behavior tests
+  - Error handling tests
+
+#### Configuration File Format
+```json
+{
+  "demotrading": false,
+  "newFeature": true,
+  "feature-with-dash": true,
+  "feature_with_underscore": true
+}
+```
+
+#### Design Decisions
+- **JSON file storage**: Simple, human-readable, easy to edit
+- **3-minute cache TTL**: Balance between responsiveness and file I/O
+- **Default to false**: Unknown toggles return false (fail-safe)
+- **Configurable file path**: Constructor injection for testability
+
+### Build Status ✅
+```
+Tests run: 424, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+All coverage checks have been met.
+```
+
+---
+
+## Previous Milestone: SQLite Integration for Historical Price Data ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY** - All 407 tests passing
 
 ### Implementation Complete (February 18, 2026)
 
@@ -12,95 +59,32 @@
 - **UTC Timestamps**: Best practice storage with timezone-agnostic epoch seconds
 - **Auto-schema**: Table and indexes created automatically on startup
 
-#### New Components Created
-- `PriceQuoteEntity.java` - Entity class with Lombok builder
-  - All price fields: current, open, high, low, change, previousClose
-  - Timestamp stored as UTC epoch seconds
-- `PriceQuoteRepository.java` - Interface defining persistence contract
-  - `save(PriceQuoteResponse)` - Store a price quote
-  - `findBySymbol(String)` - Query by symbol
-  - `findBySymbolAndDate(String, LocalDate)` - Query by symbol and date
-  - `findBySymbolAndDateRange(String, LocalDate, LocalDate)` - Range query
-- `SqlitePriceQuoteRepository.java` - SQLite implementation
-  - Auto-initializes schema on construction
-  - Creates table and 3 indexes
-  - Uses JDBC with prepared statements
-
-#### Database Schema
-```sql
-CREATE TABLE finnhub_price_quotes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    symbol TEXT NOT NULL,
-    timestamp INTEGER NOT NULL,  -- UTC epoch seconds
-    current_price REAL NOT NULL,
-    daily_open REAL,
-    daily_high REAL,
-    daily_low REAL,
-    change_amount REAL,
-    change_percent REAL,
-    previous_close REAL,
-    UNIQUE(symbol, timestamp)
-)
-```
-
-**Indexes:**
-- `idx_finnhub_price_quotes_symbol` - For symbol lookups
-- `idx_finnhub_price_quotes_timestamp` - For time-based queries
-- `idx_finnhub_price_quotes_symbol_timestamp` - Composite for range queries
-
-#### Files Modified
-- `pom.xml` - Added SQLite JDBC driver
-- `BeanConfig.java` - Added DataSource bean
-- `application.yaml` - Added database.path configuration
-- `FinnhubPriceEvaluator.java` - Repository integration
-- `FinnhubPriceEvaluatorTest.java` - Repository mock
-- `.gitignore` - Added `/data/` and `*.db`
-
-#### Design Decisions
-- **UTC for storage**: Epoch seconds are inherently UTC, queries use ZoneId.of("UTC")
-- **Table naming**: `finnhub_price_quotes` allows future `coingecko_price_quotes`
-- **No "I" prefix**: Java convention uses `PriceQuoteRepository` not `IPriceQuoteRepository`
-- **Auto-initialization**: No migration tool needed for simple schema
-
-### Build Status ✅
-```
-Tests run: 407, Failures: 0, Errors: 0, Skipped: 0
-BUILD SUCCESS
-All coverage checks have been met.
-```
+#### Components Created
+- `PriceQuoteEntity.java`, `PriceQuoteRepository.java`, `SqlitePriceQuoteRepository.java`
 
 ---
 
 ## Previous Milestone: Relative Strength vs SPY Benchmark ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All tests passing, build successful
+**Status**: ✅ **PRODUCTION READY** - All tests passing
 
 ### Implementation Complete (February 16, 2026)
 
 #### Feature Overview
 - **TradingView-Style RS Indicator**: Compares monitored stocks against SPY benchmark
 - **50-Period EMA Crossover Detection**: Alerts when RS line crosses above/below EMA
-- **Daily Analysis**: Runs after RSI stock price collection at market close
-
-#### Components Created
-- `RelativeStrengthSignal.java`, `RelativeStrengthData.java`
-- `RelativeStrengthService.java`, `RelativeStrengthTracker.java`
 
 ---
 
 ## Previous Milestone: Sector Rotation Detection Algorithm ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All tests passing, build successful
+**Status**: ✅ **PRODUCTION READY** - All tests passing
 
 ### Implementation Complete (February 15, 2026)
 
 #### Algorithm Overview
 - **Z-Score Based Statistical Analysis**: Adaptive thresholds
 - **High Confidence Alerts Only**: Both weekly and monthly z-scores > 2.0
-- **Same-Direction Requirement**: Prevents false positives
-
-#### Components Created
-- `RotationSignal.java`, `SectorRotationAnalyzer.java`
 
 ---
 
@@ -114,14 +98,16 @@ All coverage checks have been met.
 - Insider transaction tracking
 - Sector rotation tracking with Z-Score analysis
 - Relative Strength vs SPY benchmark
-- **SQLite historical price persistence** ✅ **NEW**
+- SQLite historical price persistence
+- **Feature toggle system** ✅ **NEW**
 
 ### Data Persistence ✅
 - JSON-based storage for target prices and configuration
-- **SQLite database for historical price data** ✅ **NEW**
+- SQLite database for historical price data
 - Sector performance history (JSON)
 - Insider transaction history (JSON)
 - API request metering
+- **Feature toggles (JSON)** ✅ **NEW**
 
 ### Telegram Commands ✅
 - `/set buy/sell <symbol> <price>` - Set target prices
@@ -139,8 +125,8 @@ All coverage checks have been met.
 - All critical paths covered with tests
 
 ### Test Metrics
-- ✅ Total tests: 407 (increased from 347)
-- ✅ New tests added: 17 (SqlitePriceQuoteRepositoryTest)
+- ✅ Total tests: 424 (increased from 407)
+- ✅ New tests added: 17 (FeatureToggleServiceTest)
 - ✅ No compilation errors
 - ✅ Integration tests validated
 
@@ -149,7 +135,7 @@ All coverage checks have been met.
 | Dependency | Version | Purpose |
 |------------|---------|---------|
 | Spring Boot | 3.5.7 | Framework |
-| SQLite JDBC | 3.49.0.0 | **NEW** - SQLite database driver |
+| SQLite JDBC | 3.49.0.0 | SQLite database driver |
 | JSoup | 1.22.1 | HTML parsing for FinViz scraping |
 | Lombok | 1.18.34 | Boilerplate reduction |
 | JUnit Jupiter | 6.0.1 | Testing |
@@ -164,13 +150,14 @@ All coverage checks have been met.
 | `config/target-prices-coins.json` | Crypto target prices |
 | `config/sector-performance.json` | Sector performance history |
 | `config/insider-transactions.json` | Insider trading data |
-| `data/tradebot.db` | **NEW** SQLite price history |
+| `config/feature-toggles.json` | **NEW** Runtime feature flags |
+| `data/tradebot.db` | SQLite price history |
 
 ## Scheduled Tasks Summary
 
 | Task | Schedule | Description |
 |------|----------|-------------|
-| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + **SQLite storage** |
+| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + SQLite storage |
 | cryptoMarketMonitoring | Every 5 min (24/7) | Crypto price monitoring |
 | rsiStockMonitoring | Daily 16:30 ET (Mon-Fri) | RSI + Relative Strength analysis |
 | rsiCryptoMonitoring | Daily 00:05 ET | RSI calculation for crypto |
@@ -180,17 +167,19 @@ All coverage checks have been met.
 
 ## Future Enhancements
 
+### Feature Toggle Enhancements (Future)
+- Telegram command to view/modify toggles
+- Toggle change notifications
+- Non-boolean toggle values support
+- Toggle expiration/scheduling
+
 ### SQLite (Future PRs)
 - Migrate existing JSON persistence to SQLite
 - Add CoinGecko price persistence (`coingecko_price_quotes` table)
 - Data retention/cleanup policies
-- Aggregate queries for analysis
-- Query endpoints via Telegram commands
 
 ### Technical Analysis (Future)
 - Historical price-based indicators (MACD, Bollinger Bands)
-- Price pattern recognition
-- Volatility analysis using stored data
 - Backtesting capabilities
 
 ## Deployment Status
@@ -201,7 +190,7 @@ All coverage checks have been met.
 - Environment: Ready for production
 
 ### Pre-Deployment Checklist
-- ✅ All tests passing (407/407)
+- ✅ All tests passing (424/424)
 - ✅ Build successful
 - ✅ Code coverage acceptable (97%)
 - ✅ Documentation updated
