@@ -31,7 +31,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
     private void initializeSchema() {
         String createTableSql =
                 """
-                CREATE TABLE IF NOT EXISTS price_quotes (
+                CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     symbol TEXT NOT NULL,
                     timestamp INTEGER NOT NULL,
@@ -47,14 +47,14 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 """;
 
         String createSymbolIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_price_quotes_symbol ON price_quotes(symbol)";
+                "CREATE INDEX IF NOT EXISTS idx_finnhub_price_quotes_symbol ON finnhub_price_quotes(symbol)";
 
         String createTimestampIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_price_quotes_timestamp ON price_quotes(timestamp)";
+                "CREATE INDEX IF NOT EXISTS idx_finnhub_price_quotes_timestamp ON finnhub_price_quotes(timestamp)";
 
         String createCompositeIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_price_quotes_symbol_timestamp "
-                        + "ON price_quotes(symbol, timestamp)";
+                "CREATE INDEX IF NOT EXISTS idx_finnhub_price_quotes_symbol_timestamp "
+                        + "ON finnhub_price_quotes(symbol, timestamp)";
 
         try (Connection conn = dataSource.getConnection();
                 Statement stmt = conn.createStatement()) {
@@ -62,7 +62,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
             stmt.execute(createSymbolIndexSql);
             stmt.execute(createTimestampIndexSql);
             stmt.execute(createCompositeIndexSql);
-            log.info("SQLite price_quotes table and indexes initialized successfully");
+            log.info("SQLite finnhub_price_quotes table and indexes initialized successfully");
         } catch (SQLException e) {
             log.error("Failed to initialize SQLite schema", e);
             throw new IllegalStateException("Failed to initialize SQLite schema", e);
@@ -73,7 +73,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
     public void save(PriceQuoteResponse priceQuote) {
         String sql =
                 """
-                INSERT OR REPLACE INTO price_quotes
+                INSERT OR REPLACE INTO finnhub_price_quotes
                 (symbol, timestamp, current_price, daily_open, daily_high, daily_low,
                  change_amount, change_percent, previous_close)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -112,7 +112,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 """
                 SELECT id, symbol, timestamp, current_price, daily_open, daily_high, daily_low,
                        change_amount, change_percent, previous_close
-                FROM price_quotes
+                FROM finnhub_price_quotes
                 WHERE symbol = ?
                 ORDER BY timestamp ASC
                 """;
@@ -156,7 +156,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 """
                 SELECT id, symbol, timestamp, current_price, daily_open, daily_high, daily_low,
                        change_amount, change_percent, previous_close
-                FROM price_quotes
+                FROM finnhub_price_quotes
                 WHERE symbol = ? AND timestamp >= ? AND timestamp < ?
                 ORDER BY timestamp ASC
                 """;
