@@ -25,10 +25,10 @@ public class CoinGeckoPriceResponse {
     @Data
     public static class CoinData {
         @JsonProperty("usd")
-        private double usd;
+        private Double usd;
 
         @JsonProperty("usd_24h_change")
-        private double usd_24h_change;
+        private Double usd_24h_change;
 
         private CoinId coinId;
     }

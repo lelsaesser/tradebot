@@ -41,9 +41,12 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
         for (CoinId coinId : coinIds) {
             CoinGeckoPriceResponse.CoinData priceData = coinGeckoClient.getCoinPriceData(coinId);
 
+            if (priceData == null || priceData.getUsd() == null) {
+                continue;
+            }
+
             Double lastPrice = lastPriceCache.get(coinId);
-            if (priceData == null
-                    || (lastPrice != null && Math.abs(lastPrice - priceData.getUsd()) < 0.0001)) {
+            if (lastPrice != null && Math.abs(lastPrice - priceData.getUsd()) < 0.0001) {
                 continue;
             }
             lastPriceCache.put(coinId, priceData.getUsd());
@@ -70,7 +73,10 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
     public void evaluateHighPriceChange(CoinGeckoPriceResponse.CoinData priceData) {
         CoinId coinId = priceData.getCoinId();
-        double percentChange = priceData.getUsd_24h_change();
+        Double percentChange = priceData.getUsd_24h_change();
+        if (percentChange == null) {
+            return;
+        }
         double absPercentChange = Math.abs(percentChange);
 
         if (absPercentChange < 5.0) {

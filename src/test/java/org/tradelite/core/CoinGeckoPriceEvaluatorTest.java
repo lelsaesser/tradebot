@@ -77,7 +77,7 @@ class CoinGeckoPriceEvaluatorTest {
         when(targetPriceProvider.getCoinTargetPrices()).thenReturn(targetPrices);
 
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
-        coinData.setUsd(1500);
+        coinData.setUsd(1500.0);
         coinData.setCoinId(CoinId.BITCOIN);
 
         when(coinGeckoClient.getCoinPriceData(CoinId.BITCOIN)).thenReturn(coinData);
@@ -87,7 +87,7 @@ class CoinGeckoPriceEvaluatorTest {
         assertThat(coinDataSize, is(1));
         verify(coinGeckoClient, times(1)).getCoinPriceData(CoinId.BITCOIN);
         verify(coinGeckoPriceEvaluator, times(1))
-                .comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000, 2000);
+                .comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000.0, 2000.0);
     }
 
     @Test
@@ -204,5 +204,32 @@ class CoinGeckoPriceEvaluatorTest {
         verify(coinGeckoClient, times(1)).getCoinPriceData(CoinId.BITCOIN);
         verify(coinGeckoPriceEvaluator, times(1))
                 .comparePrices(coinData.getCoinId(), coinData.getUsd(), 1000, 2000);
+    }
+
+    @Test
+    void evaluateHighPriceChange_shouldSkipWhenUsd24hChangeIsNull() {
+        CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
+        coinData.setCoinId(CoinId.BITCOIN);
+        coinData.setUsd_24h_change(null);
+
+        coinGeckoPriceEvaluator.evaluateHighPriceChange(coinData);
+
+        verify(telegramClient, never()).sendMessage(anyString());
+        verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
+        verify(targetPriceProvider, never()).isSymbolIgnored(any(), any(), anyInt());
+    }
+
+    @Test
+    void evaluatePrice_shouldSkipWhenUsdIsNull() throws InterruptedException {
+        CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
+        coinData.setUsd(null);
+        coinData.setCoinId(CoinId.BITCOIN);
+
+        when(coinGeckoClient.getCoinPriceData(any())).thenReturn(coinData);
+
+        int coinDataSize = coinGeckoPriceEvaluator.evaluatePrice();
+
+        assertThat(coinDataSize, is(0));
+        assertThat(coinGeckoPriceEvaluator.lastPriceCache.containsKey(CoinId.BITCOIN), is(false));
     }
 }
