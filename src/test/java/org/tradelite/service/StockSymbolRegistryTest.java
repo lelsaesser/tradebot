@@ -18,13 +18,12 @@ import org.tradelite.common.StockSymbol;
 class StockSymbolRegistryTest {
 
     private StockSymbolRegistry stockSymbolRegistry;
-    private ObjectMapper objectMapper;
 
     @TempDir File tempDir;
 
     @BeforeEach
     void setUp() throws IOException {
-        objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
         stockSymbolRegistry = new StockSymbolRegistry(objectMapper);
     }
 
@@ -196,5 +195,41 @@ class StockSymbolRegistryTest {
 
         assertNotSame(list1, list2);
         assertEquals(list1.size(), list2.size());
+    }
+
+    @Test
+    void isEtf_etfSymbol_returnsTrue() {
+        assertTrue(stockSymbolRegistry.isEtf("SPY"));
+        assertTrue(stockSymbolRegistry.isEtf("XLK"));
+        assertTrue(stockSymbolRegistry.isEtf("XLF"));
+        assertTrue(stockSymbolRegistry.isEtf("XLE"));
+        assertTrue(stockSymbolRegistry.isEtf("XLV"));
+        assertTrue(stockSymbolRegistry.isEtf("XLY"));
+        assertTrue(stockSymbolRegistry.isEtf("XLP"));
+        assertTrue(stockSymbolRegistry.isEtf("XLI"));
+        assertTrue(stockSymbolRegistry.isEtf("XLC"));
+        assertTrue(stockSymbolRegistry.isEtf("XLRE"));
+        assertTrue(stockSymbolRegistry.isEtf("XLB"));
+        assertTrue(stockSymbolRegistry.isEtf("XLU"));
+    }
+
+    @Test
+    void isEtf_regularStock_returnsFalse() {
+        assertFalse(stockSymbolRegistry.isEtf("AAPL"));
+        assertFalse(stockSymbolRegistry.isEtf("MSFT"));
+        assertFalse(stockSymbolRegistry.isEtf("GOOGL"));
+    }
+
+    @Test
+    void isEtf_nullOrEmpty_returnsFalse() {
+        assertFalse(stockSymbolRegistry.isEtf(null));
+        assertFalse(stockSymbolRegistry.isEtf(""));
+    }
+
+    @Test
+    void isEtf_caseInsensitive_returnsTrue() {
+        assertTrue(stockSymbolRegistry.isEtf("spy"));
+        assertTrue(stockSymbolRegistry.isEtf("Spy"));
+        assertTrue(stockSymbolRegistry.isEtf("xlk"));
     }
 }
