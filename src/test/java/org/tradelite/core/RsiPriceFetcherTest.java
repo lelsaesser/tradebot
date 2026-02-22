@@ -69,7 +69,7 @@ class RsiPriceFetcherTest {
         when(targetPriceProvider.getCoinTargetPrices())
                 .thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
-        coinData.setUsd(50000);
+        coinData.setUsd(50000.0);
         when(coinGeckoClient.getCoinPriceData(any(CoinId.class))).thenReturn(coinData);
 
         rsiPriceFetcher.fetchCryptoClosingPrices();
