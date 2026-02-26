@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.core.RelativeStrengthSignal;
+import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RelativeStrengthData;
 import org.tradelite.service.model.RsiDailyClosePrice;
@@ -31,22 +32,38 @@ public class RelativeStrengthService {
     /** EMA period (default 50, matching TradingView indicator) */
     private static final int EMA_PERIOD = 50;
 
-    /** Minimum RS history required for EMA calculation */
-    private static final int MIN_HISTORY_SIZE = EMA_PERIOD;
+    /** Minimum RS history required for EMA calculation (allows calculation with limited data) */
+    private static final int MIN_HISTORY_SIZE = 20;
+
+    /** Number of calendar days to fetch for RS calculation (with buffer for weekends/holidays) */
+    private static final int RS_LOOKBACK_DAYS = 80;
+
+    /** Result of RS and EMA calculation with data completeness info */
+    public record RsResult(double rs, double ema, int dataPoints, boolean isComplete) {
+        /** Returns true if we have at least the full EMA period of data */
+        public boolean isComplete() {
+            return dataPoints >= EMA_PERIOD;
+        }
+    }
 
     /** File to persist RS data */
     private static final String RS_DATA_FILE = "config/rs-data.json";
 
     private final ObjectMapper objectMapper;
     private final RsiService rsiService;
+    private final PriceQuoteRepository priceQuoteRepository;
 
     @Getter private Map<String, RelativeStrengthData> rsHistory = new HashMap<>();
 
     @Autowired
-    public RelativeStrengthService(ObjectMapper objectMapper, RsiService rsiService)
+    public RelativeStrengthService(
+            ObjectMapper objectMapper,
+            RsiService rsiService,
+            PriceQuoteRepository priceQuoteRepository)
             throws IOException {
         this.objectMapper = objectMapper;
         this.rsiService = rsiService;
+        this.priceQuoteRepository = priceQuoteRepository;
         loadRsHistory();
     }
 
@@ -236,24 +253,77 @@ public class RelativeStrengthService {
     /**
      * Gets the current RS and EMA values for a symbol.
      *
+     * <p>This method fetches fresh price data from SQLite to ensure up-to-date values even if the
+     * application has been running for an extended period.
+     *
      * @param symbol The stock ticker symbol
      * @return Optional containing [RS, EMA] array, or empty if insufficient data
      */
     public Optional<double[]> getCurrentRsAndEma(String symbol) {
-        RelativeStrengthData rsData = rsHistory.get(symbol);
-        if (rsData == null) {
+        return getCurrentRsResult(symbol).map(result -> new double[] {result.rs(), result.ema()});
+    }
+
+    /**
+     * Gets the current RS calculation result with data completeness info.
+     *
+     * <p>This method fetches fresh price data from SQLite and includes metadata about whether the
+     * calculation was based on complete data (at least 50 data points for the EMA period).
+     *
+     * @param symbol The stock ticker symbol
+     * @return Optional containing RsResult with RS, EMA, and completeness info
+     */
+    public Optional<RsResult> getCurrentRsResult(String symbol) {
+        // Skip benchmark itself
+        if (BENCHMARK_SYMBOL.equals(symbol)) {
             return Optional.empty();
         }
 
-        List<Double> rsValues = rsData.getRsValues();
+        // Fetch fresh daily prices from SQLite (only last 80 days)
+        List<DailyPrice> stockPrices =
+                priceQuoteRepository.findDailyClosingPrices(symbol, RS_LOOKBACK_DAYS);
+        List<DailyPrice> spyPrices =
+                priceQuoteRepository.findDailyClosingPrices(BENCHMARK_SYMBOL, RS_LOOKBACK_DAYS);
+
+        if (stockPrices.isEmpty() || spyPrices.isEmpty()) {
+            log.debug(
+                    "Insufficient price data for RS calculation. Stock={}, SPY={}",
+                    !stockPrices.isEmpty(),
+                    !spyPrices.isEmpty());
+            return Optional.empty();
+        }
+
+        // Build a map of SPY prices by date for efficient lookup
+        Map<LocalDate, Double> spyPriceMap = new HashMap<>();
+        for (DailyPrice price : spyPrices) {
+            spyPriceMap.put(price.getDate(), price.getPrice());
+        }
+
+        // Calculate RS values for each date where we have both stock and SPY prices
+        List<Double> rsValues = new ArrayList<>();
+        for (DailyPrice stockPrice : stockPrices) {
+            Double spyPrice = spyPriceMap.get(stockPrice.getDate());
+            if (spyPrice != null && spyPrice > 0) {
+                double rs = stockPrice.getPrice() / spyPrice;
+                rsValues.add(rs);
+            }
+        }
+
         if (rsValues.size() < MIN_HISTORY_SIZE) {
+            log.debug(
+                    "Insufficient RS history for {}: {} values (need {})",
+                    symbol,
+                    rsValues.size(),
+                    MIN_HISTORY_SIZE);
             return Optional.empty();
         }
 
         double currentRs = rsValues.getLast();
-        double currentEma = calculateEma(rsValues, EMA_PERIOD);
+        // Use available data for EMA, even if less than full period
+        int emaPeriod = Math.min(rsValues.size(), EMA_PERIOD);
+        double currentEma = calculateEma(rsValues, emaPeriod);
+        boolean isComplete = rsValues.size() >= EMA_PERIOD;
 
-        return Optional.of(new double[] {currentRs, currentEma});
+        return Optional.of(new RsResult(currentRs, currentEma, rsValues.size(), isComplete));
     }
 
     /** Persists RS history to file. */

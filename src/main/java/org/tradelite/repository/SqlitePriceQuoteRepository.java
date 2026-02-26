@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.service.model.DailyPrice;
 
 @Slf4j
 @Repository
@@ -197,5 +198,50 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 .changePercent(rs.getDouble("change_percent"))
                 .previousClose(rs.getDouble("previous_close"))
                 .build();
+    }
+
+    @Override
+    public List<DailyPrice> findDailyClosingPrices(String symbol, int days) {
+        // Calculate the start timestamp (N days ago from now)
+        long startTimestamp =
+                LocalDate.now().minusDays(days).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+
+        // SQL query that groups by date and gets the latest price for each day
+        // Uses date() function to group timestamps by calendar day
+        String sql =
+                """
+                SELECT date(timestamp, 'unixepoch', 'localtime') as price_date,
+                       current_price
+                FROM finnhub_price_quotes
+                WHERE symbol = ? AND timestamp >= ?
+                GROUP BY price_date
+                HAVING timestamp = MAX(timestamp)
+                ORDER BY price_date ASC
+                """;
+
+        List<DailyPrice> results = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, symbol);
+            pstmt.setLong(2, startTimestamp);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    LocalDate date = LocalDate.parse(rs.getString("price_date"));
+                    double price = rs.getDouble("current_price");
+                    DailyPrice dailyPrice = new DailyPrice();
+                    dailyPrice.setDate(date);
+                    dailyPrice.setPrice(price);
+                    results.add(dailyPrice);
+                }
+            }
+        } catch (SQLException e) {
+            log.error(
+                    "Failed to find daily closing prices for symbol {} over {} days",
+                    symbol,
+                    days,
+                    e);
+            throw new IllegalStateException("Failed to find daily closing prices", e);
+        }
+        return results;
     }
 }

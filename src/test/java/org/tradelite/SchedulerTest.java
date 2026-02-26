@@ -22,6 +22,7 @@ import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
 import org.tradelite.core.RelativeStrengthTracker;
 import org.tradelite.core.RsiPriceFetcher;
+import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 
@@ -39,6 +40,7 @@ class SchedulerTest {
     @Mock private ApiRequestMeteringService apiRequestMeteringService;
     @Mock private SectorRotationTracker sectorRotationTracker;
     @Mock private RelativeStrengthTracker relativeStrengthTracker;
+    @Mock private SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
 
     private Scheduler scheduler;
 
@@ -56,7 +58,8 @@ class SchedulerTest {
                         rsiPriceFetcher,
                         apiRequestMeteringService,
                         sectorRotationTracker,
-                        relativeStrengthTracker);
+                        relativeStrengthTracker,
+                        sectorRelativeStrengthTracker);
     }
 
     @Test
@@ -305,5 +308,18 @@ class SchedulerTest {
         captor.getValue().run();
 
         verify(sectorRotationTracker, times(1)).fetchAndStoreDailyPerformance();
+    }
+
+    @Test
+    void dailySectorRelativeStrengthReport_shouldSendSummary() throws Exception {
+        scheduler.dailySectorRelativeStrengthReport();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(sectorRelativeStrengthTracker, times(1)).sendDailySectorRsSummary();
     }
 }

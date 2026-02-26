@@ -3,6 +3,7 @@ package org.tradelite.service;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
@@ -20,6 +21,8 @@ import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.RelativeStrengthSignal;
+import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
 @SpringBootTest
@@ -28,6 +31,7 @@ class RelativeStrengthServiceTest {
     @MockitoBean private TelegramClient telegramClient;
     @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
     @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+    @MockitoBean private PriceQuoteRepository priceQuoteRepository;
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -47,7 +51,8 @@ class RelativeStrengthServiceTest {
                         objectMapper,
                         finnhubPriceEvaluator,
                         coinGeckoPriceEvaluator);
-        relativeStrengthService = new RelativeStrengthService(objectMapper, rsiService);
+        relativeStrengthService =
+                new RelativeStrengthService(objectMapper, rsiService, priceQuoteRepository);
     }
 
     @Test
@@ -275,21 +280,23 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsAndEma_withSufficientData() {
-        // Add 60 days of aligned price data
+        // Mock the repository to return 60 days of daily price data
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        List<DailyPrice> spyPrices = new ArrayList<>();
         for (int i = 0; i < 60; i++) {
             LocalDate date = LocalDate.now().minusDays(59 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 600.0);
-        }
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(600.0);
+            stockPrices.add(stockPrice);
 
-        // Calculate RS to populate history
-        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+            DailyPrice spyPrice = new DailyPrice();
+            spyPrice.setDate(date);
+            spyPrice.setPrice(500.0);
+            spyPrices.add(spyPrice);
+        }
+        when(priceQuoteRepository.findDailyClosingPrices("NVDA", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("NVDA");
 
@@ -300,6 +307,10 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsAndEma_noData() {
+        // Mock repository to return empty data
+        when(priceQuoteRepository.findDailyClosingPrices("UNKNOWN", 80))
+                .thenReturn(new ArrayList<>());
+
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("UNKNOWN");
 
         assertThat(rsAndEma.isEmpty(), is(true));
@@ -332,7 +343,8 @@ class RelativeStrengthServiceTest {
         assertThat(rsFile.exists(), is(true));
 
         // Create a new service that should load from the file
-        RelativeStrengthService newService = new RelativeStrengthService(objectMapper, rsiService);
+        RelativeStrengthService newService =
+                new RelativeStrengthService(objectMapper, rsiService, priceQuoteRepository);
 
         // Verify data was loaded
         assertThat(newService.getRsHistory().containsKey("NVDA"), is(true));
@@ -344,23 +356,25 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsAndEma_withInsufficientHistory() {
-        // Add only 30 days of data (less than 50 required for EMA)
-        for (int i = 0; i < 30; i++) {
-            LocalDate date = LocalDate.now().minusDays(29 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("MSFT", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 300.0);
+        // Mock repository to return only 15 days of data (less than 20 minimum)
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        List<DailyPrice> spyPrices = new ArrayList<>();
+        for (int i = 0; i < 15; i++) {
+            LocalDate date = LocalDate.now().minusDays(14 - i);
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(300.0);
+            stockPrices.add(stockPrice);
+
+            DailyPrice spyPrice = new DailyPrice();
+            spyPrice.setDate(date);
+            spyPrice.setPrice(500.0);
+            spyPrices.add(spyPrice);
         }
+        when(priceQuoteRepository.findDailyClosingPrices("MSFT", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
-        // Calculate RS to populate history (even though insufficient for EMA)
-        relativeStrengthService.calculateRelativeStrength("MSFT", "Microsoft");
-
-        // Should return empty because insufficient history for EMA
+        // Should return empty because insufficient history (less than 20 minimum)
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("MSFT");
 
         assertThat(rsAndEma.isEmpty(), is(true));
