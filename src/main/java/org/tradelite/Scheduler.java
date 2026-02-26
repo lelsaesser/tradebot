@@ -33,6 +33,7 @@ public class Scheduler {
     private final SectorRotationTracker sectorRotationTracker;
     private final RelativeStrengthTracker relativeStrengthTracker;
     private final SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
+    private final SectorMomentumRocTracker sectorMomentumRocTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -50,7 +51,8 @@ public class Scheduler {
             ApiRequestMeteringService apiRequestMeteringService,
             SectorRotationTracker sectorRotationTracker,
             RelativeStrengthTracker relativeStrengthTracker,
-            SectorRelativeStrengthTracker sectorRelativeStrengthTracker) {
+            SectorRelativeStrengthTracker sectorRelativeStrengthTracker,
+            SectorMomentumRocTracker sectorMomentumRocTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -63,12 +65,16 @@ public class Scheduler {
         this.sectorRotationTracker = sectorRotationTracker;
         this.relativeStrengthTracker = relativeStrengthTracker;
         this.sectorRelativeStrengthTracker = sectorRelativeStrengthTracker;
+        this.sectorMomentumRocTracker = sectorMomentumRocTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     protected void stockMarketMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+            // Analyze sector ETFs in real-time for rotation signals
+            rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
+            rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }

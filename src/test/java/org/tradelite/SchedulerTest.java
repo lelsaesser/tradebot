@@ -22,6 +22,7 @@ import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
 import org.tradelite.core.RelativeStrengthTracker;
 import org.tradelite.core.RsiPriceFetcher;
+import org.tradelite.core.SectorMomentumRocTracker;
 import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.service.ApiRequestMeteringService;
@@ -41,6 +42,7 @@ class SchedulerTest {
     @Mock private SectorRotationTracker sectorRotationTracker;
     @Mock private RelativeStrengthTracker relativeStrengthTracker;
     @Mock private SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
+    @Mock private SectorMomentumRocTracker sectorMomentumRocTracker;
 
     private Scheduler scheduler;
 
@@ -59,7 +61,8 @@ class SchedulerTest {
                         apiRequestMeteringService,
                         sectorRotationTracker,
                         relativeStrengthTracker,
-                        sectorRelativeStrengthTracker);
+                        sectorRelativeStrengthTracker,
+                        sectorMomentumRocTracker);
     }
 
     @Test
@@ -69,14 +72,20 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        // Called 3 times: finnhubPriceEvaluator, sectorRelativeStrengthTracker, sectorMomentumRocTracker
+        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
+        verify(rootErrorHandler, times(3)).run(captor.capture());
 
-        captor.getValue().run();
+        // Execute all captured runnables
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
+        verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
+        verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
         verify(coinGeckoPriceEvaluator, times(0)).evaluatePrice();
     }
 
