@@ -436,4 +436,201 @@ class RelativeStrengthServiceTest {
         var rsData = relativeStrengthService.getRsHistory().get("AAPL");
         assertThat(rsData.getLatestRs(), is(closeTo(0.5, 0.001)));
     }
+
+    @Test
+    void testGetCurrentRsResult_withCompleteData() {
+        // Mock repository to return 50+ days of data (complete)
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        List<DailyPrice> spyPrices = new ArrayList<>();
+        for (int i = 0; i < 55; i++) {
+            LocalDate date = LocalDate.now().minusDays(54 - i);
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(600.0);
+            stockPrices.add(stockPrice);
+
+            DailyPrice spyPrice = new DailyPrice();
+            spyPrice.setDate(date);
+            spyPrice.setPrice(500.0);
+            spyPrices.add(spyPrice);
+        }
+        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("XLK");
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().isComplete(), is(true));
+        assertThat(result.get().dataPoints(), is(55));
+        assertThat(result.get().rs(), is(closeTo(1.2, 0.01)));
+    }
+
+    @Test
+    void testGetCurrentRsResult_withIncompleteData() {
+        // Mock repository to return 30 days of data (incomplete but above minimum)
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        List<DailyPrice> spyPrices = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            LocalDate date = LocalDate.now().minusDays(29 - i);
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(600.0);
+            stockPrices.add(stockPrice);
+
+            DailyPrice spyPrice = new DailyPrice();
+            spyPrice.setDate(date);
+            spyPrice.setPrice(500.0);
+            spyPrices.add(spyPrice);
+        }
+        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("XLK");
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().isComplete(), is(false)); // Less than 50 data points
+        assertThat(result.get().dataPoints(), is(30));
+    }
+
+    @Test
+    void testGetCurrentRsResult_withNoSpyData() {
+        // Mock repository to return data for stock but not SPY
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        for (int i = 0; i < 60; i++) {
+            LocalDate date = LocalDate.now().minusDays(59 - i);
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(600.0);
+            stockPrices.add(stockPrice);
+        }
+        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(new ArrayList<>());
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("XLK");
+
+        assertThat(result.isEmpty(), is(true));
+    }
+
+    @Test
+    void testGetCurrentRsResult_withMismatchedDates() {
+        // Mock repository to return data with different dates for stock and SPY
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        List<DailyPrice> spyPrices = new ArrayList<>();
+
+        // Stock has data from last 60 days
+        for (int i = 0; i < 60; i++) {
+            LocalDate date = LocalDate.now().minusDays(59 - i);
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(600.0);
+            stockPrices.add(stockPrice);
+        }
+
+        // SPY has data from last 60 days (same dates)
+        for (int i = 0; i < 60; i++) {
+            LocalDate date = LocalDate.now().minusDays(59 - i);
+            DailyPrice spyPrice = new DailyPrice();
+            spyPrice.setDate(date);
+            spyPrice.setPrice(500.0);
+            spyPrices.add(spyPrice);
+        }
+
+        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("XLK");
+
+        assertThat(result.isPresent(), is(true));
+    }
+
+    @Test
+    void testGetCurrentRsResult_returnsEmptyForBenchmark() {
+        // Requesting RS for SPY itself should return empty
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("SPY");
+
+        assertThat(result.isEmpty(), is(true));
+    }
+
+    @Test
+    void testGetCurrentRsResult_exactlyMinimumData() {
+        // Mock repository to return exactly 20 days (minimum required)
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        List<DailyPrice> spyPrices = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            LocalDate date = LocalDate.now().minusDays(19 - i);
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(600.0);
+            stockPrices.add(stockPrice);
+
+            DailyPrice spyPrice = new DailyPrice();
+            spyPrice.setDate(date);
+            spyPrice.setPrice(500.0);
+            spyPrices.add(spyPrice);
+        }
+        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("XLK");
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().dataPoints(), is(20));
+        assertThat(result.get().isComplete(), is(false));
+    }
+
+    @Test
+    void testGetCurrentRsResult_exactlyFullData() {
+        // Mock repository to return exactly 50 days (full EMA period)
+        List<DailyPrice> stockPrices = new ArrayList<>();
+        List<DailyPrice> spyPrices = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            LocalDate date = LocalDate.now().minusDays(49 - i);
+            DailyPrice stockPrice = new DailyPrice();
+            stockPrice.setDate(date);
+            stockPrice.setPrice(600.0);
+            stockPrices.add(stockPrice);
+
+            DailyPrice spyPrice = new DailyPrice();
+            spyPrice.setDate(date);
+            spyPrice.setPrice(500.0);
+            spyPrices.add(spyPrice);
+        }
+        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("XLK");
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().dataPoints(), is(50));
+        assertThat(result.get().isComplete(), is(true));
+    }
+
+    @Test
+    void testRsResultRecord_isCompleteMethod() {
+        RelativeStrengthService.RsResult complete =
+                new RelativeStrengthService.RsResult(1.2, 1.1, 50, true);
+        RelativeStrengthService.RsResult incomplete =
+                new RelativeStrengthService.RsResult(1.2, 1.1, 30, false);
+
+        assertThat(complete.isComplete(), is(true));
+        assertThat(incomplete.isComplete(), is(false));
+    }
+
+    @Test
+    void testRsResultRecord_fields() {
+        RelativeStrengthService.RsResult result =
+                new RelativeStrengthService.RsResult(1.25, 1.20, 45, false);
+
+        assertThat(result.rs(), is(1.25));
+        assertThat(result.ema(), is(1.20));
+        assertThat(result.dataPoints(), is(45));
+        assertThat(result.isComplete(), is(false));
+    }
 }
