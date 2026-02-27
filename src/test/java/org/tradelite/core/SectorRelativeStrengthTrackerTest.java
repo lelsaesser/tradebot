@@ -30,6 +30,205 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
+    void analyzeAndSendAlerts_noSignals_noMessageSent() throws Exception {
+        // Given: No crossover signals
+        when(relativeStrengthService.calculateRelativeStrength(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+
+        // When
+        tracker.analyzeAndSendAlerts();
+
+        // Then
+        verify(telegramClient, never()).sendMessage(anyString());
+        verify(relativeStrengthService).saveRsHistory();
+    }
+
+    @Test
+    void analyzeAndSendAlerts_outperformingSignal_sendsAlert() throws Exception {
+        // Given: One sector outperforming
+        RelativeStrengthSignal signal =
+                new RelativeStrengthSignal(
+                        "XLK",
+                        "Technology",
+                        RelativeStrengthSignal.SignalType.OUTPERFORMING,
+                        1.05,
+                        1.00,
+                        2.5);
+        when(relativeStrengthService.calculateRelativeStrength("XLK", "Technology"))
+                .thenReturn(Optional.of(signal));
+
+        // When
+        tracker.analyzeAndSendAlerts();
+
+        // Then
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String message = messageCaptor.getValue();
+        assertTrue(message.contains("SECTOR RS CROSSOVER ALERT"));
+        assertTrue(message.contains("NOW OUTPERFORMING SPY"));
+        assertTrue(message.contains("Technology"));
+    }
+
+    @Test
+    void analyzeAndSendAlerts_underperformingSignal_sendsAlert() throws Exception {
+        // Given: One sector underperforming
+        RelativeStrengthSignal signal =
+                new RelativeStrengthSignal(
+                        "XLU",
+                        "Utilities",
+                        RelativeStrengthSignal.SignalType.UNDERPERFORMING,
+                        0.95,
+                        1.00,
+                        -3.5);
+        when(relativeStrengthService.calculateRelativeStrength("XLU", "Utilities"))
+                .thenReturn(Optional.of(signal));
+
+        // When
+        tracker.analyzeAndSendAlerts();
+
+        // Then
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String message = messageCaptor.getValue();
+        assertTrue(message.contains("NOW UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Utilities"));
+    }
+
+    @Test
+    void analyzeAndSendAlerts_mixedSignals_sendsGroupedAlert() throws Exception {
+        // Given: Mixed signals
+        RelativeStrengthSignal outperforming =
+                new RelativeStrengthSignal(
+                        "XLK",
+                        "Technology",
+                        RelativeStrengthSignal.SignalType.OUTPERFORMING,
+                        1.05,
+                        1.00,
+                        2.5);
+        RelativeStrengthSignal underperforming =
+                new RelativeStrengthSignal(
+                        "XLU",
+                        "Utilities",
+                        RelativeStrengthSignal.SignalType.UNDERPERFORMING,
+                        0.95,
+                        1.00,
+                        -3.5);
+
+        when(relativeStrengthService.calculateRelativeStrength("XLK", "Technology"))
+                .thenReturn(Optional.of(outperforming));
+        when(relativeStrengthService.calculateRelativeStrength("XLU", "Utilities"))
+                .thenReturn(Optional.of(underperforming));
+
+        // When
+        tracker.analyzeAndSendAlerts();
+
+        // Then
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String message = messageCaptor.getValue();
+        assertTrue(message.contains("NOW OUTPERFORMING SPY"));
+        assertTrue(message.contains("NOW UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Technology"));
+        assertTrue(message.contains("Utilities"));
+    }
+
+    @Test
+    void analyzeAndSendAlerts_exceptionInOneSector_continuesProcessing() throws Exception {
+        // Given: One sector throws exception
+        when(relativeStrengthService.calculateRelativeStrength("XLK", "Technology"))
+                .thenThrow(new RuntimeException("API Error"));
+        RelativeStrengthSignal signal =
+                new RelativeStrengthSignal(
+                        "XLF",
+                        "Financials",
+                        RelativeStrengthSignal.SignalType.OUTPERFORMING,
+                        1.03,
+                        1.00,
+                        1.5);
+        when(relativeStrengthService.calculateRelativeStrength("XLF", "Financials"))
+                .thenReturn(Optional.of(signal));
+
+        // When
+        tracker.analyzeAndSendAlerts();
+
+        // Then: Should still process other sectors
+        verify(telegramClient).sendMessage(contains("Financials"));
+        verify(relativeStrengthService).saveRsHistory();
+    }
+
+    @Test
+    void analyzeAndSendAlerts_saveRsHistoryCalled() throws Exception {
+        // Given
+        when(relativeStrengthService.calculateRelativeStrength(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+
+        // When
+        tracker.analyzeAndSendAlerts();
+
+        // Then
+        verify(relativeStrengthService).saveRsHistory();
+    }
+
+    @Test
+    void formatCrossoverAlertMessage_outperformingOnly_correctFormat() {
+        RelativeStrengthSignal signal =
+                new RelativeStrengthSignal(
+                        "XLK",
+                        "Technology",
+                        RelativeStrengthSignal.SignalType.OUTPERFORMING,
+                        1.05,
+                        1.00,
+                        2.5);
+
+        String message = tracker.formatCrossoverAlertMessage(List.of(signal), List.of());
+
+        assertTrue(message.contains("SECTOR RS CROSSOVER ALERT"));
+        assertTrue(message.contains("NOW OUTPERFORMING SPY"));
+        assertTrue(message.contains("Technology"));
+        assertTrue(message.contains("XLK"));
+        assertTrue(message.contains("+2.5%"));
+        assertFalse(message.contains("NOW UNDERPERFORMING SPY"));
+    }
+
+    @Test
+    void formatCrossoverAlertMessage_underperformingOnly_correctFormat() {
+        RelativeStrengthSignal signal =
+                new RelativeStrengthSignal(
+                        "XLU",
+                        "Utilities",
+                        RelativeStrengthSignal.SignalType.UNDERPERFORMING,
+                        0.95,
+                        1.00,
+                        -3.5);
+
+        String message = tracker.formatCrossoverAlertMessage(List.of(), List.of(signal));
+
+        assertTrue(message.contains("NOW UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Utilities"));
+        assertTrue(message.contains("-3.5%"));
+        assertFalse(message.contains("NOW OUTPERFORMING SPY"));
+    }
+
+    @Test
+    void formatCrossoverAlertMessage_containsFooter() {
+        RelativeStrengthSignal signal =
+                new RelativeStrengthSignal(
+                        "XLK",
+                        "Technology",
+                        RelativeStrengthSignal.SignalType.OUTPERFORMING,
+                        1.05,
+                        1.00,
+                        2.5);
+
+        String message = tracker.formatCrossoverAlertMessage(List.of(signal), List.of());
+
+        assertTrue(message.contains("RS crossed 50-period EMA"));
+    }
+
+    @Test
     void sendDailySectorRsSummary_withMixedPerformance_sendsFormattedMessage() {
         // Given: Some sectors outperforming, some underperforming
         when(relativeStrengthService.getCurrentRsResult("XLK"))

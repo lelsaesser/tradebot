@@ -1,159 +1,78 @@
 # Active Context
 
 ## Current Work Focus
-✅ **COMPLETED**: Momentum ROC Sector Rotation Enhancement (February 26, 2026)
-- Added Rate of Change (ROC) momentum analysis for sector ETFs
-- Real-time crossover detection during market hours
-- Enhanced SectorRelativeStrengthTracker with real-time RS alerts
-- Three-pronged sector rotation detection now active
 
-## Recent Changes (February 2026)
+The Momentum ROC (Rate of Change) feature has been implemented as the third sector rotation detection approach. This complements the existing Z-score analysis and relative strength tracking.
 
-### Momentum ROC Sector Tracking - COMPLETED (Feb 26, 2026)
+## Recent Changes
 
-1. **New Core Components** ✅
-   - `MomentumRocSignal` - Record for momentum signals with ROC10/ROC20 values
-   - `MomentumRocData` - Model for persisting previous ROC values
-   - `MomentumRocRepository` - Interface for ROC state persistence
-   - `SqliteMomentumRocRepository` - SQLite implementation for momentum state
-   - `MomentumRocService` - Calculates ROC and detects zero-line crossovers
-   - `SectorMomentumRocTracker` - Orchestrates sector analysis and Telegram alerts
+### Momentum ROC Feature Implementation (Completed)
+1. **Core Classes Created:**
+   - `MomentumRocSignal` - Record for storing momentum crossover signals
+   - `MomentumRocData` - Model for persisting ROC state between calculations  
+   - `MomentumRocRepository` - Interface for SQLite persistence
+   - `SqliteMomentumRocRepository` - SQLite implementation with state tracking
+   - `MomentumRocService` - Service calculating ROC and detecting zero-line crossovers
+   - `SectorMomentumRocTracker` - Component monitoring all 11 SPDR sector ETFs
 
-2. **ROC Calculation** ✅
-   - **ROC Formula**: `((Current Price - Price N days ago) / Price N days ago) × 100`
-   - **ROC10**: 10-trading-day momentum (short-term)
-   - **ROC20**: 20-trading-day momentum (longer-term)
-   - **Crossover Detection**: Alerts when ROC10 crosses the zero line
+2. **Integration:**
+   - Added `SectorMomentumRocTracker` to `Scheduler.runDailySectorRotationTracking()`
+   - Uses existing price data from SQLite via `PriceQuoteRepository`
 
-3. **Signal Types** ✅
-   - `MOMENTUM_TURNING_POSITIVE` - ROC crossed from negative to positive (bullish)
-   - `MOMENTUM_TURNING_NEGATIVE` - ROC crossed from positive to negative (bearish)
+3. **How It Works:**
+   - Calculates ROC10 (10-day) and ROC20 (20-day) momentum from historical prices
+   - Detects zero-line crossovers (momentum turning positive/negative)
+   - Persists previous ROC values to detect crossovers between daily runs
+   - Sends Telegram alerts when crossovers occur
 
-4. **SQLite Persistence** ✅
-   - New table `momentum_roc_state` stores previous ROC values
-   - Enables crossover detection across monitoring cycles
-   - Auto-schema creation on startup
+4. **Tests Added:**
+   - `MomentumRocSignalTest` - 10 tests
+   - `MomentumRocDataTest` - 7 tests
+   - `SqliteMomentumRocRepositoryTest` - 7 tests
+   - `MomentumRocServiceTest` - 27 tests
+   - `SectorMomentumRocTrackerTest` - 10 tests
 
-5. **Real-Time Monitoring** ✅
-   - Runs every 5 minutes during market hours (part of `stockMarketMonitoring`)
-   - Analyzes all 11 SPDR sector ETFs
-   - Sends Telegram alert only when crossover detected
+### Test Coverage Improvements
+- Added 9 tests to `SectorRelativeStrengthTrackerTest` covering `analyzeAndSendAlerts()`
+- Total tests: 539 (up from ~509)
+- Coverage now meets 97% threshold
 
-6. **Files Created** ✅
-   - `src/main/java/org/tradelite/core/MomentumRocSignal.java` (NEW)
-   - `src/main/java/org/tradelite/service/model/MomentumRocData.java` (NEW)
-   - `src/main/java/org/tradelite/repository/MomentumRocRepository.java` (NEW)
-   - `src/main/java/org/tradelite/repository/SqliteMomentumRocRepository.java` (NEW)
-   - `src/main/java/org/tradelite/service/MomentumRocService.java` (NEW)
-   - `src/main/java/org/tradelite/core/SectorMomentumRocTracker.java` (NEW)
+## Three-Pronged Sector Rotation Detection
 
-### Real-Time Sector RS Alerts - COMPLETED (Feb 26, 2026)
+The system now uses three complementary approaches:
 
-1. **Enhanced SectorRelativeStrengthTracker** ✅
-   - Added `analyzeAndSendAlerts()` method for real-time RS crossover detection
-   - Detects when sector ETF RS crosses above/below 50-period EMA
-   - Sends "📊 SECTOR RS CROSSOVER ALERT" messages
-   - Now provides both daily summary AND real-time crossover alerts
+1. **Z-Score Analysis** (via FinViz data)
+   - Statistical deviation from historical performance
+   - Detects extreme moves in sector performance
 
-2. **Files Modified** ✅
-   - `src/main/java/org/tradelite/core/SectorRelativeStrengthTracker.java` (MODIFIED)
-   - `src/main/java/org/tradelite/Scheduler.java` (MODIFIED)
-   - `src/test/java/org/tradelite/SchedulerTest.java` (MODIFIED)
+2. **Relative Strength vs SPY** 
+   - RS = Sector Price / SPY Price ratio
+   - EMA crossover detection (50-period)
+   - Shows momentum vs benchmark
 
-### Three-Pronged Sector Rotation Detection
+3. **Momentum ROC** (NEW)
+   - Rate of Change over 10 and 20 days
+   - Zero-line crossover detection
+   - Shows pure momentum direction change
 
-| Approach | Signal Type | Schedule | Data Source |
-|----------|-------------|----------|-------------|
-| **Z-Score Analysis** | Industry performance anomalies | Daily (after market) | Finviz |
-| **Relative Strength vs SPY** | RS EMA crossovers | Real-time (5 min) | SQLite price data |
-| **Momentum ROC** | Zero-line crossovers | Real-time (5 min) | SQLite price data |
+## Technical Patterns
 
-### Stock Market Monitoring Flow
-
-```java
-@Scheduled(initialDelay = 0, fixedRate = 300000)
-protected void stockMarketMonitoring() {
-    if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
-        rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
-        // Real-time sector rotation signals
-        rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
-        rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
-    }
-}
+### ROC Formula
+```
+ROC = ((Current Price - Price N days ago) / Price N days ago) × 100
 ```
 
-## Testing Summary
+### Signal Detection
+- **Momentum Turning Positive**: Previous ROC10 < 0 AND Current ROC10 >= 0
+- **Momentum Turning Negative**: Previous ROC10 >= 0 AND Current ROC10 < 0
 
-- **Total Tests**: 466 ✅
-- **Build Status**: SUCCESS ✅
-- **All Scheduler tests updated for new constructor parameter**
+### Minimum Data Requirements
+- 21 data points minimum for ROC calculation
+- 35 days fetched to ensure sufficient history
 
-## Active Decisions and Considerations
+## Next Steps
 
-### Momentum ROC Design Decisions
-- **SQLite persistence**: Previous ROC values stored to detect crossovers across cycles
-- **ROC10 for signals**: Short-term 10-day ROC used for crossover detection
-- **ROC20 for context**: 20-day ROC included in alerts for trend confirmation
-- **Minimum 21 data points**: Requires sufficient history for reliable calculation
-- **35-day lookback**: Calendar days with buffer for weekends/holidays
-
-### Sector ETFs Monitored
-All 11 Select Sector SPDR ETFs:
-- XLK (Technology), XLF (Financials), XLE (Energy)
-- XLV (Health Care), XLY (Consumer Discretionary), XLP (Consumer Staples)
-- XLI (Industrials), XLC (Communication Services), XLRE (Real Estate)
-- XLB (Materials), XLU (Utilities)
-
-## Configuration Files
-- `config/stock-symbols.json` - Stock symbol registry (49 symbols with sector ETFs)
-- `config/target-prices-stocks.json` - Stock target prices
-- `config/target-prices-coins.json` - Crypto target prices
-- `config/sector-performance.json` - Sector performance history
-- `config/insider-transactions.json` - Insider trading data
-- `config/feature-toggles.json` - Runtime feature flags
-- `data/tradebot.db` - SQLite database (price history + momentum ROC state)
-
-## Scheduled Tasks
-
-| Task | Schedule | Description |
-|------|----------|-------------|
-| stockMarketMonitoring | Every 5 min (9:30-16:00 ET) | Stock prices + RS alerts + ROC alerts |
-| dailySectorRotationTracking | Daily 22:30 ET (Mon-Fri) | Sector performance + Z-score rotation alerts |
-| dailySectorRsSummary | Daily 12:00 CET (Mon-Fri) | Sector RS vs SPY daily summary |
-| rsiStockMonitoring | Daily 23:00 CET (Mon-Fri) | RSI + Relative Strength analysis |
-
-## Alert Message Formats
-
-### Momentum ROC Alert
-```
-⚡ *SECTOR MOMENTUM ROC ALERT*
-
-📈 *MOMENTUM TURNING POSITIVE:*
-• *Technology* (XLK): ROC₁₀ +2.5% | ROC₂₀ +1.8%
-
-📉 *MOMENTUM TURNING NEGATIVE:*
-• *Energy* (XLE): ROC₁₀ -1.2% | ROC₂₀ -0.5%
-
-_ROC₁₀ = 10-day momentum | ROC₂₀ = 20-day momentum_
-```
-
-### Sector RS Crossover Alert
-```
-📊 *SECTOR RS CROSSOVER ALERT*
-
-*🟢 NOW OUTPERFORMING SPY:*
-• *Technology* (XLK): +3.5%
-
-*🔴 NOW UNDERPERFORMING SPY:*
-• *Utilities* (XLU): -2.1%
-
-_RS crossed 50-period EMA_
-```
-
-## Next Iteration Opportunities
-
-### Future Enhancements
-- ROC divergence alerts (when ROC10 and ROC20 diverge)
-- Sector strength ranking in ROC alerts
-- Combine RS and ROC signals for stronger confirmation
-- Historical crossover tracking for backtesting
+Potential enhancements:
+- Add ROC divergence detection (price vs ROC)
+- Consider ROC20 crossover for longer-term signals
+- Add configurable thresholds (e.g., only signal if ROC > ±2%)
