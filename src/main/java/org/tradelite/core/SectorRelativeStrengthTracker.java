@@ -1,5 +1,6 @@
 package org.tradelite.core;
 
+import java.io.IOException;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,11 +10,17 @@ import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
 /**
- * Tracks and reports daily relative strength of sector ETFs vs SPY benchmark.
+ * Tracks and reports relative strength of sector ETFs vs SPY benchmark.
  *
- * <p>This component generates a daily summary showing all 11 SPDR sector ETFs ranked by their
- * relative strength compared to SPY. The RS value is the ratio of sector price to SPY price, and
- * the percentage shown is the deviation from the 50-period EMA of that ratio.
+ * <p>This component provides two capabilities:
+ *
+ * <ol>
+ *   <li>Real-time RS crossover detection during market hours (every 5 minutes)
+ *   <li>Daily summary showing all 11 SPDR sector ETFs ranked by RS
+ * </ol>
+ *
+ * <p>The RS value is the ratio of sector price to SPY price, and the percentage shown is the
+ * deviation from the 50-period EMA of that ratio.
  */
 @Component
 @RequiredArgsConstructor
@@ -37,6 +44,105 @@ public class SectorRelativeStrengthTracker {
 
     private final RelativeStrengthService relativeStrengthService;
     private final TelegramClient telegramClient;
+
+    /**
+     * Analyzes sector ETFs for RS crossovers and sends alerts.
+     *
+     * <p>This method is called during market hours as part of the stock monitoring cycle. It
+     * detects when a sector ETF's RS crosses above or below its 50-period EMA.
+     *
+     * @throws IOException if RS data persistence fails
+     */
+    public void analyzeAndSendAlerts() throws IOException {
+        log.info("Analyzing sector ETF relative strength for crossovers");
+
+        List<RelativeStrengthSignal> outperformingSignals = new ArrayList<>();
+        List<RelativeStrengthSignal> underperformingSignals = new ArrayList<>();
+
+        for (Map.Entry<String, String> entry : SECTOR_ETF_NAMES.entrySet()) {
+            String symbol = entry.getKey();
+            String displayName = entry.getValue();
+
+            try {
+                Optional<RelativeStrengthSignal> signal =
+                        relativeStrengthService.calculateRelativeStrength(symbol, displayName);
+
+                if (signal.isPresent()) {
+                    if (signal.get().signalType()
+                            == RelativeStrengthSignal.SignalType.OUTPERFORMING) {
+                        outperformingSignals.add(signal.get());
+                    } else {
+                        underperformingSignals.add(signal.get());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error calculating RS for sector ETF {}: {}", symbol, e.getMessage());
+            }
+        }
+
+        // Send consolidated alert if any crossovers detected
+        if (!outperformingSignals.isEmpty() || !underperformingSignals.isEmpty()) {
+            String alertMessage =
+                    formatCrossoverAlertMessage(outperformingSignals, underperformingSignals);
+            telegramClient.sendMessage(alertMessage);
+            log.info(
+                    "Sent sector RS crossover alert: {} outperforming, {} underperforming",
+                    outperformingSignals.size(),
+                    underperformingSignals.size());
+        } else {
+            log.info("No sector ETF RS crossovers detected");
+        }
+
+        // Persist RS data
+        relativeStrengthService.saveRsHistory();
+    }
+
+    /**
+     * Formats the crossover alert message for Telegram.
+     *
+     * @param outperforming List of sectors that crossed above their RS EMA
+     * @param underperforming List of sectors that crossed below their RS EMA
+     * @return Formatted Markdown message
+     */
+    protected String formatCrossoverAlertMessage(
+            List<RelativeStrengthSignal> outperforming,
+            List<RelativeStrengthSignal> underperforming) {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 *SECTOR RS CROSSOVER ALERT*\n\n");
+
+        if (!outperforming.isEmpty()) {
+            sb.append("*🟢 NOW OUTPERFORMING SPY:*\n");
+            for (RelativeStrengthSignal signal : outperforming) {
+                sb.append(formatCrossoverSignalLine(signal));
+            }
+            sb.append("\n");
+        }
+
+        if (!underperforming.isEmpty()) {
+            sb.append("*🔴 NOW UNDERPERFORMING SPY:*\n");
+            for (RelativeStrengthSignal signal : underperforming) {
+                sb.append(formatCrossoverSignalLine(signal));
+            }
+            sb.append("\n");
+        }
+
+        sb.append("_RS crossed 50-period EMA_");
+
+        return sb.toString();
+    }
+
+    /**
+     * Formats a single crossover signal line.
+     *
+     * @param signal The signal to format
+     * @return Formatted line
+     */
+    private String formatCrossoverSignalLine(RelativeStrengthSignal signal) {
+        return String.format(
+                "• *%s* (%s): %+.1f%%%n",
+                signal.displayName(), signal.symbol(), signal.percentageDiff());
+    }
 
     /** Represents a sector's RS data for sorting and display */
     record SectorRsData(

@@ -16,6 +16,9 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz. Fetches daily performance data, sends reports on top/bottom performers, and triggers rotation analysis.
 -   **`SectorRotationAnalyzer`:** Statistical analysis component that detects sector rotation signals using Z-Score analysis. Calculates historical mean/standard deviation and identifies sectors with >2σ deviation.
 -   **`RelativeStrengthTracker`:** Tracks stock performance relative to SPY benchmark using 50-period EMA crossover detection.
+-   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Provides real-time RS crossover alerts during market hours AND daily summary reports.
+-   **`MomentumRocService`:** **NEW** - Calculates Rate of Change (ROC) momentum and detects zero-line crossovers.
+-   **`SectorMomentumRocTracker`:** **NEW** - Real-time sector ETF momentum analysis using ROC10/ROC20 values.
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
@@ -36,7 +39,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorPerformancePersistence`:** Stores daily sector performance snapshots for trend analysis.
 -   **`TelegramMessageTracker`:** Tracks last processed message ID to avoid duplicates.
 -   **`SqlitePriceQuoteRepository`:** SQLite-based storage for historical Finnhub price quotes.
--   **`FeatureToggleService`:** **NEW** - Runtime feature flag management with JSON persistence and caching.
+-   **`SqliteMomentumRocRepository`:** **NEW** - SQLite-based storage for momentum ROC state (previous ROC values for crossover detection).
+-   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence and caching.
 
 ## Design Patterns
 
@@ -54,24 +58,29 @@ The application follows a modular, component-based architecture built on the Spr
 
 | Task | Schedule | Zone | Description |
 |------|----------|------|-------------|
-| `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock price monitoring + **SQLite storage** |
+| `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock prices + RS alerts + ROC alerts |
 | `cryptoMarketMonitoring` | Every 5 min | UTC | 24/7 crypto monitoring |
 | `rsiStockMonitoring` | Daily 16:30 (Mon-Fri) | America/New_York | Stock RSI + RS analysis |
 | `rsiCryptoMonitoring` | Daily 00:05 | America/New_York | Crypto RSI calculations |
 | `weeklyInsiderTradingReport` | Weekly Fri 17:00 | America/New_York | Insider transactions |
 | `monthlyApiUsageReport` | Monthly 1st, 00:30 | UTC | API usage statistics |
-| `dailySectorRotationTracking` | Daily 22:30 (Mon-Fri) | America/New_York | Sector performance + rotation alerts |
-| `telegramMessagePolling` | Every 5 seconds | UTC | Process Telegram commands |
+| `dailySectorRotationTracking` | Daily 22:30 (Mon-Fri) | America/New_York | Sector performance + Z-score alerts |
+| `dailySectorRsSummary` | Daily 12:00 | CET | Sector RS vs SPY daily summary |
+| `telegramMessagePolling` | Every 60 seconds | UTC | Process Telegram commands |
 
 ## Component Relationships
 
 ```
 Scheduler
 ├── FinnhubPriceEvaluator → FinnhubClient → Finnhub API
-│   └── SqlitePriceQuoteRepository → SQLite DB (NEW)
+│   └── SqlitePriceQuoteRepository → SQLite DB
 ├── CoinGeckoPriceEvaluator → CoinGeckoClient → CoinGecko API
 ├── RsiService → RsiPriceFetcher → Price APIs
 │   └── RelativeStrengthTracker → RelativeStrengthService
+├── SectorRelativeStrengthTracker → RelativeStrengthService (NEW)
+│   └── Real-time RS crossover detection for sector ETFs
+├── SectorMomentumRocTracker → MomentumRocService (NEW)
+│   └── SqliteMomentumRocRepository → SQLite DB (momentum_roc_state)
 ├── InsiderTracker → InsiderPersistence → JSON file
 ├── SectorRotationTracker → FinvizClient → FinViz website
 │   ├── SectorPerformancePersistence → JSON file
@@ -219,6 +228,68 @@ if (absZWeekly >= 2.0 && absZMonthly >= 2.0) {
 - **Dual Timeframe**: Requires both weekly AND monthly confirmation
 - **Same-Direction Requirement**: Prevents false positives from diverging signals
 - **Minimum History**: Requires 5+ snapshots for reliable statistics
+
+## Momentum ROC Pattern (Sector Rotation) - NEW
+
+The `MomentumRocService` calculates Rate of Change momentum and detects zero-line crossovers:
+
+```java
+// ROC Formula: ((Current Price - Price N days ago) / Price N days ago) × 100
+double roc10 = calculateRocValue(prices, 10);  // 10-day momentum
+double roc20 = calculateRocValue(prices, 20);  // 20-day momentum
+
+// Zero-line crossover detection
+boolean wasNegative = previousRoc10 < 0;
+boolean isPositive = currentRoc10 > 0;
+boolean crossoverPositive = wasNegative && isPositive;  // Momentum turning bullish
+```
+
+**SQLite State Persistence:**
+```java
+// Store ROC state for crossover detection across cycles
+momentumRocRepository.save(symbol, momentumData);
+
+// Retrieve previous values for comparison
+Optional<MomentumRocData> previousState = momentumRocRepository.findBySymbol(symbol);
+```
+
+**Database Schema:**
+```sql
+CREATE TABLE IF NOT EXISTS momentum_roc_state (
+    symbol TEXT PRIMARY KEY,
+    previous_roc10 REAL NOT NULL,
+    previous_roc20 REAL NOT NULL,
+    initialized INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+)
+```
+
+**Signal Types:**
+- `MOMENTUM_TURNING_POSITIVE` - ROC crossed from negative to positive (bullish)
+- `MOMENTUM_TURNING_NEGATIVE` - ROC crossed from positive to negative (bearish)
+
+## Three-Pronged Sector Rotation Detection
+
+The system now uses three complementary approaches for sector rotation detection:
+
+| Approach | Component | Signal | Schedule |
+|----------|-----------|--------|----------|
+| **Z-Score Analysis** | `SectorRotationAnalyzer` | Industry performance anomalies | Daily (after market) |
+| **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
+| **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
+
+**Stock Market Monitoring Flow:**
+```java
+@Scheduled(initialDelay = 0, fixedRate = 300000)
+protected void stockMarketMonitoring() {
+    if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
+        rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+        // Real-time sector rotation signals
+        rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
+        rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
+    }
+}
+```
 
 ## Testing Patterns
 

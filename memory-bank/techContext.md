@@ -61,6 +61,7 @@ This document covers the technologies used, development setup, technical constra
 | Database | Repository | Purpose | Location |
 |----------|------------|---------|----------|
 | SQLite | `SqlitePriceQuoteRepository` | Historical Finnhub price quotes | `data/tradebot.db` |
+| SQLite | `SqliteMomentumRocRepository` | Momentum ROC state | `data/tradebot.db` |
 
 ## Configuration Files
 
@@ -96,11 +97,16 @@ src/main/java/org/tradelite/
 │   ├── *PriceEvaluator.java    # Price evaluation
 │   ├── InsiderTracker.java     # Insider monitoring
 │   ├── SectorRotationTracker.java  # Sector tracking
+│   ├── SectorRelativeStrengthTracker.java  # Sector RS tracking
+│   ├── SectorMomentumRocTracker.java  # Sector ROC tracking (NEW)
+│   ├── MomentumRocSignal.java  # ROC signal record (NEW)
 │   └── ...
-├── repository/                  # NEW: Data persistence layer
+├── repository/                  # Data persistence layer
 │   ├── PriceQuoteEntity.java   # Entity class
 │   ├── PriceQuoteRepository.java # Interface
-│   └── SqlitePriceQuoteRepository.java # SQLite implementation
+│   ├── SqlitePriceQuoteRepository.java # SQLite price implementation
+│   ├── MomentumRocRepository.java # Interface (NEW)
+│   └── SqliteMomentumRocRepository.java # SQLite ROC implementation (NEW)
 ├── service/                     # Application services
 ├── utils/                       # Utility classes
 └── web/                         # Web endpoints (if any)
@@ -111,7 +117,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** 424
+- **Total Tests:** 466
 
 ### Testing Libraries
 ```xml

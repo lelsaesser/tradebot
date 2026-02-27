@@ -1,146 +1,78 @@
 # Active Context
 
 ## Current Work Focus
-✅ **COMPLETED**: Daily Sector RS Summary Feature (February 26, 2026)
-- Daily Telegram report showing sector ETF performance vs SPY benchmark
-- Uses SQLite historical price data for relative strength calculation
-- Shows RS value, percentage vs benchmark, and data completeness status
-- Scheduled daily at 22:35 ET (Mon-Fri)
 
-## Recent Changes (February 2026)
+The Momentum ROC (Rate of Change) feature has been implemented as the third sector rotation detection approach. This complements the existing Z-score analysis and relative strength tracking.
 
-### Daily Sector RS Summary - COMPLETED (Feb 26, 2026)
+## Recent Changes
 
-1. **New Core Component** ✅
-   - `SectorRelativeStrengthTracker` - Daily sector ETF relative strength summary
-   - Monitors all 11 SPDR sector ETFs (XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLC, XLRE, XLB, XLU)
-   - Calculates RS (Relative Strength) vs SPY benchmark from SQLite data
-   - Sends formatted Telegram summary sorted by performance
+### Momentum ROC Feature Implementation (Completed)
+1. **Core Classes Created:**
+   - `MomentumRocSignal` - Record for storing momentum crossover signals
+   - `MomentumRocData` - Model for persisting ROC state between calculations  
+   - `MomentumRocRepository` - Interface for SQLite persistence
+   - `SqliteMomentumRocRepository` - SQLite implementation with state tracking
+   - `MomentumRocService` - Service calculating ROC and detecting zero-line crossovers
+   - `SectorMomentumRocTracker` - Component monitoring all 11 SPDR sector ETFs
 
-2. **Data Model** ✅
-   - `RsResult` record in `RelativeStrengthService`:
-     - `rs` - Current relative strength value (stock_price/SPY_price)
-     - `ema` - 50-period EMA of RS values
-     - `dataPoints` - Number of days of data available
-     - `isComplete` - Whether full 50 data points available
-   - `SectorRsData` record for formatted output
+2. **Integration:**
+   - Added `SectorMomentumRocTracker` to `Scheduler.runDailySectorRotationTracking()`
+   - Uses existing price data from SQLite via `PriceQuoteRepository`
 
-3. **Repository Enhancement** ✅
-   - `findDailyClosingPrices(symbol, days)` method added to `PriceQuoteRepository`
-   - Groups intraday prices to get one closing price per day
-   - Returns chronologically ordered `DailyPrice` list
+3. **How It Works:**
+   - Calculates ROC10 (10-day) and ROC20 (20-day) momentum from historical prices
+   - Detects zero-line crossovers (momentum turning positive/negative)
+   - Persists previous ROC values to detect crossovers between daily runs
+   - Sends Telegram alerts when crossovers occur
 
-4. **Summary Message Format** ✅
-   ```
-   📊 Daily Sector RS Summary (Feb 26)
-   
-   XLK: RS 1.12 | +12.0% ✅
-   XLF: RS 1.05 | +5.0% ✅
-   XLY: RS 0.98 | -2.0% ✅
-   XLE: RS 0.92 | -8.0% (32 days)
-   ...
-   
-   ✅ = outperforming SPY | (N days) = incomplete data
-   ```
+4. **Tests Added:**
+   - `MomentumRocSignalTest` - 10 tests
+   - `MomentumRocDataTest` - 7 tests
+   - `SqliteMomentumRocRepositoryTest` - 7 tests
+   - `MomentumRocServiceTest` - 27 tests
+   - `SectorMomentumRocTrackerTest` - 10 tests
 
-5. **Files Created/Modified** ✅
-   - `src/main/java/org/tradelite/core/SectorRelativeStrengthTracker.java` (NEW)
-   - `src/test/java/org/tradelite/core/SectorRelativeStrengthTrackerTest.java` (NEW)
-   - `src/main/java/org/tradelite/service/RelativeStrengthService.java` (MODIFIED)
-   - `src/main/java/org/tradelite/repository/PriceQuoteRepository.java` (MODIFIED)
-   - `src/main/java/org/tradelite/repository/SqlitePriceQuoteRepository.java` (MODIFIED)
-   - `src/main/java/org/tradelite/Scheduler.java` (MODIFIED)
+### Test Coverage Improvements
+- Added 9 tests to `SectorRelativeStrengthTrackerTest` covering `analyzeAndSendAlerts()`
+- Total tests: 539 (up from ~509)
+- Coverage now meets 97% threshold
 
-6. **Schedule** ✅
-   - Daily at 22:35 ET, Monday-Friday (after sector rotation tracking at 22:30)
-   - Cron: `0 35 22 * * MON-FRI`
+## Three-Pronged Sector Rotation Detection
 
-### Test Coverage Improvement (Feb 26, 2026)
+The system now uses three complementary approaches:
 
-Added 23 new tests to improve coverage:
+1. **Z-Score Analysis** (via FinViz data)
+   - Statistical deviation from historical performance
+   - Detects extreme moves in sector performance
 
-**SectorRelativeStrengthTrackerTest (6 tests):**
-- Incomplete data shows "(32 days)" indicator
-- Mixed complete/incomplete data formatting
-- Empty result list handling
-- Zero percentage edge case
-- All 11 sector names verification
-- SectorRsData record fields
+2. **Relative Strength vs SPY** 
+   - RS = Sector Price / SPY Price ratio
+   - EMA crossover detection (50-period)
+   - Shows momentum vs benchmark
 
-**RelativeStrengthServiceTest (10 tests):**
-- getCurrentRsResult with complete data (50+ days)
-- getCurrentRsResult with incomplete data
-- getCurrentRsResult with no SPY data
-- getCurrentRsResult with mismatched dates
-- getCurrentRsResult returns empty for benchmark
-- Exact minimum/full data boundary tests
-- RsResult record methods
+3. **Momentum ROC** (NEW)
+   - Rate of Change over 10 and 20 days
+   - Zero-line crossover detection
+   - Shows pure momentum direction change
 
-**SqlitePriceQuoteRepositoryTest (7 tests):**
-- findDailyClosingPrices for unknown symbol
-- Price grouping by date
-- Chronological ordering
-- Days limit enforcement
-- Symbol filtering
-- Error handling
+## Technical Patterns
 
-### Previous: Feature Toggle System - COMPLETED (Feb 18, 2026)
+### ROC Formula
+```
+ROC = ((Current Price - Price N days ago) / Price N days ago) × 100
+```
 
-- JSON-based runtime feature toggles without restart
-- 3-minute cache TTL for dynamic updates
-- `FeatureToggleService` with `isEnabled(String)` API
+### Signal Detection
+- **Momentum Turning Positive**: Previous ROC10 < 0 AND Current ROC10 >= 0
+- **Momentum Turning Negative**: Previous ROC10 >= 0 AND Current ROC10 < 0
 
-### Previous: SQLite Integration - COMPLETED (Feb 18, 2026)
+### Minimum Data Requirements
+- 21 data points minimum for ROC calculation
+- 35 days fetched to ensure sufficient history
 
-- SQLite database for historical price data
-- Repository pattern with interface and implementation
-- Auto-schema creation on startup
+## Next Steps
 
-## Testing Summary
-
-- **Total Tests**: 466 ✅ (increased from 424)
-- **New Tests Added**: 42 (23 for sector RS feature + test improvements)
-- **Build Status**: SUCCESS ✅
-- **Coverage**: All checks met (≥97%) ✅
-
-## Active Decisions and Considerations
-
-### Sector RS Summary Design Decisions
-- **SQLite-based calculation**: Uses persisted historical prices, not in-memory RsiService data
-- **Minimum 20 days**: Requires at least 20 data points for meaningful RS
-- **50-day complete threshold**: Shows "(N days)" for incomplete data
-- **Performance sorting**: Summary sorted best to worst performers
-- **Checkmark indicator**: ✅ for outperforming SPY (RS > 1.0)
-
-### Sector ETFs Monitored
-All 11 Select Sector SPDR ETFs:
-- XLK (Technology), XLF (Financials), XLE (Energy)
-- XLV (Health Care), XLY (Consumer Discretionary), XLP (Consumer Staples)
-- XLI (Industrials), XLC (Communication Services), XLRE (Real Estate)
-- XLB (Materials), XLU (Utilities)
-
-## Configuration Files
-- `config/stock-symbols.json` - Stock symbol registry (49 symbols with sector ETFs)
-- `config/target-prices-stocks.json` - Stock target prices
-- `config/target-prices-coins.json` - Crypto target prices
-- `config/sector-performance.json` - Sector performance history
-- `config/insider-transactions.json` - Insider trading data
-- `config/feature-toggles.json` - Runtime feature flags
-- `data/tradebot.db` - SQLite database for price history
-
-## Scheduled Tasks
-
-| Task | Schedule | Description |
-|------|----------|-------------|
-| stockMarketMonitoring | Every 5 min (9:30-16:00 ET) | Stock prices + SQLite storage |
-| dailySectorRotationTracking | Daily 22:30 ET (Mon-Fri) | Sector performance + rotation alerts |
-| **dailySectorRsSummary** | Daily 22:35 ET (Mon-Fri) | **NEW** Sector RS vs SPY summary |
-| rsiStockMonitoring | Daily 16:30 ET (Mon-Fri) | RSI + Relative Strength analysis |
-
-## Next Iteration Opportunities
-
-### Enhancements (Future)
-- Telegram command to request sector RS summary on-demand
-- Trend indicators (up/down arrows based on RS direction)
-- Weekly sector performance comparison
-- Sector rotation alerts based on RS crossovers
+Potential enhancements:
+- Add ROC divergence detection (price vs ROC)
+- Consider ROC20 crossover for longer-term signals
+- Add configurable thresholds (e.g., only signal if ROC > ±2%)
