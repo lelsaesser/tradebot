@@ -72,7 +72,8 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        // Called 3 times: finnhubPriceEvaluator, sectorRelativeStrengthTracker, sectorMomentumRocTracker
+        // Called 3 times: finnhubPriceEvaluator, sectorRelativeStrengthTracker,
+        // sectorMomentumRocTracker
         verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
