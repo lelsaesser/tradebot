@@ -230,6 +230,44 @@ class InsiderTrackerTest {
     }
 
     @Test
+    void enrichWithHistoricData_withHistoricSymbolNotInCurrentTransactions_shouldSkipGracefully() {
+        // This test verifies that when historic data contains symbols that are no longer monitored
+        // (not in current transactions), the method handles it gracefully without NPE
+        Map<StockSymbol, Map<String, Integer>> insiderTransactions = new HashMap<>();
+
+        Map<String, Integer> aaplMap = new HashMap<>();
+        aaplMap.put("S", 10);
+        aaplMap.put("P", 5);
+
+        // Only AAPL is in current transactions
+        insiderTransactions.put(new StockSymbol("AAPL", "Apple"), aaplMap);
+
+        // Historic data contains AAPL (still monitored) AND MSFT (no longer monitored)
+        List<InsiderTransactionHistoric> historicData = new ArrayList<>();
+        historicData.add(
+                new InsiderTransactionHistoric(
+                        new StockSymbol("AAPL", "Apple"), Map.of("S", 5, "P", 2)));
+        historicData.add(
+                new InsiderTransactionHistoric(
+                        new StockSymbol("MSFT", "Microsoft"),
+                        Map.of("S", 8, "P", 3))); // Not in current transactions
+
+        when(insiderPersistence.readFromFile(InsiderPersistence.PERSISTENCE_FILE_PATH))
+                .thenReturn(historicData);
+
+        // Should NOT throw NullPointerException
+        Map<StockSymbol, Map<String, Integer>> enrichedData =
+                insiderTracker.enrichWithHistoricData(insiderTransactions);
+
+        // AAPL should be enriched with historic data
+        assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("S_HISTORIC"), is(5));
+        assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("P_HISTORIC"), is(2));
+
+        // MSFT should NOT be added to the result (it was skipped)
+        assertThat(enrichedData.containsKey(new StockSymbol("MSFT", "Microsoft")), is(false));
+    }
+
+    @Test
     void enrichWithHistoricData_withHistoricNullValues() {
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new HashMap<>();
 

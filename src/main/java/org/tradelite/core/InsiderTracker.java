@@ -166,6 +166,11 @@ public class InsiderTracker {
         for (InsiderTransactionHistoric historic : historicData) {
             StockSymbol symbol = historic.getSymbol();
 
+            // Skip if symbol is not in current transactions (no longer monitored)
+            if (!insiderTransactions.containsKey(symbol)) {
+                continue;
+            }
+
             Integer historicSellTransactionCount =
                     historic.getTransactions().get(InsiderTransactionCodes.SELL.getCode());
             Integer historicBuyTransactionCount =
