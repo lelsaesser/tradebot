@@ -13,16 +13,22 @@ public class PriceQuoteResponse {
 
     @JsonProperty("c")
     double currentPrice;
+
     @JsonProperty("o")
     double dailyOpen;
+
     @JsonProperty("h")
     double dailyHigh;
+
     @JsonProperty("l")
     double dailyLow;
+
     @JsonProperty("d")
     double change;
+
     @JsonProperty("dp")
     double changePercent;
+
     @JsonProperty("pc")
     double previousClose;
 

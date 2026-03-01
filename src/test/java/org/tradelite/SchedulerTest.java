@@ -1,5 +1,13 @@
 package org.tradelite;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.*;
+
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,47 +20,49 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
+import org.tradelite.core.RelativeStrengthTracker;
 import org.tradelite.core.RsiPriceFetcher;
+import org.tradelite.core.SectorMomentumRocTracker;
+import org.tradelite.core.SectorRelativeStrengthTracker;
+import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.service.ApiRequestMeteringService;
-
-import java.time.DayOfWeek;
-import java.time.LocalTime;
-import java.util.Objects;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SchedulerTest {
 
-    @Mock
-    private FinnhubPriceEvaluator finnhubPriceEvaluator;
-    @Mock
-    private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
-    @Mock
-    private TargetPriceProvider targetPriceProvider;
-    @Mock
-    private TelegramClient telegramClient;
-    @Mock
-    private TelegramMessageProcessor telegramMessageProcessor;
-    @Mock
-    private RootErrorHandler rootErrorHandler;
-    @Mock
-    private InsiderTracker insiderTracker;
-    @Mock
-    private RsiPriceFetcher rsiPriceFetcher;
-    @Mock
-    private ApiRequestMeteringService apiRequestMeteringService;
+    @Mock private FinnhubPriceEvaluator finnhubPriceEvaluator;
+    @Mock private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+    @Mock private TargetPriceProvider targetPriceProvider;
+    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramMessageProcessor telegramMessageProcessor;
+    @Mock private RootErrorHandler rootErrorHandler;
+    @Mock private InsiderTracker insiderTracker;
+    @Mock private RsiPriceFetcher rsiPriceFetcher;
+    @Mock private ApiRequestMeteringService apiRequestMeteringService;
+    @Mock private SectorRotationTracker sectorRotationTracker;
+    @Mock private RelativeStrengthTracker relativeStrengthTracker;
+    @Mock private SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
+    @Mock private SectorMomentumRocTracker sectorMomentumRocTracker;
 
     private Scheduler scheduler;
 
     @BeforeEach
     void setUp() {
-        scheduler = new Scheduler(finnhubPriceEvaluator, coinGeckoPriceEvaluator, targetPriceProvider,
-                telegramClient, telegramMessageProcessor, rootErrorHandler, insiderTracker, rsiPriceFetcher,
-                apiRequestMeteringService);
+        scheduler =
+                new Scheduler(
+                        finnhubPriceEvaluator,
+                        coinGeckoPriceEvaluator,
+                        targetPriceProvider,
+                        telegramClient,
+                        telegramMessageProcessor,
+                        rootErrorHandler,
+                        insiderTracker,
+                        rsiPriceFetcher,
+                        apiRequestMeteringService,
+                        sectorRotationTracker,
+                        relativeStrengthTracker,
+                        sectorRelativeStrengthTracker,
+                        sectorMomentumRocTracker);
     }
 
     @Test
@@ -62,14 +72,21 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        // Called 3 times: finnhubPriceEvaluator, sectorRelativeStrengthTracker,
+        // sectorMomentumRocTracker
+        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
+        verify(rootErrorHandler, times(3)).run(captor.capture());
 
-        captor.getValue().run();
+        // Execute all captured runnables
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
+        verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
+        verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
         verify(coinGeckoPriceEvaluator, times(0)).evaluatePrice();
     }
 
@@ -85,20 +102,20 @@ class SchedulerTest {
         verify(coinGeckoPriceEvaluator, never()).evaluatePrice();
     }
 
-    // @Test
-    // void cryptoMarketMonitoring_shouldRun() throws Exception {
-    //     scheduler.cryptoMarketMonitoring();
+    @Test
+    void cryptoMarketMonitoring_shouldRun() throws Exception {
+        scheduler.cryptoMarketMonitoring();
 
-    //     verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
 
-    //     ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-    //     verify(rootErrorHandler, times(1)).run(captor.capture());
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
 
-    //     captor.getValue().run();
+        captor.getValue().run();
 
-    //     verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
-    //     verify(finnhubPriceEvaluator, never()).evaluatePrice();
-    // }
+        verify(coinGeckoPriceEvaluator, times(1)).evaluatePrice();
+        verify(finnhubPriceEvaluator, never()).evaluatePrice();
+    }
 
     @Test
     void cleanupIgnoreSymbols_shouldRun() throws Exception {
@@ -111,7 +128,8 @@ class SchedulerTest {
 
         captor.getValue().run();
 
-        verify(targetPriceProvider, times(1)).cleanupIgnoreSymbols(TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS);
+        verify(targetPriceProvider, times(1))
+                .cleanupIgnoreSymbols(TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS);
     }
 
     @Test
@@ -142,16 +160,22 @@ class SchedulerTest {
     }
 
     @Test
-    void rsiStockMonitoring_shouldFetchStockPrices() throws Exception {
+    void rsiStockMonitoring_shouldFetchStockPricesAndAnalyzeRS() throws Exception {
         scheduler.rsiStockMonitoring();
 
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        // Verify rootErrorHandler.run is called twice (once for RSI, once for RS)
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
+        verify(rootErrorHandler, times(2)).run(captor.capture());
+
+        // Execute both captured runnables
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(rsiPriceFetcher, times(1)).fetchStockClosingPrices();
+        verify(relativeStrengthTracker, times(1)).analyzeAndSendAlerts();
     }
 
     @Test
@@ -281,5 +305,31 @@ class SchedulerTest {
         assertTrue(sentMessage.contains("🔹 *Total*: 50 requests"));
 
         verify(apiRequestMeteringService, times(1)).resetCounters();
+    }
+
+    @Test
+    void dailySectorRotationTracking_shouldFetchSectorPerformance() throws Exception {
+        scheduler.dailySectorRotationTracking();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(sectorRotationTracker, times(1)).fetchAndStoreDailyPerformance();
+    }
+
+    @Test
+    void dailySectorRelativeStrengthReport_shouldSendSummary() throws Exception {
+        scheduler.dailySectorRelativeStrengthReport();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(sectorRelativeStrengthTracker, times(1)).sendDailySectorRsSummary();
     }
 }

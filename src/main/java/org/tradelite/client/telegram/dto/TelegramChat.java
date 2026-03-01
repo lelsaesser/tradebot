@@ -8,8 +8,10 @@ public class TelegramChat {
 
     @JsonProperty("id")
     private Long chatId;
+
     @JsonProperty("title")
     private String title;
+
     @JsonProperty("type")
     private String type;
 }

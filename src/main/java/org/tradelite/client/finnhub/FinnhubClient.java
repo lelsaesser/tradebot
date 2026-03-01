@@ -46,10 +46,16 @@ public class FinnhubClient {
 
         try {
             meteringService.incrementFinnhubRequests();
-            ResponseEntity<PriceQuoteResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
+            ResponseEntity<PriceQuoteResponse> response =
+                    restTemplate.exchange(
+                            url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
             PriceQuoteResponse quote = response.getBody();
             if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
-                throw new IllegalStateException("Failed to fetch price quote for " + ticker.getTicker() + ": " + response.getStatusCode());
+                throw new IllegalStateException(
+                        "Failed to fetch price quote for "
+                                + ticker.getTicker()
+                                + ": "
+                                + response.getStatusCode());
             }
             quote.setStockSymbol(ticker);
             return quote;
@@ -71,7 +77,9 @@ public class FinnhubClient {
 
         try {
             meteringService.incrementFinnhubRequests();
-            ResponseEntity<InsiderTransactionResponse> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
+            ResponseEntity<InsiderTransactionResponse> response =
+                    restTemplate.exchange(
+                            url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
             return response.getBody();
         } catch (Exception e) {
             log.error(e.getMessage(), e);

@@ -1,5 +1,14 @@
 package org.tradelite.client.telegram;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,39 +21,54 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.dto.TelegramMessage;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.CoinId;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TickerSymbol;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramMessageProcessorTest {
 
-    @Mock
-    private TelegramClient telegramClient;
-    @Mock
-    private TelegramCommandDispatcher commandDispatcher;
-    @Mock
-    private TelegramMessageTracker messageTracker;
+    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramCommandDispatcher commandDispatcher;
+    @Mock private TelegramMessageTracker messageTracker;
+    @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
 
     private TelegramMessageProcessor messageProcessor;
 
     @BeforeEach
     void setUp() {
-        messageProcessor = new TelegramMessageProcessor(telegramClient, commandDispatcher, messageTracker);
+        messageProcessor =
+                new TelegramMessageProcessor(
+                        telegramClient, commandDispatcher, messageTracker, stockSymbolRegistry);
+
+        // Setup lenient mock responses for common stock symbols
+        lenient()
+                .when(stockSymbolRegistry.fromString("pltr"))
+                .thenReturn(
+                        java.util.Optional.of(
+                                new org.tradelite.common.StockSymbol("PLTR", "Palantir")));
+        lenient()
+                .when(stockSymbolRegistry.fromString("aapl"))
+                .thenReturn(
+                        java.util.Optional.of(
+                                new org.tradelite.common.StockSymbol("AAPL", "Apple")));
+        lenient()
+                .when(stockSymbolRegistry.fromString("invalid_symbol"))
+                .thenReturn(java.util.Optional.empty());
+        lenient()
+                .when(
+                        stockSymbolRegistry.fromString(
+                                argThat(
+                                        s ->
+                                                s != null
+                                                        && !s.equals("pltr")
+                                                        && !s.equals("aapl")
+                                                        && !s.equals("invalid_symbol"))))
+                .thenReturn(java.util.Optional.empty());
     }
 
     @ParameterizedTest
     @MethodSource("validInputsProvider")
-    void buildSetCommand_validInputs_createsSetCommand(String subCommand, String symbol, double target) {
+    void buildSetCommand_validInputs_createsSetCommand(
+            String subCommand, String symbol, double target) {
         var command = messageProcessor.buildSetCommand(subCommand, symbol, target);
         assertThat(command.isPresent(), is(true));
         assertThat(command.get().getSubCommand(), is(subCommand));
@@ -59,13 +83,13 @@ class TelegramMessageProcessorTest {
                 Arguments.of("buy", "pltr", 80.0),
                 Arguments.of("sell", "aapl", 500.0),
                 Arguments.of("buy", "aapl", 0),
-                Arguments.of("sell", "aapl", 0)
-        );
+                Arguments.of("sell", "aapl", 0));
     }
 
     @ParameterizedTest
     @MethodSource("invalidInputsProvider")
-    void buildSetCommand_invalidInputs_returnsEmpty(String subCommand, String symbol, double target) {
+    void buildSetCommand_invalidInputs_returnsEmpty(
+            String subCommand, String symbol, double target) {
         var command = messageProcessor.buildSetCommand(subCommand, symbol, target);
         assertThat(command.isPresent(), is(false));
     }
@@ -78,7 +102,7 @@ class TelegramMessageProcessorTest {
                 Arguments.of("invalid", "bitcoin", 50000.0), // Invalid subCommand
                 Arguments.of("buy", "", 50000.0), // Empty symbol
                 Arguments.of("buy", "invalid_symbol", 50000.0) // Invalid symbol
-        );
+                );
     }
 
     @ParameterizedTest
@@ -101,8 +125,7 @@ class TelegramMessageProcessorTest {
                 Arguments.of("/Set buy pltr 80.0"),
                 Arguments.of("/sEt sell aapl 500.0"),
                 Arguments.of("/seT buy aapl 0"),
-                Arguments.of("/sET sell aapl 0")
-        );
+                Arguments.of("/sET sell aapl 0"));
     }
 
     @ParameterizedTest
@@ -125,13 +148,12 @@ class TelegramMessageProcessorTest {
                 Arguments.of("/show stocks"),
                 Arguments.of("/SHOW stocks"),
                 Arguments.of("/Show stocks"),
-                Arguments.of("/shOW stocks")
-        );
+                Arguments.of("/shOW stocks"));
     }
 
     @Test
     void parseMessage_validAddCommand_returnsAddCommand() {
-        String text = "/add bitcoin 50000.0 60000.0";
+        String text = "/add COHR Coherent_Corp";
         TelegramMessage message = new TelegramMessage();
         message.setText(text);
         TelegramUpdateResponse update = new TelegramUpdateResponse();
@@ -145,7 +167,7 @@ class TelegramMessageProcessorTest {
 
     @Test
     void parseMessage_validRemoveCommand_returnsRemoveCommand() {
-        String text = "/remove bitcoin";
+        String text = "/remove COHR";
         TelegramMessage message = new TelegramMessage();
         message.setText(text);
         TelegramUpdateResponse update = new TelegramUpdateResponse();
@@ -155,6 +177,20 @@ class TelegramMessageProcessorTest {
 
         assertThat(command.isPresent(), is(true));
         assertThat(command.get(), is(instanceOf(RemoveCommand.class)));
+    }
+
+    @Test
+    void parseMessage_validRsiCommand_returnsRsiCommand() {
+        String text = "/rsi bitcoin";
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(RsiCommand.class)));
     }
 
     @ParameterizedTest
@@ -180,10 +216,8 @@ class TelegramMessageProcessorTest {
                 Arguments.of("show all"), // missing slash
                 Arguments.of("/show all bla bla"), // Not a valid show command
                 Arguments.of("/show all bla"), // Not a valid show command
-                Arguments.of("/add all bla"), // Not a valid add command
-                Arguments.of("/remove bla bla"), // Not a valid remove command
-                Arguments.of("/remove bit") // invalid symbol
-        );
+                Arguments.of("/remove bla bla") // Not a valid remove command
+                );
     }
 
     @Test
@@ -231,27 +265,33 @@ class TelegramMessageProcessorTest {
     }
 
     @Test
+    void processUpdates_nullMessage_skipsProcessing() {
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(null);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        verify(commandDispatcher, never()).dispatch(any());
+        verify(messageTracker, never()).setLastProcessedMessageId(anyLong());
+    }
+
+    @Test
     void parseAddCommand_validInput_returnsAddCommand() {
-        String messageText = "/add bitcoin 50000.0 60000.0";
+        String messageText = "/add COHR Coherent_Corp";
         Optional<AddCommand> command = messageProcessor.parseAddCommand(messageText);
 
         assertThat(command.isPresent(), is(true));
-        assertThat(command.get().getSymbol(), is(CoinId.BITCOIN));
-        assertThat(command.get().getBuyTargetPrice(), is(50000.0));
-        assertThat(command.get().getSellTargetPrice(), is(60000.0));
+        assertThat(command.get().getTicker(), is("COHR"));
+        assertThat(command.get().getDisplayName(), is("Coherent Corp"));
+        assertThat(command.get().getBuyTargetPrice(), is(0.0));
+        assertThat(command.get().getSellTargetPrice(), is(0.0));
     }
 
     @ParameterizedTest
     @CsvSource({
-            "/add bitcoin 50000.0 60000.0 123",
-            "/add 123 50000.0 60000.0",
-            "/add bitcoin 60000.0",
-            "/add bitcoin _ 60000.0",
-            "/add bitcoin -1 60000.0",
-            "/add bitcoin -1 -60000.0",
-            "/add bitcoin abc -60000.0",
-            "/add bitcoin abc def",
-            "/add bitcoin 100 def",
+        "/add COHR",
+        "/add COHR Coherent_Corp Extra",
+        "/add",
     })
     void parseAddCommand_invalidInputs_returnsEmpty(String commandText) {
         Optional<AddCommand> command = messageProcessor.parseAddCommand(commandText);
@@ -262,14 +302,19 @@ class TelegramMessageProcessorTest {
         verify(telegramClient, times(1)).sendMessage(anyString());
     }
 
-    @Test
-    void parseTickerSymbol_validStock_returnsStockSymbol() {
-        String ticker = "AAPL";
-        Optional<TickerSymbol> stockSymbol = messageProcessor.parseTickerSymbol(ticker);
+    @ParameterizedTest
+    @CsvSource({
+        "/rsi",
+        "/rsi bitcoin extra",
+        "/rsi invalid_symbol",
+    })
+    void parseRsiCommand_invalidInputs_returnsEmpty(String commandText) {
+        Optional<RsiCommand> command = messageProcessor.parseRsiCommand(commandText);
 
-        assertThat(stockSymbol.isPresent(), is(true));
-        assertThat(stockSymbol.get().getName(), is("AAPL"));
-        assertThat(stockSymbol.get(), instanceOf(StockSymbol.class));
+        assertThat(command.isPresent(), is(false));
+
+        verify(commandDispatcher, never()).dispatch(any(RsiCommand.class));
+        verify(telegramClient, times(1)).sendMessage(anyString());
     }
 
     @Test
@@ -295,6 +340,19 @@ class TelegramMessageProcessorTest {
         String ticker = "";
         Optional<TickerSymbol> result = messageProcessor.parseTickerSymbol(ticker);
 
+        assertThat(result.isPresent(), is(false));
+    }
+
+    @Test
+    void parseTickerSymbol_nullTicker_returnsEmpty() {
+        Optional<TickerSymbol> result = messageProcessor.parseTickerSymbol(null);
+
+        assertThat(result.isPresent(), is(false));
+    }
+
+    @Test
+    void tryParseDouble_nullValue_returnsEmpty() {
+        Optional<Double> result = messageProcessor.tryParseDouble(null);
         assertThat(result.isPresent(), is(false));
     }
 }

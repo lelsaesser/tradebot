@@ -1,5 +1,10 @@
 package org.tradelite.client.telegram;
 
+import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.mockito.Mockito.*;
+
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,19 +15,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.List;
-
-import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class ShowCommandProcessorTest {
 
-    @Mock
-    private TargetPriceProvider targetPriceProvider;
-    @Mock
-    private TelegramClient telegramClient;
+    @Mock private TargetPriceProvider targetPriceProvider;
+    @Mock private TelegramClient telegramClient;
 
     private ShowCommandProcessor showCommandProcessor;
 
@@ -54,7 +51,8 @@ class ShowCommandProcessorTest {
 
         showCommandProcessor.processCommand(command);
 
-        verify(telegramClient, times(1)).sendMessage("Sub-command is required. Use all, coins, or stocks.");
+        verify(telegramClient, times(1))
+                .sendMessage("Sub-command is required. Use all, coins, or stocks.");
         verify(targetPriceProvider, never()).getCoinTargetPrices();
         verify(targetPriceProvider, never()).getStockTargetPrices();
     }
@@ -73,10 +71,10 @@ class ShowCommandProcessorTest {
     }
 
     private static Object[][] processCommandParamProvider() {
-        return new Object[][]{
-                {new ShowCommand(ShowCommandOptions.ALL.getName())},
-                {new ShowCommand(ShowCommandOptions.COINS.getName())},
-                {new ShowCommand(ShowCommandOptions.STOCKS.getName())}
+        return new Object[][] {
+            {new ShowCommand(ShowCommandOptions.ALL.getName())},
+            {new ShowCommand(ShowCommandOptions.COINS.getName())},
+            {new ShowCommand(ShowCommandOptions.STOCKS.getName())}
         };
     }
 
@@ -98,23 +96,30 @@ class ShowCommandProcessorTest {
     }
 
     private static Object[][] invalidCommandParamProvider() {
-        return new Object[][]{
-                {new ShowCommand("invalid")},
-                {new ShowCommand("")},
-                {new ShowCommand(null)}
+        return new Object[][] {
+            {new ShowCommand("invalid")}, {new ShowCommand("")}, {new ShowCommand(null)}
         };
     }
 
     @Test
     void builtResponseMessage_all() {
-        List<TargetPrice> coinPrices = List.of(new TargetPrice("BTC", 50000.0, 200000.0), new TargetPrice("ETH", 3000.0, 10000.0));
-        List<TargetPrice> stockPrices = List.of(new TargetPrice("AAPL", 150.0, 300.0), new TargetPrice("GOOG", 180.0, 500.0));
+        List<TargetPrice> coinPrices =
+                List.of(
+                        new TargetPrice("BTC", 50000.0, 200000.0),
+                        new TargetPrice("ETH", 3000.0, 10000.0));
+        List<TargetPrice> stockPrices =
+                List.of(
+                        new TargetPrice("AAPL", 150.0, 300.0),
+                        new TargetPrice("GOOG", 180.0, 500.0));
 
         String responseMessage = showCommandProcessor.builtResponseMessage(coinPrices, stockPrices);
 
         assertThat(responseMessage, containsStringIgnoringCase("stocks:"));
         assertThat(responseMessage, containsStringIgnoringCase("cryptos:"));
-        assertThat(responseMessage, containsStringIgnoringCase("Current monitoring watchlist contains following symbols:"));
+        assertThat(
+                responseMessage,
+                containsStringIgnoringCase(
+                        "Current monitoring watchlist contains following symbols:"));
     }
 
     @Test
@@ -126,7 +131,10 @@ class ShowCommandProcessorTest {
 
         assertThat(responseMessage, containsStringIgnoringCase("cryptos:"));
         assertThat(responseMessage, not(containsStringIgnoringCase("stocks:")));
-        assertThat(responseMessage, containsStringIgnoringCase("Current monitoring watchlist contains following symbols:"));
+        assertThat(
+                responseMessage,
+                containsStringIgnoringCase(
+                        "Current monitoring watchlist contains following symbols:"));
     }
 
     @Test
@@ -138,6 +146,9 @@ class ShowCommandProcessorTest {
 
         assertThat(responseMessage, containsStringIgnoringCase("stocks:"));
         assertThat(responseMessage, not(containsStringIgnoringCase("cryptos:")));
-        assertThat(responseMessage, containsStringIgnoringCase("Current monitoring watchlist contains following symbols:"));
+        assertThat(
+                responseMessage,
+                containsStringIgnoringCase(
+                        "Current monitoring watchlist contains following symbols:"));
     }
 }

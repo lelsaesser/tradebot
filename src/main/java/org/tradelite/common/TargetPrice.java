@@ -1,6 +1,5 @@
 package org.tradelite.common;
 
-
 import lombok.*;
 
 @Getter

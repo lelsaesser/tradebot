@@ -2,14 +2,6 @@ package org.tradelite.common;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.AddCommand;
-import org.tradelite.client.telegram.RemoveCommand;
-import org.tradelite.core.IgnoreReason;
-import org.tradelite.core.IgnoredSymbol;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -18,6 +10,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.tradelite.core.IgnoreReason;
+import org.tradelite.core.IgnoredSymbol;
 
 @Slf4j
 @Component
@@ -53,7 +50,8 @@ public class TargetPriceProvider {
     }
 
     public void addIgnoredSymbol(TickerSymbol symbol, IgnoreReason reason, int alertThreshold) {
-        IgnoredSymbol existingSymbol = ignoredSymbols.computeIfAbsent(symbol.getName(), s -> new IgnoredSymbol(symbol));
+        IgnoredSymbol existingSymbol =
+                ignoredSymbols.computeIfAbsent(symbol.getName(), _ -> new IgnoredSymbol(symbol));
         existingSymbol.getIgnoreTimes().put(reason, Instant.now());
         existingSymbol.getAlertThresholds().put(reason, alertThreshold);
     }
@@ -81,7 +79,11 @@ public class TargetPriceProvider {
 
         long elapsedSeconds = Duration.between(ignoreTime, Instant.now()).getSeconds();
         if (elapsedSeconds < IGNORE_DURATION_TTL_SECONDS) {
-            log.info("{} is ignored for reason {}. Time remaining: {} seconds", symbol.getName(), reason, IGNORE_DURATION_TTL_SECONDS - elapsedSeconds);
+            log.info(
+                    "{} is ignored for reason {}. Time remaining: {} seconds",
+                    symbol.getName(),
+                    reason,
+                    IGNORE_DURATION_TTL_SECONDS - elapsedSeconds);
             return true;
         }
         return false;
@@ -110,7 +112,8 @@ public class TargetPriceProvider {
         ignoredSymbols.entrySet().removeIf(entry -> entry.getValue().getIgnoreTimes().isEmpty());
     }
 
-    public synchronized void updateTargetPrice(TickerSymbol symbol, Double newBuyTarget, Double newSellTarget, String filePath) {
+    public synchronized void updateTargetPrice(
+            TickerSymbol symbol, Double newBuyTarget, Double newSellTarget, String filePath) {
         File file = new File(filePath);
 
         try {
@@ -135,45 +138,49 @@ public class TargetPriceProvider {
         }
     }
 
-    public synchronized boolean addSymbolToTargetPriceConfig(AddCommand addCommand, String filePath) {
+    public synchronized boolean addTargetPrice(TargetPrice targetPrice, String filePath) {
         List<TargetPrice> entries;
         File file = new File(filePath);
         try {
             entries = objectMapper.readValue(file, new TypeReference<>() {});
 
-            boolean alreadyExists = entries.stream()
-                    .anyMatch(tp -> tp.getSymbol().equalsIgnoreCase(addCommand.getSymbol().getName()));
+            boolean alreadyExists =
+                    entries.stream()
+                            .anyMatch(
+                                    tp -> tp.getSymbol().equalsIgnoreCase(targetPrice.getSymbol()));
 
             if (alreadyExists) {
-                log.warn("Symbol {} already exists in target prices", addCommand.getSymbol().getName());
+                log.warn("Symbol {} already exists in target prices", targetPrice.getSymbol());
                 return false;
             }
 
-            TargetPrice newEntry = new TargetPrice(addCommand.getSymbol().getName(), addCommand.getBuyTargetPrice(), addCommand.getSellTargetPrice());
-            entries.add(newEntry);
-
+            entries.add(targetPrice);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
 
             return true;
 
         } catch (IOException e) {
-            log.error("Failed to update target price in JSON file", e);
+            log.error("Failed to add target price to JSON file", e);
             return false;
         }
     }
 
-    public synchronized void removeSymbolFromTargetPriceConfig(RemoveCommand command, String filePath) {
+    public synchronized boolean removeSymbolFromTargetPrices(String ticker, String filePath) {
         File file = new File(filePath);
         try {
             List<TargetPrice> entries = objectMapper.readValue(file, new TypeReference<>() {});
 
-            entries.removeIf(tp -> tp.getSymbol().equalsIgnoreCase(command.getSymbol().getName()));
+            boolean removed = entries.removeIf(tp -> tp.getSymbol().equalsIgnoreCase(ticker));
 
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
+            if (removed) {
+                objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
+            }
+
+            return removed;
 
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to remove symbol from target prices in JSON file", e);
+            log.error("Failed to remove symbol from target prices in JSON file", e);
+            return false;
         }
     }
-
 }

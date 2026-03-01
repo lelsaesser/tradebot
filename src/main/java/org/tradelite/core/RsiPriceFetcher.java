@@ -1,5 +1,8 @@
 package org.tradelite.core;
 
+import java.io.IOException;
+import java.time.LocalDate;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,10 +15,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
-
-import java.io.IOException;
-import java.time.LocalDate;
-import java.util.Optional;
+import org.tradelite.service.StockSymbolRegistry;
 
 @Component
 @RequiredArgsConstructor
@@ -26,17 +26,22 @@ public class RsiPriceFetcher {
     private final CoinGeckoClient coinGeckoClient;
     private final TargetPriceProvider targetPriceProvider;
     private final RsiService rsiService;
+    private final StockSymbolRegistry stockSymbolRegistry;
 
-    public void fetchStockClosingPrices() throws IOException {
+    public void fetchStockClosingPrices() throws IOException, InterruptedException {
         LocalDate today = LocalDate.now();
 
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
             try {
-                Optional<StockSymbol> stockSymbol = StockSymbol.fromString(targetPrice.getSymbol());
+                Optional<StockSymbol> stockSymbol =
+                        stockSymbolRegistry.fromString(targetPrice.getSymbol());
                 if (stockSymbol.isPresent()) {
                     PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(stockSymbol.get());
                     rsiService.addPrice(stockSymbol.get(), priceQuote.getCurrentPrice(), today);
                 }
+                // prevent 60 requests/minute Finnhub API limit by sleeping for 1 second between
+                // requests
+                Thread.sleep(1000);
             } catch (Exception e) {
                 log.error("Error fetching stock price for RSI", e);
                 throw e;
@@ -51,7 +56,8 @@ public class RsiPriceFetcher {
             try {
                 Optional<CoinId> coinId = CoinId.fromString(targetPrice.getSymbol());
                 if (coinId.isPresent()) {
-                    CoinGeckoPriceResponse.CoinData coinData = coinGeckoClient.getCoinPriceData(coinId.get());
+                    CoinGeckoPriceResponse.CoinData coinData =
+                            coinGeckoClient.getCoinPriceData(coinId.get());
                     rsiService.addPrice(coinId.get(), coinData.getUsd(), today);
                 }
             } catch (Exception e) {

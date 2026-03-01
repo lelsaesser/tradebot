@@ -1,32 +1,78 @@
 # Active Context
 
-This document tracks the current work focus, recent changes, next steps, active decisions, important patterns, and project insights.
-
 ## Current Work Focus
-The scheduler has been updated to run cryptocurrency monitoring every 7 minutes, while stock monitoring remains at 5 minutes.
+
+The Momentum ROC (Rate of Change) feature has been implemented as the third sector rotation detection approach. This complements the existing Z-score analysis and relative strength tracking.
 
 ## Recent Changes
-- **Separated Schedulers**: The combined market monitoring job was split into `stockMarketMonitoring` and `cryptoMarketMonitoring`.
-- **Updated Crypto Schedule**: The `cryptoMarketMonitoring` job is now scheduled to run every 7 minutes.
-- **Updated Tests**: The `SchedulerTest` class was updated to reflect the new scheduler methods.
+
+### Momentum ROC Feature Implementation (Completed)
+1. **Core Classes Created:**
+   - `MomentumRocSignal` - Record for storing momentum crossover signals
+   - `MomentumRocData` - Model for persisting ROC state between calculations  
+   - `MomentumRocRepository` - Interface for SQLite persistence
+   - `SqliteMomentumRocRepository` - SQLite implementation with state tracking
+   - `MomentumRocService` - Service calculating ROC and detecting zero-line crossovers
+   - `SectorMomentumRocTracker` - Component monitoring all 11 SPDR sector ETFs
+
+2. **Integration:**
+   - Added `SectorMomentumRocTracker` to `Scheduler.runDailySectorRotationTracking()`
+   - Uses existing price data from SQLite via `PriceQuoteRepository`
+
+3. **How It Works:**
+   - Calculates ROC10 (10-day) and ROC20 (20-day) momentum from historical prices
+   - Detects zero-line crossovers (momentum turning positive/negative)
+   - Persists previous ROC values to detect crossovers between daily runs
+   - Sends Telegram alerts when crossovers occur
+
+4. **Tests Added:**
+   - `MomentumRocSignalTest` - 10 tests
+   - `MomentumRocDataTest` - 7 tests
+   - `SqliteMomentumRocRepositoryTest` - 7 tests
+   - `MomentumRocServiceTest` - 27 tests
+   - `SectorMomentumRocTrackerTest` - 10 tests
+
+### Test Coverage Improvements
+- Added 9 tests to `SectorRelativeStrengthTrackerTest` covering `analyzeAndSendAlerts()`
+- Total tests: 539 (up from ~509)
+- Coverage now meets 97% threshold
+
+## Three-Pronged Sector Rotation Detection
+
+The system now uses three complementary approaches:
+
+1. **Z-Score Analysis** (via FinViz data)
+   - Statistical deviation from historical performance
+   - Detects extreme moves in sector performance
+
+2. **Relative Strength vs SPY** 
+   - RS = Sector Price / SPY Price ratio
+   - EMA crossover detection (50-period)
+   - Shows momentum vs benchmark
+
+3. **Momentum ROC** (NEW)
+   - Rate of Change over 10 and 20 days
+   - Zero-line crossover detection
+   - Shows pure momentum direction change
+
+## Technical Patterns
+
+### ROC Formula
+```
+ROC = ((Current Price - Price N days ago) / Price N days ago) × 100
+```
+
+### Signal Detection
+- **Momentum Turning Positive**: Previous ROC10 < 0 AND Current ROC10 >= 0
+- **Momentum Turning Negative**: Previous ROC10 >= 0 AND Current ROC10 < 0
+
+### Minimum Data Requirements
+- 21 data points minimum for ROC calculation
+- 35 days fetched to ensure sufficient history
 
 ## Next Steps
-- Monitor the application to ensure the schedulers are running at their new, correct intervals.
-- Update the system patterns to reflect the new scheduler structure.
 
-## Active Decisions
-- Chose to implement graceful error handling rather than trying to modify production configuration files
-- Decided to silently skip invalid symbols to maintain system stability while processing valid ones
-
-## Important Patterns and Preferences
-- The project uses a scheduler-based approach to orchestrate tasks
-- Components are loosely coupled using dependency injection
-- Error handling is centralized in the `RootErrorHandler`
-- **New pattern**: Graceful degradation when configuration contains invalid data - skip invalid entries and continue processing valid ones
-
-## Learnings and Project Insights
-- The project is a trading bot with a clear, modular structure
-- The use of Spring Boot and its scheduling features simplifies the orchestration of complex workflows
-- **Critical insight**: Configuration files in production may contain symbols not defined in the enum, requiring resilient error handling
-- The `StockSymbol` enum acts as a whitelist - only symbols defined there can be processed for insider tracking
-- The system should be designed to handle configuration mismatches gracefully rather than failing completely
+Potential enhancements:
+- Add ROC divergence detection (price vs ROC)
+- Consider ROC20 crossover for longer-term signals
+- Add configurable thresholds (e.g., only signal if ROC > ±2%)

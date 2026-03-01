@@ -1,5 +1,10 @@
 package org.tradelite;
 
+import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS;
+
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,12 +16,6 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
-
-import java.time.DayOfWeek;
-import java.time.LocalTime;
-import java.util.List;
-
-import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS;
 
 @Slf4j
 @Component
@@ -31,16 +30,29 @@ public class Scheduler {
     private final InsiderTracker insiderTracker;
     private final RsiPriceFetcher rsiPriceFetcher;
     private final ApiRequestMeteringService apiRequestMeteringService;
+    private final SectorRotationTracker sectorRotationTracker;
+    private final RelativeStrengthTracker relativeStrengthTracker;
+    private final SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
+    private final SectorMomentumRocTracker sectorMomentumRocTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
 
-
     @Autowired
-    Scheduler(FinnhubPriceEvaluator finnhubPriceEvaluator, CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
-              TargetPriceProvider targetPriceProvider, TelegramClient telegramClient, TelegramMessageProcessor telegramMessageProcessor,
-              RootErrorHandler rootErrorHandler, InsiderTracker insiderTracker, RsiPriceFetcher rsiPriceFetcher,
-              ApiRequestMeteringService apiRequestMeteringService) {
+    Scheduler(
+            FinnhubPriceEvaluator finnhubPriceEvaluator,
+            CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
+            TargetPriceProvider targetPriceProvider,
+            TelegramClient telegramClient,
+            TelegramMessageProcessor telegramMessageProcessor,
+            RootErrorHandler rootErrorHandler,
+            InsiderTracker insiderTracker,
+            RsiPriceFetcher rsiPriceFetcher,
+            ApiRequestMeteringService apiRequestMeteringService,
+            SectorRotationTracker sectorRotationTracker,
+            RelativeStrengthTracker relativeStrengthTracker,
+            SectorRelativeStrengthTracker sectorRelativeStrengthTracker,
+            SectorMomentumRocTracker sectorMomentumRocTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -50,12 +62,19 @@ public class Scheduler {
         this.rootErrorHandler = rootErrorHandler;
         this.insiderTracker = insiderTracker;
         this.apiRequestMeteringService = apiRequestMeteringService;
+        this.sectorRotationTracker = sectorRotationTracker;
+        this.relativeStrengthTracker = relativeStrengthTracker;
+        this.sectorRelativeStrengthTracker = sectorRelativeStrengthTracker;
+        this.sectorMomentumRocTracker = sectorMomentumRocTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     protected void stockMarketMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+            // Analyze sector ETFs in real-time for rotation signals
+            rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
+            rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
@@ -64,15 +83,24 @@ public class Scheduler {
 
     @Scheduled(initialDelay = 0, fixedRate = 420000)
     protected void cryptoMarketMonitoring() {
-        //rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
+        rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
         log.info("Crypto market monitoring round completed.");
     }
 
     @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
     protected void rsiStockMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchStockClosingPrices);
-
         log.info("RSI daily stock price data fetch completed.");
+
+        // Run RS analysis after RSI data is fetched (both use same price data)
+        rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);
+        log.info("Relative strength vs SPY analysis completed.");
+    }
+
+    @Scheduled(cron = "0 0 12 * * MON-FRI", zone = "CET")
+    protected void dailySectorRelativeStrengthReport() {
+        rootErrorHandler.run(sectorRelativeStrengthTracker::sendDailySectorRsSummary);
+        log.info("Daily sector relative strength report completed.");
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
@@ -84,7 +112,8 @@ public class Scheduler {
 
     @Scheduled(fixedRate = 600000)
     protected void cleanupIgnoreSymbols() {
-        rootErrorHandler.run(() -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
+        rootErrorHandler.run(
+                () -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
 
         log.info("Cleanup of ignored symbols completed.");
     }
@@ -104,31 +133,48 @@ public class Scheduler {
         log.info("Weekly insider trading report generated.");
     }
 
+    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
+    protected void dailySectorRotationTracking() {
+        rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
+
+        log.info("Daily sector rotation tracking completed.");
+    }
+
     @Scheduled(cron = "0 0 0 1 * *", zone = "UTC")
     protected void monthlyApiUsageReport() {
-        rootErrorHandler.run(() -> {
-            int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
-            int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
-            
-            if (finnhubCount > 0 || coingeckoCount > 0) {
-                String previousMonth = apiRequestMeteringService.getCurrentMonth();
-                
-                String message = String.format("""
+        rootErrorHandler.run(
+                () -> {
+                    int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
+                    int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
+
+                    if (finnhubCount > 0 || coingeckoCount > 0) {
+                        String previousMonth = apiRequestMeteringService.getCurrentMonth();
+
+                        String message =
+                                String.format(
+                                        """
                         📊 *Monthly API Usage Report - %s*
                         "🔹 *Finnhub API*: %,d requests
                         "🔹 *CoinGecko API*: %,d requests
                         "🔹 *Total*: %,d requests""",
-                        previousMonth, finnhubCount, coingeckoCount, finnhubCount + coingeckoCount);
-                
-                telegramClient.sendMessage(message);
-                log.info("Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}", 
-                        previousMonth, finnhubCount, coingeckoCount);
-            } else {
-                log.info("No API requests recorded for the previous month, skipping report");
-            }
-            
-            apiRequestMeteringService.resetCounters();
-        });
+                                        previousMonth,
+                                        finnhubCount,
+                                        coingeckoCount,
+                                        finnhubCount + coingeckoCount);
+
+                        telegramClient.sendMessage(message);
+                        log.info(
+                                "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}",
+                                previousMonth,
+                                finnhubCount,
+                                coingeckoCount);
+                    } else {
+                        log.info(
+                                "No API requests recorded for the previous month, skipping report");
+                    }
+
+                    apiRequestMeteringService.resetCounters();
+                });
 
         log.info("Monthly API usage report completed.");
     }

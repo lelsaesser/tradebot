@@ -1,5 +1,11 @@
 package org.tradelite.core;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,35 +21,29 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
 
-import java.io.IOException;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class RsiPriceFetcherTest {
 
-    @Mock
-    private FinnhubClient finnhubClient;
+    @Mock private FinnhubClient finnhubClient;
 
-    @Mock
-    private CoinGeckoClient coinGeckoClient;
+    @Mock private CoinGeckoClient coinGeckoClient;
 
-    @Mock
-    private TargetPriceProvider targetPriceProvider;
+    @Mock private TargetPriceProvider targetPriceProvider;
 
-    @Mock
-    private RsiService rsiService;
+    @Mock private RsiService rsiService;
 
-    @InjectMocks
-    private RsiPriceFetcher rsiPriceFetcher;
+    @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
+
+    @InjectMocks private RsiPriceFetcher rsiPriceFetcher;
 
     @Test
-    void testFetchStockClosingPrices() throws IOException {
-        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(new PriceQuoteResponse());
+    void testFetchStockClosingPrices() throws IOException, InterruptedException {
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
+        when(stockSymbolRegistry.fromString("AAPL"))
+                .thenReturn(java.util.Optional.of(new StockSymbol("AAPL", "Apple")));
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
+                .thenReturn(new PriceQuoteResponse());
 
         rsiPriceFetcher.fetchStockClosingPrices();
 
@@ -52,8 +52,12 @@ class RsiPriceFetcherTest {
 
     @Test
     void testFetchStockClosingPrices_exception() throws IOException {
-        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenThrow(new RuntimeException("API error"));
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(List.of(new TargetPrice("AAPL", 100, 200)));
+        when(stockSymbolRegistry.fromString("AAPL"))
+                .thenReturn(java.util.Optional.of(new StockSymbol("AAPL", "Apple")));
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
+                .thenThrow(new RuntimeException("API error"));
 
         assertThrows(RuntimeException.class, () -> rsiPriceFetcher.fetchStockClosingPrices());
 
@@ -62,9 +66,10 @@ class RsiPriceFetcherTest {
 
     @Test
     void testFetchCryptoClosingPrices() throws IOException {
-        when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
+        when(targetPriceProvider.getCoinTargetPrices())
+                .thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
         CoinGeckoPriceResponse.CoinData coinData = new CoinGeckoPriceResponse.CoinData();
-        coinData.setUsd(50000);
+        coinData.setUsd(50000.0);
         when(coinGeckoClient.getCoinPriceData(any(CoinId.class))).thenReturn(coinData);
 
         rsiPriceFetcher.fetchCryptoClosingPrices();
@@ -74,11 +79,37 @@ class RsiPriceFetcherTest {
 
     @Test
     void testFetchCryptoClosingPrices_coinNotFound() throws IOException {
-        when(targetPriceProvider.getCoinTargetPrices()).thenReturn(List.of(new TargetPrice("not_a_coin", 100, 200)));
+        when(targetPriceProvider.getCoinTargetPrices())
+                .thenReturn(List.of(new TargetPrice("not_a_coin", 100, 200)));
 
         rsiPriceFetcher.fetchCryptoClosingPrices();
 
         verify(coinGeckoClient, never()).getCoinPriceData(any(CoinId.class));
+        verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), any());
+    }
+
+    @Test
+    void testFetchStockClosingPrices_invalidSymbol() throws IOException, InterruptedException {
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(List.of(new TargetPrice("INVALID_SYMBOL", 100, 200)));
+        when(stockSymbolRegistry.fromString("INVALID_SYMBOL"))
+                .thenReturn(java.util.Optional.empty());
+
+        rsiPriceFetcher.fetchStockClosingPrices();
+
+        verify(finnhubClient, never()).getPriceQuote(any(StockSymbol.class));
+        verify(rsiService, never()).addPrice(any(StockSymbol.class), anyDouble(), any());
+    }
+
+    @Test
+    void testFetchCryptoClosingPrices_exception() throws IOException {
+        when(targetPriceProvider.getCoinTargetPrices())
+                .thenReturn(List.of(new TargetPrice("bitcoin", 100, 200)));
+        when(coinGeckoClient.getCoinPriceData(any(CoinId.class)))
+                .thenThrow(new RuntimeException("Network error"));
+
+        assertThrows(RuntimeException.class, () -> rsiPriceFetcher.fetchCryptoClosingPrices());
+
         verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), any());
     }
 }

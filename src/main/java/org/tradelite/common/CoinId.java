@@ -1,10 +1,9 @@
 package org.tradelite.common;
 
-import lombok.Getter;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import lombok.Getter;
 
 @Getter
 public enum CoinId implements TickerSymbol {
@@ -40,5 +39,10 @@ public enum CoinId implements TickerSymbol {
     @Override
     public SymbolType getSymbolType() {
         return SymbolType.CRYPTO;
+    }
+
+    @Override
+    public String getDisplayName() {
+        return id;
     }
 }

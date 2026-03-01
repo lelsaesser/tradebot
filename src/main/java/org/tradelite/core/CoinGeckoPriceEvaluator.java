@@ -1,5 +1,7 @@
 package org.tradelite.core;
 
+import java.util.*;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.coingecko.CoinGeckoClient;
@@ -9,9 +11,6 @@ import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
 @Component
 public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
@@ -19,12 +18,13 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
 
-    protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
-
+    @Getter protected final Map<CoinId, Double> lastPriceCache = new EnumMap<>(CoinId.class);
 
     @Autowired
-    public CoinGeckoPriceEvaluator(CoinGeckoClient coinGeckoClient, TargetPriceProvider targetPriceProvider,
-                                   TelegramClient telegramClient) {
+    public CoinGeckoPriceEvaluator(
+            CoinGeckoClient coinGeckoClient,
+            TargetPriceProvider targetPriceProvider,
+            TelegramClient telegramClient) {
         super(telegramClient, targetPriceProvider);
         this.coinGeckoClient = coinGeckoClient;
         this.targetPriceProvider = targetPriceProvider;
@@ -41,8 +41,12 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
         for (CoinId coinId : coinIds) {
             CoinGeckoPriceResponse.CoinData priceData = coinGeckoClient.getCoinPriceData(coinId);
 
+            if (priceData == null || priceData.getUsd() == null) {
+                continue;
+            }
+
             Double lastPrice = lastPriceCache.get(coinId);
-            if (priceData == null || (lastPrice != null && Math.abs(lastPrice - priceData.getUsd()) < 0.0001)) {
+            if (lastPrice != null && Math.abs(lastPrice - priceData.getUsd()) < 0.0001) {
                 continue;
             }
             lastPriceCache.put(coinId, priceData.getUsd());
@@ -55,18 +59,24 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
             evaluateHighPriceChange(priceData);
             for (TargetPrice targetPrice : targetPrices) {
                 if (priceData.getCoinId().getId().equalsIgnoreCase(targetPrice.getSymbol())) {
-                    comparePrices(priceData.getCoinId(), priceData.getUsd(), targetPrice.getBuyTarget(), targetPrice.getSellTarget());
+                    comparePrices(
+                            priceData.getCoinId(),
+                            priceData.getUsd(),
+                            targetPrice.getBuyTarget(),
+                            targetPrice.getSellTarget());
                 }
             }
         }
 
         return coinData.size();
-
     }
 
     public void evaluateHighPriceChange(CoinGeckoPriceResponse.CoinData priceData) {
         CoinId coinId = priceData.getCoinId();
-        double percentChange = priceData.getUsd_24h_change();
+        Double percentChange = priceData.getUsd_24h_change();
+        if (percentChange == null) {
+            return;
+        }
         double absPercentChange = Math.abs(percentChange);
 
         if (absPercentChange < 5.0) {
@@ -75,10 +85,19 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
 
         int alertThreshold = (int) (absPercentChange / 5.0) * 5;
 
-        if (alertThreshold > 0 && !targetPriceProvider.isSymbolIgnored(coinId, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
+        if (alertThreshold > 0
+                && !targetPriceProvider.isSymbolIgnored(
+                        coinId, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
             String emoji = percentChange > 0 ? "📈" : "📉";
-            telegramClient.sendMessage(emoji + " High daily price swing detected for " + coinId.getId() + ": " + String.format("%.2f", percentChange) + "%");
-            targetPriceProvider.addIgnoredSymbol(coinId, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
+            telegramClient.sendMessage(
+                    emoji
+                            + " High daily price swing detected for "
+                            + coinId.getId()
+                            + ": "
+                            + String.format("%.2f", percentChange)
+                            + "%");
+            targetPriceProvider.addIgnoredSymbol(
+                    coinId, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
         }
     }
 }

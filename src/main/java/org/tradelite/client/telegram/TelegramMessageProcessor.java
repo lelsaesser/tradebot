@@ -1,31 +1,36 @@
 package org.tradelite.client.telegram;
 
+import java.util.List;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.CoinId;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TickerSymbol;
-
-import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Component
 public class TelegramMessageProcessor {
 
-    private static final String ERROR_MSG_INVALID_SYMBOL = "Invalid symbol. Please provide a valid symbol.";
+    private static final String ERROR_MSG_INVALID_SYMBOL =
+            "Invalid symbol. Please provide a valid symbol.";
 
     private final TelegramClient telegramClient;
     private final TelegramCommandDispatcher telegramCommandDispatcher;
     private final TelegramMessageTracker telegramMessageTracker;
+    private final org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
 
     @Autowired
-    public TelegramMessageProcessor(TelegramClient telegramClient, TelegramCommandDispatcher telegramCommandDispatcher, TelegramMessageTracker telegramMessageTracker) {
+    public TelegramMessageProcessor(
+            TelegramClient telegramClient,
+            TelegramCommandDispatcher telegramCommandDispatcher,
+            TelegramMessageTracker telegramMessageTracker,
+            org.tradelite.service.StockSymbolRegistry stockSymbolRegistry) {
         this.telegramClient = telegramClient;
         this.telegramCommandDispatcher = telegramCommandDispatcher;
         this.telegramMessageTracker = telegramMessageTracker;
+        this.stockSymbolRegistry = stockSymbolRegistry;
     }
 
     public void processUpdates(List<TelegramUpdateResponse> chatUpdates) {
@@ -63,7 +68,11 @@ public class TelegramMessageProcessor {
 
                 Optional<SetCommand> cmd = buildSetCommand(subCommand, symbol, target);
                 if (cmd.isPresent()) {
-                    log.info("Received set command: {}, symbol: {}, target: {}", subCommand, symbol, target);
+                    log.info(
+                            "Received set command: {}, symbol: {}, target: {}",
+                            subCommand,
+                            symbol,
+                            target);
                     return Optional.of(cmd.get());
                 }
             }
@@ -87,12 +96,20 @@ public class TelegramMessageProcessor {
                 log.info("Received remove command: {}", removeCommand.get());
                 return Optional.of(removeCommand.get());
             }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/rsi")) {
+            Optional<RsiCommand> rsiCommand = parseRsiCommand(messageText);
+            if (rsiCommand.isPresent()) {
+                log.info("Received rsi command: {}", rsiCommand.get());
+                return Optional.of(rsiCommand.get());
+            }
         }
         return Optional.empty();
     }
 
-    protected Optional<SetCommand> buildSetCommand(String subCommand, String symbol, double target) {
-        String errorMessageCommandFormat = "Invalid command format. Use /set <buy|sell> <symbol> <target>";
+    protected Optional<SetCommand> buildSetCommand(
+            String subCommand, String symbol, double target) {
+        String errorMessageCommandFormat =
+                "Invalid command format. Use /set <buy|sell> <symbol> <target>";
         String errorMessageInvalidTarget = "Invalid target. Please provide a valid target price.";
 
         if (subCommand == null) {
@@ -121,51 +138,26 @@ public class TelegramMessageProcessor {
 
     protected Optional<AddCommand> parseAddCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
-        if (parts.length != 4) {
-            telegramClient.sendMessage("Invalid command format. Use /add <symbol> <buyTarget> <sellTarget>");
+        if (parts.length != 3) {
+            telegramClient.sendMessage("Invalid command format. Use /add <TICKER> <Display_Name>");
             return Optional.empty();
         }
 
-        String symbol = parts[1];
-        Optional<Double> buyTarget;
-        Optional<Double> sellTarget;
+        String ticker = parts[1];
+        String displayName = parts[2].replace("_", " ");
 
-        buyTarget = tryParseDouble(parts[2]);
-        sellTarget = tryParseDouble(parts[3]);
-        if (buyTarget.isEmpty() || sellTarget.isEmpty()) {
-            telegramClient.sendMessage("Invalid target price. Please provide valid numbers.");
-            return Optional.empty();
-        }
-
-        if (buyTarget.get() < 0 || sellTarget.get() < 0) {
-            telegramClient.sendMessage("Target prices must be non-negative.");
-            return Optional.empty();
-        }
-
-        Optional<TickerSymbol> tickerSymbol = parseTickerSymbol(symbol);
-        if (tickerSymbol.isEmpty()) {
-            telegramClient.sendMessage(ERROR_MSG_INVALID_SYMBOL);
-            return Optional.empty();
-        }
-
-        return Optional.of(new AddCommand(tickerSymbol.get(), buyTarget.get(), sellTarget.get(), tickerSymbol.get().getSymbolType()));
+        return Optional.of(new AddCommand(ticker, displayName, 0.0, 0.0));
     }
 
     protected Optional<RemoveCommand> parseRemoveCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 2) {
-            telegramClient.sendMessage("Invalid command format. Use /remove <symbol>");
+            telegramClient.sendMessage("Invalid command format. Use /remove <TICKER>");
             return Optional.empty();
         }
 
-        String symbol = parts[1];
-        Optional<TickerSymbol> tickerSymbol = parseTickerSymbol(symbol);
-        if (tickerSymbol.isEmpty()) {
-            telegramClient.sendMessage(ERROR_MSG_INVALID_SYMBOL);
-            return Optional.empty();
-        }
-
-        return Optional.of(new RemoveCommand(tickerSymbol.get(), tickerSymbol.get().getSymbolType()));
+        String ticker = parts[1];
+        return Optional.of(new RemoveCommand(ticker));
     }
 
     protected Optional<Double> tryParseDouble(String value) {
@@ -181,13 +173,26 @@ public class TelegramMessageProcessor {
             return Optional.empty();
         }
         Optional<CoinId> coinId = CoinId.fromString(symbol);
-        Optional<StockSymbol> stockSymbol = StockSymbol.fromString(symbol);
         if (coinId.isPresent()) {
             return Optional.of(coinId.get());
-        } else if (stockSymbol.isPresent()) {
-            return Optional.of(stockSymbol.get());
         }
-        return  Optional.empty();
+        return stockSymbolRegistry.fromString(symbol).map(s -> s);
     }
 
+    protected Optional<RsiCommand> parseRsiCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 2) {
+            telegramClient.sendMessage("Invalid command format. Use /rsi <symbol>");
+            return Optional.empty();
+        }
+
+        String symbol = parts[1];
+        Optional<TickerSymbol> tickerSymbol = parseTickerSymbol(symbol);
+        if (tickerSymbol.isEmpty()) {
+            telegramClient.sendMessage(ERROR_MSG_INVALID_SYMBOL);
+            return Optional.empty();
+        }
+
+        return Optional.of(new RsiCommand(tickerSymbol.get()));
+    }
 }
