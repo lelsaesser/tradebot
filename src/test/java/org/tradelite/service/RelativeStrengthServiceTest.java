@@ -356,11 +356,11 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsAndEma_withInsufficientHistory() {
-        // Mock repository to return only 15 days of data (less than 20 minimum)
+        // Mock repository to return only 5 days of data (less than 10 minimum)
         List<DailyPrice> stockPrices = new ArrayList<>();
         List<DailyPrice> spyPrices = new ArrayList<>();
-        for (int i = 0; i < 15; i++) {
-            LocalDate date = LocalDate.now().minusDays(14 - i);
+        for (int i = 0; i < 5; i++) {
+            LocalDate date = LocalDate.now().minusDays(4 - i);
             DailyPrice stockPrice = new DailyPrice();
             stockPrice.setDate(date);
             stockPrice.setPrice(300.0);
@@ -374,7 +374,7 @@ class RelativeStrengthServiceTest {
         when(priceQuoteRepository.findDailyClosingPrices("MSFT", 80)).thenReturn(stockPrices);
         when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
-        // Should return empty because insufficient history (less than 20 minimum)
+        // Should return empty because insufficient history (less than 10 minimum)
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("MSFT");
 
         assertThat(rsAndEma.isEmpty(), is(true));
