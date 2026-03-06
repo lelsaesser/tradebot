@@ -33,7 +33,7 @@ public class RelativeStrengthService {
     private static final int EMA_PERIOD = 50;
 
     /** Minimum RS history required for EMA calculation (allows calculation with limited data) */
-    private static final int MIN_HISTORY_SIZE = 20;
+    private static final int MIN_HISTORY_SIZE = 10;
 
     /** Number of calendar days to fetch for RS calculation (with buffer for weekends/holidays) */
     private static final int RS_LOOKBACK_DAYS = 80;
