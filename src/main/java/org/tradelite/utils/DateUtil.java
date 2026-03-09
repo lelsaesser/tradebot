@@ -30,7 +30,7 @@ public class DateUtil {
             currentTime = nowInCET.toLocalTime();
         }
         LocalTime start = LocalTime.of(22, 30);
-        LocalTime end = LocalTime.of(14, 55);
+        LocalTime end = LocalTime.of(14, 30);
 
         // Handles time ranges that go past midnight
         return currentTime.isAfter(start) || currentTime.isBefore(end);
