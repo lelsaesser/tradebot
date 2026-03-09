@@ -97,7 +97,7 @@ public class Scheduler {
         log.info("Relative strength vs SPY analysis completed.");
     }
 
-    @Scheduled(cron = "0 0 12 * * MON-FRI", zone = "CET")
+    @Scheduled(cron = "0 0 16 * * MON-FRI", zone = "CET")
     protected void dailySectorRelativeStrengthReport() {
         rootErrorHandler.run(sectorRelativeStrengthTracker::sendDailySectorRsSummary);
         log.info("Daily sector relative strength report completed.");
@@ -133,7 +133,7 @@ public class Scheduler {
         log.info("Weekly insider trading report generated.");
     }
 
-    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
+    @Scheduled(cron = "0 30 16 * * MON-FRI", zone = "CET")
     protected void dailySectorRotationTracking() {
         rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
 
