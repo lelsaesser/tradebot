@@ -295,7 +295,8 @@ class SqlitePriceQuoteRepositoryTest {
 
         assertThat(results, hasSize(1));
         assertThat(results.getFirst().getPrice(), is(175.50));
-        assertThat(results.getFirst().getDate(), is(LocalDate.now(ZoneId.of("UTC"))));
+        // Repository uses 'localtime' in SQL, so date should match system's local date
+        assertThat(results.getFirst().getDate(), is(LocalDate.now()));
     }
 
     @Test
