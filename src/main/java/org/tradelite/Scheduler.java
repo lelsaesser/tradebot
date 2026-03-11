@@ -14,6 +14,7 @@ import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
+import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 
@@ -34,6 +35,7 @@ public class Scheduler {
     private final RelativeStrengthTracker relativeStrengthTracker;
     private final SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
     private final SectorMomentumRocTracker sectorMomentumRocTracker;
+    private final TailRiskTracker tailRiskTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -52,7 +54,8 @@ public class Scheduler {
             SectorRotationTracker sectorRotationTracker,
             RelativeStrengthTracker relativeStrengthTracker,
             SectorRelativeStrengthTracker sectorRelativeStrengthTracker,
-            SectorMomentumRocTracker sectorMomentumRocTracker) {
+            SectorMomentumRocTracker sectorMomentumRocTracker,
+            TailRiskTracker tailRiskTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -66,6 +69,7 @@ public class Scheduler {
         this.relativeStrengthTracker = relativeStrengthTracker;
         this.sectorRelativeStrengthTracker = sectorRelativeStrengthTracker;
         this.sectorMomentumRocTracker = sectorMomentumRocTracker;
+        this.tailRiskTracker = tailRiskTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -101,6 +105,12 @@ public class Scheduler {
     protected void dailySectorRelativeStrengthReport() {
         rootErrorHandler.run(sectorRelativeStrengthTracker::sendDailySectorRsSummary);
         log.info("Daily sector relative strength report completed.");
+    }
+
+    @Scheduled(cron = "0 0 10 * * MON-FRI", zone = "CET")
+    protected void dailyTailRiskMonitoring() {
+        rootErrorHandler.run(tailRiskTracker::trackAndAlert);
+        log.info("Daily tail risk monitoring completed.");
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")

@@ -25,6 +25,7 @@ import org.tradelite.core.RsiPriceFetcher;
 import org.tradelite.core.SectorMomentumRocTracker;
 import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
+import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +44,7 @@ class SchedulerTest {
     @Mock private RelativeStrengthTracker relativeStrengthTracker;
     @Mock private SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
     @Mock private SectorMomentumRocTracker sectorMomentumRocTracker;
+    @Mock private TailRiskTracker tailRiskTracker;
 
     private Scheduler scheduler;
 
@@ -62,7 +64,8 @@ class SchedulerTest {
                         sectorRotationTracker,
                         relativeStrengthTracker,
                         sectorRelativeStrengthTracker,
-                        sectorMomentumRocTracker);
+                        sectorMomentumRocTracker,
+                        tailRiskTracker);
     }
 
     @Test

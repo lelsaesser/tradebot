@@ -1,8 +1,78 @@
 # Progress Tracking
 
-## Latest Milestone: Momentum ROC & Real-Time Sector Alerts ✅ COMPLETE
+## Latest Milestone: Tail Risk (Kurtosis) Analysis ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All 466 tests passing, build successful
+**Status**: ✅ **PRODUCTION READY** - All tests passing
+
+### Implementation Complete (March 11, 2026)
+
+#### Feature Overview
+- **Tail Risk Analysis**: Statistical measure of fat tails in price distributions
+- **Kurtosis Calculation**: Excess kurtosis from daily price change percentages
+- **New `quant` Package**: Foundation for advanced quantitative analysis
+
+#### New Components Created
+
+**Tail Risk Feature (quant package):**
+- `TailRiskLevel.java` - Enum: LOW, MODERATE, HIGH, EXTREME with emoji indicators
+- `TailRiskAnalysis.java` - Record holding analysis results
+- `TailRiskService.java` - Kurtosis calculation from daily price changes
+- `TailRiskTracker.java` - Sector ETF monitoring and alert generation
+
+**Repository Enhancement:**
+- Added `findDailyChangePercents(symbol, days)` to `PriceQuoteRepository`
+- Returns daily change percentages for kurtosis calculation
+
+#### Kurtosis Formula
+```
+Kurtosis = n * Σ(xi - x̄)⁴ / (Σ(xi - x̄)²)²
+Excess Kurtosis = Kurtosis - 3.0
+
+Normal distribution: kurtosis = 3, excess = 0
+Fat tails: excess kurtosis > 0 (more extreme moves likely)
+```
+
+#### Risk Level Classification
+| Excess Kurtosis | Level | Emoji | Meaning |
+|-----------------|-------|-------|---------|
+| < 1.0 | LOW | 🟢 | Normal tail risk |
+| 1.0 - 3.0 | MODERATE | 🟡 | Slightly elevated |
+| 3.0 - 6.0 | HIGH | 🟠 | Significant fat tails |
+| ≥ 6.0 | EXTREME | 🔴 | Crash/rally risk elevated |
+
+#### Alert Message Format
+```
+⚠️ *TAIL RISK ALERT* ⚠️
+
+🔴 *EXTREME* tail risk detected:
+• *Energy* (XLE): Kurtosis 10.5 | Excess +7.5
+
+🟠 *HIGH* tail risk detected:
+• *Technology* (XLK): Kurtosis 8.2 | Excess +5.2
+
+📊 _Kurtosis measures probability of extreme moves._
+_High values indicate "fat tails" - big moves more likely than normal._
+_This is directionally agnostic - review macro conditions._
+```
+
+#### Scheduler Integration
+```java
+@Scheduled(cron = "0 0 10 * * MON-FRI", zone = "CET")
+protected void dailyTailRiskMonitoring() {
+    rootErrorHandler.run(tailRiskTracker::trackAndAlert);
+    log.info("Daily tail risk monitoring completed.");
+}
+```
+
+#### Tests Added
+- `TailRiskServiceTest` - 9 tests covering kurtosis calculation
+- `TailRiskTrackerTest` - 10 tests covering alerts and reporting
+
+---
+
+## Previous Milestone: Momentum ROC & Real-Time Sector Alerts ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY** - All tests passing
 
 ### Implementation Complete (February 26, 2026)
 
@@ -11,134 +81,18 @@
 - **Real-Time Sector RS Alerts**: EMA crossover detection during market hours
 - **Three-Pronged Detection**: Z-Score + RS vs SPY + ROC all active
 
-#### New Components Created
-
-**Momentum ROC Feature:**
-- `MomentumRocSignal.java` - Record for momentum signals (ROC10/ROC20 values)
-- `MomentumRocData.java` - Model for persisting previous ROC state
-- `MomentumRocRepository.java` - Interface for ROC state persistence
-- `SqliteMomentumRocRepository.java` - SQLite implementation
-- `MomentumRocService.java` - ROC calculation and zero-line crossover detection
-- `SectorMomentumRocTracker.java` - Orchestrates analysis and Telegram alerts
-
-**Enhanced Components:**
-- `SectorRelativeStrengthTracker.java` - Added `analyzeAndSendAlerts()` for real-time RS crossovers
-- `Scheduler.java` - Added ROC and RS alerts to `stockMarketMonitoring()`
-- `SchedulerTest.java` - Updated for new constructor parameter
-
-#### ROC Calculation
-```
-ROC = ((Current Price - Price N days ago) / Price N days ago) × 100
-
-- ROC10: 10-trading-day momentum (used for signal generation)
-- ROC20: 20-trading-day momentum (included for trend context)
-```
-
-#### Signal Types
-- `MOMENTUM_TURNING_POSITIVE` - ROC crossed from negative to positive (bullish)
-- `MOMENTUM_TURNING_NEGATIVE` - ROC crossed from positive to negative (bearish)
-
-#### SQLite Persistence
-- New table: `momentum_roc_state`
-  - `symbol` (PRIMARY KEY)
-  - `previous_roc10`
-  - `previous_roc20`
-  - `initialized`
-  - `updated_at`
-
-#### Alert Message Formats
-
-**Momentum ROC Alert:**
-```
-⚡ *SECTOR MOMENTUM ROC ALERT*
-
-📈 *MOMENTUM TURNING POSITIVE:*
-• *Technology* (XLK): ROC₁₀ +2.5% | ROC₂₀ +1.8%
-
-📉 *MOMENTUM TURNING NEGATIVE:*
-• *Energy* (XLE): ROC₁₀ -1.2% | ROC₂₀ -0.5%
-
-_ROC₁₀ = 10-day momentum | ROC₂₀ = 20-day momentum_
-```
-
-**Sector RS Crossover Alert:**
-```
-📊 *SECTOR RS CROSSOVER ALERT*
-
-*🟢 NOW OUTPERFORMING SPY:*
-• *Technology* (XLK): +3.5%
-
-*🔴 NOW UNDERPERFORMING SPY:*
-• *Utilities* (XLU): -2.1%
-
-_RS crossed 50-period EMA_
-```
-
-#### Stock Market Monitoring Flow
-```java
-@Scheduled(initialDelay = 0, fixedRate = 300000)
-protected void stockMarketMonitoring() {
-    if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
-        rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
-        // Real-time sector rotation signals
-        rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
-        rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
-    }
-}
-```
-
-### Three-Pronged Sector Rotation Detection
-
-| Approach | Signal Type | Schedule | Data Source |
-|----------|-------------|----------|-------------|
-| **Z-Score Analysis** | Industry performance anomalies | Daily (after market) | Finviz |
-| **Relative Strength vs SPY** | RS EMA crossovers | Real-time (5 min) | SQLite price data |
-| **Momentum ROC** | Zero-line crossovers | Real-time (5 min) | SQLite price data |
-
-### Build Status ✅
-```
-Tests run: 466, Failures: 0, Errors: 0, Skipped: 0
-BUILD SUCCESS
-All coverage checks have been met.
-```
-
 ---
 
-## Previous Milestone: Daily Sector RS Summary ✅ COMPLETE
+## Four-Pronged Statistical Analysis
 
-**Status**: ✅ **PRODUCTION READY** - All tests passing
+The system now uses four complementary approaches:
 
-### Implementation Complete (February 26, 2026)
-
-#### Feature Overview
-- **Daily Sector RS Report**: Telegram summary of sector ETF performance vs SPY
-- **SQLite-Based Calculation**: Uses persisted historical price data
-- **Data Completeness Indicator**: Shows "(N days)" for incomplete data
-
----
-
-## Previous Milestone: Feature Toggle System ✅ COMPLETE
-
-**Status**: ✅ **PRODUCTION READY** - All tests passing
-
-### Implementation Complete (February 18, 2026)
-
-#### Feature Overview
-- **Runtime Feature Toggles**: Enable/disable features without restart
-- **JSON Configuration**: Simple `config/feature-toggles.json` file
-- **3-Minute Cache**: Balance between responsiveness and performance
-
----
-
-## Previous Milestone: SQLite Integration ✅ COMPLETE
-
-**Status**: ✅ **PRODUCTION READY** - All tests passing
-
-### Implementation Complete (February 18, 2026)
-
-#### Feature Overview
-- **SQLite Database**: Persistent storage for Finnhub price quotes
-- **Repository Pattern**: Clean abstraction with interface and implementation
+| Approach | Component | Signal | Schedule |
+|----------|-----------|--------|----------|
+| **Z-Score Analysis** | `SectorRotationAnalyzer` | Industry performance anomalies | Daily (after market) |
+| **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
+| **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
+| **Tail Risk (Kurtosis)** | `TailRiskTracker` | Fat tail detection | Daily 10:00 CET |
 
 ---
 
@@ -155,13 +109,14 @@ All coverage checks have been met.
 - SQLite historical price persistence
 - Feature toggle system
 - Daily sector RS summary
-- **Real-time sector RS crossover alerts** ✅ **NEW**
-- **Momentum ROC sector tracking** ✅ **NEW**
+- Real-time sector RS crossover alerts
+- Momentum ROC sector tracking
+- **Tail Risk (Kurtosis) analysis** ✅ **NEW**
 
 ### Data Persistence ✅
 - JSON-based storage for target prices and configuration
 - SQLite database for historical price data
-- **SQLite momentum ROC state** ✅ **NEW**
+- SQLite momentum ROC state
 - Sector performance history (JSON)
 - Insider transaction history (JSON)
 - API request metering
@@ -182,23 +137,6 @@ All coverage checks have been met.
 - Status: ✅ Acceptable
 - All critical paths covered with tests
 
-### Test Metrics
-- ✅ Total tests: 466
-- ✅ No compilation errors
-- ✅ Integration tests validated
-
-## Configuration Files Summary
-
-| File | Purpose |
-|------|---------|
-| `config/stock-symbols.json` | Stock symbol registry (49 symbols with sector ETFs) |
-| `config/target-prices-stocks.json` | Stock target prices |
-| `config/target-prices-coins.json` | Crypto target prices |
-| `config/sector-performance.json` | Sector performance history |
-| `config/insider-transactions.json` | Insider trading data |
-| `config/feature-toggles.json` | Runtime feature flags |
-| `data/tradebot.db` | SQLite database (prices + momentum ROC state) |
-
 ## Scheduled Tasks Summary
 
 | Task | Schedule | Description |
@@ -211,19 +149,20 @@ All coverage checks have been met.
 | monthlyApiUsageReport | Monthly 1st, 00:00 UTC | API usage statistics |
 | dailySectorRotationTracking | Daily 22:30 ET (Mon-Fri) | Sector performance + Z-score alerts |
 | dailySectorRsSummary | Daily 12:00 CET (Mon-Fri) | Sector RS vs SPY summary |
+| **dailyTailRiskMonitoring** | Daily 10:00 CET (Mon-Fri) | **Tail risk kurtosis alerts** ✅ **NEW** |
 
 ## Future Enhancements
+
+### Tail Risk Enhancements (Future)
+- Historical kurtosis tracking for trend detection
+- VIX integration for additional volatility context
+- Skewness calculation for directional bias hints
+- Combine tail risk with other signals for confirmation
 
 ### Momentum ROC Enhancements (Future)
 - ROC divergence alerts (when ROC10 and ROC20 diverge)
 - Sector strength ranking in ROC alerts
 - Combine RS and ROC signals for stronger confirmation
-- Historical crossover tracking for backtesting
-
-### Sector RS Enhancements (Future)
-- Telegram command to request sector RS summary on-demand
-- Trend indicators (up/down arrows based on RS direction)
-- Weekly sector performance comparison
 
 ### SQLite Enhancements (Future)
 - Migrate existing JSON persistence to SQLite
@@ -233,12 +172,12 @@ All coverage checks have been met.
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: February 26, 2026
+- Date: March 11, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
 
 ### Pre-Deployment Checklist
-- ✅ All tests passing (466/466)
+- ✅ All tests passing
 - ✅ Build successful
 - ✅ Code coverage acceptable (97%)
 - ✅ Documentation updated
