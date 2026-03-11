@@ -379,6 +379,91 @@ class SqlitePriceQuoteRepositoryTest {
                 IllegalStateException.class, () -> repoWithMock.findDailyClosingPrices("AAPL", 30));
     }
 
+    @Test
+    void findDailyChangePercents_returnsEmptyListForUnknownSymbol() {
+        List<Double> results = repository.findDailyChangePercents("UNKNOWN", 30);
+        assertThat(results, is(empty()));
+    }
+
+    @Test
+    void findDailyChangePercents_returnsChangePercentWithinDaysLimit() {
+        PriceQuoteResponse quote = createPriceQuote("AAPL", 175.50);
+        quote.setChangePercent(2.5);
+        repository.save(quote);
+
+        List<Double> results = repository.findDailyChangePercents("AAPL", 30);
+
+        assertThat(results, hasSize(1));
+        assertThat(results.getFirst(), is(2.5));
+    }
+
+    @Test
+    void findDailyChangePercents_groupsByDateReturnsLatestChangePercent()
+            throws InterruptedException {
+        // Save multiple quotes on the same day
+        PriceQuoteResponse quote1 = createPriceQuote("AAPL", 175.50);
+        quote1.setChangePercent(1.5);
+        repository.save(quote1);
+
+        Thread.sleep(1100);
+
+        PriceQuoteResponse quote2 = createPriceQuote("AAPL", 176.00);
+        quote2.setChangePercent(2.0);
+        repository.save(quote2);
+
+        Thread.sleep(1100);
+
+        PriceQuoteResponse quote3 = createPriceQuote("AAPL", 176.50);
+        quote3.setChangePercent(2.5);
+        repository.save(quote3);
+
+        List<Double> results = repository.findDailyChangePercents("AAPL", 30);
+
+        // Should only return one result per day (the last one)
+        assertThat(results, hasSize(1));
+        assertThat(results.getFirst(), is(2.5));
+    }
+
+    @Test
+    void findDailyChangePercents_returnsOnlyMatchingSymbol() {
+        PriceQuoteResponse aaplQuote = createPriceQuote("AAPL", 175.50);
+        aaplQuote.setChangePercent(1.5);
+        repository.save(aaplQuote);
+
+        PriceQuoteResponse googQuote = createPriceQuote("GOOG", 150.25);
+        googQuote.setChangePercent(2.5);
+        repository.save(googQuote);
+
+        PriceQuoteResponse msftQuote = createPriceQuote("MSFT", 400.00);
+        msftQuote.setChangePercent(3.5);
+        repository.save(msftQuote);
+
+        List<Double> results = repository.findDailyChangePercents("GOOG", 30);
+
+        assertThat(results, hasSize(1));
+        assertThat(results.getFirst(), is(2.5));
+    }
+
+    @Test
+    void findDailyChangePercents_throwsExceptionOnDatabaseError() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        Connection mockConnection = mock(Connection.class);
+
+        // First call for schema init succeeds
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createStatement())
+                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
+
+        SqlitePriceQuoteRepository repoWithMock = new SqlitePriceQuoteRepository(mockDataSource);
+
+        // Second call for findDailyChangePercents fails
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> repoWithMock.findDailyChangePercents("AAPL", 30));
+    }
+
     private PriceQuoteResponse createPriceQuote(String symbol, double price) {
         PriceQuoteResponse priceQuote = new PriceQuoteResponse();
         priceQuote.setStockSymbol(new StockSymbol(symbol, symbol + " Inc."));
