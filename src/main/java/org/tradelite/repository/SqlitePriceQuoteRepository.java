@@ -244,4 +244,43 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
         }
         return results;
     }
+
+    @Override
+    public List<Double> findDailyChangePercents(String symbol, int days) {
+        // Calculate the start timestamp (N days ago from now)
+        long startTimestamp =
+                LocalDate.now().minusDays(days).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+
+        // SQL query that groups by date and gets the change_percent for the latest record each day
+        String sql =
+                """
+                SELECT date(timestamp, 'unixepoch', 'localtime') as price_date,
+                       change_percent
+                FROM finnhub_price_quotes
+                WHERE symbol = ? AND timestamp >= ?
+                GROUP BY price_date
+                HAVING timestamp = MAX(timestamp)
+                ORDER BY price_date ASC
+                """;
+
+        List<Double> results = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, symbol);
+            pstmt.setLong(2, startTimestamp);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    results.add(rs.getDouble("change_percent"));
+                }
+            }
+        } catch (SQLException e) {
+            log.error(
+                    "Failed to find daily change percents for symbol {} over {} days",
+                    symbol,
+                    days,
+                    e);
+            throw new IllegalStateException("Failed to find daily change percents", e);
+        }
+        return results;
+    }
 }

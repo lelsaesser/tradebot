@@ -98,15 +98,20 @@ src/main/java/org/tradelite/
 │   ├── InsiderTracker.java     # Insider monitoring
 │   ├── SectorRotationTracker.java  # Sector tracking
 │   ├── SectorRelativeStrengthTracker.java  # Sector RS tracking
-│   ├── SectorMomentumRocTracker.java  # Sector ROC tracking (NEW)
-│   ├── MomentumRocSignal.java  # ROC signal record (NEW)
+│   ├── SectorMomentumRocTracker.java  # Sector ROC tracking
+│   ├── MomentumRocSignal.java  # ROC signal record
 │   └── ...
+├── quant/                       # Quantitative analysis (NEW)
+│   ├── TailRiskLevel.java      # Risk level enum
+│   ├── TailRiskAnalysis.java   # Analysis result record
+│   ├── TailRiskService.java    # Kurtosis calculation
+│   └── TailRiskTracker.java    # Sector tail risk monitoring
 ├── repository/                  # Data persistence layer
 │   ├── PriceQuoteEntity.java   # Entity class
-│   ├── PriceQuoteRepository.java # Interface
+│   ├── PriceQuoteRepository.java # Interface (includes findDailyChangePercents)
 │   ├── SqlitePriceQuoteRepository.java # SQLite price implementation
-│   ├── MomentumRocRepository.java # Interface (NEW)
-│   └── SqliteMomentumRocRepository.java # SQLite ROC implementation (NEW)
+│   ├── MomentumRocRepository.java # Interface
+│   └── SqliteMomentumRocRepository.java # SQLite ROC implementation
 ├── service/                     # Application services
 ├── utils/                       # Utility classes
 └── web/                         # Web endpoints (if any)

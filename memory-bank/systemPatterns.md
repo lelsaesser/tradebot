@@ -17,8 +17,10 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorRotationAnalyzer`:** Statistical analysis component that detects sector rotation signals using Z-Score analysis. Calculates historical mean/standard deviation and identifies sectors with >2σ deviation.
 -   **`RelativeStrengthTracker`:** Tracks stock performance relative to SPY benchmark using 50-period EMA crossover detection.
 -   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Provides real-time RS crossover alerts during market hours AND daily summary reports.
--   **`MomentumRocService`:** **NEW** - Calculates Rate of Change (ROC) momentum and detects zero-line crossovers.
--   **`SectorMomentumRocTracker`:** **NEW** - Real-time sector ETF momentum analysis using ROC10/ROC20 values.
+-   **`MomentumRocService`:** Calculates Rate of Change (ROC) momentum and detects zero-line crossovers.
+-   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values.
+-   **`TailRiskService`:** **NEW** - Calculates excess kurtosis from daily price changes to detect fat tail risk.
+-   **`TailRiskTracker`:** **NEW** - Monitors sector ETFs for elevated tail risk (fat tails indicating extreme move probability).
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
@@ -39,7 +41,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorPerformancePersistence`:** Stores daily sector performance snapshots for trend analysis.
 -   **`TelegramMessageTracker`:** Tracks last processed message ID to avoid duplicates.
 -   **`SqlitePriceQuoteRepository`:** SQLite-based storage for historical Finnhub price quotes.
--   **`SqliteMomentumRocRepository`:** **NEW** - SQLite-based storage for momentum ROC state (previous ROC values for crossover detection).
+-   **`SqliteMomentumRocRepository`:** SQLite-based storage for momentum ROC state (previous ROC values for crossover detection).
 -   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence and caching.
 
 ## Design Patterns
@@ -66,6 +68,7 @@ The application follows a modular, component-based architecture built on the Spr
 | `monthlyApiUsageReport` | Monthly 1st, 00:30 | UTC | API usage statistics |
 | `dailySectorRotationTracking` | Daily 22:30 (Mon-Fri) | America/New_York | Sector performance + Z-score alerts |
 | `dailySectorRsSummary` | Daily 12:00 | CET | Sector RS vs SPY daily summary |
+| `dailyTailRiskMonitoring` | Daily 10:00 (Mon-Fri) | CET | **Tail risk kurtosis alerts** |
 | `telegramMessagePolling` | Every 60 seconds | UTC | Process Telegram commands |
 
 ## Component Relationships
@@ -79,8 +82,10 @@ Scheduler
 │   └── RelativeStrengthTracker → RelativeStrengthService
 ├── SectorRelativeStrengthTracker → RelativeStrengthService (NEW)
 │   └── Real-time RS crossover detection for sector ETFs
-├── SectorMomentumRocTracker → MomentumRocService (NEW)
+├── SectorMomentumRocTracker → MomentumRocService
 │   └── SqliteMomentumRocRepository → SQLite DB (momentum_roc_state)
+├── TailRiskTracker → TailRiskService (NEW)
+│   └── PriceQuoteRepository.findDailyChangePercents()
 ├── InsiderTracker → InsiderPersistence → JSON file
 ├── SectorRotationTracker → FinvizClient → FinViz website
 │   ├── SectorPerformancePersistence → JSON file
@@ -268,15 +273,16 @@ CREATE TABLE IF NOT EXISTS momentum_roc_state (
 - `MOMENTUM_TURNING_POSITIVE` - ROC crossed from negative to positive (bullish)
 - `MOMENTUM_TURNING_NEGATIVE` - ROC crossed from positive to negative (bearish)
 
-## Three-Pronged Sector Rotation Detection
+## Four-Pronged Statistical Analysis
 
-The system now uses three complementary approaches for sector rotation detection:
+The system now uses four complementary approaches for market analysis:
 
 | Approach | Component | Signal | Schedule |
 |----------|-----------|--------|----------|
 | **Z-Score Analysis** | `SectorRotationAnalyzer` | Industry performance anomalies | Daily (after market) |
 | **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
+| **Tail Risk (Kurtosis)** | `TailRiskTracker` | Fat tail detection | Daily 10:00 CET |
 
 **Stock Market Monitoring Flow:**
 ```java
