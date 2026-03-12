@@ -77,7 +77,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             }
 
             finnhubData.add(priceQuote);
-            Thread.sleep(100);
+            Thread.sleep(1100);
         }
 
         for (PriceQuoteResponse priceQuote : finnhubData) {
