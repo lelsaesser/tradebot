@@ -9,9 +9,12 @@ import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.StockSymbolRegistry;
 
 @Slf4j
@@ -22,6 +25,8 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramClient telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
+    private final PriceQuoteRepository priceQuoteRepository;
+    private final FeatureToggleService featureToggleService;
 
     @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
 
@@ -30,12 +35,16 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             FinnhubClient finnhubClient,
             TargetPriceProvider targetPriceProvider,
             TelegramClient telegramClient,
-            StockSymbolRegistry stockSymbolRegistry) {
+            StockSymbolRegistry stockSymbolRegistry,
+            PriceQuoteRepository priceQuoteRepository,
+            FeatureToggleService featureToggleService) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.stockSymbolRegistry = stockSymbolRegistry;
+        this.priceQuoteRepository = priceQuoteRepository;
+        this.featureToggleService = featureToggleService;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
@@ -62,8 +71,13 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             }
             lastPriceCache.put(ticker.get().getTicker(), priceQuote.getCurrentPrice());
 
+            // Persist price quote to SQLite for historical data collection (if enabled)
+            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)) {
+                priceQuoteRepository.save(priceQuote);
+            }
+
             finnhubData.add(priceQuote);
-            Thread.sleep(100);
+            Thread.sleep(1100);
         }
 
         for (PriceQuoteResponse priceQuote : finnhubData) {

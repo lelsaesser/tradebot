@@ -14,6 +14,7 @@ import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
+import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 
@@ -31,6 +32,10 @@ public class Scheduler {
     private final RsiPriceFetcher rsiPriceFetcher;
     private final ApiRequestMeteringService apiRequestMeteringService;
     private final SectorRotationTracker sectorRotationTracker;
+    private final RelativeStrengthTracker relativeStrengthTracker;
+    private final SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
+    private final SectorMomentumRocTracker sectorMomentumRocTracker;
+    private final TailRiskTracker tailRiskTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -46,7 +51,11 @@ public class Scheduler {
             InsiderTracker insiderTracker,
             RsiPriceFetcher rsiPriceFetcher,
             ApiRequestMeteringService apiRequestMeteringService,
-            SectorRotationTracker sectorRotationTracker) {
+            SectorRotationTracker sectorRotationTracker,
+            RelativeStrengthTracker relativeStrengthTracker,
+            SectorRelativeStrengthTracker sectorRelativeStrengthTracker,
+            SectorMomentumRocTracker sectorMomentumRocTracker,
+            TailRiskTracker tailRiskTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -57,12 +66,19 @@ public class Scheduler {
         this.insiderTracker = insiderTracker;
         this.apiRequestMeteringService = apiRequestMeteringService;
         this.sectorRotationTracker = sectorRotationTracker;
+        this.relativeStrengthTracker = relativeStrengthTracker;
+        this.sectorRelativeStrengthTracker = sectorRelativeStrengthTracker;
+        this.sectorMomentumRocTracker = sectorMomentumRocTracker;
+        this.tailRiskTracker = tailRiskTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     protected void stockMarketMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+            // Analyze sector ETFs in real-time for rotation signals
+            rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
+            rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
@@ -78,8 +94,23 @@ public class Scheduler {
     @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
     protected void rsiStockMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchStockClosingPrices);
-
         log.info("RSI daily stock price data fetch completed.");
+
+        // Run RS analysis after RSI data is fetched (both use same price data)
+        rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);
+        log.info("Relative strength vs SPY analysis completed.");
+    }
+
+    @Scheduled(cron = "0 0 16 * * MON-FRI", zone = "CET")
+    protected void dailySectorRelativeStrengthReport() {
+        rootErrorHandler.run(sectorRelativeStrengthTracker::sendDailySectorRsSummary);
+        log.info("Daily sector relative strength report completed.");
+    }
+
+    @Scheduled(cron = "0 0 10 * * MON-FRI", zone = "CET")
+    protected void dailyTailRiskMonitoring() {
+        rootErrorHandler.run(tailRiskTracker::trackAndAlert);
+        log.info("Daily tail risk monitoring completed.");
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
@@ -112,7 +143,7 @@ public class Scheduler {
         log.info("Weekly insider trading report generated.");
     }
 
-    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
+    @Scheduled(cron = "0 30 16 * * MON-FRI", zone = "CET")
     protected void dailySectorRotationTracking() {
         rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
 

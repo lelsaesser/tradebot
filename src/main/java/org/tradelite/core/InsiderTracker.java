@@ -39,6 +39,7 @@ public class InsiderTracker {
         List<String> monitoredSymbols =
                 targetPriceProvider.getStockTargetPrices().stream()
                         .map(TargetPrice::getSymbol)
+                        .filter(symbol -> !stockSymbolRegistry.isEtf(symbol))
                         .toList();
 
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
@@ -164,6 +165,11 @@ public class InsiderTracker {
 
         for (InsiderTransactionHistoric historic : historicData) {
             StockSymbol symbol = historic.getSymbol();
+
+            // Skip if symbol is not in current transactions (no longer monitored)
+            if (!insiderTransactions.containsKey(symbol)) {
+                continue;
+            }
 
             Integer historicSellTransactionCount =
                     historic.getTransactions().get(InsiderTransactionCodes.SELL.getCode());

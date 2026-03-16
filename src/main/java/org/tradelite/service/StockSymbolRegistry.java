@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -22,6 +23,11 @@ import org.tradelite.common.StockSymbol;
 public class StockSymbolRegistry {
 
     private static final String STOCK_SYMBOLS_FILE = "config/stock-symbols.json";
+
+    private static final Set<String> ETF_SYMBOLS =
+            Set.of(
+                    "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLC", "XLRE", "XLB", "XLU",
+                    "SPY");
 
     private final ObjectMapper objectMapper;
     private List<StockSymbolEntry> stockSymbols;
@@ -47,6 +53,13 @@ public class StockSymbolRegistry {
         return stockSymbols.stream()
                 .map(entry -> new StockSymbol(entry.getTicker(), entry.getDisplayName()))
                 .toList();
+    }
+
+    public boolean isEtf(String ticker) {
+        if (ticker == null || ticker.isEmpty()) {
+            return false;
+        }
+        return ETF_SYMBOLS.contains(ticker.toUpperCase());
     }
 
     public synchronized boolean addSymbol(String ticker, String displayName) {

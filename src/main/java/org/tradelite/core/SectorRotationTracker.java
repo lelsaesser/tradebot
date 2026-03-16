@@ -20,6 +20,7 @@ public class SectorRotationTracker {
 
     private final FinvizClient finvizClient;
     private final SectorPerformancePersistence persistence;
+    private final SectorRotationAnalyzer rotationAnalyzer;
     private final TelegramClient telegramClient;
 
     public void fetchAndStoreDailyPerformance() {
@@ -35,6 +36,7 @@ public class SectorRotationTracker {
             persistence.saveSnapshot(snapshot);
 
             sendDailySummary();
+            analyzeAndSendRotationAlerts();
         } catch (IOException e) {
             log.error("Failed to fetch sector performance: {}", e.getMessage());
         }
@@ -77,6 +79,64 @@ public class SectorRotationTracker {
         }
 
         telegramClient.sendMessage(report.toString());
+    }
+
+    void analyzeAndSendRotationAlerts() {
+        List<SectorPerformanceSnapshot> history = persistence.loadHistory();
+        List<RotationSignal> signals = rotationAnalyzer.analyzeRotations(history);
+
+        if (signals.isEmpty()) {
+            log.info("No significant sector rotation signals detected");
+            return;
+        }
+
+        StringBuilder alert = new StringBuilder();
+        alert.append("🚨 *SECTOR ROTATION ALERT*\n\n");
+
+        // Group signals by type
+        List<RotationSignal> rotatingIn =
+                signals.stream()
+                        .filter(s -> s.signalType() == RotationSignal.SignalType.ROTATING_IN)
+                        .toList();
+
+        List<RotationSignal> rotatingOut =
+                signals.stream()
+                        .filter(s -> s.signalType() == RotationSignal.SignalType.ROTATING_OUT)
+                        .toList();
+
+        if (!rotatingIn.isEmpty()) {
+            alert.append("*💰 Money Flowing INTO:*\n");
+            for (RotationSignal signal : rotatingIn) {
+                alert.append(formatSignal(signal));
+            }
+            alert.append("\n");
+        }
+
+        if (!rotatingOut.isEmpty()) {
+            alert.append("*💸 Money Flowing OUT OF:*\n");
+            for (RotationSignal signal : rotatingOut) {
+                alert.append(formatSignal(signal));
+            }
+        }
+
+        alert.append("\n_Based on Z-Score analysis (>2σ deviation)_");
+
+        telegramClient.sendMessage(alert.toString());
+        log.info(
+                "Sent rotation alert with {} signals ({} in, {} out)",
+                signals.size(),
+                rotatingIn.size(),
+                rotatingOut.size());
+    }
+
+    private String formatSignal(RotationSignal signal) {
+        return String.format(
+                "• *%s*%n  Weekly: %+.2f%% (z=%.1f) | Monthly: %+.2f%% (z=%.1f)%n",
+                signal.sectorName(),
+                signal.weeklyPerformance().doubleValue(),
+                signal.zScoreWeekly(),
+                signal.monthlyPerformance().doubleValue(),
+                signal.zScoreMonthly());
     }
 
     public String generateSectorReport() {

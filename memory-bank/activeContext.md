@@ -1,147 +1,105 @@
 # Active Context
 
 ## Current Work Focus
-✅ **COMPLETED**: Sector Rotation Tracking Feature (February 9, 2026)
-- Web scraper for FinViz industry performance data
-- Daily scheduled task to fetch and store data
-- Telegram notifications for top/bottom performers
-- All 330 tests passing, build successful
 
-## Recent Changes (February 2026)
+The Tail Risk (Kurtosis) Analysis feature has been implemented as a new quantitative analysis capability. This introduces the new `quant` package for advanced statistical analysis beyond the existing sector rotation metrics.
 
-### Sector Rotation Tracking - COMPLETED
+## Recent Changes
 
-1. **FinViz Web Scraper** ✅
-   - Created `FinvizClient` using JSoup for HTML parsing
-   - Scrapes industry performance data from https://finviz.com/groups.ashx?g=industry&v=140
-   - Parses performance metrics: daily change, weekly, monthly, quarterly, half-year, yearly, YTD
-   - No browser automation needed (pure HTTP + HTML parsing)
+### Tail Risk Analysis Feature Implementation (Completed - March 11, 2026)
+1. **New `quant` Package Created:**
+   - `TailRiskLevel` - Enum for risk classifications (LOW, MODERATE, HIGH, EXTREME)
+   - `TailRiskAnalysis` - Record for storing analysis results
+   - `TailRiskService` - Service calculating excess kurtosis from daily price changes
+   - `TailRiskTracker` - Component monitoring sector ETFs + SPY for fat tail risk
 
-2. **Data Persistence** ✅
-   - `SectorPerformancePersistence` stores snapshots in `config/sector-performance.json`
-   - Historical data maintained for trend analysis
-   - Methods for top/bottom performers by period (daily, weekly, monthly, quarterly, yearly)
+2. **Repository Enhancement:**
+   - Added `findDailyChangePercents(symbol, days)` to `PriceQuoteRepository`
+   - Returns list of daily change percentages for kurtosis calculation
 
-3. **Automated Tracking** ✅
-   - `SectorRotationTracker` orchestrates fetch → store → report workflow
-   - Sends daily Telegram report with top 5 gainers and losers
-   - Scheduled daily at 10:30 PM ET (after US market close) on weekdays
+3. **Integration:**
+   - Added `TailRiskTracker` to `Scheduler` with dedicated daily task at 10:00 AM CET
+   - Only alerts when HIGH or EXTREME risk detected (not daily reports)
 
-4. **New Files Created** ✅
-   - `src/main/java/org/tradelite/client/finviz/FinvizClient.java`
-   - `src/main/java/org/tradelite/client/finviz/dto/IndustryPerformance.java`
-   - `src/main/java/org/tradelite/core/SectorPerformanceSnapshot.java`
-   - `src/main/java/org/tradelite/core/SectorPerformancePersistence.java`
-   - `src/main/java/org/tradelite/core/SectorRotationTracker.java`
-   - `src/test/java/org/tradelite/client/finviz/FinvizClientTest.java`
-   - `src/test/java/org/tradelite/core/SectorPerformancePersistenceTest.java`
-   - `src/test/java/org/tradelite/core/SectorRotationTrackerTest.java`
+4. **How It Works:**
+   - Calculates excess kurtosis from historical daily price changes (last 25 days)
+   - Kurtosis > 3 (excess > 0) indicates "fat tails" - higher probability of extreme moves
+   - Risk levels: LOW (< 1.0), MODERATE (1.0-3.0), HIGH (3.0-6.0), EXTREME (≥ 6.0)
+   - Monitors 12 sector ETFs: SPY, XLE, XLK, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC
 
-5. **Modified Files** ✅
-   - `pom.xml` - Added JSoup 1.18.3 dependency
-   - `Scheduler.java` - Added dailySectorRotationTracking() method
-   - `SchedulerTest.java` - Updated with SectorRotationTracker mock
-   - `BeanConfig.java` - Registered new beans
+5. **Tests Added:**
+   - `TailRiskServiceTest` - 9 tests covering kurtosis calculation and edge cases
+   - `TailRiskTrackerTest` - 10 tests covering alert generation and reporting
 
-### Previous: Dynamic Stock Symbol Management - COMPLETED
+### Kurtosis Formula
+```
+Kurtosis = n * Σ(xi - x̄)⁴ / (Σ(xi - x̄)²)²
+Excess Kurtosis = Kurtosis - 3  (normal distribution has kurtosis = 3)
+```
 
-1. **StockSymbol Refactoring**: Converted from enum to regular class ✅
-2. **New Telegram Commands**: `/add TICKER Display_Name` and `/remove TICKER` ✅
-3. **StockSymbolRegistry**: Dynamic symbol management with JSON persistence ✅
+### Alert Interpretation
+- **High Excess Kurtosis**: Indicates "fat tails" - extreme price moves more likely than normal
+- **Direction Agnostic**: High kurtosis doesn't predict direction (could be crash OR rally)
+- **Context Required**: Alert recommends reviewing macro conditions for direction assessment
 
-## Testing Summary
+## Four-Pronged Statistical Analysis
 
-- **Total Tests**: 330 ✅
-- **Build Status**: SUCCESS ✅
-- New sector rotation tests: 22 tests across 3 test files
+The system now uses four complementary approaches:
 
-## Active Decisions and Considerations
+1. **Z-Score Analysis** (via FinViz data)
+   - Statistical deviation from historical performance
+   - Detects extreme moves in sector performance
 
-### Sector Rotation Architecture
-- **JSoup over Playwright**: Simpler, faster, no browser dependencies
-- **JSON Persistence**: Consistent with other config files pattern
-- **No Telegram Command**: Scheduler-only, no manual trigger needed
-- **Historical Storage**: Full snapshots stored for future trend analysis
+2. **Relative Strength vs SPY** 
+   - RS = Sector Price / SPY Price ratio
+   - EMA crossover detection (50-period)
+   - Shows momentum vs benchmark
 
-### Data Model
+3. **Momentum ROC**
+   - Rate of Change over 10 and 20 days
+   - Zero-line crossover detection
+   - Shows pure momentum direction change
+
+4. **Tail Risk (Kurtosis)** (NEW)
+   - Measures probability of extreme moves
+   - Fat tail detection via excess kurtosis
+   - Early warning for volatile conditions
+
+## Technical Patterns
+
+### Kurtosis Calculation
 ```java
-record IndustryPerformance(
-    String name,
-    BigDecimal perfWeek,
-    BigDecimal perfMonth, 
-    BigDecimal perfQuarter,
-    BigDecimal perfHalf,
-    BigDecimal perfYear,
-    BigDecimal perfYtd,
-    BigDecimal change  // daily change
-)
-```
+// Step 1: Calculate mean
+double mean = changes.stream().mapToDouble(d -> d).average().orElse(0);
 
-### Telegram Report Format
-```
-📊 *Daily Sector Performance Report*
-📅 2026-02-09
-
-📈 *Top 5 Daily Gainers:*
-1. Technology: +5.25%
-2. Healthcare: +3.50%
-...
-
-📉 *Bottom 5 Daily Losers:*
-1. Energy: -4.20%
-2. Financials: -2.80%
-...
-
-📈 *Top 5 Weekly Gainers:*
-...
-```
-
-## Important Patterns and Preferences
-
-### Web Scraping Pattern (FinViz)
-```java
-Document doc = Jsoup.connect(url)
-    .userAgent("Mozilla/5.0...")
-    .timeout(10000)
-    .get();
-Elements rows = doc.select("table.table-light tr");
-```
-
-### Persistence Pattern (Sector Data)
-```java
-// Save snapshot
-persistence.saveSnapshot(new SectorPerformanceSnapshot(
-    LocalDate.now(), performances));
-
-// Get top performers
-List<IndustryPerformance> top = persistence.getTopPerformersByWeek(5);
-```
-
-### Scheduled Task Pattern
-```java
-@Scheduled(cron = "0 30 22 * * MON-FRI", zone = "America/New_York")
-public void dailySectorRotationTracking() {
-    rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
+// Step 2: Calculate second (variance) and fourth moments
+double sumSquared = 0, sumFourth = 0;
+for (double change : changes) {
+    double diff = change - mean;
+    sumSquared += diff * diff;
+    sumFourth += diff * diff * diff * diff;
 }
+
+// Step 3: Kurtosis formula
+double kurtosis = (n * sumFourth) / (sumSquared * sumSquared);
+double excessKurtosis = kurtosis - 3.0;
 ```
 
-## Configuration Files
-- `config/stock-symbols.json` - Stock symbol registry (38 symbols)
-- `config/target-prices-stocks.json` - Stock target prices
-- `config/target-prices-coins.json` - Crypto target prices
-- `config/sector-performance.json` - Sector performance history (NEW)
-- `config/insider-transactions.json` - Insider trading data
+### Risk Level Classification
+| Excess Kurtosis | Risk Level | Meaning |
+|-----------------|------------|---------|
+| < 1.0 | LOW 🟢 | Normal tail risk |
+| 1.0 - 3.0 | MODERATE 🟡 | Slightly elevated |
+| 3.0 - 6.0 | HIGH 🟠 | Significant fat tails |
+| ≥ 6.0 | EXTREME 🔴 | Crash/rally risk elevated |
 
-## Next Iteration Opportunities
+### Minimum Data Requirements
+- 20 data points minimum for reliable kurtosis calculation
+- Default 25 days fetched for analysis
 
-### Sector Rotation Enhancements (Future)
-- Trend analysis over multiple weeks
-- Sector rotation alerts (big changes)
-- Historical comparison reports
-- Sector heatmap visualization
-- Correlation with market indices
+## Next Steps
 
-### General Enhancements
-- Bulk import/export of stock symbols
-- Rate limiting for API calls
-- Performance optimizations
+Potential enhancements:
+- Add historical kurtosis tracking for trend detection
+- Consider VIX integration for additional context
+- Add skewness calculation for directional bias hints
