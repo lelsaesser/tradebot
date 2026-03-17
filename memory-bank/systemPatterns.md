@@ -19,8 +19,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Provides real-time RS crossover alerts during market hours AND daily summary reports.
 -   **`MomentumRocService`:** Calculates Rate of Change (ROC) momentum and detects zero-line crossovers.
 -   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values.
--   **`TailRiskService`:** **NEW** - Calculates excess kurtosis from daily price changes to detect fat tail risk.
--   **`TailRiskTracker`:** **NEW** - Monitors sector ETFs for elevated tail risk (fat tails indicating extreme move probability).
+-   **`TailRiskService`:** Calculates excess kurtosis and skewness from daily price changes to detect fat tail risk and directional bias.
+-   **`TailRiskTracker`:** Monitors sector ETFs for elevated tail risk (fat tails) with directional context (crash vs rally bias).
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
@@ -68,7 +68,7 @@ The application follows a modular, component-based architecture built on the Spr
 | `monthlyApiUsageReport` | Monthly 1st, 00:30 | UTC | API usage statistics |
 | `dailySectorRotationTracking` | Daily 22:30 (Mon-Fri) | America/New_York | Sector performance + Z-score alerts |
 | `dailySectorRsSummary` | Daily 12:00 | CET | Sector RS vs SPY daily summary |
-| `dailyTailRiskMonitoring` | Daily 10:00 (Mon-Fri) | CET | **Tail risk kurtosis alerts** |
+| `dailyTailRiskMonitoring` | Daily 10:00 (Mon-Fri) | CET | **Tail risk kurtosis + skewness alerts** |
 | `telegramMessagePolling` | Every 60 seconds | UTC | Process Telegram commands |
 
 ## Component Relationships
@@ -282,7 +282,7 @@ The system now uses four complementary approaches for market analysis:
 | **Z-Score Analysis** | `SectorRotationAnalyzer` | Industry performance anomalies | Daily (after market) |
 | **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
-| **Tail Risk (Kurtosis)** | `TailRiskTracker` | Fat tail detection | Daily 10:00 CET |
+| **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
 
 **Stock Market Monitoring Flow:**
 ```java

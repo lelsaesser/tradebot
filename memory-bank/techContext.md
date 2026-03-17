@@ -101,10 +101,11 @@ src/main/java/org/tradelite/
 │   ├── SectorMomentumRocTracker.java  # Sector ROC tracking
 │   ├── MomentumRocSignal.java  # ROC signal record
 │   └── ...
-├── quant/                       # Quantitative analysis (NEW)
+├── quant/                       # Quantitative analysis
+│   ├── SkewnessLevel.java      # Skewness classification enum (NEW)
 │   ├── TailRiskLevel.java      # Risk level enum
-│   ├── TailRiskAnalysis.java   # Analysis result record
-│   ├── TailRiskService.java    # Kurtosis calculation
+│   ├── TailRiskAnalysis.java   # Analysis result record (kurtosis + skewness)
+│   ├── TailRiskService.java    # Kurtosis + skewness calculation
 │   └── TailRiskTracker.java    # Sector tail risk monitoring
 ├── repository/                  # Data persistence layer
 │   ├── PriceQuoteEntity.java   # Entity class

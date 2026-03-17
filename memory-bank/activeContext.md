@@ -2,87 +2,98 @@
 
 ## Current Work Focus
 
-The Tail Risk (Kurtosis) Analysis feature has been implemented as a new quantitative analysis capability. This introduces the new `quant` package for advanced statistical analysis beyond the existing sector rotation metrics.
+The Tail Risk Analysis feature has been enhanced with **Skewness calculation** to provide directional bias alongside kurtosis. This completes the original tail risk implementation by adding the ability to indicate whether extreme moves lean toward crashes or rallies.
 
 ## Recent Changes
 
-### Tail Risk Analysis Feature Implementation (Completed - March 11, 2026)
-1. **New `quant` Package Created:**
-   - `TailRiskLevel` - Enum for risk classifications (LOW, MODERATE, HIGH, EXTREME)
-   - `TailRiskAnalysis` - Record for storing analysis results
-   - `TailRiskService` - Service calculating excess kurtosis from daily price changes
-   - `TailRiskTracker` - Component monitoring sector ETFs + SPY for fat tail risk
+### Skewness Enhancement to Tail Risk (Completed - March 17, 2026)
 
-2. **Repository Enhancement:**
-   - Added `findDailyChangePercents(symbol, days)` to `PriceQuoteRepository`
-   - Returns list of daily change percentages for kurtosis calculation
+1. **New Component Created:**
+   - `SkewnessLevel` - Enum for skewness classifications (HIGHLY_NEGATIVE, NEGATIVE, NEUTRAL, POSITIVE, HIGHLY_POSITIVE)
 
-3. **Integration:**
-   - Added `TailRiskTracker` to `Scheduler` with dedicated daily task at 10:00 AM CET
-   - Only alerts when HIGH or EXTREME risk detected (not daily reports)
+2. **Enhanced Components:**
+   - `TailRiskAnalysis` - Added `skewness` and `skewnessLevel` fields
+   - `TailRiskLevel` - Added `isElevated()` method for HIGH/EXTREME detection
+   - `TailRiskService` - Added `calculateSkewness()` method
+   - `TailRiskTracker` - Enhanced alert messages with directional bias information
 
-4. **How It Works:**
-   - Calculates excess kurtosis from historical daily price changes (last 25 days)
-   - Kurtosis > 3 (excess > 0) indicates "fat tails" - higher probability of extreme moves
-   - Risk levels: LOW (< 1.0), MODERATE (1.0-3.0), HIGH (3.0-6.0), EXTREME (≥ 6.0)
-   - Monitors 12 sector ETFs: SPY, XLE, XLK, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC
+3. **How Skewness Works:**
+   - **Negative Skewness**: Left tail is fatter → crashes more likely than rallies
+   - **Positive Skewness**: Right tail is fatter → rallies more likely than crashes  
+   - **Zero Skewness**: Symmetric distribution → balanced risk
 
-5. **Tests Added:**
-   - `TailRiskServiceTest` - 9 tests covering kurtosis calculation and edge cases
-   - `TailRiskTrackerTest` - 10 tests covering alert generation and reporting
+4. **Combined Risk Assessment:**
+   - **Kurtosis**: Tells you *how likely* extreme moves are
+   - **Skewness**: Tells you *which direction* they're more likely to go
 
-### Kurtosis Formula
+5. **Tests Updated:**
+   - `TailRiskServiceTest` - 19 tests (added 10 new skewness tests)
+   - `TailRiskTrackerTest` - 13 tests (updated for new message format)
+
+### Skewness Formula
 ```
-Kurtosis = n * Σ(xi - x̄)⁴ / (Σ(xi - x̄)²)²
-Excess Kurtosis = Kurtosis - 3  (normal distribution has kurtosis = 3)
+Skewness = (1/n) * Σ((xi - x̄)³) / σ³
+
+Normal distribution: skewness = 0
+Negative skew: < 0 (crash bias)
+Positive skew: > 0 (rally bias)
 ```
 
-### Alert Interpretation
-- **High Excess Kurtosis**: Indicates "fat tails" - extreme price moves more likely than normal
-- **Direction Agnostic**: High kurtosis doesn't predict direction (could be crash OR rally)
-- **Context Required**: Alert recommends reviewing macro conditions for direction assessment
+### Skewness Level Classification
+| Skewness | Level | Emoji | Meaning |
+|----------|-------|-------|---------|
+| < -1.0 | HIGHLY_NEGATIVE | ⬇️⬇️ | Strong crash bias |
+| -1.0 to -0.5 | NEGATIVE | ⬇️ | Moderate downside skew |
+| -0.5 to +0.5 | NEUTRAL | ↔️ | No directional bias |
+| +0.5 to +1.0 | POSITIVE | ⬆️ | Moderate upside skew |
+| > +1.0 | HIGHLY_POSITIVE | ⬆️⬆️ | Strong rally bias |
+
+### Enhanced Alert Format
+```
+🔴 *Tail Risk Alert - Extreme*
+
+*Extreme* risk sectors:
+• *Energy* (XLE): Kurtosis 10.5 | Skew -1.2 ⬇️⬇️
+   _Fat tails with strong crash bias_
+
+📊 *Directional Bias:*
+• ⬇️ 1 sector(s) with crash risk bias
+• ⬆️ 1 sector(s) with rally potential
+
+_Kurtosis = probability of extreme moves_
+_Skewness = likely direction (⬇️ crash / ⬆️ rally)_
+```
+
+### Combined Interpretation
+| Kurtosis | Skewness | Interpretation |
+|----------|----------|----------------|
+| HIGH/EXTREME | Negative | Fat tails with crash bias - **defensive posture** |
+| HIGH/EXTREME | Positive | Fat tails with rally bias - **opportunity window** |
+| HIGH/EXTREME | Neutral | Fat tails, uncertain direction - **high volatility** |
+| LOW/MODERATE | Any | Normal market conditions |
 
 ## Four-Pronged Statistical Analysis
 
-The system now uses four complementary approaches:
+The system uses four complementary approaches:
 
-1. **Z-Score Analysis** (via FinViz data)
-   - Statistical deviation from historical performance
-   - Detects extreme moves in sector performance
-
-2. **Relative Strength vs SPY** 
-   - RS = Sector Price / SPY Price ratio
-   - EMA crossover detection (50-period)
-   - Shows momentum vs benchmark
-
-3. **Momentum ROC**
-   - Rate of Change over 10 and 20 days
-   - Zero-line crossover detection
-   - Shows pure momentum direction change
-
-4. **Tail Risk (Kurtosis)** (NEW)
-   - Measures probability of extreme moves
-   - Fat tail detection via excess kurtosis
-   - Early warning for volatile conditions
+| Approach | Component | Signal | Schedule |
+|----------|-----------|--------|----------|
+| **Z-Score Analysis** | `SectorRotationAnalyzer` | Industry performance anomalies | Daily (after market) |
+| **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
+| **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
+| **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
 
 ## Technical Patterns
 
 ### Kurtosis Calculation
 ```java
-// Step 1: Calculate mean
-double mean = changes.stream().mapToDouble(d -> d).average().orElse(0);
-
-// Step 2: Calculate second (variance) and fourth moments
-double sumSquared = 0, sumFourth = 0;
-for (double change : changes) {
-    double diff = change - mean;
-    sumSquared += diff * diff;
-    sumFourth += diff * diff * diff * diff;
-}
-
-// Step 3: Kurtosis formula
 double kurtosis = (n * sumFourth) / (sumSquared * sumSquared);
 double excessKurtosis = kurtosis - 3.0;
+```
+
+### Skewness Calculation
+```java
+double skewness = (sumCubedDiff / n) / (stdDev * stdDev * stdDev);
 ```
 
 ### Risk Level Classification
@@ -93,13 +104,21 @@ double excessKurtosis = kurtosis - 3.0;
 | 3.0 - 6.0 | HIGH 🟠 | Significant fat tails |
 | ≥ 6.0 | EXTREME 🔴 | Crash/rally risk elevated |
 
-### Minimum Data Requirements
-- 20 data points minimum for reliable kurtosis calculation
-- Default 25 days fetched for analysis
+## Quant Package Overview
+
+```
+src/main/java/org/tradelite/quant/
+├── SkewnessLevel.java     # Enum: directional bias classification
+├── TailRiskLevel.java     # Enum: risk level classification
+├── TailRiskAnalysis.java  # Record: analysis results (kurtosis + skewness)
+├── TailRiskService.java   # Service: kurtosis & skewness calculation
+└── TailRiskTracker.java   # Component: sector monitoring & alerts
+```
 
 ## Next Steps
 
-Potential enhancements:
-- Add historical kurtosis tracking for trend detection
-- Consider VIX integration for additional context
-- Add skewness calculation for directional bias hints
+Potential future enhancements:
+- Historical kurtosis/skewness tracking for trend detection
+- VIX integration for additional volatility context
+- Sharpe/Sortino ratio calculations
+- Combine tail risk with other signals for confirmation alerts

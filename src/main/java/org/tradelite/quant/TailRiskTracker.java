@@ -12,8 +12,12 @@ import org.tradelite.client.telegram.TelegramClient;
 /**
  * Tracks tail risk across sector ETFs and SPY to provide early warning of market instability.
  *
- * <p>Monitors kurtosis levels and sends alerts when tail risk becomes elevated. High kurtosis
- * indicates increased probability of extreme price moves (crashes or rallies).
+ * <p>Monitors kurtosis and skewness levels and sends alerts when tail risk becomes elevated:
+ *
+ * <ul>
+ *   <li><b>Kurtosis</b>: High values indicate increased probability of extreme moves
+ *   <li><b>Skewness</b>: Direction of risk - negative = crash bias, positive = rally potential
+ * </ul>
  */
 @Slf4j
 @Component
@@ -92,25 +96,27 @@ public class TailRiskTracker {
 
         // Header with severity
         if (!extremeRisk.isEmpty()) {
-            sb.append("🔴 TAIL RISK ALERT - EXTREME\n\n");
+            sb.append("🔴 *Tail Risk Alert - Extreme*\n\n");
         } else {
-            sb.append("🟠 TAIL RISK ALERT - HIGH\n\n");
+            sb.append("🟠 *Tail Risk Alert - High*\n\n");
         }
 
-        // List extreme risk sectors first
+        // List extreme risk sectors first with skewness context
         if (!extremeRisk.isEmpty()) {
-            sb.append("EXTREME risk sectors:\n");
+            sb.append("*Extreme* risk sectors:\n");
             for (TailRiskAnalysis analysis : extremeRisk) {
-                sb.append("• ").append(analysis.toSummaryLine()).append("\n");
+                sb.append(analysis.toSummaryLine()).append("\n");
+                sb.append("   _").append(analysis.getRiskInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
 
-        // List high risk sectors
+        // List high risk sectors with skewness context
         if (!highRisk.isEmpty()) {
-            sb.append("HIGH risk sectors:\n");
+            sb.append("*High* risk sectors:\n");
             for (TailRiskAnalysis analysis : highRisk) {
-                sb.append("• ").append(analysis.toSummaryLine()).append("\n");
+                sb.append(analysis.toSummaryLine()).append("\n");
+                sb.append("   _").append(analysis.getRiskInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
@@ -122,9 +128,29 @@ public class TailRiskTracker {
         }
         sb.append("\n\n");
 
+        // Directional summary
+        long crashRiskCount = allAnalyses.stream().filter(TailRiskAnalysis::hasCrashRisk).count();
+        long rallyPotentialCount =
+                allAnalyses.stream().filter(TailRiskAnalysis::hasRallyPotential).count();
+
+        if (crashRiskCount > 0 || rallyPotentialCount > 0) {
+            sb.append("📊 *Directional Bias:*\n");
+            if (crashRiskCount > 0) {
+                sb.append("• ⬇️ ")
+                        .append(crashRiskCount)
+                        .append(" sector(s) with crash risk bias\n");
+            }
+            if (rallyPotentialCount > 0) {
+                sb.append("• ⬆️ ")
+                        .append(rallyPotentialCount)
+                        .append(" sector(s) with rally potential\n");
+            }
+            sb.append("\n");
+        }
+
         // Interpretation guidance
-        sb.append("⚠️ Big moves more likely than normal.\n");
-        sb.append("Review macro conditions to assess direction.");
+        sb.append("_Kurtosis = probability of extreme moves_\n");
+        sb.append("_Skewness = likely direction (⬇️ crash / ⬆️ rally)_");
 
         return sb.toString();
     }
@@ -134,29 +160,34 @@ public class TailRiskTracker {
         List<TailRiskAnalysis> analyses = analyzeAllSectors();
 
         if (analyses.isEmpty()) {
-            return "📊 Tail Risk Report\n\nInsufficient data for analysis.";
+            return "📊 *Tail Risk Report*\n\n_Insufficient data for analysis._";
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 Tail Risk Report\n\n");
+        sb.append("📊 *Tail Risk Report*\n\n");
 
         for (TailRiskAnalysis analysis : analyses) {
             sb.append(analysis.toSummaryLine()).append("\n");
         }
 
-        long elevatedCount =
-                analyses.stream()
-                        .filter(
-                                a ->
-                                        a.riskLevel() == TailRiskLevel.HIGH
-                                                || a.riskLevel() == TailRiskLevel.EXTREME)
-                        .count();
+        long elevatedCount = analyses.stream().filter(a -> a.riskLevel().isElevated()).count();
+
+        long crashRiskCount = analyses.stream().filter(TailRiskAnalysis::hasCrashRisk).count();
+        long rallyPotentialCount =
+                analyses.stream().filter(TailRiskAnalysis::hasRallyPotential).count();
 
         sb.append("\n");
         if (elevatedCount == 0) {
             sb.append("✅ All sectors within normal tail risk range.");
         } else {
-            sb.append(String.format("⚠️ %d sector(s) showing elevated tail risk.", elevatedCount));
+            sb.append(
+                    String.format("⚠️ %d sector(s) showing elevated tail risk.%n", elevatedCount));
+            if (crashRiskCount > 0) {
+                sb.append(String.format("   ⬇️ %d with crash risk bias%n", crashRiskCount));
+            }
+            if (rallyPotentialCount > 0) {
+                sb.append(String.format("   ⬆️ %d with rally potential", rallyPotentialCount));
+            }
         }
 
         return sb.toString();
