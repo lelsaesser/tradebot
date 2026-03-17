@@ -30,7 +30,8 @@ class TailRiskTrackerTest {
 
     @Test
     void analyzeAllSectors_returnsListOfAnalyses() {
-        TailRiskAnalysis spyAnalysis = createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.1);
+        TailRiskAnalysis spyAnalysis =
+                createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.1);
         TailRiskAnalysis xleAnalysis =
                 createAnalysis("XLE", "Energy", 4.2, TailRiskLevel.MODERATE, -0.3);
 
@@ -178,7 +179,8 @@ class TailRiskTrackerTest {
 
     @Test
     void buildSummaryReport_includesAllSectorAnalyses() {
-        TailRiskAnalysis spyAnalysis = createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.1);
+        TailRiskAnalysis spyAnalysis =
+                createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.1);
         TailRiskAnalysis xleAnalysis =
                 createAnalysis("XLE", "Energy", 6.5, TailRiskLevel.HIGH, -0.8);
 
@@ -233,8 +235,7 @@ class TailRiskTrackerTest {
 
     @Test
     void buildSummaryReport_includesSkewnessInformation() {
-        TailRiskAnalysis analysis =
-                createAnalysis("XLE", "Energy", 6.5, TailRiskLevel.HIGH, -1.2);
+        TailRiskAnalysis analysis = createAnalysis("XLE", "Energy", 6.5, TailRiskLevel.HIGH, -1.2);
 
         when(tailRiskService.analyzeTailRisk(anyString(), anyString()))
                 .thenReturn(Optional.empty());
@@ -265,7 +266,13 @@ class TailRiskTrackerTest {
         double excessKurtosis = kurtosis - 3.0;
         SkewnessLevel skewnessLevel = SkewnessLevel.fromSkewness(skewness);
         return new TailRiskAnalysis(
-                symbol, displayName, kurtosis, excessKurtosis, riskLevel, skewness, skewnessLevel,
+                symbol,
+                displayName,
+                kurtosis,
+                excessKurtosis,
+                riskLevel,
+                skewness,
+                skewnessLevel,
                 25);
     }
 }

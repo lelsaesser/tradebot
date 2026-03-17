@@ -180,7 +180,8 @@ public class TailRiskTracker {
         if (elevatedCount == 0) {
             sb.append("✅ All sectors within normal tail risk range.");
         } else {
-            sb.append(String.format("⚠️ %d sector(s) showing elevated tail risk.%n", elevatedCount));
+            sb.append(
+                    String.format("⚠️ %d sector(s) showing elevated tail risk.%n", elevatedCount));
             if (crashRiskCount > 0) {
                 sb.append(String.format("   ⬇️ %d with crash risk bias%n", crashRiskCount));
             }

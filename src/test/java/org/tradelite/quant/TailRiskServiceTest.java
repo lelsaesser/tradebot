@@ -173,8 +173,9 @@ class TailRiskServiceTest {
     void calculateSkewness_returnsZeroForSymmetricData() {
         // Symmetric data around mean
         List<Double> symmetricData =
-                Arrays.asList(-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0,
-                        3.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0);
+                Arrays.asList(
+                        -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0,
+                        -3.0, -2.0, -1.0, 0.0, 1.0, 2.0);
 
         double skewness = tailRiskService.calculateSkewness(symmetricData);
 
