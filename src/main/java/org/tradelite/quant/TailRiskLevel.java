@@ -50,4 +50,14 @@ public enum TailRiskLevel {
             return EXTREME;
         }
     }
+
+    /**
+     * Returns true if the risk level indicates elevated tail risk. HIGH and EXTREME levels are
+     * considered elevated.
+     *
+     * @return true for HIGH and EXTREME levels
+     */
+    public boolean isElevated() {
+        return this == HIGH || this == EXTREME;
+    }
 }

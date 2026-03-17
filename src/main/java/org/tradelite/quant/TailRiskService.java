@@ -8,20 +8,28 @@ import org.springframework.stereotype.Service;
 import org.tradelite.repository.PriceQuoteRepository;
 
 /**
- * Service for calculating tail risk metrics using kurtosis.
+ * Service for calculating tail risk metrics using kurtosis and skewness.
  *
- * <p>Kurtosis measures the "tailedness" of a probability distribution. Higher kurtosis indicates
- * more extreme values (crashes or rallies) than a normal distribution would predict.
+ * <p><b>Kurtosis</b> measures the "tailedness" of a probability distribution. Higher kurtosis
+ * indicates more extreme values (crashes or rallies) than a normal distribution would predict.
  *
- * <p>Normal distribution has kurtosis = 3.0 (mesokurtic). Values above 3 indicate fat tails
- * (leptokurtic), meaning extreme price moves are more likely than normal.
+ * <p><b>Skewness</b> measures the asymmetry of the distribution:
+ *
+ * <ul>
+ *   <li>Negative skew: Left tail is fatter → crashes more likely than rallies
+ *   <li>Positive skew: Right tail is fatter → rallies more likely than crashes
+ *   <li>Zero skew: Symmetric distribution → balanced risk
+ * </ul>
+ *
+ * <p>Normal distribution has kurtosis = 3.0 (mesokurtic) and skewness = 0.0. Values above 3
+ * indicate fat tails (leptokurtic), meaning extreme price moves are more likely than normal.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TailRiskService {
 
-    /** Minimum number of data points required for kurtosis calculation. */
+    /** Minimum number of data points required for kurtosis/skewness calculation. */
     private static final int MIN_DATA_POINTS = 20;
 
     /** Number of calendar days to look back for price data. */
@@ -47,9 +55,19 @@ public class TailRiskService {
         double excessKurtosis = kurtosis - 3.0;
         TailRiskLevel riskLevel = TailRiskLevel.fromExcessKurtosis(excessKurtosis);
 
+        double skewness = calculateSkewness(returns);
+        SkewnessLevel skewnessLevel = SkewnessLevel.fromSkewness(skewness);
+
         return Optional.of(
                 new TailRiskAnalysis(
-                        symbol, displayName, kurtosis, excessKurtosis, riskLevel, returns.size()));
+                        symbol,
+                        displayName,
+                        kurtosis,
+                        excessKurtosis,
+                        riskLevel,
+                        skewness,
+                        skewnessLevel,
+                        returns.size()));
     }
 
     /**
@@ -95,13 +113,73 @@ public class TailRiskService {
      * Calculates excess kurtosis (kurtosis - 3).
      *
      * <p>Excess kurtosis is often more intuitive as it measures deviation from normal distribution:
-     * - Positive = fatter tails than normal (leptokurtic) - Negative = thinner tails than normal
-     * (platykurtic) - Zero = normal distribution (mesokurtic)
+     *
+     * <ul>
+     *   <li>Positive = fatter tails than normal (leptokurtic)
+     *   <li>Negative = thinner tails than normal (platykurtic)
+     *   <li>Zero = normal distribution (mesokurtic)
+     * </ul>
      *
      * @param values List of values
      * @return Excess kurtosis
      */
     protected double calculateExcessKurtosis(List<Double> values) {
         return calculateKurtosis(values) - 3.0;
+    }
+
+    /**
+     * Calculates the skewness of a distribution.
+     *
+     * <p>Skewness formula: E[(X - μ)^3] / σ^3
+     *
+     * <p>For sample skewness, we use: Σ((xi - x̄)^3) / (n * σ^3)
+     *
+     * <p>Interpretation:
+     *
+     * <ul>
+     *   <li>Negative skew (< 0): Left tail is longer/fatter → more crash risk
+     *   <li>Zero skew (= 0): Symmetric distribution
+     *   <li>Positive skew (> 0): Right tail is longer/fatter → more rally potential
+     * </ul>
+     *
+     * @param values List of values (e.g., daily returns)
+     * @return The calculated skewness (normal distribution = 0.0)
+     */
+    protected double calculateSkewness(List<Double> values) {
+        if (values.size() < 3) {
+            return 0.0; // Return zero skewness if insufficient data
+        }
+
+        int n = values.size();
+
+        // Calculate mean
+        double mean = values.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+
+        // Calculate sum of squared differences and cubed differences
+        double sumSquaredDiff = 0;
+        double sumCubedDiff = 0;
+
+        for (Double value : values) {
+            double diff = value - mean;
+            double squaredDiff = diff * diff;
+            sumSquaredDiff += squaredDiff;
+            sumCubedDiff += squaredDiff * diff; // diff^3
+        }
+
+        if (sumSquaredDiff == 0) {
+            return 0.0; // No variance, return zero skewness
+        }
+
+        // Calculate standard deviation
+        double variance = sumSquaredDiff / n;
+        double stdDev = Math.sqrt(variance);
+
+        if (stdDev == 0) {
+            return 0.0;
+        }
+
+        // Sample skewness: (1/n) * Σ((xi - x̄)^3) / σ^3
+        double stdDevCubed = stdDev * stdDev * stdDev;
+        return (sumCubedDiff / n) / stdDevCubed;
     }
 }

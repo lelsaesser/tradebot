@@ -167,6 +167,120 @@ class TailRiskServiceTest {
         assertThat(excessKurtosis).isCloseTo(kurtosis - 3.0, within(0.001));
     }
 
+    // ========== Skewness Tests ==========
+
+    @Test
+    void calculateSkewness_returnsZeroForSymmetricData() {
+        // Symmetric data around mean
+        List<Double> symmetricData =
+                Arrays.asList(-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0,
+                        3.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0);
+
+        double skewness = tailRiskService.calculateSkewness(symmetricData);
+
+        // Symmetric data should have skewness close to 0
+        assertThat(skewness).isCloseTo(0.0, within(0.1));
+    }
+
+    @Test
+    void calculateSkewness_returnsNegativeForLeftSkewedData() {
+        // Left-skewed: many small positive values, few large negative values (crash-like)
+        List<Double> leftSkewedData =
+                Arrays.asList(
+                        0.5, 0.3, 0.4, 0.2, 0.1, 0.3, 0.4, 0.2, 0.5, 0.3, 0.4, 0.2, 0.1, 0.3, 0.4,
+                        0.2, -5.0, // Extreme negative (crash)
+                        -6.0, // Extreme negative (crash)
+                        -4.5, // Extreme negative
+                        0.1);
+
+        double skewness = tailRiskService.calculateSkewness(leftSkewedData);
+
+        // Left-skewed (crash bias) should have negative skewness
+        assertThat(skewness).isLessThan(0);
+    }
+
+    @Test
+    void calculateSkewness_returnsPositiveForRightSkewedData() {
+        // Right-skewed: many small negative values, few large positive values (rally-like)
+        List<Double> rightSkewedData =
+                Arrays.asList(
+                        -0.5, -0.3, -0.4, -0.2, -0.1, -0.3, -0.4, -0.2, -0.5, -0.3, -0.4, -0.2,
+                        -0.1, -0.3, -0.4, -0.2, 5.0, // Extreme positive (rally)
+                        6.0, // Extreme positive (rally)
+                        4.5, // Extreme positive
+                        -0.1);
+
+        double skewness = tailRiskService.calculateSkewness(rightSkewedData);
+
+        // Right-skewed (rally potential) should have positive skewness
+        assertThat(skewness).isGreaterThan(0);
+    }
+
+    @Test
+    void calculateSkewness_returnsZeroForInsufficientData() {
+        List<Double> tooFewValues = Arrays.asList(1.0, 2.0);
+
+        double skewness = tailRiskService.calculateSkewness(tooFewValues);
+
+        assertThat(skewness).isEqualTo(0.0);
+    }
+
+    @Test
+    void calculateSkewness_returnsZeroForZeroVariance() {
+        List<Double> constantValues = Arrays.asList(5.0, 5.0, 5.0, 5.0, 5.0);
+
+        double skewness = tailRiskService.calculateSkewness(constantValues);
+
+        assertThat(skewness).isEqualTo(0.0);
+    }
+
+    @Test
+    void analyzeTailRisk_includesSkewnessInResult() {
+        List<Double> returns = generateNormalReturns(25);
+        when(priceQuoteRepository.findDailyChangePercents("XLK", 35)).thenReturn(returns);
+
+        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLK", "Technology");
+
+        assertThat(result).isPresent();
+        TailRiskAnalysis analysis = result.get();
+        // Verify skewness fields are present
+        assertThat(analysis.skewnessLevel()).isNotNull();
+        // Skewness should be a reasonable value
+        assertThat(analysis.skewness()).isBetween(-5.0, 5.0);
+    }
+
+    @Test
+    void analyzeTailRisk_classifiesNegativeSkewnessCorrectly() {
+        // Left-skewed data (crash bias)
+        List<Double> leftSkewedData =
+                Arrays.asList(
+                        0.5, 0.3, 0.4, 0.2, 0.1, 0.3, 0.4, 0.2, 0.5, 0.3, 0.4, 0.2, 0.1, 0.3, 0.4,
+                        0.2, -5.0, -6.0, -4.5, 0.1);
+        when(priceQuoteRepository.findDailyChangePercents("XLE", 35)).thenReturn(leftSkewedData);
+
+        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLE", "Energy");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().skewness()).isLessThan(0);
+        assertThat(result.get().skewnessLevel().isNegative()).isTrue();
+    }
+
+    @Test
+    void analyzeTailRisk_classifiesPositiveSkewnessCorrectly() {
+        // Right-skewed data (rally potential)
+        List<Double> rightSkewedData =
+                Arrays.asList(
+                        -0.5, -0.3, -0.4, -0.2, -0.1, -0.3, -0.4, -0.2, -0.5, -0.3, -0.4, -0.2,
+                        -0.1, -0.3, -0.4, -0.2, 5.0, 6.0, 4.5, -0.1);
+        when(priceQuoteRepository.findDailyChangePercents("XLF", 35)).thenReturn(rightSkewedData);
+
+        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLF", "Financials");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().skewness()).isGreaterThan(0);
+        assertThat(result.get().skewnessLevel().isPositive()).isTrue();
+    }
+
     @Test
     void tailRiskAnalysis_hasReliableDataWithMinimumPoints() {
         List<Double> returns = generateNormalReturns(20);
@@ -187,7 +301,7 @@ class TailRiskServiceTest {
 
         assertThat(result).isPresent();
         String summaryLine = result.get().toSummaryLine();
-        assertThat(summaryLine).contains("XLI").contains("Industrials").contains("kurtosis");
+        assertThat(summaryLine).contains("XLI").contains("Industrials").contains("Kurtosis");
     }
 
     @Test
