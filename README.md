@@ -1,4 +1,4 @@
-## Swing trading support bot.  
+## Trading, investment and quant analysis bot.
 ![Code Coverage](https://raw.githubusercontent.com/lelsaesser/tradebot/main/.github/badges/badge-coverage.svg?sanitize=true)
 [![Code Formatter](https://github.com/lelsaesser/tradebot/actions/workflows/formatter.yml/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/formatter.yml)
 [![CodeQL](https://github.com/lelsaesser/tradebot/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/github-code-scanning/codeql)
@@ -7,6 +7,8 @@
 [![OSV-Scanner](https://github.com/lelsaesser/tradebot/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/osv-scanner.yml)
 
 Integrates into several APIs and sends notifications and updates to Telegram chats.
+
+24/7 market monitoring, quantitative analysis and sector/industry/smart money rotation tracking.
 
 Stock market and price data from Finnhub.io (https://finnhub.io/)  
 Crypto market and price data by CoinGecko (https://www.coingecko.com/)  
