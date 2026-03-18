@@ -87,6 +87,12 @@ public class TailRiskTracker {
         }
     }
 
+    public void sendDailyReport() {
+        String report = buildSummaryReport();
+        telegramClient.sendMessage(report);
+        log.info("Daily tail risk report sent");
+    }
+
     private String buildAlertMessage(
             List<TailRiskAnalysis> allAnalyses,
             List<TailRiskAnalysis> highRisk,

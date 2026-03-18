@@ -107,8 +107,9 @@ public class Scheduler {
         log.info("Daily sector relative strength report completed.");
     }
 
-    @Scheduled(cron = "0 0 10 * * MON-FRI", zone = "CET")
+    @Scheduled(cron = "0 0 13 * * MON-FRI", zone = "CET")
     protected void dailyTailRiskMonitoring() {
+        rootErrorHandler.run(tailRiskTracker::sendDailyReport);
         rootErrorHandler.run(tailRiskTracker::trackAndAlert);
         log.info("Daily tail risk monitoring completed.");
     }
