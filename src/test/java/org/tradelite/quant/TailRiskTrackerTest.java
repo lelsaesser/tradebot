@@ -234,6 +234,23 @@ class TailRiskTrackerTest {
     }
 
     @Test
+    void sendDailyReport_sendsSummaryReportViaTelegram() {
+        TailRiskAnalysis analysis = createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.1);
+
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(tailRiskService.analyzeTailRisk("SPY", "S&P 500")).thenReturn(Optional.of(analysis));
+
+        tailRiskTracker.sendDailyReport();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String report = messageCaptor.getValue();
+        assertThat(report).contains("Tail Risk Report").contains("SPY");
+    }
+
+    @Test
     void buildSummaryReport_includesSkewnessInformation() {
         TailRiskAnalysis analysis = createAnalysis("XLE", "Energy", 6.5, TailRiskLevel.HIGH, -1.2);
 

@@ -335,4 +335,23 @@ class SchedulerTest {
 
         verify(sectorRelativeStrengthTracker, times(1)).sendDailySectorRsSummary();
     }
+
+    @Test
+    void dailyTailRiskMonitoring_shouldSendReportAndAlerts() throws Exception {
+        scheduler.dailyTailRiskMonitoring();
+
+        // Verify rootErrorHandler.run is called twice (once for daily report, once for alerts)
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(2)).run(captor.capture());
+
+        // Execute both captured runnables
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
+
+        verify(tailRiskTracker, times(1)).sendDailyReport();
+        verify(tailRiskTracker, times(1)).trackAndAlert();
+    }
 }
