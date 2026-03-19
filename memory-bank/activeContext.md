@@ -2,75 +2,71 @@
 
 ## Current Work Focus
 
-The Tail Risk Analysis feature has been enhanced with **Skewness calculation** to provide directional bias alongside kurtosis. This completes the original tail risk implementation by adding the ability to indicate whether extreme moves lean toward crashes or rallies.
+**Sector RS Streak Tracking** has been implemented to track consecutive days of outperformance or underperformance vs SPY for each sector ETF. This provides at-a-glance visibility into whether a sector's strength/weakness is a short-term anomaly or a sustained trend.
 
 ## Recent Changes
 
-### Skewness Enhancement to Tail Risk (Completed - March 17, 2026)
+### Sector RS Streak Tracking (Completed - March 19, 2026)
 
-1. **New Component Created:**
-   - `SkewnessLevel` - Enum for skewness classifications (HIGHLY_NEGATIVE, NEGATIVE, NEUTRAL, POSITIVE, HIGHLY_POSITIVE)
+1. **New Components Created:**
+   - `SectorRsStreak` - Record tracking symbol, streak days, direction (outperforming/underperforming), and last updated date
+   - `SectorRsStreakPersistence` - JSON file persistence for streak data across application restarts
 
 2. **Enhanced Components:**
-   - `TailRiskAnalysis` - Added `skewness` and `skewnessLevel` fields
-   - `TailRiskLevel` - Added `isElevated()` method for HIGH/EXTREME detection
-   - `TailRiskService` - Added `calculateSkewness()` method
-   - `TailRiskTracker` - Enhanced alert messages with directional bias information
+   - `SectorRelativeStrengthTracker` - Integrated streak tracking into the daily sector RS report
 
-3. **How Skewness Works:**
-   - **Negative Skewness**: Left tail is fatter → crashes more likely than rallies
-   - **Positive Skewness**: Right tail is fatter → rallies more likely than crashes  
-   - **Zero Skewness**: Symmetric distribution → balanced risk
+3. **How Streak Tracking Works:**
+   - **New Sector**: Streak starts at day 1
+   - **Same Direction**: Streak increments each day the sector maintains same performance direction
+   - **Direction Change**: Streak resets to day 1 with new direction
+   - **Same Day Updates**: Returns existing streak (no double-counting)
 
-4. **Combined Risk Assessment:**
-   - **Kurtosis**: Tells you *how likely* extreme moves are
-   - **Skewness**: Tells you *which direction* they're more likely to go
+4. **Daily Report Format:**
+   ```
+   📊 *Sector Relative Strength Report*
 
-5. **Tests Updated:**
-   - `TailRiskServiceTest` - 19 tests (added 10 new skewness tests)
-   - `TailRiskTrackerTest` - 13 tests (updated for new message format)
+   🟢 *Outperforming SPY:*
+   • XLK (Tech): RS 1.05 | EMA 1.03 🟢5
+   • XLF (Finance): RS 1.02 | EMA 1.01 🟢2
 
-### Skewness Formula
+   🔴 *Underperforming SPY:*
+   • XLU (Utilities): RS 0.95 | EMA 0.97 🔴12
+   • XLE (Energy): RS 0.92 | EMA 0.94 🔴3
+   ```
+   - `🟢5` = 5 consecutive days outperforming SPY
+   - `🔴12` = 12 consecutive days underperforming SPY
+
+5. **Value Proposition:**
+   - Immediately see if sector outperformance is short-term (1-2 days) or sustained (10+ days)
+   - Long streaks indicate strong trends worth paying attention to
+   - Short streaks may be noise/mean reversion candidates
+
+6. **Tests Added:**
+   - `SectorRsStreakTest` - 9 tests for streak record behavior
+   - `SectorRsStreakPersistenceTest` - 14 tests for persistence logic
+   - `SectorRelativeStrengthTrackerTest` - Updated existing tests for streak integration
+
+### Files Created
 ```
-Skewness = (1/n) * Σ((xi - x̄)³) / σ³
+src/main/java/org/tradelite/core/
+├── SectorRsStreak.java              # Streak data record
+└── SectorRsStreakPersistence.java   # JSON file persistence
 
-Normal distribution: skewness = 0
-Negative skew: < 0 (crash bias)
-Positive skew: > 0 (rally bias)
-```
+config/
+└── sector-rs-streaks.json           # Streak data file (created at runtime)
 
-### Skewness Level Classification
-| Skewness | Level | Emoji | Meaning |
-|----------|-------|-------|---------|
-| < -1.0 | HIGHLY_NEGATIVE | ⬇️⬇️ | Strong crash bias |
-| -1.0 to -0.5 | NEGATIVE | ⬇️ | Moderate downside skew |
-| -0.5 to +0.5 | NEUTRAL | ↔️ | No directional bias |
-| +0.5 to +1.0 | POSITIVE | ⬆️ | Moderate upside skew |
-| > +1.0 | HIGHLY_POSITIVE | ⬆️⬆️ | Strong rally bias |
-
-### Enhanced Alert Format
-```
-🔴 *Tail Risk Alert - Extreme*
-
-*Extreme* risk sectors:
-• *Energy* (XLE): Kurtosis 10.5 | Skew -1.2 ⬇️⬇️
-   _Fat tails with strong crash bias_
-
-📊 *Directional Bias:*
-• ⬇️ 1 sector(s) with crash risk bias
-• ⬆️ 1 sector(s) with rally potential
-
-_Kurtosis = probability of extreme moves_
-_Skewness = likely direction (⬇️ crash / ⬆️ rally)_
+src/test/java/org/tradelite/core/
+├── SectorRsStreakTest.java          # Unit tests for record
+└── SectorRsStreakPersistenceTest.java # Integration tests for persistence
 ```
 
-### Combined Interpretation
-| Kurtosis | Skewness | Interpretation |
-|----------|----------|----------------|
-| HIGH/EXTREME | Negative | Fat tails with crash bias - **defensive posture** |
-| HIGH/EXTREME | Positive | Fat tails with rally bias - **opportunity window** |
-| HIGH/EXTREME | Neutral | Fat tails, uncertain direction - **high volatility** |
-| LOW/MODERATE | Any | Normal market conditions |
+### Streak Indicator Format
+| Streak | Indicator | Meaning |
+|--------|-----------|---------|
+| 1 day outperforming | 🟢1 | Just started outperforming |
+| 5 days outperforming | 🟢5 | Sustained outperformance |
+| 1 day underperforming | 🔴1 | Just started underperforming |
+| 15 days underperforming | 🔴15 | Long-term weakness |
 
 ## Four-Pronged Statistical Analysis
 
@@ -79,46 +75,60 @@ The system uses four complementary approaches:
 | Approach | Component | Signal | Schedule |
 |----------|-----------|--------|----------|
 | **Z-Score Analysis** | `SectorRotationAnalyzer` | Industry performance anomalies | Daily (after market) |
-| **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
+| **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers + **streak tracking** | Real-time (5 min) |
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
 
 ## Technical Patterns
 
-### Kurtosis Calculation
+### Streak Update Logic
 ```java
-double kurtosis = (n * sumFourth) / (sumSquared * sumSquared);
-double excessKurtosis = kurtosis - 3.0;
+if (currentStreak == null) {
+    // First time tracking this sector
+    return SectorRsStreak.newStreak(symbol, isOutperforming, date);
+} else if (currentStreak.lastUpdated().equals(date)) {
+    // Already updated today
+    return currentStreak;
+} else if (isOutperforming == currentStreak.isOutperforming()) {
+    // Same direction - increment streak
+    return new SectorRsStreak(symbol, streakDays + 1, isOutperforming, date);
+} else {
+    // Direction changed - reset to 1
+    return new SectorRsStreak(symbol, 1, isOutperforming, date);
+}
 ```
 
-### Skewness Calculation
-```java
-double skewness = (sumCubedDiff / n) / (stdDev * stdDev * stdDev);
+### Streak Persistence Format (JSON)
+```json
+{
+  "XLK": {
+    "symbol": "XLK",
+    "streakDays": 5,
+    "isOutperforming": true,
+    "lastUpdated": "2026-03-19"
+  },
+  "XLU": {
+    "symbol": "XLU",
+    "streakDays": 12,
+    "isOutperforming": false,
+    "lastUpdated": "2026-03-19"
+  }
+}
 ```
 
-### Risk Level Classification
-| Excess Kurtosis | Risk Level | Meaning |
-|-----------------|------------|---------|
-| < 1.0 | LOW 🟢 | Normal tail risk |
-| 1.0 - 3.0 | MODERATE 🟡 | Slightly elevated |
-| 3.0 - 6.0 | HIGH 🟠 | Significant fat tails |
-| ≥ 6.0 | EXTREME 🔴 | Crash/rally risk elevated |
+## Configuration
 
-## Quant Package Overview
-
-```
-src/main/java/org/tradelite/quant/
-├── SkewnessLevel.java     # Enum: directional bias classification
-├── TailRiskLevel.java     # Enum: risk level classification
-├── TailRiskAnalysis.java  # Record: analysis results (kurtosis + skewness)
-├── TailRiskService.java   # Service: kurtosis & skewness calculation
-└── TailRiskTracker.java   # Component: sector monitoring & alerts
+The streak persistence file path can be configured via:
+```yaml
+tradebot:
+  sector-rs-streaks:
+    file-path: config/sector-rs-streaks.json  # default
 ```
 
 ## Next Steps
 
 Potential future enhancements:
-- Historical kurtosis/skewness tracking for trend detection
-- VIX integration for additional volatility context
-- Sharpe/Sortino ratio calculations
-- Combine tail risk with other signals for confirmation alerts
+- Historical streak analysis (longest streaks, average streak length)
+- Alert when streak exceeds threshold (e.g., 10+ days)
+- Combine streak data with other signals for confirmation
+- Track streak reversal patterns

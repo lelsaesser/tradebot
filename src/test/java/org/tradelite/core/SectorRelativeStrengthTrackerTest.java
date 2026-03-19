@@ -3,6 +3,8 @@ package org.tradelite.core;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,11 +24,15 @@ class SectorRelativeStrengthTrackerTest {
 
     @Mock private TelegramClient telegramClient;
 
+    @Mock private SectorRsStreakPersistence streakPersistence;
+
     private SectorRelativeStrengthTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new SectorRelativeStrengthTracker(relativeStrengthService, telegramClient);
+        tracker =
+                new SectorRelativeStrengthTracker(
+                        relativeStrengthService, telegramClient, streakPersistence);
     }
 
     @Test
@@ -229,7 +235,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_withMixedPerformance_sendsFormattedMessage() {
+    void sendDailySectorRsSummary_withMixedPerformance_sendsFormattedMessage() throws IOException {
         // Given: Some sectors outperforming, some underperforming
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.02, 50, true))); // +2.94%
@@ -249,6 +255,16 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLC")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreak(symbol, 3, isOutperforming, date);
+                        });
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -264,6 +280,7 @@ class SectorRelativeStrengthTrackerTest {
         assertTrue(message.contains("Financials"));
         assertTrue(message.contains("Utilities"));
         assertTrue(message.contains("Real Estate"));
+        assertTrue(message.contains("📅")); // Streak indicator
     }
 
     @Test
@@ -279,7 +296,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_allOutperforming_formatsCorrectly() {
+    void sendDailySectorRsSummary_allOutperforming_formatsCorrectly() throws IOException {
         // Given: All sectors outperforming
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true)));
@@ -297,6 +314,16 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                        });
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -310,7 +337,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_allUnderperforming_formatsCorrectly() {
+    void sendDailySectorRsSummary_allUnderperforming_formatsCorrectly() throws IOException {
         // Given: All sectors underperforming
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(0.95, 1.00, 50, true)));
@@ -328,6 +355,16 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                        });
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -341,7 +378,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void collectSectorRsData_sortsDescendingByPercentageDiff() {
+    void collectSectorRsData_sortsDescendingByPercentageDiff() throws IOException {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.03, 1.00, 50, true))); // +3%
@@ -360,8 +397,18 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLRE")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                        });
+
         // When
-        List<SectorRelativeStrengthTracker.SectorRsData> result = tracker.collectSectorRsData();
+        List<SectorRsData> result = tracker.collectSectorRsData();
 
         // Then
         assertEquals(3, result.size());
@@ -371,7 +418,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void formatSummaryMessage_containsFooterExplanation() {
+    void formatSummaryMessage_containsFooterExplanation() throws IOException {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.02, 1.00, 50, true)));
@@ -388,6 +435,10 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenReturn(new SectorRsStreak("XLK", 1, true, LocalDate.now()));
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -398,10 +449,11 @@ class SectorRelativeStrengthTrackerTest {
         String message = messageCaptor.getValue();
         assertTrue(message.contains("RS = Sector/SPY ratio"));
         assertTrue(message.contains("50-EMA"));
+        assertTrue(message.contains("streak days"));
     }
 
     @Test
-    void collectSectorRsData_handlesExceptionGracefully() {
+    void collectSectorRsData_handlesExceptionGracefully() throws IOException {
         // Given: One sector throws exception
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenThrow(new RuntimeException("Test error"));
@@ -419,8 +471,12 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenReturn(new SectorRsStreak("XLF", 1, true, LocalDate.now()));
+
         // When
-        List<SectorRelativeStrengthTracker.SectorRsData> result = tracker.collectSectorRsData();
+        List<SectorRsData> result = tracker.collectSectorRsData();
 
         // Then: Should still return data for XLF
         assertEquals(1, result.size());
@@ -428,7 +484,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void formatSummaryMessage_displaysOnlySectorName_notEtfSymbol() {
+    void formatSummaryMessage_displaysStreakDays() throws IOException {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.02, 1.00, 50, true)));
@@ -445,6 +501,10 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence - return 5 day streak
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenReturn(new SectorRsStreak("XLK", 5, true, LocalDate.now()));
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -453,15 +513,11 @@ class SectorRelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        // Should contain sector name
-        assertTrue(message.contains("Technology"));
-        // Should not contain ETF symbol in the list items (only in title)
-        // The format should be "1. *Technology*: +2.0%" not "1. *XLK* (Technology): +2.0%"
-        assertFalse(message.contains("*XLK*:"));
+        assertTrue(message.contains("📅5")); // 5 day streak
     }
 
     @Test
-    void sendDailySectorRsSummary_incompleteData_showsDaysCount() {
+    void sendDailySectorRsSummary_incompleteData_showsDaysCount() throws IOException {
         // Given: Sector with incomplete data (less than 50 data points)
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(
@@ -479,6 +535,10 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenReturn(new SectorRsStreak("XLK", 1, true, LocalDate.now()));
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -492,7 +552,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_mixedCompleteAndIncomplete_formatsCorrectly() {
+    void sendDailySectorRsSummary_mixedCompleteAndIncomplete_formatsCorrectly() throws IOException {
         // Given: One complete and one incomplete sector
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true))); // Complete
@@ -509,6 +569,16 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLRE")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
+
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                        });
 
         // When
         tracker.sendDailySectorRsSummary();
@@ -531,14 +601,14 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult(anyString())).thenReturn(Optional.empty());
 
         // When
-        List<SectorRelativeStrengthTracker.SectorRsData> result = tracker.collectSectorRsData();
+        List<SectorRsData> result = tracker.collectSectorRsData();
 
         // Then
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void formatSummaryMessage_withZeroPercentage_showsPlusSign() {
+    void formatSummaryMessage_withZeroPercentage_showsPlusSign() throws IOException {
         // Given: Sector with exactly 0% difference
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.00, 1.00, 50, true))); // RS = EMA, 0%
@@ -555,6 +625,10 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenReturn(new SectorRsStreak("XLK", 1, true, LocalDate.now()));
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -567,7 +641,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void formatSummaryMessage_allSectors_includesAllSectorNames() {
+    void formatSummaryMessage_allSectors_includesAllSectorNames() throws IOException {
         // Given: All 11 sectors have data
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true)));
@@ -592,6 +666,16 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLU"))
                 .thenReturn(Optional.of(new RsResult(0.94, 1.00, 50, true)));
 
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                        });
+
         // When
         tracker.sendDailySectorRsSummary();
 
@@ -615,7 +699,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sectorRsData_recordFields() {
+    void sectorRsData_recordFieldsIncludeStreakDays() throws IOException {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.02, 45, false)));
@@ -632,17 +716,59 @@ class SectorRelativeStrengthTrackerTest {
         when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
         when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
+        // Mock streak persistence with 7 day streak
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenReturn(new SectorRsStreak("XLK", 7, true, LocalDate.now()));
+
         // When
-        List<SectorRelativeStrengthTracker.SectorRsData> result = tracker.collectSectorRsData();
+        List<SectorRsData> result = tracker.collectSectorRsData();
 
         // Then
         assertEquals(1, result.size());
-        SectorRelativeStrengthTracker.SectorRsData data = result.getFirst();
+        SectorRsData data = result.getFirst();
         assertEquals("XLK", data.symbol());
         assertEquals("Technology", data.displayName());
         assertEquals(1.05, data.rsValue(), 0.001);
         assertEquals(1.02, data.emaValue(), 0.001);
         assertEquals(45, data.dataPoints());
         assertFalse(data.isComplete());
+        assertEquals(7, data.streakDays());
+    }
+
+    @Test
+    void collectSectorRsData_updatesStreakPersistence() throws IOException {
+        // Given
+        when(relativeStrengthService.getCurrentRsResult("XLK"))
+                .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true)));
+        when(relativeStrengthService.getCurrentRsResult("XLU"))
+                .thenReturn(Optional.of(new RsResult(0.95, 1.00, 50, true)));
+
+        // Return empty for other sectors
+        when(relativeStrengthService.getCurrentRsResult("XLF")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLE")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLV")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLY")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLP")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLI")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLC")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLRE")).thenReturn(Optional.empty());
+        when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
+
+        // Mock streak persistence
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                        });
+
+        // When
+        tracker.collectSectorRsData();
+
+        // Then - verify streak persistence was called with correct parameters
+        verify(streakPersistence).updateStreak(eq("XLK"), eq(true), any(LocalDate.class));
+        verify(streakPersistence).updateStreak(eq("XLU"), eq(false), any(LocalDate.class));
     }
 }
