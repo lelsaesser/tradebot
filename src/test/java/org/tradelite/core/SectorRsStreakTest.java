@@ -83,31 +83,4 @@ class SectorRsStreakTest {
         assertEquals(1, updated.streakDays());
         assertTrue(updated.isOutperforming());
     }
-
-    @Test
-    void getStreakIndicator_outperforming_returnsGreenEmoji() {
-        SectorRsStreak streak = new SectorRsStreak("XLK", 5, true, LocalDate.now());
-
-        String indicator = streak.getStreakIndicator();
-
-        assertEquals("🟢5", indicator);
-    }
-
-    @Test
-    void getStreakIndicator_underperforming_returnsRedEmoji() {
-        SectorRsStreak streak = new SectorRsStreak("XLU", 3, false, LocalDate.now());
-
-        String indicator = streak.getStreakIndicator();
-
-        assertEquals("🔴3", indicator);
-    }
-
-    @Test
-    void getStreakIndicator_singleDay() {
-        SectorRsStreak streak = SectorRsStreak.newStreak("XLK", true, LocalDate.now());
-
-        String indicator = streak.getStreakIndicator();
-
-        assertEquals("🟢1", indicator);
-    }
 }

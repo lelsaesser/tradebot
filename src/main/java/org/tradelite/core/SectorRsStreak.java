@@ -1,8 +1,8 @@
 package org.tradelite.core;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDate;
 
 /**
@@ -48,16 +48,5 @@ public record SectorRsStreak(
         }
         // Direction changed, reset to 1
         return new SectorRsStreak(symbol, 1, currentlyOutperforming, date);
-    }
-
-    /**
-     * Returns emoji indicator for the streak direction and length.
-     *
-     * @return Emoji string (e.g., "🟢5" for 5 days outperforming)
-     */
-    @JsonIgnore
-    public String getStreakIndicator() {
-        String emoji = isOutperforming ? "🟢" : "🔴";
-        return emoji + streakDays;
     }
 }
