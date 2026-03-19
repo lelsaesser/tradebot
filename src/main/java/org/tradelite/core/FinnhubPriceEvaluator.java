@@ -62,6 +62,8 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             }
 
             PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker.get());
+            // Rate limit: Finnhub has 60 requests/minute limit, sleep after EVERY API call
+            Thread.sleep(1100);
 
             Double lastPrice = lastPriceCache.get(ticker.get().getTicker());
             if (priceQuote == null
@@ -77,7 +79,6 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             }
 
             finnhubData.add(priceQuote);
-            Thread.sleep(1100);
         }
 
         for (PriceQuoteResponse priceQuote : finnhubData) {
