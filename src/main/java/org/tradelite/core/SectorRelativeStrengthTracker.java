@@ -1,6 +1,7 @@
 package org.tradelite.core;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,11 +17,14 @@ import org.tradelite.service.RelativeStrengthService.RsResult;
  *
  * <ol>
  *   <li>Real-time RS crossover detection during market hours (every 5 minutes)
- *   <li>Daily summary showing all 11 SPDR sector ETFs ranked by RS
+ *   <li>Daily summary showing all 11 SPDR sector ETFs ranked by RS with streak counts
  * </ol>
  *
  * <p>The RS value is the ratio of sector price to SPY price, and the percentage shown is the
  * deviation from the 50-period EMA of that ratio.
+ *
+ * <p>Streak tracking shows consecutive days each sector has been outperforming or underperforming
+ * SPY. This helps identify sustained trends vs short-term fluctuations.
  */
 @Component
 @RequiredArgsConstructor
@@ -44,6 +48,7 @@ public class SectorRelativeStrengthTracker {
 
     private final RelativeStrengthService relativeStrengthService;
     private final TelegramClient telegramClient;
+    private final SectorRsStreakPersistence streakPersistence;
 
     /**
      * Analyzes sector ETFs for RS crossovers and sends alerts.
@@ -144,21 +149,12 @@ public class SectorRelativeStrengthTracker {
                 signal.displayName(), signal.symbol(), signal.percentageDiff());
     }
 
-    /** Represents a sector's RS data for sorting and display */
-    record SectorRsData(
-            String symbol,
-            String displayName,
-            double rsValue,
-            double emaValue,
-            double percentageDiff,
-            int dataPoints,
-            boolean isComplete) {}
-
     /**
      * Generates and sends a daily summary of sector ETF relative strength vs SPY.
      *
      * <p>Sectors are sorted by their percentage deviation from the 50-period EMA, with
-     * outperforming sectors listed first and underperforming sectors listed last.
+     * outperforming sectors listed first and underperforming sectors listed last. Each sector shows
+     * its current streak count (consecutive days in current direction).
      */
     public void sendDailySectorRsSummary() {
         log.info("Generating daily sector RS summary");
@@ -176,12 +172,13 @@ public class SectorRelativeStrengthTracker {
     }
 
     /**
-     * Collects RS data for all sector ETFs.
+     * Collects RS data for all sector ETFs, including streak information.
      *
      * @return List of sector RS data, sorted by percentage difference (descending)
      */
     protected List<SectorRsData> collectSectorRsData() {
         List<SectorRsData> sectorData = new ArrayList<>();
+        LocalDate today = LocalDate.now();
 
         for (Map.Entry<String, String> entry : SECTOR_ETF_NAMES.entrySet()) {
             String symbol = entry.getKey();
@@ -193,6 +190,12 @@ public class SectorRelativeStrengthTracker {
                 if (rsResult.isPresent()) {
                     RsResult result = rsResult.get();
                     double percentageDiff = ((result.rs() - result.ema()) / result.ema()) * 100;
+                    boolean isOutperforming = percentageDiff >= 0;
+
+                    // Update streak and get current streak days
+                    SectorRsStreak streak =
+                            streakPersistence.updateStreak(symbol, isOutperforming, today);
+                    int streakDays = streak.streakDays();
 
                     sectorData.add(
                             new SectorRsData(
@@ -202,7 +205,8 @@ public class SectorRelativeStrengthTracker {
                                     result.ema(),
                                     percentageDiff,
                                     result.dataPoints(),
-                                    result.isComplete()));
+                                    result.isComplete(),
+                                    streakDays));
                 } else {
                     log.debug("No RS data available for {}", symbol);
                 }
@@ -251,26 +255,33 @@ public class SectorRelativeStrengthTracker {
             sb.append("\n");
         }
 
-        sb.append("_RS = Sector/SPY ratio | % = deviation from 50-EMA_");
+        sb.append("_RS = Sector/SPY ratio | % = deviation from 50-EMA | 📅 = streak days_");
 
         return sb.toString();
     }
 
     /**
-     * Formats a single sector line for the summary.
+     * Formats a single sector line for the summary with streak information.
      *
      * @param rank The rank number
      * @param sector The sector data
-     * @return Formatted line
+     * @return Formatted line with streak count
      */
     private String formatSectorLine(int rank, SectorRsData sector) {
+        String streakIndicator = String.format("📅%d", sector.streakDays());
+
         if (sector.isComplete()) {
             return String.format(
-                    "%d. *%s*: %+.1f%%%n", rank, sector.displayName(), sector.percentageDiff());
+                    "%d. *%s*: %+.1f%% %s%n",
+                    rank, sector.displayName(), sector.percentageDiff(), streakIndicator);
         } else {
             return String.format(
-                    "%d. *%s*: %+.1f%% (%d days)%n",
-                    rank, sector.displayName(), sector.percentageDiff(), sector.dataPoints());
+                    "%d. *%s*: %+.1f%% %s (%d days)%n",
+                    rank,
+                    sector.displayName(),
+                    sector.percentageDiff(),
+                    streakIndicator,
+                    sector.dataPoints());
         }
     }
 }
