@@ -92,13 +92,14 @@ src/main/java/org/tradelite/
 │   ├── finviz/                  # FinViz web scraper
 │   └── telegram/                # Telegram Bot API
 ├── common/                      # Shared DTOs and utilities
+│   ├── SectorEtfRegistry.java  # Central ETF symbol/name registry (20 ETFs)
 ├── config/                      # Spring configuration
 ├── core/                        # Business logic
 │   ├── *PriceEvaluator.java    # Price evaluation
 │   ├── InsiderTracker.java     # Insider monitoring
 │   ├── SectorRotationTracker.java  # Sector tracking
-│   ├── SectorRelativeStrengthTracker.java  # Sector RS tracking
-│   ├── SectorMomentumRocTracker.java  # Sector ROC tracking
+│   ├── SectorRelativeStrengthTracker.java  # Sector RS tracking (uses SectorEtfRegistry)
+│   ├── SectorMomentumRocTracker.java  # Sector ROC tracking (uses SectorEtfRegistry)
 │   ├── MomentumRocSignal.java  # ROC signal record
 │   └── ...
 ├── quant/                       # Quantitative analysis
@@ -106,7 +107,7 @@ src/main/java/org/tradelite/
 │   ├── TailRiskLevel.java      # Risk level enum
 │   ├── TailRiskAnalysis.java   # Analysis result record (kurtosis + skewness)
 │   ├── TailRiskService.java    # Kurtosis + skewness calculation
-│   └── TailRiskTracker.java    # Sector tail risk monitoring
+│   └── TailRiskTracker.java    # Sector tail risk monitoring (uses SectorEtfRegistry)
 ├── repository/                  # Data persistence layer
 │   ├── PriceQuoteEntity.java   # Entity class
 │   ├── PriceQuoteRepository.java # Interface (includes findDailyChangePercents)

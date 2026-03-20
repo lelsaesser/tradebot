@@ -16,11 +16,12 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz. Fetches daily performance data, sends reports on top/bottom performers, and triggers rotation analysis.
 -   **`SectorRotationAnalyzer`:** Statistical analysis component that detects sector rotation signals using Z-Score analysis. Calculates historical mean/standard deviation and identifies sectors with >2σ deviation.
 -   **`RelativeStrengthTracker`:** Tracks stock performance relative to SPY benchmark using 50-period EMA crossover detection.
--   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Provides real-time RS crossover alerts during market hours AND daily summary reports.
+-   **`SectorEtfRegistry`:** Central registry for all ETF symbols and display names. Provides `broadSectors()` (11 SPDR ETFs), `thematicEtfs()` (9 industry/thematic ETFs), `allEtfs()` (all 20 combined), and `thematicSymbols()`. Used by all sector tracking components.
+-   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Provides real-time RS crossover alerts during market hours AND daily summary reports. Daily summary splits into "Sectors" and "Thematic / Industry" sections.
 -   **`MomentumRocService`:** Calculates Rate of Change (ROC) momentum and detects zero-line crossovers.
--   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values.
+-   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values. Uses `SectorEtfRegistry` for ETF list.
 -   **`TailRiskService`:** Calculates excess kurtosis and skewness from daily price changes to detect fat tail risk and directional bias.
--   **`TailRiskTracker`:** Monitors sector ETFs for elevated tail risk (fat tails) with directional context (crash vs rally bias).
+-   **`TailRiskTracker`:** Monitors sector ETFs for elevated tail risk (fat tails) with directional context (crash vs rally bias). Uses `SectorEtfRegistry` for ETF list.
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
@@ -80,11 +81,14 @@ Scheduler
 ├── CoinGeckoPriceEvaluator → CoinGeckoClient → CoinGecko API
 ├── RsiService → RsiPriceFetcher → Price APIs
 │   └── RelativeStrengthTracker → RelativeStrengthService
-├── SectorRelativeStrengthTracker → RelativeStrengthService (NEW)
-│   └── Real-time RS crossover detection for sector ETFs
-├── SectorMomentumRocTracker → MomentumRocService
+├── SectorEtfRegistry (central ETF symbol/name registry)
+│   ├── broadSectors() → 11 SPDR sector ETFs
+│   └── thematicEtfs() → 9 industry/thematic ETFs (SMH, URA, SHLD, IGV, XOP, XHB, ITA, XBI, TAN)
+├── SectorRelativeStrengthTracker → RelativeStrengthService + SectorEtfRegistry
+│   └── Real-time RS crossover detection for all 20 ETFs + daily summary (sectors vs thematic)
+├── SectorMomentumRocTracker → MomentumRocService + SectorEtfRegistry
 │   └── SqliteMomentumRocRepository → SQLite DB (momentum_roc_state)
-├── TailRiskTracker → TailRiskService (NEW)
+├── TailRiskTracker → TailRiskService + SectorEtfRegistry
 │   └── PriceQuoteRepository.findDailyChangePercents()
 ├── InsiderTracker → InsiderPersistence → JSON file
 ├── SectorRotationTracker → FinvizClient → FinViz website

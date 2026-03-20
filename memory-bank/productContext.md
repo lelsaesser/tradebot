@@ -66,6 +66,32 @@ The bot runs continuously in the background, requiring no manual intervention wh
 | RSI Monitoring | Daily | Finnhub/CoinGecko | Telegram alert |
 | Insider Trading | Weekly | Finnhub | Telegram report |
 | **Sector Rotation** | Daily | FinViz | Telegram report **NEW** |
+| **Sector ETF Tracking** | Real-time + Daily | Finnhub | Telegram alerts + daily summary |
+
+## Tracked Sector & Thematic ETFs
+
+The system monitors 20 ETFs across two categories:
+
+### Broad Sectors (11 SPDR ETFs)
+XLK (Technology), XLF (Financials), XLE (Energy), XLV (Health Care), XLY (Consumer Disc.), XLP (Consumer Staples), XLI (Industrials), XLC (Communication), XLRE (Real Estate), XLB (Materials), XLU (Utilities)
+
+### Thematic / Industry ETFs (9)
+| Symbol | Name | Focus |
+|--------|------|-------|
+| SMH | Semiconductors | VanEck Semiconductor ETF |
+| URA | Uranium/Nuclear | Global X Uranium ETF |
+| SHLD | Cybersecurity | Global X Cybersecurity ETF |
+| IGV | Software | iShares Expanded Tech-Software ETF |
+| XOP | Oil & Gas E&P | SPDR S&P Oil & Gas Exploration ETF |
+| XHB | Homebuilders | SPDR S&P Homebuilders ETF |
+| ITA | Aerospace & Defense | iShares U.S. Aerospace & Defense ETF |
+| XBI | Biotech | SPDR S&P Biotech ETF |
+| TAN | Solar Energy | Invesco Solar ETF |
+
+All 20 ETFs are tracked by three analysis systems:
+- **Relative Strength vs SPY** — daily summary splits into "Sectors" and "Thematic / Industry" sections
+- **Momentum ROC** — zero-line crossover detection
+- **Tail Risk (Kurtosis + Skewness)** — fat tail and directional bias analysis
 
 ## Sector Rotation Feature (NEW)
 

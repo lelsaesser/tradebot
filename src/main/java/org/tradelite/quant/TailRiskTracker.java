@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.SectorEtfRegistry;
 
 /**
  * Tracks tail risk across sector ETFs and SPY to provide early warning of market instability.
@@ -24,22 +25,6 @@ import org.tradelite.client.telegram.TelegramClient;
 @RequiredArgsConstructor
 public class TailRiskTracker {
 
-    /** Sector ETFs to track with display names. */
-    private static final Map<String, String> SECTOR_ETFS =
-            Map.ofEntries(
-                    Map.entry("SPY", "S&P 500"),
-                    Map.entry("XLE", "Energy"),
-                    Map.entry("XLK", "Technology"),
-                    Map.entry("XLF", "Financials"),
-                    Map.entry("XLV", "Healthcare"),
-                    Map.entry("XLI", "Industrials"),
-                    Map.entry("XLP", "Consumer Staples"),
-                    Map.entry("XLY", "Consumer Discretionary"),
-                    Map.entry("XLB", "Materials"),
-                    Map.entry("XLU", "Utilities"),
-                    Map.entry("XLRE", "Real Estate"),
-                    Map.entry("XLC", "Communication Services"));
-
     private final TailRiskService tailRiskService;
     private final TelegramClient telegramClient;
 
@@ -47,7 +32,8 @@ public class TailRiskTracker {
     public List<TailRiskAnalysis> analyzeAllSectors() {
         List<TailRiskAnalysis> results = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : SECTOR_ETFS.entrySet()) {
+        for (Map.Entry<String, String> entry :
+                SectorEtfRegistry.allEtfsWithBenchmark().entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 

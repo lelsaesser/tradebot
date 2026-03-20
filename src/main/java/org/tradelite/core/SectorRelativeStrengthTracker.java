@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -31,21 +32,6 @@ import org.tradelite.service.RelativeStrengthService.RsResult;
 @Slf4j
 public class SectorRelativeStrengthTracker {
 
-    /** Sector ETF symbols with their display names */
-    private static final Map<String, String> SECTOR_ETF_NAMES =
-            Map.ofEntries(
-                    Map.entry("XLK", "Technology"),
-                    Map.entry("XLF", "Financials"),
-                    Map.entry("XLE", "Energy"),
-                    Map.entry("XLV", "Health Care"),
-                    Map.entry("XLY", "Cons. Discretionary"),
-                    Map.entry("XLP", "Cons. Staples"),
-                    Map.entry("XLI", "Industrials"),
-                    Map.entry("XLC", "Communication"),
-                    Map.entry("XLRE", "Real Estate"),
-                    Map.entry("XLB", "Materials"),
-                    Map.entry("XLU", "Utilities"));
-
     private final RelativeStrengthService relativeStrengthService;
     private final TelegramClient telegramClient;
     private final SectorRsStreakPersistence streakPersistence;
@@ -64,7 +50,7 @@ public class SectorRelativeStrengthTracker {
         List<RelativeStrengthSignal> outperformingSignals = new ArrayList<>();
         List<RelativeStrengthSignal> underperformingSignals = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : SECTOR_ETF_NAMES.entrySet()) {
+        for (Map.Entry<String, String> entry : SectorEtfRegistry.allEtfs().entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 
@@ -177,10 +163,20 @@ public class SectorRelativeStrengthTracker {
      * @return List of sector RS data, sorted by percentage difference (descending)
      */
     protected List<SectorRsData> collectSectorRsData() {
+        return collectRsDataForEtfs(SectorEtfRegistry.allEtfs());
+    }
+
+    /**
+     * Collects RS data for a given set of ETFs, including streak information.
+     *
+     * @param etfNames Map of symbol to display name
+     * @return List of sector RS data, sorted by percentage difference (descending)
+     */
+    private List<SectorRsData> collectRsDataForEtfs(Map<String, String> etfNames) {
         List<SectorRsData> sectorData = new ArrayList<>();
         LocalDate today = LocalDate.now();
 
-        for (Map.Entry<String, String> entry : SECTOR_ETF_NAMES.entrySet()) {
+        for (Map.Entry<String, String> entry : etfNames.entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 
@@ -228,17 +224,45 @@ public class SectorRelativeStrengthTracker {
      * @return Formatted Markdown message
      */
     protected String formatSummaryMessage(List<SectorRsData> sectorData) {
+        // Split into broad sector and thematic ETFs
+        Set<String> thematicSymbols = SectorEtfRegistry.thematicSymbols();
+        List<SectorRsData> broadData =
+                sectorData.stream().filter(s -> !thematicSymbols.contains(s.symbol())).toList();
+        List<SectorRsData> thematicData =
+                sectorData.stream().filter(s -> thematicSymbols.contains(s.symbol())).toList();
+
         StringBuilder sb = new StringBuilder();
         sb.append("📊 *SECTOR ETF RELATIVE STRENGTH vs SPY*\n\n");
 
+        // Format broad sectors
+        formatSection(sb, broadData, "Sectors");
+
+        // Format thematic ETFs
+        if (!thematicData.isEmpty()) {
+            formatSection(sb, thematicData, "Thematic / Industry");
+        }
+
+        sb.append("_RS = Sector/SPY ratio | % = deviation from 50-EMA | 📅 = streak days_");
+
+        return sb.toString();
+    }
+
+    /**
+     * Formats a section of the summary with outperforming/underperforming split.
+     *
+     * @param sb StringBuilder to append to
+     * @param data RS data for this section
+     * @param sectionTitle Title for this section
+     */
+    private void formatSection(StringBuilder sb, List<SectorRsData> data, String sectionTitle) {
         List<SectorRsData> outperforming =
-                sectorData.stream().filter(s -> s.percentageDiff() >= 0).toList();
+                data.stream().filter(s -> s.percentageDiff() >= 0).toList();
 
         List<SectorRsData> underperforming =
-                sectorData.stream().filter(s -> s.percentageDiff() < 0).toList();
+                data.stream().filter(s -> s.percentageDiff() < 0).toList();
 
         if (!outperforming.isEmpty()) {
-            sb.append("🟢 *OUTPERFORMING SPY:*\n");
+            sb.append("🟢 *").append(sectionTitle).append(" Outperforming SPY:*\n");
             for (int i = 0; i < outperforming.size(); i++) {
                 SectorRsData sector = outperforming.get(i);
                 sb.append(formatSectorLine(i + 1, sector));
@@ -247,17 +271,13 @@ public class SectorRelativeStrengthTracker {
         }
 
         if (!underperforming.isEmpty()) {
-            sb.append("🔴 *UNDERPERFORMING SPY:*\n");
+            sb.append("🔴 *").append(sectionTitle).append(" Underperforming SPY:*\n");
             for (int i = 0; i < underperforming.size(); i++) {
                 SectorRsData sector = underperforming.get(i);
                 sb.append(formatSectorLine(outperforming.size() + i + 1, sector));
             }
             sb.append("\n");
         }
-
-        sb.append("_RS = Sector/SPY ratio | % = deviation from 50-EMA | 📅 = streak days_");
-
-        return sb.toString();
     }
 
     /**
