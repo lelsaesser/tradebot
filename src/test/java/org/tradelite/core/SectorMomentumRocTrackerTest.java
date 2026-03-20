@@ -1,7 +1,7 @@
 package org.tradelite.core;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.Optional;
@@ -26,6 +26,11 @@ class SectorMomentumRocTrackerTest {
     @BeforeEach
     void setUp() {
         tracker = new SectorMomentumRocTracker(momentumRocService, telegramClient);
+
+        // Default stub so un-mocked ETFs return empty instead of null
+        lenient()
+                .when(momentumRocService.detectMomentumShift(anyString(), anyString()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -134,7 +139,7 @@ class SectorMomentumRocTrackerTest {
 
         tracker.analyzeAndSendAlerts();
 
-        // Verify all 11 SPDR sector ETFs are checked
+        // Verify all 11 SPDR broad sector ETFs are checked
         verify(momentumRocService).detectMomentumShift("XLK", "Technology");
         verify(momentumRocService).detectMomentumShift("XLF", "Financials");
         verify(momentumRocService).detectMomentumShift("XLE", "Energy");
@@ -146,6 +151,17 @@ class SectorMomentumRocTrackerTest {
         verify(momentumRocService).detectMomentumShift("XLRE", "Real Estate");
         verify(momentumRocService).detectMomentumShift("XLB", "Materials");
         verify(momentumRocService).detectMomentumShift("XLU", "Utilities");
+
+        // Verify thematic ETFs are also checked
+        verify(momentumRocService).detectMomentumShift("SMH", "Semiconductors");
+        verify(momentumRocService).detectMomentumShift("SHLD", "Defence Tech");
+        verify(momentumRocService).detectMomentumShift("IGV", "Software");
+        verify(momentumRocService).detectMomentumShift("XOP", "Oil & Gas");
+        verify(momentumRocService).detectMomentumShift("XHB", "Homebuilders");
+        verify(momentumRocService).detectMomentumShift("ITA", "Aerospace & Defence");
+        verify(momentumRocService).detectMomentumShift("XBI", "Biotech");
+        verify(momentumRocService).detectMomentumShift("UFO", "Space");
+        verify(momentumRocService).detectMomentumShift("TAN", "Solar");
     }
 
     @Test

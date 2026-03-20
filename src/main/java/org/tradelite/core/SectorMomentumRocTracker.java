@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.service.MomentumRocService;
 
 /**
@@ -25,21 +26,6 @@ import org.tradelite.service.MomentumRocService;
 @Slf4j
 public class SectorMomentumRocTracker {
 
-    /** Sector ETF symbols with their display names */
-    private static final Map<String, String> SECTOR_ETF_NAMES =
-            Map.ofEntries(
-                    Map.entry("XLK", "Technology"),
-                    Map.entry("XLF", "Financials"),
-                    Map.entry("XLE", "Energy"),
-                    Map.entry("XLV", "Health Care"),
-                    Map.entry("XLY", "Cons. Discretionary"),
-                    Map.entry("XLP", "Cons. Staples"),
-                    Map.entry("XLI", "Industrials"),
-                    Map.entry("XLC", "Communication"),
-                    Map.entry("XLRE", "Real Estate"),
-                    Map.entry("XLB", "Materials"),
-                    Map.entry("XLU", "Utilities"));
-
     private final MomentumRocService momentumRocService;
     private final TelegramClient telegramClient;
 
@@ -55,7 +41,7 @@ public class SectorMomentumRocTracker {
 
         List<MomentumRocSignal> signals = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : SECTOR_ETF_NAMES.entrySet()) {
+        for (Map.Entry<String, String> entry : SectorEtfRegistry.allEtfs().entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 

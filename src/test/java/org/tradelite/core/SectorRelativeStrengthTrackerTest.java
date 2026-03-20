@@ -1,6 +1,7 @@
 package org.tradelite.core;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
@@ -33,6 +34,14 @@ class SectorRelativeStrengthTrackerTest {
         tracker =
                 new SectorRelativeStrengthTracker(
                         relativeStrengthService, telegramClient, streakPersistence);
+
+        // Default stubs so un-mocked ETFs (including thematic) return empty instead of null
+        lenient()
+                .when(relativeStrengthService.calculateRelativeStrength(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        lenient()
+                .when(relativeStrengthService.getCurrentRsResult(anyString()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -237,6 +246,7 @@ class SectorRelativeStrengthTrackerTest {
     @Test
     void sendDailySectorRsSummary_withMixedPerformance_sendsFormattedMessage() throws IOException {
         // Given: Some sectors outperforming, some underperforming
+        // Lenient default in setUp returns Optional.empty() for all un-mocked ETFs
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.02, 50, true))); // +2.94%
         when(relativeStrengthService.getCurrentRsResult("XLF"))
@@ -245,15 +255,6 @@ class SectorRelativeStrengthTrackerTest {
                 .thenReturn(Optional.of(new RsResult(0.95, 1.00, 50, true))); // -5.0%
         when(relativeStrengthService.getCurrentRsResult("XLRE"))
                 .thenReturn(Optional.of(new RsResult(0.98, 1.00, 50, true))); // -2.0%
-
-        // Return empty for other sectors
-        when(relativeStrengthService.getCurrentRsResult("XLE")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLV")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLY")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLP")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLI")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLC")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
 
         // Mock streak persistence
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
@@ -274,8 +275,8 @@ class SectorRelativeStrengthTrackerTest {
 
         String message = messageCaptor.getValue();
         assertTrue(message.contains("SECTOR ETF RELATIVE STRENGTH vs SPY"));
-        assertTrue(message.contains("OUTPERFORMING SPY"));
-        assertTrue(message.contains("UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Outperforming SPY"));
+        assertTrue(message.contains("Underperforming SPY"));
         assertTrue(message.contains("Technology"));
         assertTrue(message.contains("Financials"));
         assertTrue(message.contains("Utilities"));
@@ -298,22 +299,12 @@ class SectorRelativeStrengthTrackerTest {
     @Test
     void sendDailySectorRsSummary_allOutperforming_formatsCorrectly() throws IOException {
         // Given: All sectors outperforming
+        // Lenient default in setUp returns Optional.empty() for all un-mocked ETFs
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true)));
         when(relativeStrengthService.getCurrentRsResult("XLF"))
                 .thenReturn(Optional.of(new RsResult(1.03, 1.00, 50, true)));
 
-        // Return empty for other sectors
-        when(relativeStrengthService.getCurrentRsResult("XLE")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLV")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLY")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLP")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLI")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLC")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLRE")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
-
         // Mock streak persistence
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
                 .thenAnswer(
@@ -332,28 +323,18 @@ class SectorRelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("OUTPERFORMING SPY"));
-        assertFalse(message.contains("UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Outperforming SPY"));
+        assertFalse(message.contains("Underperforming SPY"));
     }
 
     @Test
     void sendDailySectorRsSummary_allUnderperforming_formatsCorrectly() throws IOException {
         // Given: All sectors underperforming
+        // Lenient default in setUp returns Optional.empty() for all un-mocked ETFs
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(0.95, 1.00, 50, true)));
         when(relativeStrengthService.getCurrentRsResult("XLF"))
                 .thenReturn(Optional.of(new RsResult(0.97, 1.00, 50, true)));
-
-        // Return empty for other sectors
-        when(relativeStrengthService.getCurrentRsResult("XLE")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLV")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLY")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLP")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLI")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLC")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLRE")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLB")).thenReturn(Optional.empty());
-        when(relativeStrengthService.getCurrentRsResult("XLU")).thenReturn(Optional.empty());
 
         // Mock streak persistence
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
@@ -373,8 +354,8 @@ class SectorRelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertFalse(message.contains("OUTPERFORMING SPY"));
-        assertTrue(message.contains("UNDERPERFORMING SPY"));
+        assertFalse(message.contains("Outperforming SPY"));
+        assertTrue(message.contains("Underperforming SPY"));
     }
 
     @Test

@@ -1,6 +1,46 @@
 # Progress Tracking
 
-## Latest Milestone: Sector RS Streak Tracking ✅ COMPLETE
+## Latest Milestone: Extended Sector ETF Tracking ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY** - All tests passing
+
+### Implementation Complete (March 20, 2026)
+
+#### Feature Overview
+Extended sector ETF tracking from 11 broad SPDR sectors to 20 total ETFs by adding 9 thematic/industry ETFs. Created a centralized `SectorEtfRegistry` to manage all ETF symbols and display names.
+
+#### New ETFs Added
+| Symbol | Name | Focus |
+|--------|------|-------|
+| SMH | Semiconductors | VanEck Semiconductor ETF |
+| URA | Uranium/Nuclear | Global X Uranium ETF |
+| SHLD | Cybersecurity | Global X Cybersecurity ETF |
+| IGV | Software | iShares Expanded Tech-Software ETF |
+| XOP | Oil & Gas E&P | SPDR S&P Oil & Gas Exploration ETF |
+| XHB | Homebuilders | SPDR S&P Homebuilders ETF |
+| ITA | Aerospace & Defense | iShares U.S. Aerospace & Defense ETF |
+| XBI | Biotech | SPDR S&P Biotech ETF |
+| TAN | Solar Energy | Invesco Solar ETF |
+
+#### Architecture Changes
+- **`SectorEtfRegistry`** (NEW): Central registry for all ETF symbols and display names
+  - `broadSectors()` - 11 SPDR sector ETFs
+  - `thematicEtfs()` - 9 thematic/industry ETFs
+  - `allEtfs()` - All 20 ETFs combined
+  - `thematicSymbols()` - Set of thematic symbol strings
+- **`SectorRelativeStrengthTracker`**: Uses registry, daily summary splits into "Sectors" and "Thematic / Industry" sections
+- **`SectorMomentumRocTracker`**: Uses `SectorEtfRegistry.allEtfs()` instead of hardcoded map
+- **`TailRiskTracker`**: Uses `SectorEtfRegistry.allEtfs()` instead of hardcoded map
+
+#### Tests Updated
+- `SectorRelativeStrengthTrackerTest` - Updated for dual-section report format and thematic ETFs
+- `SectorMomentumRocTrackerTest` - Updated for registry usage
+- `TailRiskTrackerTest` - Updated for registry usage
+- **Total: 48 tests passing across all 3 test classes**
+
+---
+
+## Previous Milestone: Sector RS Streak Tracking ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY** - All 603 tests passing
 
