@@ -1,6 +1,83 @@
 # Progress Tracking
 
-## Latest Milestone: Extended Sector ETF Tracking ✅ COMPLETE
+## Latest Milestone: Bollinger Band Analysis + StatisticsUtil Refactor ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY** - All 659 tests passing
+
+### Implementation Complete (March 26, 2026)
+
+#### Feature Overview
+Implemented Bollinger Band analysis for all sector ETFs with squeeze detection, band touch alerts, and %B positioning. Also extracted shared statistical functions into `StatisticsUtil` to eliminate duplication across `SectorRotationAnalyzer`, `TailRiskService`, and `BollingerBandService`.
+
+#### finmath-lib Evaluation
+Evaluated [finmath-lib](https://github.com/finmath/finmath-lib) for potential integration. **Decision: NOT adding.** The library is a heavy academic framework (derivatives pricing, Monte Carlo, interest rate models) that would add significant dependency weight for functionality far beyond our needs. Our custom lightweight implementations (`StatisticsUtil`, `TailRiskService`, `BollingerBandService`) are better suited — they are purpose-built, zero-dependency, and cover exactly what the tradebot needs.
+
+#### New Components
+
+**`StatisticsUtil`** (utility class):
+- `mean(List<Double>)` — arithmetic mean
+- `standardDeviation(List<Double>)` — population standard deviation
+- `zScore(double, double, double)` — z-score calculation
+- `percentileRank(double, List<Double>)` — percentile rank in a sorted list
+- All methods handle edge cases (empty/null lists, zero std dev)
+
+**`BollingerSignalType`** (enum):
+- `UPPER_BAND_TOUCH` — price at/above upper band (overbought)
+- `LOWER_BAND_TOUCH` — price at/below lower band (oversold)
+- `SQUEEZE` — bandwidth percentile ≤ 10% (low volatility, breakout imminent)
+
+**`BollingerBandAnalysis`** (record):
+- Fields: symbol, displayName, currentPrice, sma, upperBand, lowerBand, percentB, bandwidth, bandwidthPercentile, signals, dataPoints
+- Methods: `hasReliableData()`, `isOverextended()`, `isUnderextended()`, `getInterpretation()`, `toSummaryLine()`, `toCompactLine()`
+
+**`BollingerBandService`** (core calculations):
+- 20-period SMA with 2 standard deviation bands
+- %B calculation (price position relative to bands)
+- Bandwidth and bandwidth history for percentile ranking
+- Signal detection: upper/lower band touch, Bollinger squeeze
+- Uses `StatisticsUtil` for mean/stddev calculations
+- Reads daily closing prices from `PriceQuoteRepository`
+
+**`BollingerBandTracker`** (orchestrator):
+- Analyzes all sector ETFs from `SectorEtfRegistry`
+- `trackAndAlert()` — sends Telegram alerts when signals detected
+- `sendDailyReport()` — sends daily Bollinger Band summary
+- `buildSummaryReport()` — formats multi-section report
+- Alert messages include signal type, %B value, interpretation
+
+#### Refactoring: Shared Statistics
+- **`SectorRotationAnalyzer`**: Replaced inline mean/stddev/zScore with `StatisticsUtil` calls
+- **`TailRiskService`**: Replaced inline mean/stddev with `StatisticsUtil` calls
+- **`BollingerBandService`**: Built from scratch using `StatisticsUtil`
+
+#### Bollinger Band Formulas
+```
+SMA(20) = average of last 20 closing prices
+Upper Band = SMA + (2 × σ)
+Lower Band = SMA − (2 × σ)
+%B = (Price − Lower) / (Upper − Lower)
+Bandwidth = (Upper − Lower) / SMA
+
+%B > 1.0 → overbought (upper band touch)
+%B < 0.0 → oversold (lower band touch)
+Bandwidth percentile ≤ 10% → squeeze (breakout signal)
+```
+
+#### Tests Added
+- `StatisticsUtilTest` — 10 tests for all utility methods
+- `BollingerBandServiceTest` — 24 tests (analyze, bands, signals, bandwidth history, record)
+- `BollingerBandTrackerTest` — 11 tests (alert logic, report formatting, signal routing)
+- Existing `SectorRotationAnalyzerTest` and `TailRiskServiceTest` — all pass after refactor
+
+#### Scheduler Integration
+- `BollingerBandTracker.trackAndAlert()` — real-time in 5-minute `stockMarketMonitoring` loop during market hours
+- `BollingerBandTracker.sendDailyReport()` — daily at 15:40 CET Mon-Fri via `dailyBollingerBandReport()`
+
+#### Test Count: 659 total (up from prior milestone)
+
+---
+
+## Previous Milestone: Extended Sector ETF Tracking ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY** - All tests passing
 
@@ -272,7 +349,7 @@ The system now uses four complementary approaches:
 
 | Task | Schedule | Description |
 |------|----------|-------------|
-| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + RS alerts + ROC alerts |
+| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + RS alerts + ROC alerts + BB alerts |
 | cryptoMarketMonitoring | Every 5 min (24/7) | Crypto price monitoring |
 | rsiStockMonitoring | Daily 23:00 CET (Mon-Fri) | RSI + Relative Strength analysis |
 | rsiCryptoMonitoring | Daily 00:05 ET | RSI calculation for crypto |
@@ -280,7 +357,8 @@ The system now uses four complementary approaches:
 | monthlyApiUsageReport | Monthly 1st, 00:00 UTC | API usage statistics |
 | dailySectorRotationTracking | Daily 22:30 ET (Mon-Fri) | Sector performance + Z-score alerts |
 | dailySectorRsSummary | Daily 12:00 CET (Mon-Fri) | Sector RS vs SPY summary |
-| **dailyTailRiskMonitoring** | Daily 10:00 CET (Mon-Fri) | **Tail risk kurtosis + skewness alerts** ✅ |
+| **dailyTailRiskMonitoring** | Daily 13:00 CET (Mon-Fri) | **Tail risk kurtosis + skewness alerts** ✅ |
+| **dailyBollingerBandReport** | Daily 15:40 CET (Mon-Fri) | **Bollinger Band daily summary** ✅ |
 
 ## Future Enhancements
 
