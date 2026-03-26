@@ -46,7 +46,8 @@ public final class SectorEtfRegistry {
                     Map.entry("ITA", "Aerospace & Defence"),
                     Map.entry("XBI", "Biotech"),
                     Map.entry("UFO", "Space"),
-                    Map.entry("TAN", "Solar"));
+                    Map.entry("TAN", "Solar"),
+                    Map.entry("URA", "Uranium & Nuclear"));
 
     /** Returns a combined map of all broad sector + thematic ETF names (excludes SPY benchmark). */
     public static Map<String, String> allEtfs() {
