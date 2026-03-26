@@ -113,7 +113,7 @@ class DateUtilTest {
         LocalTime start =
                 ZonedDateTime.of(LocalDate.now(), LocalTime.of(22, 30), cetZone).toLocalTime();
         LocalTime end =
-                ZonedDateTime.of(LocalDate.now(), LocalTime.of(14, 55), cetZone).toLocalTime();
+                ZonedDateTime.of(LocalDate.now(), LocalTime.of(14, 30), cetZone).toLocalTime();
         boolean expected = currentTime.isAfter(start) || currentTime.isBefore(end);
         assertThat(marketClosed, is(expected));
     }
