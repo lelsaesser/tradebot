@@ -33,5 +33,4 @@ public enum BollingerSignalType {
         this.emoji = emoji;
         this.label = label;
     }
-
 }
