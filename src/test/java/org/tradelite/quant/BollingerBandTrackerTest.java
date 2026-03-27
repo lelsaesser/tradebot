@@ -59,12 +59,12 @@ class BollingerBandTrackerTest {
                         List.of(
                                 new StockSymbol("AAPL", "Apple Inc"),
                                 new StockSymbol("MSFT", "Microsoft Corp")));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("MSFT")).thenReturn(false);
+        when(stockSymbolRegistry.isSectorEtf("AAPL")).thenReturn(false);
+        when(stockSymbolRegistry.isSectorEtf("MSFT")).thenReturn(false);
 
-        when(bollingerBandService.analyze(eq("AAPL"), eq("Apple Inc")))
+        when(bollingerBandService.analyze("AAPL", "Apple Inc"))
                 .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
-        when(bollingerBandService.analyze(eq("MSFT"), eq("Microsoft Corp")))
+        when(bollingerBandService.analyze("MSFT", "Microsoft Corp"))
                 .thenReturn(Optional.of(normalAnalysis("MSFT", "Microsoft Corp")));
 
         List<BollingerBandAnalysis> results = tracker.analyzeAllStocks();
@@ -80,17 +80,17 @@ class BollingerBandTrackerTest {
                         List.of(
                                 new StockSymbol("AAPL", "Apple Inc"),
                                 new StockSymbol("SPY", "S&P 500 ETF")));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("SPY")).thenReturn(true);
+        when(stockSymbolRegistry.isSectorEtf("AAPL")).thenReturn(false);
+        when(stockSymbolRegistry.isSectorEtf("SPY")).thenReturn(true);
 
-        when(bollingerBandService.analyze(eq("AAPL"), eq("Apple Inc")))
+        when(bollingerBandService.analyze("AAPL", "Apple Inc"))
                 .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
 
         List<BollingerBandAnalysis> results = tracker.analyzeAllStocks();
 
         assertThat(results).hasSize(1);
         assertThat(results.getFirst().symbol()).isEqualTo("AAPL");
-        verify(bollingerBandService, never()).analyze(eq("SPY"), eq("S&P 500 ETF"));
+        verify(bollingerBandService, never()).analyze("SPY", "S&P 500 ETF");
     }
 
     @Test
@@ -181,8 +181,8 @@ class BollingerBandTrackerTest {
         // Stock with signal
         when(stockSymbolRegistry.getAll())
                 .thenReturn(List.of(new StockSymbol("TSLA", "Tesla Inc")));
-        when(stockSymbolRegistry.isEtf("TSLA")).thenReturn(false);
-        when(bollingerBandService.analyze(eq("TSLA"), eq("Tesla Inc")))
+        when(stockSymbolRegistry.isSectorEtf("TSLA")).thenReturn(false);
+        when(bollingerBandService.analyze("TSLA", "Tesla Inc"))
                 .thenReturn(Optional.of(upperBandAnalysis("TSLA", "Tesla Inc")));
 
         tracker.trackAndAlert();
@@ -254,8 +254,8 @@ class BollingerBandTrackerTest {
         // Stock data
         when(stockSymbolRegistry.getAll())
                 .thenReturn(List.of(new StockSymbol("AAPL", "Apple Inc")));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(bollingerBandService.analyze(eq("AAPL"), eq("Apple Inc")))
+        when(stockSymbolRegistry.isSectorEtf("AAPL")).thenReturn(false);
+        when(bollingerBandService.analyze("AAPL", "Apple Inc"))
                 .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
 
         String report = tracker.buildSummaryReport();

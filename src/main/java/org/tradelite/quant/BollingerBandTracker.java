@@ -55,7 +55,7 @@ public class BollingerBandTracker {
         List<BollingerBandAnalysis> results = new ArrayList<>();
 
         for (StockSymbol stock : stockSymbolRegistry.getAll()) {
-            if (stockSymbolRegistry.isEtf(stock.getTicker())) {
+            if (stockSymbolRegistry.isSectorEtf(stock.getTicker())) {
                 continue;
             }
 
