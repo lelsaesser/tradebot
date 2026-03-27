@@ -42,8 +42,8 @@ class BollingerBandServiceTest {
     }
 
     @Test
-    void analyze_returnsAnalysisWithSufficientData() {
-        List<DailyPrice> prices = generateDailyPrices(50, 100.0, 0.5);
+    void analyze_returnsAnalysisWithExactly20DataPoints() {
+        List<DailyPrice> prices = generateDailyPrices(20, 100.0, 0.5);
         when(priceQuoteRepository.findDailyClosingPrices("XLK", 90)).thenReturn(prices);
 
         Optional<BollingerBandAnalysis> result = service.analyze("XLK", "Technology");
@@ -52,15 +52,39 @@ class BollingerBandServiceTest {
         BollingerBandAnalysis analysis = result.get();
         assertThat(analysis.symbol()).isEqualTo("XLK");
         assertThat(analysis.displayName()).isEqualTo("Technology");
+        assertThat(analysis.dataPoints()).isEqualTo(20);
+        assertThat(analysis.hasReliableData()).isTrue();
+        assertThat(analysis.hasBandwidthHistory()).isFalse();
+    }
+
+    @Test
+    void analyze_returnsAnalysisWithBandwidthHistoryWhen40PlusPoints() {
+        List<DailyPrice> prices = generateDailyPrices(50, 100.0, 0.5);
+        when(priceQuoteRepository.findDailyClosingPrices("XLK", 90)).thenReturn(prices);
+
+        Optional<BollingerBandAnalysis> result = service.analyze("XLK", "Technology");
+
+        assertThat(result).isPresent();
+        BollingerBandAnalysis analysis = result.get();
         assertThat(analysis.dataPoints()).isEqualTo(50);
         assertThat(analysis.hasReliableData()).isTrue();
+        assertThat(analysis.hasBandwidthHistory()).isTrue();
+    }
+
+    @Test
+    void analyze_returnsEmptyWhenLessThan20Points() {
+        List<DailyPrice> prices = generateDailyPrices(19, 100.0, 0.5);
+        when(priceQuoteRepository.findDailyClosingPrices("SPY", 90)).thenReturn(prices);
+
+        Optional<BollingerBandAnalysis> result = service.analyze("SPY", "S&P 500");
+
+        assertThat(result).isEmpty();
     }
 
     // ========== calculateBollingerBands() core logic tests ==========
 
     @Test
     void calculateBollingerBands_computesCorrectSmaForConstantPrices() {
-        // 40 constant prices at 100.0
         List<Double> prices = new ArrayList<>();
         for (int i = 0; i < 40; i++) {
             prices.add(100.0);
@@ -70,6 +94,18 @@ class BollingerBandServiceTest {
 
         assertThat(result.sma()).isCloseTo(100.0, within(0.001));
         assertThat(result.currentPrice()).isCloseTo(100.0, within(0.001));
+    }
+
+    @Test
+    void calculateBollingerBands_worksWithExactly20DataPoints() {
+        List<Double> prices = generatePriceList(20, 100.0, 1.0);
+
+        BollingerBandAnalysis result = service.calculateBollingerBands("XLK", "Tech", prices);
+
+        assertThat(result.dataPoints()).isEqualTo(20);
+        assertThat(result.sma()).isGreaterThan(0);
+        // Bandwidth percentile defaults to 50.0 when no history available
+        assertThat(result.bandwidthPercentile()).isCloseTo(50.0, within(0.001));
     }
 
     @Test
@@ -101,7 +137,6 @@ class BollingerBandServiceTest {
         BollingerBandAnalysis result = service.calculateBollingerBands("XLF", "Financials", prices);
 
         assertThat(result.bandwidth()).isCloseTo(0.0, within(0.001));
-        // Upper and lower bands should equal SMA when no volatility
         assertThat(result.upperBand()).isCloseTo(result.sma(), within(0.001));
         assertThat(result.lowerBand()).isCloseTo(result.sma(), within(0.001));
     }
@@ -121,10 +156,9 @@ class BollingerBandServiceTest {
 
     @Test
     void calculateBollingerBands_percentBAboveOneWhenPriceAboveUpperBand() {
-        // Create prices that are stable then spike at the end
         List<Double> prices = new ArrayList<>();
         for (int i = 0; i < 39; i++) {
-            prices.add(100.0 + (i % 2 == 0 ? 0.5 : -0.5)); // Low volatility around 100
+            prices.add(100.0 + (i % 2 == 0 ? 0.5 : -0.5));
         }
         prices.add(120.0); // Sharp spike — should be well above upper band
 
@@ -136,7 +170,6 @@ class BollingerBandServiceTest {
 
     @Test
     void calculateBollingerBands_percentBBelowZeroWhenPriceBelowLowerBand() {
-        // Create prices that are stable then drop sharply
         List<Double> prices = new ArrayList<>();
         for (int i = 0; i < 39; i++) {
             prices.add(100.0 + (i % 2 == 0 ? 0.5 : -0.5));
@@ -149,32 +182,102 @@ class BollingerBandServiceTest {
         assertThat(result.signals()).contains(BollingerSignalType.LOWER_BAND_TOUCH);
     }
 
+    @Test
+    void calculateBollingerBands_squeezeDetectedForConstantPrices() {
+        // Constant prices -> bandwidth = 0 -> below 4% threshold -> SQUEEZE
+        List<Double> prices = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            prices.add(100.0);
+        }
+
+        BollingerBandAnalysis result = service.calculateBollingerBands("SPY", "S&P 500", prices);
+
+        assertThat(result.bandwidth()).isCloseTo(0.0, within(0.001));
+        assertThat(result.signals()).contains(BollingerSignalType.SQUEEZE);
+    }
+
+    @Test
+    void calculateBollingerBands_noHistoricalSqueezeWith20Points() {
+        // With only 20 points, bandwidth history is not available — no HISTORICAL_SQUEEZE
+        List<Double> prices = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            prices.add(100.0);
+        }
+
+        BollingerBandAnalysis result = service.calculateBollingerBands("SPY", "S&P 500", prices);
+
+        assertThat(result.signals()).doesNotContain(BollingerSignalType.HISTORICAL_SQUEEZE);
+    }
+
     // ========== Signal detection tests ==========
 
     @Test
     void detectSignals_upperBandTouchWhenPercentBAboveOne() {
-        List<BollingerSignalType> signals = BollingerBandService.detectSignals(1.05, 50.0);
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(1.05, 0.06, 50.0, true);
 
-        assertThat(signals).containsExactly(BollingerSignalType.UPPER_BAND_TOUCH);
+        assertThat(signals).contains(BollingerSignalType.UPPER_BAND_TOUCH);
+        assertThat(signals).doesNotContain(BollingerSignalType.SQUEEZE);
     }
 
     @Test
     void detectSignals_lowerBandTouchWhenPercentBBelowZero() {
-        List<BollingerSignalType> signals = BollingerBandService.detectSignals(-0.05, 50.0);
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(-0.05, 0.06, 50.0, true);
 
-        assertThat(signals).containsExactly(BollingerSignalType.LOWER_BAND_TOUCH);
+        assertThat(signals).contains(BollingerSignalType.LOWER_BAND_TOUCH);
     }
 
     @Test
-    void detectSignals_squeezeWhenBandwidthPercentileBelowThreshold() {
-        List<BollingerSignalType> signals = BollingerBandService.detectSignals(0.5, 5.0);
+    void detectSignals_squeezeWhenBandwidthBelowThreshold() {
+        // Bandwidth 3% is below 4% threshold -> SQUEEZE
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(0.5, 0.03, 50.0, false);
 
         assertThat(signals).containsExactly(BollingerSignalType.SQUEEZE);
     }
 
     @Test
+    void detectSignals_noSqueezeWhenBandwidthAboveThreshold() {
+        // Bandwidth 5% is above 4% threshold -> no SQUEEZE
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(0.5, 0.05, 50.0, true);
+
+        assertThat(signals).doesNotContain(BollingerSignalType.SQUEEZE);
+    }
+
+    @Test
+    void detectSignals_historicalSqueezeWhenPercentileBelowThresholdAndHistoryAvailable() {
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(0.5, 0.05, 5.0, true);
+
+        assertThat(signals).contains(BollingerSignalType.HISTORICAL_SQUEEZE);
+    }
+
+    @Test
+    void detectSignals_noHistoricalSqueezeWhenNoHistory() {
+        // Even low percentile should not trigger HISTORICAL_SQUEEZE without history
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(0.5, 0.05, 5.0, false);
+
+        assertThat(signals).doesNotContain(BollingerSignalType.HISTORICAL_SQUEEZE);
+    }
+
+    @Test
+    void detectSignals_bothSqueezeAndHistoricalSqueeze() {
+        // Bandwidth below threshold AND percentile below threshold with history
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(0.5, 0.02, 5.0, true);
+
+        assertThat(signals)
+                .containsExactly(
+                        BollingerSignalType.SQUEEZE, BollingerSignalType.HISTORICAL_SQUEEZE);
+    }
+
+    @Test
     void detectSignals_multipleSignalsWhenUpperTouchAndSqueeze() {
-        List<BollingerSignalType> signals = BollingerBandService.detectSignals(1.2, 3.0);
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(1.2, 0.03, 50.0, false);
 
         assertThat(signals)
                 .containsExactly(BollingerSignalType.UPPER_BAND_TOUCH, BollingerSignalType.SQUEEZE);
@@ -182,24 +285,30 @@ class BollingerBandServiceTest {
 
     @Test
     void detectSignals_emptyWhenNoSignalConditionsMet() {
-        List<BollingerSignalType> signals = BollingerBandService.detectSignals(0.5, 50.0);
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(0.5, 0.06, 50.0, true);
 
         assertThat(signals).isEmpty();
     }
 
     @Test
-    void detectSignals_noSignalAtExactBoundaries() {
+    void detectSignals_atExactBoundaries() {
         // %B exactly at 0.0 should trigger lower band touch
-        List<BollingerSignalType> signals = BollingerBandService.detectSignals(0.0, 50.0);
+        List<BollingerSignalType> signals =
+                BollingerBandService.detectSignals(0.0, 0.06, 50.0, true);
         assertThat(signals).containsExactly(BollingerSignalType.LOWER_BAND_TOUCH);
 
         // %B exactly at 1.0 should trigger upper band touch
-        signals = BollingerBandService.detectSignals(1.0, 50.0);
+        signals = BollingerBandService.detectSignals(1.0, 0.06, 50.0, true);
         assertThat(signals).containsExactly(BollingerSignalType.UPPER_BAND_TOUCH);
 
-        // Bandwidth percentile exactly at threshold should trigger squeeze
-        signals = BollingerBandService.detectSignals(0.5, 10.0);
+        // Bandwidth exactly at threshold should trigger squeeze
+        signals = BollingerBandService.detectSignals(0.5, 0.04, 50.0, false);
         assertThat(signals).containsExactly(BollingerSignalType.SQUEEZE);
+
+        // Bandwidth percentile exactly at threshold should trigger historical squeeze
+        signals = BollingerBandService.detectSignals(0.5, 0.06, 10.0, true);
+        assertThat(signals).containsExactly(BollingerSignalType.HISTORICAL_SQUEEZE);
     }
 
     // ========== Bandwidth history tests ==========
@@ -238,19 +347,30 @@ class BollingerBandServiceTest {
     // ========== BollingerBandAnalysis record tests ==========
 
     @Test
-    void bollingerBandAnalysis_hasReliableDataWithMinimumPoints() {
+    void bollingerBandAnalysis_hasReliableDataWith20Points() {
+        BollingerBandAnalysis analysis =
+                new BollingerBandAnalysis(
+                        "SPY", "S&P 500", 100.0, 99.0, 101.0, 97.0, 0.5, 0.04, 50.0, List.of(), 20);
+
+        assertThat(analysis.hasReliableData()).isTrue();
+        assertThat(analysis.hasBandwidthHistory()).isFalse();
+    }
+
+    @Test
+    void bollingerBandAnalysis_hasBandwidthHistoryWith40Points() {
         BollingerBandAnalysis analysis =
                 new BollingerBandAnalysis(
                         "SPY", "S&P 500", 100.0, 99.0, 101.0, 97.0, 0.5, 0.04, 50.0, List.of(), 40);
 
         assertThat(analysis.hasReliableData()).isTrue();
+        assertThat(analysis.hasBandwidthHistory()).isTrue();
     }
 
     @Test
     void bollingerBandAnalysis_notReliableWithTooFewPoints() {
         BollingerBandAnalysis analysis =
                 new BollingerBandAnalysis(
-                        "SPY", "S&P 500", 100.0, 99.0, 101.0, 97.0, 0.5, 0.04, 50.0, List.of(), 20);
+                        "SPY", "S&P 500", 100.0, 99.0, 101.0, 97.0, 0.5, 0.04, 50.0, List.of(), 19);
 
         assertThat(analysis.hasReliableData()).isFalse();
     }
@@ -299,7 +419,7 @@ class BollingerBandServiceTest {
     void bollingerBandAnalysis_getInterpretationForNoSignals() {
         BollingerBandAnalysis analysis =
                 new BollingerBandAnalysis(
-                        "SPY", "S&P 500", 100.0, 99.0, 101.0, 97.0, 0.5, 0.04, 50.0, List.of(), 50);
+                        "SPY", "S&P 500", 100.0, 99.0, 101.0, 97.0, 0.5, 0.05, 50.0, List.of(), 50);
 
         assertThat(analysis.getInterpretation()).contains("normal");
     }
@@ -316,11 +436,30 @@ class BollingerBandServiceTest {
                         97.0,
                         0.5,
                         0.02,
-                        5.0,
+                        50.0,
                         List.of(BollingerSignalType.SQUEEZE),
-                        50);
+                        25);
 
         assertThat(analysis.getInterpretation()).contains("squeeze").contains("breakout");
+    }
+
+    @Test
+    void bollingerBandAnalysis_getInterpretationForHistoricalSqueeze() {
+        BollingerBandAnalysis analysis =
+                new BollingerBandAnalysis(
+                        "SPY",
+                        "S&P 500",
+                        100.0,
+                        99.0,
+                        101.0,
+                        97.0,
+                        0.5,
+                        0.03,
+                        5.0,
+                        List.of(BollingerSignalType.HISTORICAL_SQUEEZE),
+                        50);
+
+        assertThat(analysis.getInterpretation()).contains("Historic");
     }
 
     @Test
@@ -361,6 +500,26 @@ class BollingerBandServiceTest {
 
         assertThat(analysis.isUnderextended()).isTrue();
         assertThat(analysis.isOverextended()).isFalse();
+    }
+
+    @Test
+    void bollingerBandAnalysis_isHistoricalSqueeze() {
+        BollingerBandAnalysis analysis =
+                new BollingerBandAnalysis(
+                        "SPY",
+                        "S&P 500",
+                        100.0,
+                        99.0,
+                        101.0,
+                        97.0,
+                        0.5,
+                        0.03,
+                        5.0,
+                        List.of(BollingerSignalType.HISTORICAL_SQUEEZE),
+                        50);
+
+        assertThat(analysis.isHistoricalSqueeze()).isTrue();
+        assertThat(analysis.isSqueeze()).isFalse();
     }
 
     // ========== Helpers ==========

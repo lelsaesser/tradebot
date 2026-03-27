@@ -17,11 +17,12 @@ import org.tradelite.service.model.DailyPrice;
  *
  * <ul>
  *   <li>Upper/lower band touches (%B >= 1.0 or <= 0.0)
- *   <li>Volatility squeezes (bandwidth at historically low percentile)
+ *   <li>Squeeze: absolute bandwidth below 4% threshold (needs 20+ data points)
+ *   <li>Historical squeeze: bandwidth at historically low percentile (needs 40+ data points)
  * </ul>
  *
- * <p>Requires at least 40 daily closing prices for reliable analysis (20 for the SMA window + 20
- * for bandwidth percentile history).
+ * <p>Requires at least 20 daily closing prices for basic analysis. Enhanced bandwidth percentile
+ * history requires 40+ data points.
  */
 @Slf4j
 @Service
@@ -98,12 +99,17 @@ public class BollingerBandService {
         // Bandwidth = (Upper - Lower) / SMA
         double bandwidth = sma > 0 ? bandWidth / sma : 0;
 
-        // Calculate bandwidth history for percentile ranking
-        List<Double> bandwidthHistory = calculateBandwidthHistory(prices);
-        double bandwidthPercentile = StatisticsUtil.percentile(bandwidthHistory, bandwidth);
+        // Calculate bandwidth history for percentile ranking (only if enough data)
+        boolean hasBandwidthHistory = n >= BollingerBandAnalysis.BANDWIDTH_HISTORY_MIN_DATA_POINTS;
+        double bandwidthPercentile = 50.0; // default when insufficient history
+        if (hasBandwidthHistory) {
+            List<Double> bandwidthHistory = calculateBandwidthHistory(prices);
+            bandwidthPercentile = StatisticsUtil.percentile(bandwidthHistory, bandwidth);
+        }
 
         // Detect signals
-        List<BollingerSignalType> signals = detectSignals(percentB, bandwidthPercentile);
+        List<BollingerSignalType> signals =
+                detectSignals(percentB, bandwidth, bandwidthPercentile, hasBandwidthHistory);
 
         return new BollingerBandAnalysis(
                 symbol,
@@ -146,13 +152,20 @@ public class BollingerBandService {
     }
 
     /**
-     * Detects actionable Bollinger Band signals based on %B and bandwidth percentile.
+     * Detects actionable Bollinger Band signals based on %B, absolute bandwidth, and bandwidth
+     * percentile.
      *
      * @param percentB Current %B value
-     * @param bandwidthPercentile Current bandwidth percentile
+     * @param bandwidth Current absolute bandwidth (upper - lower) / SMA
+     * @param bandwidthPercentile Current bandwidth percentile vs. history
+     * @param hasBandwidthHistory Whether sufficient data exists for percentile comparison
      * @return List of detected signals (may be empty)
      */
-    static List<BollingerSignalType> detectSignals(double percentB, double bandwidthPercentile) {
+    static List<BollingerSignalType> detectSignals(
+            double percentB,
+            double bandwidth,
+            double bandwidthPercentile,
+            boolean hasBandwidthHistory) {
         List<BollingerSignalType> signals = new ArrayList<>();
 
         if (percentB >= 1.0) {
@@ -161,8 +174,15 @@ public class BollingerBandService {
             signals.add(BollingerSignalType.LOWER_BAND_TOUCH);
         }
 
-        if (bandwidthPercentile <= BollingerBandAnalysis.SQUEEZE_PERCENTILE_THRESHOLD) {
+        // Absolute bandwidth squeeze — works with just 20 data points
+        if (bandwidth <= BollingerBandAnalysis.SQUEEZE_BANDWIDTH_THRESHOLD) {
             signals.add(BollingerSignalType.SQUEEZE);
+        }
+
+        // Historical squeeze — only when we have enough bandwidth history
+        if (hasBandwidthHistory
+                && bandwidthPercentile <= BollingerBandAnalysis.SQUEEZE_PERCENTILE_THRESHOLD) {
+            signals.add(BollingerSignalType.HISTORICAL_SQUEEZE);
         }
 
         return Collections.unmodifiableList(signals);

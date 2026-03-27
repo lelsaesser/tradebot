@@ -110,7 +110,8 @@ public class BollingerBandTracker {
         StringBuilder sb = new StringBuilder();
 
         // Header with severity indicator
-        boolean hasSqueeze = withSignals.stream().anyMatch(BollingerBandAnalysis::isSqueeze);
+        boolean hasSqueeze =
+                withSignals.stream().anyMatch(a -> a.isSqueeze() || a.isHistoricalSqueeze());
         boolean hasOverextended =
                 withSignals.stream().anyMatch(BollingerBandAnalysis::isOverextended);
         boolean hasUnderextended =
@@ -126,7 +127,7 @@ public class BollingerBandTracker {
 
         // Group by signal type
         List<BollingerBandAnalysis> squeezes =
-                withSignals.stream().filter(BollingerBandAnalysis::isSqueeze).toList();
+                withSignals.stream().filter(a -> a.isSqueeze() || a.isHistoricalSqueeze()).toList();
 
         List<BollingerBandAnalysis> overextended =
                 withSignals.stream().filter(BollingerBandAnalysis::isOverextended).toList();
@@ -206,7 +207,8 @@ public class BollingerBandTracker {
         allAnalyses.addAll(stockAnalyses);
 
         long signalCount = allAnalyses.stream().filter(BollingerBandAnalysis::hasSignals).count();
-        long squeezeCount = allAnalyses.stream().filter(BollingerBandAnalysis::isSqueeze).count();
+        long squeezeCount =
+                allAnalyses.stream().filter(a -> a.isSqueeze() || a.isHistoricalSqueeze()).count();
         long overextendedCount =
                 allAnalyses.stream().filter(BollingerBandAnalysis::isOverextended).count();
         long underextendedCount =

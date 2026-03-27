@@ -40,15 +40,28 @@ public record BollingerBandAnalysis(
         List<BollingerSignalType> signals,
         int dataPoints) {
 
-    /** Minimum data points needed for a reliable 20-day SMA + 20-day bandwidth history. */
-    public static final int MIN_DATA_POINTS = 40;
+    /** Minimum data points needed for a 20-day SMA calculation. */
+    public static final int MIN_DATA_POINTS = 20;
 
-    /** Bandwidth percentile threshold below which a squeeze is detected. */
+    /**
+     * Minimum data points needed for reliable bandwidth percentile history (20 SMA + 20 history).
+     */
+    public static final int BANDWIDTH_HISTORY_MIN_DATA_POINTS = 40;
+
+    /** Absolute bandwidth threshold below which a squeeze is detected (4% of SMA). */
+    public static final double SQUEEZE_BANDWIDTH_THRESHOLD = 0.04;
+
+    /** Bandwidth percentile threshold below which a historical squeeze is detected. */
     public static final double SQUEEZE_PERCENTILE_THRESHOLD = 10.0;
 
-    /** Returns true if sufficient data was available for reliable calculation. */
+    /** Returns true if sufficient data was available for basic Bollinger Band calculation. */
     public boolean hasReliableData() {
         return dataPoints >= MIN_DATA_POINTS;
+    }
+
+    /** Returns true if sufficient data was available for bandwidth percentile history. */
+    public boolean hasBandwidthHistory() {
+        return dataPoints >= BANDWIDTH_HISTORY_MIN_DATA_POINTS;
     }
 
     /** Returns true if the price is at or above the upper band. */
@@ -61,9 +74,14 @@ public record BollingerBandAnalysis(
         return signals.contains(BollingerSignalType.LOWER_BAND_TOUCH);
     }
 
-    /** Returns true if a volatility squeeze has been detected. */
+    /** Returns true if a volatility squeeze has been detected (absolute bandwidth). */
     public boolean isSqueeze() {
         return signals.contains(BollingerSignalType.SQUEEZE);
+    }
+
+    /** Returns true if a historical squeeze has been detected (bandwidth percentile). */
+    public boolean isHistoricalSqueeze() {
+        return signals.contains(BollingerSignalType.HISTORICAL_SQUEEZE);
     }
 
     /** Returns true if any actionable signals were detected. */
@@ -132,7 +150,11 @@ public record BollingerBandAnalysis(
                                         percentB);
                         case SQUEEZE ->
                                 String.format(
-                                        "Bandwidth squeeze (P%.0f) — breakout expected",
+                                        "Bandwidth squeeze (BW=%.1f%%) — bands compressed, breakout expected",
+                                        bandwidth * 100);
+                        case HISTORICAL_SQUEEZE ->
+                                String.format(
+                                        "Historical squeeze (P%.0f) — bandwidth at historic lows",
                                         bandwidthPercentile);
                     });
         }
