@@ -14,18 +14,23 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.service.StockSymbolRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class BollingerBandTrackerTest {
 
     @Mock private BollingerBandService bollingerBandService;
     @Mock private TelegramClient telegramClient;
+    @Mock private StockSymbolRegistry stockSymbolRegistry;
 
     private BollingerBandTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new BollingerBandTracker(bollingerBandService, telegramClient);
+        tracker = new BollingerBandTracker(bollingerBandService, telegramClient, stockSymbolRegistry);
+        // Default: no tracked stocks (tests that need stocks will override)
+        lenient().when(stockSymbolRegistry.getAll()).thenReturn(List.of());
     }
 
     @Test
@@ -44,6 +49,52 @@ class BollingerBandTrackerTest {
 
         assertThat(results).hasSize(2);
         assertThat(results).extracting(BollingerBandAnalysis::symbol).contains("SPY", "XLK");
+    }
+
+    @Test
+    void analyzeAllStocks_returnsResultsForTrackedStocks() {
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of(
+                new StockSymbol("AAPL", "Apple Inc"),
+                new StockSymbol("MSFT", "Microsoft Corp")));
+        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
+        when(stockSymbolRegistry.isEtf("MSFT")).thenReturn(false);
+
+        when(bollingerBandService.analyze(eq("AAPL"), eq("Apple Inc")))
+                .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
+        when(bollingerBandService.analyze(eq("MSFT"), eq("Microsoft Corp")))
+                .thenReturn(Optional.of(normalAnalysis("MSFT", "Microsoft Corp")));
+
+        List<BollingerBandAnalysis> results = tracker.analyzeAllStocks();
+
+        assertThat(results).hasSize(2);
+        assertThat(results).extracting(BollingerBandAnalysis::symbol).contains("AAPL", "MSFT");
+    }
+
+    @Test
+    void analyzeAllStocks_excludesEtfSymbols() {
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of(
+                new StockSymbol("AAPL", "Apple Inc"),
+                new StockSymbol("SPY", "S&P 500 ETF")));
+        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
+        when(stockSymbolRegistry.isEtf("SPY")).thenReturn(true);
+
+        when(bollingerBandService.analyze(eq("AAPL"), eq("Apple Inc")))
+                .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
+
+        List<BollingerBandAnalysis> results = tracker.analyzeAllStocks();
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().symbol()).isEqualTo("AAPL");
+        verify(bollingerBandService, never()).analyze(eq("SPY"), eq("S&P 500 ETF"));
+    }
+
+    @Test
+    void analyzeAllStocks_returnsEmptyWhenNoTrackedStocks() {
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+
+        List<BollingerBandAnalysis> results = tracker.analyzeAllStocks();
+
+        assertThat(results).isEmpty();
     }
 
     @Test
@@ -117,6 +168,28 @@ class BollingerBandTrackerTest {
     }
 
     @Test
+    void trackAndAlert_includesStockSignalsInAlert() {
+        // Sector returns normal
+        when(bollingerBandService.analyze(anyString(), anyString()))
+                .thenReturn(Optional.of(normalAnalysis("OTHER", "Other")));
+
+        // Stock with signal
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of(
+                new StockSymbol("TSLA", "Tesla Inc")));
+        when(stockSymbolRegistry.isEtf("TSLA")).thenReturn(false);
+        when(bollingerBandService.analyze(eq("TSLA"), eq("Tesla Inc")))
+                .thenReturn(Optional.of(upperBandAnalysis("TSLA", "Tesla Inc")));
+
+        tracker.trackAndAlert();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        assertThat(message).contains("TSLA");
+        assertThat(message).contains("Upper Band Touch");
+    }
+
+    @Test
     void sendDailyReport_sendsReportMessage() {
         when(bollingerBandService.analyze(anyString(), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
@@ -161,6 +234,44 @@ class BollingerBandTrackerTest {
         String report = tracker.buildSummaryReport();
 
         assertThat(report).contains("active signals");
+    }
+
+    @Test
+    void buildSummaryReport_showsSectorAndStockSections() {
+        // Sector data
+        when(bollingerBandService.analyze(eq("SPY"), anyString()))
+                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
+        when(bollingerBandService.analyze(
+                        argThat(s -> s != null && !s.equals("SPY") && !s.equals("AAPL")),
+                        anyString()))
+                .thenReturn(Optional.empty());
+
+        // Stock data
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of(
+                new StockSymbol("AAPL", "Apple Inc")));
+        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
+        when(bollingerBandService.analyze(eq("AAPL"), eq("Apple Inc")))
+                .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
+
+        String report = tracker.buildSummaryReport();
+
+        assertThat(report).contains("Sector ETFs:");
+        assertThat(report).contains("Stocks:");
+        assertThat(report).contains("SPY");
+        assertThat(report).contains("AAPL");
+    }
+
+    @Test
+    void buildSummaryReport_omitsStockSectionWhenNoStocks() {
+        when(bollingerBandService.analyze(eq("SPY"), anyString()))
+                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
+        when(bollingerBandService.analyze(argThat(s -> s != null && !s.equals("SPY")), anyString()))
+                .thenReturn(Optional.empty());
+
+        String report = tracker.buildSummaryReport();
+
+        assertThat(report).contains("Sector ETFs:");
+        assertThat(report).doesNotContain("Stocks:");
     }
 
     // ========== Helper methods ==========

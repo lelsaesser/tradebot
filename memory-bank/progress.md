@@ -1,8 +1,28 @@
 # Progress Tracking
 
-## Latest Milestone: Bollinger Band Analysis + StatisticsUtil Refactor ✅ COMPLETE
+## Latest Milestone: Bollinger Band Stock Coverage ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All 659 tests passing
+**Status**: ✅ **PRODUCTION READY** - All 665 tests passing
+
+### Implementation Complete (March 27, 2026)
+
+#### Feature Overview
+Extended `BollingerBandTracker` to analyze all tracked stocks (via `StockSymbolRegistry`) in addition to sector ETFs. ETF symbols are excluded from stock analysis to avoid duplication. Reports now show separate "Sector ETFs" and "Stocks" sections.
+
+#### Changes
+- **`BollingerBandTracker`**: Added `StockSymbolRegistry` dependency, new `analyzeAllStocks()` method
+  - `trackAndAlert()` now combines sector + stock analyses into unified alerts
+  - `buildSummaryReport()` shows separate sections for sectors and stocks
+  - ETFs excluded from stock analysis (handled by `analyzeAllSectors()`)
+- **`BollingerBandTrackerTest`**: 17 test cases covering sector analysis, stock analysis, ETF exclusion, combined alerts, and report formatting
+
+#### Test Count: 665 total (up from 659)
+
+---
+
+## Previous Milestone: Bollinger Band Analysis + StatisticsUtil Refactor ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
 
 ### Implementation Complete (March 26, 2026)
 
