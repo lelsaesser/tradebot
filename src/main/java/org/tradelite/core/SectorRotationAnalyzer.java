@@ -8,6 +8,7 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finviz.dto.IndustryPerformance;
+import org.tradelite.quant.StatisticsUtil;
 
 /**
  * Analyzes sector performance data to detect rotation signals using Z-Score statistical analysis.
@@ -69,7 +70,7 @@ public class SectorRotationAnalyzer {
             if (signal != null) {
                 signals.add(signal);
                 log.info(
-                        "Detected {} signal for {}: zWeekly={:.2f}, zMonthly={:.2f}",
+                        "Detected {} signal for {}: zWeekly={}, zMonthly={}",
                         signal.signalType(),
                         signal.sectorName(),
                         zScoreWeekly,
@@ -96,8 +97,8 @@ public class SectorRotationAnalyzer {
         // Collect all historical values for each sector
         for (SectorPerformanceSnapshot snapshot : history) {
             for (IndustryPerformance perf : snapshot.performances()) {
-                weeklyValues.computeIfAbsent(perf.name(), k -> new ArrayList<>());
-                monthlyValues.computeIfAbsent(perf.name(), k -> new ArrayList<>());
+                weeklyValues.computeIfAbsent(perf.name(), _ -> new ArrayList<>());
+                monthlyValues.computeIfAbsent(perf.name(), _ -> new ArrayList<>());
 
                 if (perf.perfWeek() != null) {
                     weeklyValues.get(perf.name()).add(perf.perfWeek().doubleValue());
@@ -115,10 +116,10 @@ public class SectorRotationAnalyzer {
             List<Double> weekly = entry.getValue();
             List<Double> monthly = monthlyValues.getOrDefault(sectorName, List.of());
 
-            double weeklyMean = calculateMean(weekly);
-            double weeklyStdDev = calculateStdDev(weekly, weeklyMean);
-            double monthlyMean = calculateMean(monthly);
-            double monthlyStdDev = calculateStdDev(monthly, monthlyMean);
+            double weeklyMean = StatisticsUtil.mean(weekly);
+            double weeklyStdDev = StatisticsUtil.sampleStdDev(weekly, weeklyMean);
+            double monthlyMean = StatisticsUtil.mean(monthly);
+            double monthlyStdDev = StatisticsUtil.sampleStdDev(monthly, monthlyMean);
 
             int weeklySize = weekly == null ? 0 : weekly.size();
             int monthlySize = monthly == null ? 0 : monthly.size();
@@ -189,29 +190,12 @@ public class SectorRotationAnalyzer {
                 confidence);
     }
 
-    /** Calculates the z-score: (value - mean) / stdDev */
+    /** Calculates the z-score, returning 0 if value is null. */
     private double calculateZScore(BigDecimal value, double mean, double stdDev) {
-        if (value == null || stdDev == 0) {
+        if (value == null) {
             return 0;
         }
-        return (value.doubleValue() - mean) / stdDev;
-    }
-
-    /** Calculates the arithmetic mean of a list of values. */
-    private double calculateMean(List<Double> values) {
-        if (values == null || values.isEmpty()) {
-            return 0;
-        }
-        return values.stream().mapToDouble(Double::doubleValue).average().orElse(0);
-    }
-
-    /** Calculates the standard deviation of a list of values. */
-    private double calculateStdDev(List<Double> values, double mean) {
-        if (values == null || values.size() < 2) {
-            return 0;
-        }
-        double sumSquaredDiffs = values.stream().mapToDouble(v -> Math.pow(v - mean, 2)).sum();
-        return Math.sqrt(sumSquaredDiffs / (values.size() - 1)); // Sample standard deviation
+        return StatisticsUtil.zScore(value.doubleValue(), mean, stdDev);
     }
 
     /** Internal class to hold statistical data for a sector. */

@@ -22,6 +22,9 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values. Uses `SectorEtfRegistry` for ETF list.
 -   **`TailRiskService`:** Calculates excess kurtosis and skewness from daily price changes to detect fat tail risk and directional bias.
 -   **`TailRiskTracker`:** Monitors sector ETFs for elevated tail risk (fat tails) with directional context (crash vs rally bias). Uses `SectorEtfRegistry` for ETF list.
+-   **`StatisticsUtil`:** Shared utility class providing `mean()`, `standardDeviation()`, `zScore()`, `percentileRank()`, `populationStdDev()`, and `percentile()` (including range-based overloads). Used by `SectorRotationAnalyzer`, `TailRiskService`, and `BollingerBandService` to eliminate code duplication.
+-   **`BollingerBandService`:** Calculates Bollinger Bands (20-period SMA ± 2σ), %B positioning, bandwidth, and bandwidth percentile for squeeze detection. Uses split data thresholds: 20 points for basic bands, 40+ for bandwidth percentile history. Detects both absolute squeezes (bandwidth ≤ 4%) and historical squeezes (percentile ≤ 10%). Uses `StatisticsUtil` and reads prices from `PriceQuoteRepository`.
+-   **`BollingerBandTracker`:** Orchestrates Bollinger Band analysis across all sector ETFs and tracked stocks. Sends Telegram alerts for band touches and squeezes, plus daily summary reports. Uses `SectorEtfRegistry` for ETFs and `StockSymbolRegistry` for individual stocks (excluding ETFs to avoid duplication).
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
@@ -90,6 +93,9 @@ Scheduler
 │   └── SqliteMomentumRocRepository → SQLite DB (momentum_roc_state)
 ├── TailRiskTracker → TailRiskService + SectorEtfRegistry
 │   └── PriceQuoteRepository.findDailyChangePercents()
+├── BollingerBandTracker → BollingerBandService + SectorEtfRegistry
+│   └── PriceQuoteRepository.findBySymbol()
+├── StatisticsUtil (shared by SectorRotationAnalyzer, TailRiskService, BollingerBandService)
 ├── InsiderTracker → InsiderPersistence → JSON file
 ├── SectorRotationTracker → FinvizClient → FinViz website
 │   ├── SectorPerformancePersistence → JSON file
@@ -287,6 +293,7 @@ The system now uses four complementary approaches for market analysis:
 | **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
+| **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Daily |
 
 **Stock Market Monitoring Flow:**
 ```java
