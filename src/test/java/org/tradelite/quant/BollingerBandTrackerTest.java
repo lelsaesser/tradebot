@@ -103,33 +103,33 @@ class BollingerBandTrackerTest {
     }
 
     @Test
-    void trackAndAlert_doesNotSendMessageWhenNoData() {
+    void analyzeAndSendAlerts_doesNotSendMessageWhenNoData() {
         when(bollingerBandService.analyze(anyString(), anyString())).thenReturn(Optional.empty());
 
-        tracker.trackAndAlert();
+        tracker.analyzeAndSendAlerts();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void trackAndAlert_doesNotSendMessageWhenNoSignals() {
+    void analyzeAndSendAlerts_doesNotSendMessageWhenNoSignals() {
         when(bollingerBandService.analyze(anyString(), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
 
-        tracker.trackAndAlert();
+        tracker.analyzeAndSendAlerts();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void trackAndAlert_sendsAlertWhenUpperBandTouch() {
+    void analyzeAndAlert_sendsSendAlertsWhenUpperBandTouch() {
         BollingerBandAnalysis upperTouch = upperBandAnalysis("XLK", "Technology");
         when(bollingerBandService.analyze(eq("XLK"), anyString()))
                 .thenReturn(Optional.of(upperTouch));
         when(bollingerBandService.analyze(argThat(s -> s != null && !s.equals("XLK")), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("OTHER", "Other")));
 
-        tracker.trackAndAlert();
+        tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(messageCaptor.capture());
@@ -140,14 +140,14 @@ class BollingerBandTrackerTest {
     }
 
     @Test
-    void trackAndAlert_sendsAlertWhenLowerBandTouch() {
+    void analyzeAndAlert_sendsSendAlertsWhenLowerBandTouch() {
         BollingerBandAnalysis lowerTouch = lowerBandAnalysis("XLE", "Energy");
         when(bollingerBandService.analyze(eq("XLE"), anyString()))
                 .thenReturn(Optional.of(lowerTouch));
         when(bollingerBandService.analyze(argThat(s -> s != null && !s.equals("XLE")), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("OTHER", "Other")));
 
-        tracker.trackAndAlert();
+        tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(messageCaptor.capture());
@@ -157,13 +157,13 @@ class BollingerBandTrackerTest {
     }
 
     @Test
-    void trackAndAlert_sendsAlertWhenSqueezeDetected() {
+    void analyzeAndAlert_sendsSendAlertsWhenSqueezeDetected() {
         BollingerBandAnalysis squeeze = squeezeAnalysis("XLF", "Financials");
         when(bollingerBandService.analyze(eq("XLF"), anyString())).thenReturn(Optional.of(squeeze));
         when(bollingerBandService.analyze(argThat(s -> s != null && !s.equals("XLF")), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("OTHER", "Other")));
 
-        tracker.trackAndAlert();
+        tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(messageCaptor.capture());
@@ -173,7 +173,7 @@ class BollingerBandTrackerTest {
     }
 
     @Test
-    void trackAndAlert_includesStockSignalsInAlert() {
+    void analyzeAndAlert_includesStockSignalsInSendAlerts() {
         // Sector returns normal
         when(bollingerBandService.analyze(anyString(), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("OTHER", "Other")));
@@ -185,7 +185,7 @@ class BollingerBandTrackerTest {
         when(bollingerBandService.analyze("TSLA", "Tesla Inc"))
                 .thenReturn(Optional.of(upperBandAnalysis("TSLA", "Tesla Inc")));
 
-        tracker.trackAndAlert();
+        tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(messageCaptor.capture());

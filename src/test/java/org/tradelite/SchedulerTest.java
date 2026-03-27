@@ -93,7 +93,7 @@ class SchedulerTest {
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
-        verify(bollingerBandTracker, times(1)).trackAndAlert();
+        verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
         verify(coinGeckoPriceEvaluator, times(0)).evaluatePrice();
     }
 

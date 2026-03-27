@@ -68,7 +68,7 @@ public class BollingerBandTracker {
     }
 
     /** Performs daily Bollinger Band check and sends Telegram alerts for actionable signals. */
-    public void trackAndAlert() {
+    public void analyzeAndSendAlerts() {
         List<BollingerBandAnalysis> sectorAnalyses = analyzeAllSectors();
         List<BollingerBandAnalysis> stockAnalyses = analyzeAllStocks();
 
