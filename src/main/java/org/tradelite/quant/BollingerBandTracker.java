@@ -1,0 +1,238 @@
+package org.tradelite.quant;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.common.SectorEtfRegistry;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.service.StockSymbolRegistry;
+
+/**
+ * Tracks Bollinger Band signals across sector ETFs, SPY, and all tracked stocks to detect
+ * volatility extremes.
+ *
+ * <p>Monitors three signal types and sends Telegram alerts when actionable conditions arise:
+ *
+ * <ul>
+ *   <li><b>Upper Band Touch</b>: Price above upper band — may be overextended
+ *   <li><b>Lower Band Touch</b>: Price below lower band — may be underextended
+ *   <li><b>Squeeze</b>: Bandwidth at historically low levels — breakout expected
+ * </ul>
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class BollingerBandTracker {
+
+    private final BollingerBandService bollingerBandService;
+    private final TelegramClient telegramClient;
+    private final StockSymbolRegistry stockSymbolRegistry;
+
+    /** Analyzes Bollinger Bands for all tracked sector ETFs and returns the results. */
+    public List<BollingerBandAnalysis> analyzeAllSectors() {
+        List<BollingerBandAnalysis> results = new ArrayList<>();
+
+        for (Map.Entry<String, String> entry :
+                SectorEtfRegistry.allEtfsWithBenchmark().entrySet()) {
+            String symbol = entry.getKey();
+            String displayName = entry.getValue();
+
+            Optional<BollingerBandAnalysis> analysis =
+                    bollingerBandService.analyze(symbol, displayName);
+            analysis.ifPresent(results::add);
+        }
+
+        return results;
+    }
+
+    /** Analyzes Bollinger Bands for all tracked stocks (excluding ETFs to avoid duplication). */
+    public List<BollingerBandAnalysis> analyzeAllStocks() {
+        List<BollingerBandAnalysis> results = new ArrayList<>();
+
+        for (StockSymbol stock : stockSymbolRegistry.getAll()) {
+            if (stockSymbolRegistry.isSectorEtf(stock.getTicker())) {
+                continue;
+            }
+
+            Optional<BollingerBandAnalysis> analysis =
+                    bollingerBandService.analyze(stock.getTicker(), stock.getCompanyName());
+            analysis.ifPresent(results::add);
+        }
+
+        return results;
+    }
+
+    /** Performs daily Bollinger Band check and sends Telegram alerts for actionable signals. */
+    public void analyzeAndSendAlerts() {
+        List<BollingerBandAnalysis> sectorAnalyses = analyzeAllSectors();
+        List<BollingerBandAnalysis> stockAnalyses = analyzeAllStocks();
+
+        List<BollingerBandAnalysis> allAnalyses = new ArrayList<>(sectorAnalyses);
+        allAnalyses.addAll(stockAnalyses);
+
+        if (allAnalyses.isEmpty()) {
+            log.warn("No Bollinger Band data available — insufficient price history");
+            return;
+        }
+
+        List<BollingerBandAnalysis> withSignals =
+                allAnalyses.stream().filter(BollingerBandAnalysis::hasSignals).toList();
+
+        if (!withSignals.isEmpty()) {
+            String alertMessage = buildAlertMessage(allAnalyses, withSignals);
+            telegramClient.sendMessage(alertMessage);
+            log.info(
+                    "Bollinger Band alert sent: {} symbol(s) with signals out of {} analyzed",
+                    withSignals.size(),
+                    allAnalyses.size());
+        } else {
+            log.info(
+                    "Bollinger Band check complete: all {} symbols within normal range",
+                    allAnalyses.size());
+        }
+    }
+
+    /** Sends a full daily report of Bollinger Band state for all sectors and stocks. */
+    public void sendDailyReport() {
+        String report = buildSummaryReport();
+        telegramClient.sendMessage(report);
+        log.info("Daily Bollinger Band report sent");
+    }
+
+    private String buildAlertMessage(
+            List<BollingerBandAnalysis> allAnalyses, List<BollingerBandAnalysis> withSignals) {
+
+        StringBuilder sb = new StringBuilder();
+
+        // Header with severity indicator
+        boolean hasSqueeze =
+                withSignals.stream().anyMatch(a -> a.isSqueeze() || a.isHistoricalSqueeze());
+        boolean hasOverextended =
+                withSignals.stream().anyMatch(BollingerBandAnalysis::isOverextended);
+        boolean hasUnderextended =
+                withSignals.stream().anyMatch(BollingerBandAnalysis::isUnderextended);
+
+        if (hasSqueeze) {
+            sb.append("🔵 *Bollinger Band Alert — Squeeze Detected*\n\n");
+        } else if (hasOverextended || hasUnderextended) {
+            sb.append("🟡 *Bollinger Band Alert — Band Touch*\n\n");
+        } else {
+            sb.append("📊 *Bollinger Band Alert*\n\n");
+        }
+
+        // Group by signal type
+        List<BollingerBandAnalysis> squeezes =
+                withSignals.stream().filter(a -> a.isSqueeze() || a.isHistoricalSqueeze()).toList();
+
+        List<BollingerBandAnalysis> overextended =
+                withSignals.stream().filter(BollingerBandAnalysis::isOverextended).toList();
+
+        List<BollingerBandAnalysis> underextended =
+                withSignals.stream().filter(BollingerBandAnalysis::isUnderextended).toList();
+
+        if (!squeezes.isEmpty()) {
+            sb.append("*Volatility Squeeze* (breakout expected):\n");
+            for (BollingerBandAnalysis analysis : squeezes) {
+                sb.append(analysis.toSummaryLine()).append("\n");
+                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!overextended.isEmpty()) {
+            sb.append("*Upper Band Touch* (overextended):\n");
+            for (BollingerBandAnalysis analysis : overextended) {
+                sb.append(analysis.toSummaryLine()).append("\n");
+                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!underextended.isEmpty()) {
+            sb.append("*Lower Band Touch* (underextended):\n");
+            for (BollingerBandAnalysis analysis : underextended) {
+                sb.append(analysis.toSummaryLine()).append("\n");
+                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
+            }
+            sb.append("\n");
+        }
+
+        // Compact summary of all symbols
+        sb.append("All symbols: ");
+        for (BollingerBandAnalysis analysis : allAnalyses) {
+            sb.append(analysis.toCompactLine()).append(" ");
+        }
+        sb.append("\n\n");
+
+        sb.append("_%B = position within bands (0=lower, 1=upper)_\n");
+        sb.append("_BW = bandwidth; P = bandwidth percentile_");
+
+        return sb.toString();
+    }
+
+    /** Builds a summary report of all Bollinger Band states for display. */
+    public String buildSummaryReport() {
+        List<BollingerBandAnalysis> sectorAnalyses = analyzeAllSectors();
+        List<BollingerBandAnalysis> stockAnalyses = analyzeAllStocks();
+
+        if (sectorAnalyses.isEmpty() && stockAnalyses.isEmpty()) {
+            return "📊 *Bollinger Band Report*\n\n_Insufficient data for analysis._";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 *Bollinger Band Report*\n\n");
+
+        if (!sectorAnalyses.isEmpty()) {
+            sb.append("*Sector ETFs:*\n");
+            for (BollingerBandAnalysis analysis : sectorAnalyses) {
+                sb.append(analysis.toSummaryLine()).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!stockAnalyses.isEmpty()) {
+            sb.append("*Stocks:*\n");
+            for (BollingerBandAnalysis analysis : stockAnalyses) {
+                sb.append(analysis.toSummaryLine()).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        List<BollingerBandAnalysis> allAnalyses = new ArrayList<>(sectorAnalyses);
+        allAnalyses.addAll(stockAnalyses);
+
+        long signalCount = allAnalyses.stream().filter(BollingerBandAnalysis::hasSignals).count();
+        long squeezeCount =
+                allAnalyses.stream().filter(a -> a.isSqueeze() || a.isHistoricalSqueeze()).count();
+        long overextendedCount =
+                allAnalyses.stream().filter(BollingerBandAnalysis::isOverextended).count();
+        long underextendedCount =
+                allAnalyses.stream().filter(BollingerBandAnalysis::isUnderextended).count();
+
+        if (signalCount == 0) {
+            sb.append("✅ All symbols trading within normal Bollinger Band range.");
+        } else {
+            sb.append(String.format("⚠️ %d symbol(s) with active signals.%n", signalCount));
+            if (squeezeCount > 0) {
+                sb.append(String.format("   🔵 %d squeeze(s) — breakout expected%n", squeezeCount));
+            }
+            if (overextendedCount > 0) {
+                sb.append(
+                        String.format(
+                                "   ⬆️ %d overextended (above upper band)%n", overextendedCount));
+            }
+            if (underextendedCount > 0) {
+                sb.append(
+                        String.format(
+                                "   ⬇️ %d underextended (below lower band)", underextendedCount));
+            }
+        }
+
+        return sb.toString();
+    }
+}

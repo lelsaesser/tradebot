@@ -198,19 +198,70 @@ class StockSymbolRegistryTest {
     }
 
     @Test
-    void isEtf_etfSymbol_returnsTrue() {
+    void isSectorEtf_sectorEtfSymbol_returnsTrue() {
+        assertTrue(stockSymbolRegistry.isSectorEtf("SPY"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLK"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLF"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLE"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLV"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLY"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLP"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLI"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLC"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLRE"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLB"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("XLU"));
+    }
+
+    @Test
+    void isSectorEtf_thematicEtf_returnsFalse() {
+        assertFalse(stockSymbolRegistry.isSectorEtf("SMH"));
+        assertFalse(stockSymbolRegistry.isSectorEtf("URA"));
+        assertFalse(stockSymbolRegistry.isSectorEtf("IGV"));
+        assertFalse(stockSymbolRegistry.isSectorEtf("SHLD"));
+    }
+
+    @Test
+    void isSectorEtf_regularStock_returnsFalse() {
+        assertFalse(stockSymbolRegistry.isSectorEtf("AAPL"));
+        assertFalse(stockSymbolRegistry.isSectorEtf("MSFT"));
+        assertFalse(stockSymbolRegistry.isSectorEtf("GOOGL"));
+    }
+
+    @Test
+    void isSectorEtf_nullOrEmpty_returnsFalse() {
+        assertFalse(stockSymbolRegistry.isSectorEtf(null));
+        assertFalse(stockSymbolRegistry.isSectorEtf(""));
+    }
+
+    @Test
+    void isSectorEtf_caseInsensitive_returnsTrue() {
+        assertTrue(stockSymbolRegistry.isSectorEtf("spy"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("Spy"));
+        assertTrue(stockSymbolRegistry.isSectorEtf("xlk"));
+    }
+
+    @Test
+    void isEtf_sectorEtfSymbol_returnsTrue() {
         assertTrue(stockSymbolRegistry.isEtf("SPY"));
         assertTrue(stockSymbolRegistry.isEtf("XLK"));
         assertTrue(stockSymbolRegistry.isEtf("XLF"));
         assertTrue(stockSymbolRegistry.isEtf("XLE"));
-        assertTrue(stockSymbolRegistry.isEtf("XLV"));
-        assertTrue(stockSymbolRegistry.isEtf("XLY"));
-        assertTrue(stockSymbolRegistry.isEtf("XLP"));
-        assertTrue(stockSymbolRegistry.isEtf("XLI"));
-        assertTrue(stockSymbolRegistry.isEtf("XLC"));
-        assertTrue(stockSymbolRegistry.isEtf("XLRE"));
-        assertTrue(stockSymbolRegistry.isEtf("XLB"));
         assertTrue(stockSymbolRegistry.isEtf("XLU"));
+    }
+
+    @Test
+    void isEtf_thematicEtfSymbol_returnsTrue() {
+        assertTrue(stockSymbolRegistry.isEtf("SMH"));
+        assertTrue(stockSymbolRegistry.isEtf("SHLD"));
+        assertTrue(stockSymbolRegistry.isEtf("IGV"));
+        assertTrue(stockSymbolRegistry.isEtf("XOP"));
+        assertTrue(stockSymbolRegistry.isEtf("XHB"));
+        assertTrue(stockSymbolRegistry.isEtf("ITA"));
+        assertTrue(stockSymbolRegistry.isEtf("XBI"));
+        assertTrue(stockSymbolRegistry.isEtf("UFO"));
+        assertTrue(stockSymbolRegistry.isEtf("TAN"));
+        assertTrue(stockSymbolRegistry.isEtf("URA"));
     }
 
     @Test
@@ -228,8 +279,8 @@ class StockSymbolRegistryTest {
 
     @Test
     void isEtf_caseInsensitive_returnsTrue() {
-        assertTrue(stockSymbolRegistry.isEtf("spy"));
-        assertTrue(stockSymbolRegistry.isEtf("Spy"));
-        assertTrue(stockSymbolRegistry.isEtf("xlk"));
+        assertTrue(stockSymbolRegistry.isEtf("smh"));
+        assertTrue(stockSymbolRegistry.isEtf("Smh"));
+        assertTrue(stockSymbolRegistry.isEtf("ura"));
     }
 }

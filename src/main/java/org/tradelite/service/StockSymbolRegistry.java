@@ -24,10 +24,15 @@ public class StockSymbolRegistry {
 
     private static final String STOCK_SYMBOLS_FILE = "config/stock-symbols.json";
 
-    private static final Set<String> ETF_SYMBOLS =
+    private static final Set<String> SECTOR_ETF_SYMBOLS =
             Set.of(
                     "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLC", "XLRE", "XLB", "XLU",
                     "SPY");
+
+    private static final Set<String> ETF_SYMBOLS =
+            Set.of(
+                    "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLC", "XLRE", "XLB", "XLU",
+                    "SPY", "SMH", "URA", "IGV", "XOP", "XHB", "ITA", "XBI", "TAN", "UFO", "SHLD");
 
     private final ObjectMapper objectMapper;
     private List<StockSymbolEntry> stockSymbols;
@@ -53,6 +58,13 @@ public class StockSymbolRegistry {
         return stockSymbols.stream()
                 .map(entry -> new StockSymbol(entry.getTicker(), entry.getDisplayName()))
                 .toList();
+    }
+
+    public boolean isSectorEtf(String ticker) {
+        if (ticker == null || ticker.isEmpty()) {
+            return false;
+        }
+        return SECTOR_ETF_SYMBOLS.contains(ticker.toUpperCase());
     }
 
     public boolean isEtf(String ticker) {

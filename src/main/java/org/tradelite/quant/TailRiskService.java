@@ -86,9 +86,7 @@ public class TailRiskService {
         }
 
         int n = values.size();
-
-        // Calculate mean
-        double mean = values.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        double mean = StatisticsUtil.mean(values);
 
         // Calculate second and fourth central moments
         double sumSquaredDiff = 0;
@@ -151,9 +149,7 @@ public class TailRiskService {
         }
 
         int n = values.size();
-
-        // Calculate mean
-        double mean = values.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        double mean = StatisticsUtil.mean(values);
 
         // Calculate sum of squared differences and cubed differences
         double sumSquaredDiff = 0;

@@ -1,42 +1,81 @@
 # Progress Tracking
 
-## Latest Milestone: Extended Sector ETF Tracking ✅ COMPLETE
+## Latest Milestone: Bollinger Band Refinement ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All tests passing
+**Status**: ✅ **PRODUCTION READY** - All 677 tests passing
+
+### Implementation Complete (March 27, 2026)
+
+#### Feature Overview
+Refined Bollinger Band analysis with split data point thresholds. Basic band calculation works with 20 data points, while bandwidth percentile history requires 40+ points. Added `HISTORICAL_SQUEEZE` signal type for percentile-based squeeze detection and `SQUEEZE` for absolute bandwidth threshold. Enhanced `StatisticsUtil` with range-based methods.
+
+#### Changes
+- **`BollingerBandAnalysis`**: Split constants — `MIN_DATA_POINTS = 20`, `BANDWIDTH_HISTORY_MIN_DATA_POINTS = 40`, `SQUEEZE_BANDWIDTH_THRESHOLD = 0.04`, `SQUEEZE_PERCENTILE_THRESHOLD = 10.0`
+  - New methods: `hasBandwidthHistory()`, `isSqueeze()`, `isHistoricalSqueeze()`
+- **`BollingerSignalType`**: Added `HISTORICAL_SQUEEZE` enum value (bandwidth at historic lows)
+- **`BollingerBandService`**: `detectSignals()` now distinguishes absolute squeeze (bandwidth ≤ 4%) from historical squeeze (percentile ≤ 10%)
+  - `hasBandwidthHistory` flag prevents false percentile signals on limited data
+- **`StatisticsUtil`**: Added `mean(List, start, end)`, `populationStdDev(List, start, end, mean)`, `percentile(List, value)` — range-based overloads for efficient Bollinger calculation
+- **`BollingerBandTracker`**: Extended to analyze all tracked stocks via `StockSymbolRegistry` + sector ETFs
+  - `analyzeAllStocks()` method, ETF exclusion, combined alerts, separate report sections
+
+#### Signal Detection Logic
+```
+UPPER_BAND_TOUCH: %B >= 1.0 (price above upper band)
+LOWER_BAND_TOUCH: %B <= 0.0 (price below lower band)
+SQUEEZE:          bandwidth <= 4% of SMA (works with 20+ data points)
+HISTORICAL_SQUEEZE: bandwidth percentile <= 10% (requires 40+ data points)
+```
+
+#### Test Count: 677 total (up from 665)
+
+---
+
+## Previous Milestone: Bollinger Band Analysis + StatisticsUtil Refactor ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation Complete (March 26, 2026)
+
+#### Feature Overview
+Implemented Bollinger Band analysis for all sector ETFs with squeeze detection, band touch alerts, and %B positioning. Also extracted shared statistical functions into `StatisticsUtil` to eliminate duplication across `SectorRotationAnalyzer`, `TailRiskService`, and `BollingerBandService`.
+
+#### finmath-lib Evaluation
+Evaluated [finmath-lib](https://github.com/finmath/finmath-lib) for potential integration. **Decision: NOT adding.** The library is a heavy academic framework (derivatives pricing, Monte Carlo, interest rate models) that would add significant dependency weight for functionality far beyond our needs. Our custom lightweight implementations (`StatisticsUtil`, `TailRiskService`, `BollingerBandService`) are better suited — they are purpose-built, zero-dependency, and cover exactly what the tradebot needs.
+
+#### Core Components
+- `StatisticsUtil` — shared utility: `mean()`, `standardDeviation()`, `zScore()`, `percentileRank()`
+- `BollingerSignalType` — enum: UPPER_BAND_TOUCH, LOWER_BAND_TOUCH, SQUEEZE, HISTORICAL_SQUEEZE
+- `BollingerBandAnalysis` — record with %B, bandwidth, signals, interpretation methods
+- `BollingerBandService` — 20-period SMA ± 2σ bands, %B calculation, bandwidth percentile, squeeze detection
+- `BollingerBandTracker` — orchestrator for sector ETFs + stocks, wired into Scheduler
+
+#### Bollinger Band Formulas
+```
+SMA(20) = average of last 20 closing prices
+Upper Band = SMA + (2 × σ)
+Lower Band = SMA − (2 × σ)
+%B = (Price − Lower) / (Upper − Lower)
+Bandwidth = (Upper − Lower) / SMA
+```
+
+#### Scheduler Integration
+- `BollingerBandTracker.trackAndAlert()` — real-time in 5-minute `stockMarketMonitoring` loop
+- `BollingerBandTracker.sendDailyReport()` — daily at 15:40 CET Mon-Fri
+
+---
+
+## Previous Milestone: Extended Sector ETF Tracking ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
 
 ### Implementation Complete (March 20, 2026)
 
 #### Feature Overview
-Extended sector ETF tracking from 11 broad SPDR sectors to 20 total ETFs by adding 9 thematic/industry ETFs. Created a centralized `SectorEtfRegistry` to manage all ETF symbols and display names.
+Extended sector ETF tracking from 11 broad SPDR sectors to 20 total ETFs by adding 9 thematic/industry ETFs. Created centralized `SectorEtfRegistry`.
 
 #### New ETFs Added
-| Symbol | Name | Focus |
-|--------|------|-------|
-| SMH | Semiconductors | VanEck Semiconductor ETF |
-| URA | Uranium/Nuclear | Global X Uranium ETF |
-| SHLD | Cybersecurity | Global X Cybersecurity ETF |
-| IGV | Software | iShares Expanded Tech-Software ETF |
-| XOP | Oil & Gas E&P | SPDR S&P Oil & Gas Exploration ETF |
-| XHB | Homebuilders | SPDR S&P Homebuilders ETF |
-| ITA | Aerospace & Defense | iShares U.S. Aerospace & Defense ETF |
-| XBI | Biotech | SPDR S&P Biotech ETF |
-| TAN | Solar Energy | Invesco Solar ETF |
-
-#### Architecture Changes
-- **`SectorEtfRegistry`** (NEW): Central registry for all ETF symbols and display names
-  - `broadSectors()` - 11 SPDR sector ETFs
-  - `thematicEtfs()` - 9 thematic/industry ETFs
-  - `allEtfs()` - All 20 ETFs combined
-  - `thematicSymbols()` - Set of thematic symbol strings
-- **`SectorRelativeStrengthTracker`**: Uses registry, daily summary splits into "Sectors" and "Thematic / Industry" sections
-- **`SectorMomentumRocTracker`**: Uses `SectorEtfRegistry.allEtfs()` instead of hardcoded map
-- **`TailRiskTracker`**: Uses `SectorEtfRegistry.allEtfs()` instead of hardcoded map
-
-#### Tests Updated
-- `SectorRelativeStrengthTrackerTest` - Updated for dual-section report format and thematic ETFs
-- `SectorMomentumRocTrackerTest` - Updated for registry usage
-- `TailRiskTrackerTest` - Updated for registry usage
-- **Total: 48 tests passing across all 3 test classes**
+SMH (Semiconductors), URA (Uranium), SHLD (Cybersecurity), IGV (Software), XOP (Oil & Gas E&P), XHB (Homebuilders), ITA (Aerospace & Defense), XBI (Biotech), TAN (Solar Energy)
 
 ---
 
@@ -45,142 +84,16 @@ Extended sector ETF tracking from 11 broad SPDR sectors to 20 total ETFs by addi
 **Status**: ✅ **PRODUCTION READY** - All 603 tests passing
 
 ### Implementation Complete (March 19, 2026)
-
-#### Feature Overview
-- **Streak Tracking**: Track consecutive days of outperformance/underperformance vs SPY for each sector ETF
-- **Visual Indicators**: 🟢5 (5 days outperforming) or 🔴12 (12 days underperforming)
-- **Persistence**: JSON file storage survives application restarts
-
-#### Value Proposition
-At-a-glance visibility into whether a sector's strength/weakness is:
-- **Short-term anomaly** (1-2 days) - may be noise/mean reversion
-- **Sustained trend** (10+ days) - worth paying attention to
-
-#### New Components Added
-
-**New Record:**
-- `SectorRsStreak.java` - Tracks symbol, streak days, direction, last updated date
-
-**New Persistence:**
-- `SectorRsStreakPersistence.java` - JSON file persistence with Spring `@Value` configuration
-
-**Enhanced Components:**
-- `SectorRelativeStrengthTracker.java` - Integrated streak tracking into daily sector RS report
-
-#### Daily Report Format
-```
-📊 *Sector Relative Strength Report*
-
-🟢 *Outperforming SPY:*
-• XLK (Tech): RS 1.05 | EMA 1.03 🟢5
-• XLF (Finance): RS 1.02 | EMA 1.01 🟢2
-
-🔴 *Underperforming SPY:*
-• XLU (Utilities): RS 0.95 | EMA 0.97 🔴12
-• XLE (Energy): RS 0.92 | EMA 0.94 🔴3
-```
-
-#### Streak Logic
-| Scenario | Action |
-|----------|--------|
-| New sector | Start streak at day 1 |
-| Same direction next day | Increment streak |
-| Direction change | Reset to day 1 with new direction |
-| Same day update | Return existing (no double-count) |
-
-#### Tests Added
-- `SectorRsStreakTest` - 9 tests for streak record behavior
-- `SectorRsStreakPersistenceTest` - 14 tests for persistence logic
-- `SectorRelativeStrengthTrackerTest` - Updated for streak integration
-
-#### Configuration
-```yaml
-tradebot:
-  sector-rs-streaks:
-    file-path: config/sector-rs-streaks.json  # default
-```
+Track consecutive days of outperformance/underperformance vs SPY for each sector ETF. Visual indicators (🟢5/🔴12), JSON persistence, integrated into daily reports.
 
 ---
 
-## Previous Milestone: Skewness Enhancement to Tail Risk Analysis ✅ COMPLETE
+## Previous Milestone: Skewness Enhancement to Tail Risk ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All tests passing (32 tests in TailRisk modules)
+**Status**: ✅ **PRODUCTION READY**
 
 ### Implementation Complete (March 17, 2026)
-
-#### Enhancement Overview
-- **Skewness Calculation**: Added to complement kurtosis for directional bias detection
-- **Combined Risk Assessment**: Fat tails (kurtosis) + directional bias (skewness)
-- **Actionable Alerts**: Now indicate whether risk leans toward crash or rally
-
-#### What is Skewness?
-Skewness measures the asymmetry of a distribution:
-- **Negative Skewness**: Left tail is longer/fatter → crashes more likely than rallies
-- **Positive Skewness**: Right tail is longer/fatter → rallies more likely than crashes
-- **Zero Skewness**: Symmetric distribution → balanced risk
-
-#### New Components Added
-
-**New Enum:**
-- `SkewnessLevel.java` - HIGHLY_NEGATIVE, NEGATIVE, NEUTRAL, POSITIVE, HIGHLY_POSITIVE
-
-**Enhanced Components:**
-- `TailRiskAnalysis.java` - Now includes `skewness` and `skewnessLevel` fields
-- `TailRiskLevel.java` - Added `isElevated()` method
-- `TailRiskService.java` - Added `calculateSkewness()` method
-- `TailRiskTracker.java` - Enhanced alerts with directional bias information
-
-#### Skewness Formula
-```
-Skewness = (1/n) * Σ((xi - x̄)³) / σ³
-
-Normal distribution: skewness = 0
-Negative skew: < 0 (crash bias)
-Positive skew: > 0 (rally bias)
-```
-
-#### Skewness Level Classification
-| Skewness Value | Level | Emoji | Meaning |
-|----------------|-------|-------|---------|
-| < -1.0 | HIGHLY_NEGATIVE | ⬇️⬇️ | Strong crash bias |
-| -1.0 to -0.5 | NEGATIVE | ⬇️ | Moderate downside skew |
-| -0.5 to +0.5 | NEUTRAL | ↔️ | No directional bias |
-| +0.5 to +1.0 | POSITIVE | ⬆️ | Moderate upside skew |
-| > +1.0 | HIGHLY_POSITIVE | ⬆️⬆️ | Strong rally bias |
-
-#### Enhanced Alert Message Format
-```
-🔴 *Tail Risk Alert - Extreme*
-
-*Extreme* risk sectors:
-• *Energy* (XLE): Kurtosis 10.5 | Skew -1.2 ⬇️⬇️
-   _Fat tails with strong crash bias_
-
-*High* risk sectors:
-• *Technology* (XLK): Kurtosis 8.2 | Skew +0.8 ⬆️
-   _Fat tails with moderate upside skew_
-
-All sectors: 🔴 XLE ⬇️⬇️ 🟠 XLK ⬆️ 🟢 SPY ↔️ ...
-
-📊 *Directional Bias:*
-• ⬇️ 1 sector(s) with crash risk bias
-• ⬆️ 1 sector(s) with rally potential
-
-_Kurtosis = probability of extreme moves_
-_Skewness = likely direction (⬇️ crash / ⬆️ rally)_
-```
-
-#### Combined Interpretation
-| Kurtosis | Skewness | Interpretation |
-|----------|----------|----------------|
-| HIGH/EXTREME | Negative | Fat tails with crash bias - defensive posture |
-| HIGH/EXTREME | Positive | Fat tails with rally bias - opportunity window |
-| HIGH/EXTREME | Neutral | Fat tails, uncertain direction - high volatility |
-| LOW/MODERATE | Any | Normal market conditions |
-
-#### Tests Updated
-- `TailRiskServiceTest` - 19 tests (added 10 new skewness tests)
-- `TailRiskTrackerTest` - 13 tests (updated for new message format)
+Added skewness calculation to complement kurtosis for directional bias detection. Combined risk assessment: fat tails (kurtosis) + directional bias (skewness). Enhanced alert messages with crash/rally direction.
 
 ---
 
@@ -189,34 +102,11 @@ _Skewness = likely direction (⬇️ crash / ⬆️ rally)_
 **Status**: ✅ **PRODUCTION READY**
 
 ### Implementation Complete (March 11, 2026)
-
-#### Feature Overview
-- **Tail Risk Analysis**: Statistical measure of fat tails in price distributions
-- **Kurtosis Calculation**: Excess kurtosis from daily price change percentages
-- **New `quant` Package**: Foundation for advanced quantitative analysis
-
-#### Kurtosis Formula
-```
-Kurtosis = n * Σ(xi - x̄)⁴ / (Σ(xi - x̄)²)²
-Excess Kurtosis = Kurtosis - 3.0
-
-Normal distribution: kurtosis = 3, excess = 0
-Fat tails: excess kurtosis > 0 (more extreme moves likely)
-```
-
-#### Risk Level Classification
-| Excess Kurtosis | Level | Emoji | Meaning |
-|-----------------|-------|-------|---------|
-| < 1.0 | LOW | 🟢 | Normal tail risk |
-| 1.0 - 3.0 | MODERATE | 🟡 | Slightly elevated |
-| 3.0 - 6.0 | HIGH | 🟠 | Significant fat tails |
-| ≥ 6.0 | EXTREME | 🔴 | Crash/rally risk elevated |
+Statistical measure of fat tails in price distributions using excess kurtosis. New `quant` package. Risk levels: LOW/MODERATE/HIGH/EXTREME.
 
 ---
 
-## Four-Pronged Statistical Analysis
-
-The system now uses four complementary approaches:
+## Five-Pronged Statistical Analysis
 
 | Approach | Component | Signal | Schedule |
 |----------|-----------|--------|----------|
@@ -224,6 +114,7 @@ The system now uses four complementary approaches:
 | **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
+| **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Real-time + Daily 15:40 CET |
 
 ---
 
@@ -239,10 +130,11 @@ The system now uses four complementary approaches:
 - Relative Strength vs SPY benchmark
 - SQLite historical price persistence
 - Feature toggle system
-- Daily sector RS summary
+- Daily sector RS summary with streak tracking
 - Real-time sector RS crossover alerts
 - Momentum ROC sector tracking
-- **Tail Risk (Kurtosis + Skewness) analysis** ✅ **ENHANCED**
+- Tail Risk (Kurtosis + Skewness) analysis
+- **Bollinger Band analysis** (sectors + stocks, squeeze detection, band touches)
 
 ### Data Persistence ✅
 - JSON-based storage for target prices and configuration
@@ -252,6 +144,7 @@ The system now uses four complementary approaches:
 - Insider transaction history (JSON)
 - API request metering
 - Feature toggles (JSON)
+- RS streak persistence (JSON)
 
 ### Telegram Commands ✅
 - `/set buy/sell <symbol> <price>` - Set target prices
@@ -261,18 +154,15 @@ The system now uses four complementary approaches:
 - `/remove <TICKER>` - Remove symbol and all data
 
 ## Test Coverage Status
-
-### Current Coverage
 - Target: 97% line coverage
 - Current: 97% line coverage
 - Status: ✅ Acceptable
-- All critical paths covered with tests
 
 ## Scheduled Tasks Summary
 
 | Task | Schedule | Description |
 |------|----------|-------------|
-| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + RS alerts + ROC alerts |
+| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + RS alerts + ROC alerts + BB alerts |
 | cryptoMarketMonitoring | Every 5 min (24/7) | Crypto price monitoring |
 | rsiStockMonitoring | Daily 23:00 CET (Mon-Fri) | RSI + Relative Strength analysis |
 | rsiCryptoMonitoring | Daily 00:05 ET | RSI calculation for crypto |
@@ -280,22 +170,19 @@ The system now uses four complementary approaches:
 | monthlyApiUsageReport | Monthly 1st, 00:00 UTC | API usage statistics |
 | dailySectorRotationTracking | Daily 22:30 ET (Mon-Fri) | Sector performance + Z-score alerts |
 | dailySectorRsSummary | Daily 12:00 CET (Mon-Fri) | Sector RS vs SPY summary |
-| **dailyTailRiskMonitoring** | Daily 10:00 CET (Mon-Fri) | **Tail risk kurtosis + skewness alerts** ✅ |
+| dailyTailRiskMonitoring | Daily 13:00 CET (Mon-Fri) | Tail risk kurtosis + skewness alerts |
+| dailyBollingerBandReport | Daily 15:40 CET (Mon-Fri) | Bollinger Band daily summary |
 
 ## Future Enhancements
 
 ### Statistical Enhancements (Future)
+- MACD indicator (uses same EMA concepts)
+- Multi-signal confirmation alerts (Bollinger + RS + ROC)
 - Historical kurtosis/skewness tracking for trend detection
 - VIX integration for additional volatility context
-- Combine tail risk with other signals for confirmation
 - Sharpe/Sortino ratio calculations
 
-### Momentum ROC Enhancements (Future)
-- ROC divergence alerts (when ROC10 and ROC20 diverge)
-- Sector strength ranking in ROC alerts
-- Combine RS and ROC signals for stronger confirmation
-
-### SQLite Enhancements (Future)
+### Infrastructure (Future)
 - Migrate existing JSON persistence to SQLite
 - Add CoinGecko price persistence
 - Data retention/cleanup policies
@@ -303,14 +190,8 @@ The system now uses four complementary approaches:
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: March 17, 2026
+- Date: March 27, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
-
-### Pre-Deployment Checklist
-- ✅ All tests passing
-- ✅ Build successful
-- ✅ Code coverage acceptable (97%)
-- ✅ Documentation updated
-- ✅ Code formatted with Spotless
-- ✅ Error handling verified
+- All 677 tests passing
+- Code coverage: 97%

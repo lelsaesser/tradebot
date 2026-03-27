@@ -1,29 +1,38 @@
 # Active Context
 
 ## Current Work Focus
-Extended sector ETF tracking from 11 broad SPDR sectors to 20 total ETFs by adding 9 thematic/industry ETFs. Created a centralized `SectorEtfRegistry` to manage all ETF symbols and display names.
+Refined Bollinger Band analysis with split data point thresholds — 20 points for basic band calculation, 40 points for bandwidth percentile history. Added `HISTORICAL_SQUEEZE` signal type and absolute bandwidth squeeze detection. All 677 tests passing.
 
-## Recent Changes (March 20, 2026)
+## Recent Changes (March 27, 2026)
 
-### Extended Sector ETF Tracking ✅ COMPLETE
-- **New `SectorEtfRegistry`** class in `common/` package - central registry for all 20 ETF symbols and display names
-- **9 thematic/industry ETFs added**: SMH (Semiconductors), URA (Uranium/Nuclear), SHLD (Cybersecurity), IGV (Software), XOP (Oil & Gas E&P), XHB (Homebuilders), ITA (Aerospace & Defense), XBI (Biotech), TAN (Solar Energy)
-- **`SectorRelativeStrengthTracker`**: Refactored to use registry; daily summary now splits into "Sectors" and "Thematic / Industry" sections
-- **`SectorMomentumRocTracker`**: Refactored to use `SectorEtfRegistry.allEtfs()` instead of hardcoded map
-- **`TailRiskTracker`**: Refactored to use `SectorEtfRegistry.allEtfs()` instead of hardcoded map
-- **All 48 tests passing** across the 3 updated test classes
+### Bollinger Band Refinement ✅ COMPLETE
+- **Split MIN_DATA_POINTS**: `MIN_DATA_POINTS = 20` for basic SMA/band calculation, `BANDWIDTH_HISTORY_MIN_DATA_POINTS = 40` for bandwidth percentile history
+- **New signal**: `HISTORICAL_SQUEEZE` — bandwidth at historically low percentile (requires 40+ data points)
+- **Absolute squeeze**: `SQUEEZE` signal fires when bandwidth ≤ 4% of SMA (works with just 20 points)
+- **`BollingerBandAnalysis`** — new constants: `SQUEEZE_BANDWIDTH_THRESHOLD = 0.04`, `SQUEEZE_PERCENTILE_THRESHOLD = 10.0`; new methods: `hasBandwidthHistory()`, `isSqueeze()`, `isHistoricalSqueeze()`
+- **`BollingerBandService`** — `detectSignals()` now takes `hasBandwidthHistory` flag; separate logic for absolute vs historical squeeze
+- **`StatisticsUtil`** — added range-based `mean(List, start, end)`, `populationStdDev(List, start, end, mean)`, `percentile(List, value)`
+- **All 677 tests passing** ✅
 
-### Previous: Sector RS Streak Tracking (March 19, 2026) ✅
-- Streak tracking for consecutive days of outperformance/underperformance vs SPY
-- Visual indicators (🟢5, 🔴12) in daily reports
-- JSON file persistence
+### Bollinger Band Stock Coverage ✅ COMPLETE
+- **`BollingerBandTracker`** — analyzes all tracked stocks via `StockSymbolRegistry` + sector ETFs
+  - `analyzeAllStocks()` iterates registered stocks, excluding ETFs
+  - `trackAndAlert()` combines sector + stock analyses into unified alerts
+  - `buildSummaryReport()` shows separate "Sector ETFs" and "Stocks" sections
+  - Added `StockSymbolRegistry` as constructor dependency
+
+### finmath-lib Evaluation ✅ DECIDED: NOT ADDING
+- Library is a heavy academic framework (derivatives pricing, Monte Carlo, interest rate models)
+- Our lightweight custom implementations are better suited for the tradebot's needs
 
 ## Architecture Decisions
-- **Central ETF Registry**: `SectorEtfRegistry` provides a single source of truth for all ETF symbols and display names, eliminating duplication across trackers
-- **Dual-section reports**: Daily RS summary separates broad sectors from thematic/industry ETFs for clearer reporting
-- **`Map.of()` + `Map.ofEntries()`**: Registry uses Java immutable maps for thread safety
+- **Shared `StatisticsUtil`**: Eliminates statistical code duplication across services
+- **No external quant library**: Custom implementations preferred over finmath-lib
+- **`quant` package**: All quantitative analysis components live in `org.tradelite.quant`
+- **ETF exclusion in stock analysis**: `analyzeAllStocks()` skips ETFs since they're covered by `analyzeAllSectors()`
+- **Split data thresholds**: Basic Bollinger Bands work with just 20 data points (newly tracked stocks can get signals sooner); bandwidth percentile requires 40+ for reliable history
 
 ## Next Steps
-- Monitor API rate limits with 20 ETFs (9 additional symbols per polling cycle)
-- Consider adding more thematic ETFs in the future (e.g., ARKK Innovation, KWEB China Internet, HACK Cybersecurity, JETS Airlines)
-- Historical ETF RS trend analysis
+- Consider MACD indicator as next quant feature (uses same EMA concepts)
+- Consider combining Bollinger + RS + ROC signals for multi-signal confirmation alerts
+- Monitor API rate limits with tracked stocks + 20 ETFs across all tracking systems

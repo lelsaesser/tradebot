@@ -14,6 +14,7 @@ import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
+import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
@@ -36,6 +37,7 @@ public class Scheduler {
     private final SectorRelativeStrengthTracker sectorRelativeStrengthTracker;
     private final SectorMomentumRocTracker sectorMomentumRocTracker;
     private final TailRiskTracker tailRiskTracker;
+    private final BollingerBandTracker bollingerBandTracker;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -55,7 +57,8 @@ public class Scheduler {
             RelativeStrengthTracker relativeStrengthTracker,
             SectorRelativeStrengthTracker sectorRelativeStrengthTracker,
             SectorMomentumRocTracker sectorMomentumRocTracker,
-            TailRiskTracker tailRiskTracker) {
+            TailRiskTracker tailRiskTracker,
+            BollingerBandTracker bollingerBandTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -70,6 +73,7 @@ public class Scheduler {
         this.sectorRelativeStrengthTracker = sectorRelativeStrengthTracker;
         this.sectorMomentumRocTracker = sectorMomentumRocTracker;
         this.tailRiskTracker = tailRiskTracker;
+        this.bollingerBandTracker = bollingerBandTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -79,6 +83,7 @@ public class Scheduler {
             // Analyze sector ETFs in real-time for rotation signals
             rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
+            rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
@@ -112,6 +117,12 @@ public class Scheduler {
         rootErrorHandler.run(tailRiskTracker::sendDailyReport);
         rootErrorHandler.run(tailRiskTracker::trackAndAlert);
         log.info("Daily tail risk monitoring completed.");
+    }
+
+    @Scheduled(cron = "0 40 15 * * MON-FRI", zone = "CET")
+    protected void dailyBollingerBandReport() {
+        rootErrorHandler.run(bollingerBandTracker::sendDailyReport);
+        log.info("Daily Bollinger Band report completed.");
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
