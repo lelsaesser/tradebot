@@ -418,80 +418,28 @@ class RsiServiceTest {
     }
 
     @Test
-    void testHolidayDetection_identicalPrices() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        LocalDate secondDay = LocalDate.of(2023, 12, 25);
-        double price = 150.50;
+    void testHolidayDetection_skipsWhenMarketHolidayDetected() throws IOException {
+        when(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.50)).thenReturn(true);
 
-        rsiService.addPrice(symbol, price, firstDay);
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        rsiService.addPrice(symbol, 150.50, LocalDate.now());
 
-        rsiService.addPrice(symbol, price, secondDay);
-
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-        assertEquals(
-                firstDay,
-                rsiService
-                        .getPriceHistory()
-                        .get(symbol.getName())
-                        .getPrices()
-                        .getFirst()
-                        .getDate());
+        assertThat(rsiService.getPriceHistory().containsKey(symbol.getName()), is(false));
     }
 
     @Test
-    void testHolidayDetection_slightlyDifferentPrices() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        LocalDate secondDay = LocalDate.of(2023, 12, 25);
+    void testHolidayDetection_addsWhenNotMarketHoliday() throws IOException {
+        when(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.50)).thenReturn(false);
 
-        rsiService.addPrice(symbol, 150.50, firstDay);
-        rsiService.addPrice(symbol, 150.51, secondDay);
-
-        assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-    }
-
-    @Test
-    void testHolidayDetection_sameDate() throws IOException {
-        LocalDate sameDay = LocalDate.of(2023, 12, 22);
-        double price = 150.50;
-
-        rsiService.addPrice(symbol, price, sameDay);
-        rsiService.addPrice(symbol, price, sameDay);
+        rsiService.addPrice(symbol, 150.50, LocalDate.now());
 
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
     }
 
     @Test
-    void testHolidayDetection_noPreviousData() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        double price = 150.50;
+    void testHolidayDetection_delegatesToFinnhubPriceEvaluator() throws IOException {
+        rsiService.addPrice(symbol, 150.50, LocalDate.now());
 
-        rsiService.addPrice(symbol, price, firstDay);
-
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-    }
-
-    @Test
-    void testHolidayDetection_withinEpsilon() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        LocalDate secondDay = LocalDate.of(2023, 12, 25);
-
-        rsiService.addPrice(symbol, 150.5000, firstDay);
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-
-        rsiService.addPrice(symbol, 150.5000, secondDay);
-        assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-    }
-
-    @Test
-    void testHolidayDetection_outsideEpsilon() throws IOException {
-        LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        LocalDate secondDay = LocalDate.of(2023, 12, 25);
-
-        rsiService.addPrice(symbol, 150.5000, firstDay);
-        rsiService.addPrice(symbol, 150.5002, secondDay);
-
-        assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
+        verify(finnhubPriceEvaluator).isPotentialMarketHoliday("AAPL", 150.50);
     }
 
     @Test

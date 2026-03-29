@@ -61,7 +61,7 @@ public class RsiService {
         RsiDailyClosePrice rsiDailyClosePrice =
                 priceHistory.getOrDefault(symbolKey, new RsiDailyClosePrice());
 
-        if (isPotentialMarketHoliday(rsiDailyClosePrice, price, date)) {
+        if (finnhubPriceEvaluator.isPotentialMarketHoliday(symbolKey, price)) {
             log.info(
                     "Potential market holiday detected for {}: price {} on {} is identical to previous trading day. Skipping price update.",
                     symbol,
@@ -79,22 +79,6 @@ public class RsiService {
                         ? symbol.getDisplayName()
                         : symbol.getName();
         symbolDisplayNames.put(symbolKey, displayName);
-    }
-
-    private boolean isPotentialMarketHoliday(
-            RsiDailyClosePrice rsiDailyClosePrice, double newPrice, LocalDate newDate) {
-        if (rsiDailyClosePrice.getPrices().isEmpty()) {
-            return false;
-        }
-
-        var prices = rsiDailyClosePrice.getPrices();
-        prices.sort((p1, p2) -> p2.getDate().compareTo(p1.getDate()));
-        var mostRecentPrice = prices.getFirst();
-
-        double epsilon = 0.0001;
-        boolean pricesAreIdentical = Math.abs(newPrice - mostRecentPrice.getPrice()) < epsilon;
-
-        return pricesAreIdentical && !newDate.isEqual(mostRecentPrice.getDate());
     }
 
     /**

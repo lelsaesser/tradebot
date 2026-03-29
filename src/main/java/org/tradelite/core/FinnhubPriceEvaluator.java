@@ -101,7 +101,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         return finnhubData.size();
     }
 
-    boolean isPotentialMarketHoliday(String symbol, double currentPrice) {
+    public boolean isPotentialMarketHoliday(String symbol, double currentPrice) {
         LocalDate today = LocalDate.now();
 
         List<PriceQuoteEntity> todayEntries =
