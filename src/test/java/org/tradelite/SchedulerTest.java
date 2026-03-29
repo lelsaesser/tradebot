@@ -28,6 +28,7 @@ import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.RsiService;
 
 @ExtendWith(MockitoExtension.class)
 class SchedulerTest {
@@ -47,6 +48,7 @@ class SchedulerTest {
     @Mock private SectorMomentumRocTracker sectorMomentumRocTracker;
     @Mock private TailRiskTracker tailRiskTracker;
     @Mock private BollingerBandTracker bollingerBandTracker;
+    @Mock private RsiService rsiService;
 
     private Scheduler scheduler;
 
@@ -68,7 +70,8 @@ class SchedulerTest {
                         sectorRelativeStrengthTracker,
                         sectorMomentumRocTracker,
                         tailRiskTracker,
-                        bollingerBandTracker);
+                        bollingerBandTracker,
+                        rsiService);
     }
 
     @Test
@@ -110,30 +113,36 @@ class SchedulerTest {
     }
 
     @Test
-    void hourlyBollingerBandMonitoring_marketOpen_shouldRun() throws Exception {
+    void hourlySignalMonitoring_marketOpen_shouldRun() throws Exception {
         scheduler.dayOfWeek = DayOfWeek.MONDAY;
         scheduler.localTime = LocalTime.of(17, 0);
 
-        scheduler.hourlyBollingerBandMonitoring();
+        scheduler.hourlySignalMonitoring();
 
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        // Called 2 times: bollingerBandTracker and rsiService
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
+        verify(rootErrorHandler, times(2)).run(captor.capture());
+
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
+        verify(rsiService, times(1)).sendRsiReport();
     }
 
     @Test
-    void hourlyBollingerBandMonitoring_marketClosed_shouldNotRun() {
+    void hourlySignalMonitoring_marketClosed_shouldNotRun() {
         scheduler.dayOfWeek = DayOfWeek.SATURDAY;
         scheduler.localTime = LocalTime.of(17, 0);
 
-        scheduler.hourlyBollingerBandMonitoring();
+        scheduler.hourlySignalMonitoring();
 
         verify(rootErrorHandler, never()).run(any(ThrowingRunnable.class));
         verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
+        verify(rsiService, never()).sendRsiReport();
     }
 
     @Test

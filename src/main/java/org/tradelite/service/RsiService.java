@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.OptionalLong;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,15 @@ public class RsiService {
 
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+
+    /**
+     * Stores the Telegram message ID of the last sent RSI report so it can be deleted before
+     * sending the next update.
+     */
+    private Long lastTelegramReportMessageId;
+
+    /** Maps symbol keys to their display names for use when building RSI reports. */
+    @Getter private final Map<String, String> symbolDisplayNames = new HashMap<>();
 
     @Autowired
     public RsiService(
@@ -63,7 +73,12 @@ public class RsiService {
         rsiDailyClosePrice.addPrice(date, price);
         priceHistory.put(symbolKey, rsiDailyClosePrice);
         savePriceHistory();
-        calculateAndNotifyRsi(symbol, rsiDailyClosePrice);
+
+        String displayName =
+                symbol.getSymbolType() == SymbolType.STOCK
+                        ? symbol.getDisplayName()
+                        : symbol.getName();
+        symbolDisplayNames.put(symbolKey, displayName);
     }
 
     private boolean isPotentialMarketHoliday(
@@ -82,41 +97,127 @@ public class RsiService {
         return pricesAreIdentical && !newDate.isEqual(mostRecentPrice.getDate());
     }
 
-    private void calculateAndNotifyRsi(TickerSymbol symbol, RsiDailyClosePrice rsiDailyClosePrice) {
-        // Need 15 prices to calculate 14 price changes for RSI
-        if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD + 1) {
+    /**
+     * Analyzes all symbols in priceHistory, calculates RSI, detects overbought/oversold signals,
+     * builds a consolidated report, and sends it via Telegram. Deletes the previous report message.
+     */
+    public void sendRsiReport() {
+        List<RsiSignal> signals = analyzeAllSymbols();
+
+        if (signals.isEmpty()) {
+            log.info("No RSI signals to report");
             return;
         }
 
-        double rsi = calculateRsi(rsiDailyClosePrice.getPriceValues());
-        String displayName = symbol.getName();
-        if (symbol.getSymbolType() == SymbolType.STOCK) {
-            displayName = symbol.getDisplayName();
-        }
-
-        double previousRsi = rsiDailyClosePrice.getPreviousRsi();
-        double rsiDiff = rsi - previousRsi;
-
-        String rsiDiffString = "";
-        if (previousRsi != 0) {
-            rsiDiffString = String.format("(%+.1f)", rsiDiff);
-        }
-
-        if (rsi >= 70) {
-            log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
-            telegramClient.sendMessage(
-                    String.format(
-                            "🔴 RSI for %s is in overbought zone: %.2f %s",
-                            displayName, rsi, rsiDiffString));
-        } else if (rsi <= 30) {
-            log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
-            telegramClient.sendMessage(
-                    String.format(
-                            "🟢 RSI for %s is in oversold zone: %.2f %s",
-                            displayName, rsi, rsiDiffString));
-        }
-        rsiDailyClosePrice.setPreviousRsi(rsi);
+        deletePreviousTelegramReport();
+        String report = buildRsiReport(signals);
+        OptionalLong messageId = telegramClient.sendMessageAndReturnId(report);
+        messageId.ifPresent(id -> lastTelegramReportMessageId = id);
+        log.info("RSI report sent with {} signal(s)", signals.size());
     }
+
+    /**
+     * Iterates over all symbols in priceHistory, calculates RSI for each, and returns signals for
+     * those in overbought or oversold territory.
+     */
+    protected List<RsiSignal> analyzeAllSymbols() {
+        List<RsiSignal> signals = new ArrayList<>();
+
+        for (Map.Entry<String, RsiDailyClosePrice> entry : priceHistory.entrySet()) {
+            String symbolKey = entry.getKey();
+            RsiDailyClosePrice rsiDailyClosePrice = entry.getValue();
+
+            if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD) {
+                continue;
+            }
+
+            List<Double> prices = new ArrayList<>(rsiDailyClosePrice.getPriceValues());
+            Double currentPrice = getCurrentPriceFromCacheByKey(symbolKey);
+            if (currentPrice != null) {
+                prices.add(currentPrice);
+                log.info(
+                        "Using current price {} from cache for RSI report of {}",
+                        currentPrice,
+                        symbolKey);
+            }
+
+            if (prices.size() < RSI_PERIOD + 1) {
+                continue;
+            }
+
+            double rsi = calculateRsi(prices);
+            String displayName = symbolDisplayNames.getOrDefault(symbolKey, symbolKey);
+            double previousRsi = rsiDailyClosePrice.getPreviousRsi();
+            double rsiDiff = rsi - previousRsi;
+
+            if (rsi >= 70) {
+                log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
+                signals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERBOUGHT"));
+            } else if (rsi <= 30) {
+                log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
+                signals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERSOLD"));
+            }
+            rsiDailyClosePrice.setPreviousRsi(rsi);
+        }
+
+        return signals;
+    }
+
+    private void deletePreviousTelegramReport() {
+        if (lastTelegramReportMessageId != null) {
+            log.info(
+                    "Deleting previous Telegram RSI report message {}",
+                    lastTelegramReportMessageId);
+            telegramClient.deleteMessage(lastTelegramReportMessageId);
+            lastTelegramReportMessageId = null;
+        }
+    }
+
+    /** Builds a consolidated RSI report message from the given signals. */
+    protected String buildRsiReport(List<RsiSignal> signals) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 *RSI Signal Report*\n\n");
+
+        List<RsiSignal> overbought =
+                signals.stream().filter(s -> "OVERBOUGHT".equals(s.zone())).toList();
+        List<RsiSignal> oversold =
+                signals.stream().filter(s -> "OVERSOLD".equals(s.zone())).toList();
+
+        if (!overbought.isEmpty()) {
+            sb.append("🔴 *Overbought (RSI ≥ 70):*\n");
+            for (RsiSignal signal : overbought) {
+                sb.append(formatSignalLine(signal)).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!oversold.isEmpty()) {
+            sb.append("🟢 *Oversold (RSI ≤ 30):*\n");
+            for (RsiSignal signal : oversold) {
+                sb.append(formatSignalLine(signal)).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append(
+                String.format(
+                        "_%d signal(s): %d overbought, %d oversold_",
+                        signals.size(), overbought.size(), oversold.size()));
+
+        return sb.toString();
+    }
+
+    private String formatSignalLine(RsiSignal signal) {
+        String rsiDiffString = "";
+        if (signal.previousRsi() != 0) {
+            rsiDiffString = String.format(" (%+.1f)", signal.rsiDiff());
+        }
+        return String.format("  • %s: %.2f%s", signal.displayName(), signal.rsi(), rsiDiffString);
+    }
+
+    /** Represents an RSI signal for a single symbol. */
+    public record RsiSignal(
+            String displayName, double rsi, double previousRsi, double rsiDiff, String zone) {}
 
     public Optional<Double> getCurrentRsi(TickerSymbol symbol) {
         String symbolKey = symbol.getName();
@@ -152,6 +253,19 @@ public class RsiService {
             return coinGeckoPriceEvaluator.getLastPriceCache().get(coinId);
         }
         return null;
+    }
+
+    /**
+     * Looks up the current price from the Finnhub or CoinGecko cache using only the symbol key
+     * string. Tries the stock cache first, then checks if it matches a known CoinId.
+     */
+    protected Double getCurrentPriceFromCacheByKey(String symbolKey) {
+        Double stockPrice = finnhubPriceEvaluator.getLastPriceCache().get(symbolKey);
+        if (stockPrice != null) {
+            return stockPrice;
+        }
+        Optional<CoinId> coinId = CoinId.fromString(symbolKey);
+        return coinId.map(id -> coinGeckoPriceEvaluator.getLastPriceCache().get(id)).orElse(null);
     }
 
     public synchronized boolean removeSymbolRsiData(String symbolKey) {

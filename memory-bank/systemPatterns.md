@@ -10,7 +10,7 @@ The application follows a modular, component-based architecture built on the Spr
 
 -   **`Scheduler`:** The heart of the application, orchestrating all scheduled tasks. Includes separate schedulers for stock and crypto monitoring with independent polling intervals.
 -   **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) responsible for fetching and evaluating prices from different APIs. Maintains in-memory caches of last fetched prices for real-time RSI calculations. This design supports multiple data sources and can be extended.
--   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays, and sends Telegram notifications for overbought/oversold conditions. Integrates cached current prices for accurate on-demand RSI queries.
+-   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays. Uses separated concerns: `addPrice()` purely stores data, `analyzeAllSymbols()` iterates all stored prices + appends live prices from evaluator caches (Finnhub/CoinGecko), calculates RSI, and returns `List<RsiSignal>`. `sendRsiReport()` builds consolidated hourly report and implements delete-before-send pattern (same as BB). `getCurrentPriceFromCacheByKey()` bridges symbol keys to evaluator cache lookups.
 -   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations. Critical for technical analysis.
 -   **`InsiderTracker`:** Tracks and reports insider trading activities, providing valuable market insights.
 -   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz. Fetches daily performance data, sends reports on top/bottom performers, and triggers rotation analysis.
@@ -66,7 +66,7 @@ The application follows a modular, component-based architecture built on the Spr
 | Task | Schedule | Zone | Description |
 |------|----------|------|-------------|
 | `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock prices + RS alerts + ROC alerts |
-| `hourlyBollingerBandMonitoring` | Every 60 min (9:30-16:00, Mon-Fri) | America/New_York | BB alerts (delete previous, send new) |
+| `hourlySignalMonitoring` | Every 60 min (9:30-16:00, Mon-Fri) | America/New_York | BB + RSI reports (delete previous, send new) |
 | `cryptoMarketMonitoring` | Every 5 min | UTC | 24/7 crypto monitoring |
 | `rsiStockMonitoring` | Daily 16:30 (Mon-Fri) | America/New_York | Stock RSI + RS analysis |
 | `rsiCryptoMonitoring` | Daily 00:05 | America/New_York | Crypto RSI calculations |
@@ -310,9 +310,10 @@ protected void stockMarketMonitoring() {
 }
 
 @Scheduled(initialDelay = 0, fixedRate = 3600000)
-protected void hourlyBollingerBandMonitoring() {
+protected void hourlySignalMonitoring() {
     if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
         rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
+        rootErrorHandler.run(rsiService::sendRsiReport);
     }
 }
 ```
