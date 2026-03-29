@@ -89,7 +89,7 @@ public class Scheduler {
         log.info("Stock market monitoring round completed.");
     }
 
-    @Scheduled(initialDelay = 0, fixedRate = 3600000)
+    @Scheduled(cron = "0 0 * * * MON-FRI", zone = "CET")
     protected void hourlyBollingerBandMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
