@@ -3,7 +3,6 @@ package org.tradelite.client.telegram;
 import static org.tradelite.common.TargetPriceProvider.FILE_PATH_COINS;
 import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
 
-import java.util.Objects;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -39,9 +38,9 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
         Double sellTarget = null;
         Double buyTarget = null;
 
-        if (Objects.equals(command.getSubCommand(), "buy")) {
+        if ("buy".equalsIgnoreCase(command.getSubCommand())) {
             buyTarget = command.getTarget();
-        } else if (Objects.equals(command.getSubCommand(), "sell")) {
+        } else if ("sell".equalsIgnoreCase(command.getSubCommand())) {
             sellTarget = command.getTarget();
         } else {
             throw new IllegalArgumentException("Invalid sub-command: " + command.getSubCommand());

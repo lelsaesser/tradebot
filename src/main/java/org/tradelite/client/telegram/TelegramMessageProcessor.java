@@ -116,7 +116,7 @@ public class TelegramMessageProcessor {
             telegramClient.sendMessage(errorMessageCommandFormat);
             return Optional.empty();
         }
-        if (!subCommand.equals("buy") && !subCommand.equals("sell")) {
+        if (!subCommand.equalsIgnoreCase("buy") && !subCommand.equalsIgnoreCase("sell")) {
             telegramClient.sendMessage(errorMessageCommandFormat);
             return Optional.empty();
         }
@@ -158,14 +158,6 @@ public class TelegramMessageProcessor {
 
         String ticker = parts[1];
         return Optional.of(new RemoveCommand(ticker));
-    }
-
-    protected Optional<Double> tryParseDouble(String value) {
-        try {
-            return Optional.of(Double.parseDouble(value));
-        } catch (NumberFormatException | NullPointerException _) {
-            return Optional.empty();
-        }
     }
 
     protected Optional<TickerSymbol> parseTickerSymbol(String symbol) {

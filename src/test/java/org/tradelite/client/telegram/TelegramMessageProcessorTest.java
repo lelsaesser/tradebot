@@ -318,6 +318,62 @@ class TelegramMessageProcessorTest {
     }
 
     @Test
+    void parseMessage_showCommand_caseInsensitiveSubCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/show ALL");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(ShowCommand.class)));
+        assertThat(((ShowCommand) command.get()).getSubCommand(), is("ALL"));
+    }
+
+    @Test
+    void parseMessage_showCommand_mixedCaseSubCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/show Coins");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(ShowCommand.class)));
+        assertThat(((ShowCommand) command.get()).getSubCommand(), is("Coins"));
+    }
+
+    @Test
+    void parseMessage_setCommand_caseInsensitiveSubCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/set BUY bitcoin 50000.0");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(SetCommand.class)));
+        assertThat(((SetCommand) command.get()).getSubCommand(), is("BUY"));
+    }
+
+    @Test
+    void parseMessage_setCommand_mixedCaseSubCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/set Sell aapl 300.0");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(SetCommand.class)));
+        assertThat(((SetCommand) command.get()).getSubCommand(), is("Sell"));
+    }
+
+    @Test
     void parseTickerSymbol_validCoin_returnsCoinId() {
         String ticker = "bitcoin";
         Optional<TickerSymbol> coinId = messageProcessor.parseTickerSymbol(ticker);
@@ -347,12 +403,6 @@ class TelegramMessageProcessorTest {
     void parseTickerSymbol_nullTicker_returnsEmpty() {
         Optional<TickerSymbol> result = messageProcessor.parseTickerSymbol(null);
 
-        assertThat(result.isPresent(), is(false));
-    }
-
-    @Test
-    void tryParseDouble_nullValue_returnsEmpty() {
-        Optional<Double> result = messageProcessor.tryParseDouble(null);
         assertThat(result.isPresent(), is(false));
     }
 }
