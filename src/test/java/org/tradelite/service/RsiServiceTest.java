@@ -90,8 +90,7 @@ class RsiServiceTest {
 
     @Test
     void testSendRsiReport_sendsConsolidatedReport() throws IOException {
-        when(telegramClient.sendMessageAndReturnId(anyString()))
-                .thenReturn(OptionalLong.of(123L));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(123L));
 
         // Generate overbought signals
         for (int i = 0; i < 15; i++) {
@@ -140,8 +139,7 @@ class RsiServiceTest {
 
     @Test
     void testSendRsiReport_noDeleteWhenNoPreviousMessage() throws IOException {
-        when(telegramClient.sendMessageAndReturnId(anyString()))
-                .thenReturn(OptionalLong.of(100L));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(100L));
 
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
@@ -231,8 +229,8 @@ class RsiServiceTest {
     void testCalculateRsi_mixedPrices() {
         java.util.List<Double> mixedPrices =
                 java.util.Arrays.asList(
-                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0,
-                        110.0, 116.0, 112.0, 118.0, 114.0);
+                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0, 110.0,
+                        116.0, 112.0, 118.0, 114.0);
 
         double rsi = rsiService.calculateRsi(mixedPrices);
 
@@ -243,8 +241,8 @@ class RsiServiceTest {
     void testCalculateRsi_insufficientPrices() {
         java.util.List<Double> insufficientPrices =
                 java.util.Arrays.asList(
-                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0,
-                        110.0, 116.0, 112.0);
+                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0, 110.0,
+                        116.0, 112.0);
 
         double rsi = rsiService.calculateRsi(insufficientPrices);
         assertEquals(50, rsi);
@@ -508,8 +506,8 @@ class RsiServiceTest {
     void testCalculateRsi_averageLossZero() {
         java.util.List<Double> allGainsAfterInitial =
                 java.util.Arrays.asList(
-                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
-                        110.0, 111.0, 112.0, 113.0, 114.0);
+                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0,
+                        111.0, 112.0, 113.0, 114.0);
 
         double rsi = rsiService.calculateRsi(allGainsAfterInitial);
 
