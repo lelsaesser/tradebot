@@ -39,8 +39,8 @@ public class RsiService {
      */
     private Long lastTelegramReportMessageId;
 
-    /** Accumulated RSI signals collected during price processing, sent as a batch report. */
-    @Getter private final List<RsiSignal> pendingSignals = new ArrayList<>();
+    /** Maps symbol keys to their display names for use when building RSI reports. */
+    @Getter private final Map<String, String> symbolDisplayNames = new HashMap<>();
 
     @Autowired
     public RsiService(
@@ -73,7 +73,12 @@ public class RsiService {
         rsiDailyClosePrice.addPrice(date, price);
         priceHistory.put(symbolKey, rsiDailyClosePrice);
         savePriceHistory();
-        calculateAndNotifyRsi(symbol, rsiDailyClosePrice);
+
+        String displayName =
+                symbol.getSymbolType() == SymbolType.STOCK
+                        ? symbol.getDisplayName()
+                        : symbol.getName();
+        symbolDisplayNames.put(symbolKey, displayName);
     }
 
     private boolean isPotentialMarketHoliday(
@@ -92,44 +97,56 @@ public class RsiService {
         return pricesAreIdentical && !newDate.isEqual(mostRecentPrice.getDate());
     }
 
-    private void calculateAndNotifyRsi(TickerSymbol symbol, RsiDailyClosePrice rsiDailyClosePrice) {
-        // Need 15 prices to calculate 14 price changes for RSI
-        if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD + 1) {
-            return;
-        }
-
-        double rsi = calculateRsi(rsiDailyClosePrice.getPriceValues());
-        String displayName = symbol.getName();
-        if (symbol.getSymbolType() == SymbolType.STOCK) {
-            displayName = symbol.getDisplayName();
-        }
-
-        double previousRsi = rsiDailyClosePrice.getPreviousRsi();
-        double rsiDiff = rsi - previousRsi;
-
-        if (rsi >= 70) {
-            log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
-            pendingSignals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERBOUGHT"));
-        } else if (rsi <= 30) {
-            log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
-            pendingSignals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERSOLD"));
-        }
-        rsiDailyClosePrice.setPreviousRsi(rsi);
-    }
-
-    /** Sends a consolidated RSI report with all pending signals, deleting the previous report. */
+    /**
+     * Analyzes all symbols in priceHistory, calculates RSI, detects overbought/oversold signals,
+     * builds a consolidated report, and sends it via Telegram. Deletes the previous report message.
+     */
     public void sendRsiReport() {
-        if (pendingSignals.isEmpty()) {
+        List<RsiSignal> signals = analyzeAllSymbols();
+
+        if (signals.isEmpty()) {
             log.info("No RSI signals to report");
             return;
         }
 
         deletePreviousTelegramReport();
-        String report = buildRsiReport(pendingSignals);
+        String report = buildRsiReport(signals);
         OptionalLong messageId = telegramClient.sendMessageAndReturnId(report);
         messageId.ifPresent(id -> lastTelegramReportMessageId = id);
-        log.info("RSI report sent with {} signal(s)", pendingSignals.size());
-        pendingSignals.clear();
+        log.info("RSI report sent with {} signal(s)", signals.size());
+    }
+
+    /**
+     * Iterates over all symbols in priceHistory, calculates RSI for each, and returns signals for
+     * those in overbought or oversold territory.
+     */
+    protected List<RsiSignal> analyzeAllSymbols() {
+        List<RsiSignal> signals = new ArrayList<>();
+
+        for (Map.Entry<String, RsiDailyClosePrice> entry : priceHistory.entrySet()) {
+            String symbolKey = entry.getKey();
+            RsiDailyClosePrice rsiDailyClosePrice = entry.getValue();
+
+            if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD + 1) {
+                continue;
+            }
+
+            double rsi = calculateRsi(rsiDailyClosePrice.getPriceValues());
+            String displayName = symbolDisplayNames.getOrDefault(symbolKey, symbolKey);
+            double previousRsi = rsiDailyClosePrice.getPreviousRsi();
+            double rsiDiff = rsi - previousRsi;
+
+            if (rsi >= 70) {
+                log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
+                signals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERBOUGHT"));
+            } else if (rsi <= 30) {
+                log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
+                signals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERSOLD"));
+            }
+            rsiDailyClosePrice.setPreviousRsi(rsi);
+        }
+
+        return signals;
     }
 
     private void deletePreviousTelegramReport() {

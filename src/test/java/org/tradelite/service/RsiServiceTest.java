@@ -54,54 +54,123 @@ class RsiServiceTest {
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_overbought_accumulatesSignal() throws IOException {
-        // Need 15 prices to calculate RSI (14 price changes)
+    void testAddPrice_onlyStoresData_doesNotCalculateRsi() throws IOException {
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
-        // Signals should be accumulated, not sent directly
+        // addPrice should NOT send any messages or calculate RSI
         verify(telegramClient, never()).sendMessage(anyString());
         verify(telegramClient, never()).sendMessageAndReturnId(anyString());
-        assertThat(rsiService.getPendingSignals(), is(not(empty())));
-        assertThat(
-                rsiService.getPendingSignals().stream()
-                        .anyMatch(s -> "OVERBOUGHT".equals(s.zone())),
-                is(true));
+        // Price data should be stored
+        assertEquals(15, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
         verify(rsiService, times(15)).savePriceHistory();
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_oversold_accumulatesSignal() throws IOException {
-        // Add declining prices to trigger oversold condition (RSI <= 30)
+    void testAddPrice_storesDisplayName_forStock() throws IOException {
+        rsiService.addPrice(symbol, 100, LocalDate.now());
+
+        assertEquals("Apple (AAPL)", rsiService.getSymbolDisplayNames().get("AAPL"));
+    }
+
+    @Test
+    void testAddPrice_storesDisplayName_forCrypto() throws IOException {
+        CoinId cryptoSymbol = CoinId.BITCOIN;
+        rsiService.addPrice(cryptoSymbol, 50000, LocalDate.now());
+
+        assertEquals(cryptoSymbol.getName(), rsiService.getSymbolDisplayNames().get(cryptoSymbol.getName()));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_detectsOverbought() throws IOException {
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(not(empty())));
+        assertThat(signals.stream().anyMatch(s -> "OVERBOUGHT".equals(s.zone())), is(true));
+        assertThat(
+                signals.stream().anyMatch(s -> "Apple (AAPL)".equals(s.displayName())), is(true));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_detectsOversold() throws IOException {
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
         }
 
-        // Signals should be accumulated, not sent directly
-        verify(telegramClient, never()).sendMessage(anyString());
-        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
-        assertThat(rsiService.getPendingSignals(), is(not(empty())));
-        assertThat(
-                rsiService.getPendingSignals().stream().anyMatch(s -> "OVERSOLD".equals(s.zone())),
-                is(true));
-        verify(rsiService, times(15)).savePriceHistory();
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(not(empty())));
+        assertThat(signals.stream().anyMatch(s -> "OVERSOLD".equals(s.zone())), is(true));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_insufficientData_noSignals() throws IOException {
+        for (int i = 0; i < 10; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
+        }
+
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(empty()));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_neutralRsi_noSignals() throws IOException {
+        // Mixed prices that should produce neutral RSI (between 30 and 70)
+        double[] mixedPrices = {100, 105, 102, 108, 104, 110, 106, 112, 108, 114, 110, 116, 112, 118, 114};
+        for (int i = 0; i < mixedPrices.length; i++) {
+            rsiService.addPrice(symbol, mixedPrices[i], LocalDate.now().minusDays(14 - i));
+        }
+
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(empty()));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_usesDisplayNameFromMap() throws IOException {
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(not(empty())));
+        // StockSymbol("AAPL", "Apple") display name should be "Apple (AAPL)"
+        assertThat(signals.getFirst().displayName(), is("Apple (AAPL)"));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_fallsBackToSymbolKey_whenNoDisplayName() {
+        // Manually add price data without going through addPrice (no display name registered)
+        RsiDailyClosePrice priceData = new RsiDailyClosePrice();
+        for (int i = 0; i < 15; i++) {
+            priceData.addPrice(LocalDate.now().minusDays(14 - i), 100 + i);
+        }
+        rsiService.getPriceHistory().put("UNKNOWN", priceData);
+
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(not(empty())));
+        assertThat(signals.getFirst().displayName(), is("UNKNOWN"));
     }
 
     @Test
     void testSendRsiReport_sendsConsolidatedReport() throws IOException {
         when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(123L));
 
-        // Generate overbought signals
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
-        assertThat(rsiService.getPendingSignals(), is(not(empty())));
 
         rsiService.sendRsiReport();
 
         verify(telegramClient, times(1)).sendMessageAndReturnId(contains("RSI Signal Report"));
-        assertThat(rsiService.getPendingSignals(), is(empty()));
     }
 
     @Test
@@ -124,8 +193,7 @@ class RsiServiceTest {
         }
         rsiService.sendRsiReport();
 
-        // Second report - should delete the first
-        rsiService.getPendingSignals().clear();
+        // Add more data for second report (prices keep going up => stays overbought)
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(
                     new StockSymbol("MSFT", "Microsoft"),
@@ -421,17 +489,20 @@ class RsiServiceTest {
     }
 
     @Test
-    void testRsiDiff_isAccumulatedInSignal() throws IOException {
+    void testAnalyzeAllSymbols_rsiDiffCalculation() throws IOException {
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(15 - i));
         }
+        // Set a known previousRsi so the diff is meaningful
         rsiService.getPriceHistory().get(symbol.getName()).setPreviousRsi(10);
-        rsiService.getPendingSignals().clear();
+
+        // Add one more price to keep it in oversold territory
         rsiService.addPrice(symbol, 120, LocalDate.now());
 
-        // Verify signal was accumulated with rsiDiff
-        assertThat(rsiService.getPendingSignals(), is(not(empty())));
-        RsiService.RsiSignal signal = rsiService.getPendingSignals().getFirst();
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(not(empty())));
+        RsiService.RsiSignal signal = signals.getFirst();
         assertThat(signal.previousRsi(), is(closeTo(10.0, 0.01)));
         assertThat(signal.rsiDiff(), is(not(closeTo(0.0, 0.01))));
     }
@@ -467,19 +538,18 @@ class RsiServiceTest {
     }
 
     @Test
-    void testCryptoSymbolDisplayName_accumulatesSignal() throws IOException {
+    void testAnalyzeAllSymbols_cryptoDisplayName() throws IOException {
         CoinId cryptoSymbol = CoinId.BITCOIN;
 
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(cryptoSymbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
-        // Signals should be accumulated, not sent directly
-        verify(telegramClient, never()).sendMessage(anyString());
-        assertThat(rsiService.getPendingSignals(), is(not(empty())));
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        assertThat(signals, is(not(empty())));
         assertThat(
-                rsiService.getPendingSignals().stream()
-                        .anyMatch(s -> s.displayName().equals(cryptoSymbol.getName())),
+                signals.stream().anyMatch(s -> s.displayName().equals(cryptoSymbol.getName())),
                 is(true));
     }
 
@@ -587,5 +657,41 @@ class RsiServiceTest {
         var rsi = rsiService.getCurrentRsi(symbol);
 
         assertThat(rsi.isEmpty(), is(true));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_updatesPreviousRsi() throws IOException {
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+
+        double previousRsiBefore = rsiService.getPriceHistory().get(symbol.getName()).getPreviousRsi();
+        rsiService.analyzeAllSymbols();
+        double previousRsiAfter = rsiService.getPriceHistory().get(symbol.getName()).getPreviousRsi();
+
+        // After analysis, previousRsi should be updated from its initial value
+        assertThat(previousRsiAfter, is(not(closeTo(previousRsiBefore, 0.01))));
+    }
+
+    @Test
+    void testSendRsiReport_analyzesAndSendsInOneStep() throws IOException {
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(123L));
+
+        // Add overbought data
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+        // Add oversold data for another symbol
+        StockSymbol symbol2 = new StockSymbol("TSLA", "Tesla");
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol2, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
+        }
+
+        rsiService.sendRsiReport();
+
+        verify(telegramClient, times(1)).sendMessageAndReturnId(argThat(report ->
+                report.contains("RSI Signal Report")
+                        && report.contains("Overbought")
+                        && report.contains("Oversold")));
     }
 }
