@@ -1,8 +1,26 @@
 # Progress Tracking
 
-## Latest Milestone: Bollinger Band Refinement ✅ COMPLETE
+## Latest Milestone: Telegram Delete-Before-Send for BB Reports ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY** - All 677 tests passing
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation Complete (March 29, 2026)
+
+#### Feature Overview
+Hourly Bollinger Band reports now delete the previous report message before sending the updated one, keeping the Telegram chat clean. Also separated BB alerts from the 5-minute stock monitoring loop into a dedicated hourly schedule.
+
+#### Changes
+- **`TelegramClient`**: Added `sendMessageAndReturnId(String)` returning `OptionalLong` with Telegram message ID; added `deleteMessage(long)` using `deleteMessage` Bot API endpoint; `sendMessage()` now delegates to `sendMessageAndReturnId`
+- **`TelegramSendMessageResponse`** (new DTO): Parses `sendMessage` API response to extract `message_id`
+- **`TelegramMessage`**: Added `messageId` field (`@JsonProperty("message_id")`)
+- **`BollingerBandTracker`**: `sendDailyReport()` calls `deletePreviousTelegramReport()` before sending; stores `lastTelegramReportMessageId` in-memory
+- **`Scheduler`**: Moved BB alerts from 5-min loop to dedicated `hourlyBollingerBandMonitoring()` (`fixedRate = 3600000`)
+
+---
+
+## Previous Milestone: Bollinger Band Refinement ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
 
 ### Implementation Complete (March 27, 2026)
 
@@ -114,7 +132,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 | **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
-| **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Real-time + Daily 15:40 CET |
+| **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Hourly + Daily 15:40 CET |
 
 ---
 
@@ -135,6 +153,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 - Momentum ROC sector tracking
 - Tail Risk (Kurtosis + Skewness) analysis
 - **Bollinger Band analysis** (sectors + stocks, squeeze detection, band touches)
+- **Telegram delete-before-send** for recurring BB reports (keeps chat clean)
 
 ### Data Persistence ✅
 - JSON-based storage for target prices and configuration
@@ -162,7 +181,8 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 
 | Task | Schedule | Description |
 |------|----------|-------------|
-| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + RS alerts + ROC alerts + BB alerts |
+| stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + RS alerts + ROC alerts |
+| hourlyBollingerBandMonitoring | Every 60 min (9:30-16:00 ET, Mon-Fri) | BB alerts (delete previous, send new) |
 | cryptoMarketMonitoring | Every 5 min (24/7) | Crypto price monitoring |
 | rsiStockMonitoring | Daily 23:00 CET (Mon-Fri) | RSI + Relative Strength analysis |
 | rsiCryptoMonitoring | Daily 00:05 ET | RSI calculation for crypto |
@@ -190,8 +210,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: March 27, 2026
+- Date: March 29, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
-- All 677 tests passing
 - Code coverage: 97%

@@ -25,7 +25,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`StatisticsUtil`:** Shared utility class providing `mean()`, `standardDeviation()`, `zScore()`, `percentileRank()`, `populationStdDev()`, and `percentile()` (including range-based overloads). Used by `SectorRotationAnalyzer`, `TailRiskService`, and `BollingerBandService` to eliminate code duplication.
 -   **`BollingerBandService`:** Calculates Bollinger Bands (20-period SMA ± 2σ), %B positioning, bandwidth, and bandwidth percentile for squeeze detection. Uses split data thresholds: 20 points for basic bands, 40+ for bandwidth percentile history. Detects both absolute squeezes (bandwidth ≤ 4%) and historical squeezes (percentile ≤ 10%). Uses `StatisticsUtil` and reads prices from `PriceQuoteRepository`.
 -   **`BollingerBandTracker`:** Orchestrates Bollinger Band analysis across all sector ETFs and tracked stocks. Sends Telegram alerts for band touches and squeezes, plus daily summary reports. Uses `SectorEtfRegistry` for ETFs and `StockSymbolRegistry` for individual stocks (excluding ETFs to avoid duplication).
--   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern.
+-   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern. `TelegramClient` supports `sendMessage()`, `sendMessageAndReturnId()` (returns `OptionalLong` with message ID), and `deleteMessage(long)` for the delete-before-send pattern.
+-   **`TelegramSendMessageResponse`:** DTO for parsing Telegram `sendMessage` API responses, extracting `message_id` from the `result` object.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
 -   **`TargetPriceProvider`:** Manages the watchlist of symbols to be monitored, including those to be ignored. Allows dynamic configuration.
@@ -65,6 +66,7 @@ The application follows a modular, component-based architecture built on the Spr
 | Task | Schedule | Zone | Description |
 |------|----------|------|-------------|
 | `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock prices + RS alerts + ROC alerts |
+| `hourlyBollingerBandMonitoring` | Every 60 min (9:30-16:00, Mon-Fri) | America/New_York | BB alerts (delete previous, send new) |
 | `cryptoMarketMonitoring` | Every 5 min | UTC | 24/7 crypto monitoring |
 | `rsiStockMonitoring` | Daily 16:30 (Mon-Fri) | America/New_York | Stock RSI + RS analysis |
 | `rsiCryptoMonitoring` | Daily 00:05 | America/New_York | Crypto RSI calculations |
@@ -293,7 +295,7 @@ The system now uses four complementary approaches for market analysis:
 | **Relative Strength vs SPY** | `SectorRelativeStrengthTracker` | RS EMA crossovers | Real-time (5 min) |
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
-| **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Daily |
+| **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Hourly (delete-before-send) |
 
 **Stock Market Monitoring Flow:**
 ```java
@@ -306,7 +308,41 @@ protected void stockMarketMonitoring() {
         rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
     }
 }
+
+@Scheduled(initialDelay = 0, fixedRate = 3600000)
+protected void hourlyBollingerBandMonitoring() {
+    if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
+        rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
+    }
+}
 ```
+
+## Delete-Before-Send Pattern (Telegram)
+
+For recurring reports that are "updates" rather than new information, the bot deletes the previous message before sending the new one:
+
+```java
+// BollingerBandTracker stores last message ID in-memory
+private long lastTelegramReportMessageId = -1;
+
+private void deletePreviousTelegramReport() {
+    if (lastTelegramReportMessageId > 0) {
+        telegramClient.deleteMessage(lastTelegramReportMessageId);
+    }
+}
+
+// TelegramClient uses deleteMessage Bot API endpoint
+public void deleteMessage(long messageId) {
+    String url = DELETE_URL.formatted(botToken, chatId, messageId);
+    // POST to Telegram API
+}
+```
+
+**Design choices:**
+- In-memory message ID tracking (resets on restart — acceptable for hourly reports)
+- `sendMessageAndReturnId()` returns `OptionalLong` — empty on failure
+- Delete failures are logged but don't block new message delivery
+- Reusable pattern for any recurring report type
 
 ## Testing Patterns
 
