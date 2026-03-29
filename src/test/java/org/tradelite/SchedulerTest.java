@@ -78,12 +78,12 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        // Called 4 times: finnhubPriceEvaluator, sectorRelativeStrengthTracker,
-        // sectorMomentumRocTracker, bollingerBandTracker
-        verify(rootErrorHandler, times(4)).run(any(ThrowingRunnable.class));
+        // Called 3 times: finnhubPriceEvaluator, sectorRelativeStrengthTracker,
+        // sectorMomentumRocTracker (BB moved to hourly schedule)
+        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(4)).run(captor.capture());
+        verify(rootErrorHandler, times(3)).run(captor.capture());
 
         // Execute all captured runnables
         for (ThrowingRunnable runnable : captor.getAllValues()) {
@@ -93,7 +93,7 @@ class SchedulerTest {
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
-        verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
+        verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
         verify(coinGeckoPriceEvaluator, times(0)).evaluatePrice();
     }
 
@@ -107,6 +107,33 @@ class SchedulerTest {
         verify(rootErrorHandler, never()).run(any(ThrowingRunnable.class));
         verify(finnhubPriceEvaluator, never()).evaluatePrice();
         verify(coinGeckoPriceEvaluator, never()).evaluatePrice();
+    }
+
+    @Test
+    void hourlyBollingerBandMonitoring_marketOpen_shouldRun() throws Exception {
+        scheduler.dayOfWeek = DayOfWeek.MONDAY;
+        scheduler.localTime = LocalTime.of(17, 0);
+
+        scheduler.hourlyBollingerBandMonitoring();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
+    }
+
+    @Test
+    void hourlyBollingerBandMonitoring_marketClosed_shouldNotRun() {
+        scheduler.dayOfWeek = DayOfWeek.SATURDAY;
+        scheduler.localTime = LocalTime.of(17, 0);
+
+        scheduler.hourlyBollingerBandMonitoring();
+
+        verify(rootErrorHandler, never()).run(any(ThrowingRunnable.class));
+        verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
     }
 
     @Test
