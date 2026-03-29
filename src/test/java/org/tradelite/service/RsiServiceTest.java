@@ -79,7 +79,9 @@ class RsiServiceTest {
         CoinId cryptoSymbol = CoinId.BITCOIN;
         rsiService.addPrice(cryptoSymbol, 50000, LocalDate.now());
 
-        assertEquals(cryptoSymbol.getName(), rsiService.getSymbolDisplayNames().get(cryptoSymbol.getName()));
+        assertEquals(
+                cryptoSymbol.getName(),
+                rsiService.getSymbolDisplayNames().get(cryptoSymbol.getName()));
     }
 
     @Test
@@ -122,7 +124,9 @@ class RsiServiceTest {
     @Test
     void testAnalyzeAllSymbols_neutralRsi_noSignals() throws IOException {
         // Mixed prices that should produce neutral RSI (between 30 and 70)
-        double[] mixedPrices = {100, 105, 102, 108, 104, 110, 106, 112, 108, 114, 110, 116, 112, 118, 114};
+        double[] mixedPrices = {
+            100, 105, 102, 108, 104, 110, 106, 112, 108, 114, 110, 116, 112, 118, 114
+        };
         for (int i = 0; i < mixedPrices.length; i++) {
             rsiService.addPrice(symbol, mixedPrices[i], LocalDate.now().minusDays(14 - i));
         }
@@ -665,9 +669,11 @@ class RsiServiceTest {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
-        double previousRsiBefore = rsiService.getPriceHistory().get(symbol.getName()).getPreviousRsi();
+        double previousRsiBefore =
+                rsiService.getPriceHistory().get(symbol.getName()).getPreviousRsi();
         rsiService.analyzeAllSymbols();
-        double previousRsiAfter = rsiService.getPriceHistory().get(symbol.getName()).getPreviousRsi();
+        double previousRsiAfter =
+                rsiService.getPriceHistory().get(symbol.getName()).getPreviousRsi();
 
         // After analysis, previousRsi should be updated from its initial value
         assertThat(previousRsiAfter, is(not(closeTo(previousRsiBefore, 0.01))));
@@ -689,9 +695,12 @@ class RsiServiceTest {
 
         rsiService.sendRsiReport();
 
-        verify(telegramClient, times(1)).sendMessageAndReturnId(argThat(report ->
-                report.contains("RSI Signal Report")
-                        && report.contains("Overbought")
-                        && report.contains("Oversold")));
+        verify(telegramClient, times(1))
+                .sendMessageAndReturnId(
+                        argThat(
+                                report ->
+                                        report.contains("RSI Signal Report")
+                                                && report.contains("Overbought")
+                                                && report.contains("Oversold")));
     }
 }
