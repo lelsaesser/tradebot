@@ -160,14 +160,6 @@ public class TelegramMessageProcessor {
         return Optional.of(new RemoveCommand(ticker));
     }
 
-    protected Optional<Double> tryParseDouble(String value) {
-        try {
-            return Optional.of(Double.parseDouble(value));
-        } catch (NumberFormatException | NullPointerException _) {
-            return Optional.empty();
-        }
-    }
-
     protected Optional<TickerSymbol> parseTickerSymbol(String symbol) {
         if (symbol == null || symbol.isEmpty()) {
             return Optional.empty();

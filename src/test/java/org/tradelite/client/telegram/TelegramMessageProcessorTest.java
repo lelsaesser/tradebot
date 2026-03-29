@@ -405,10 +405,4 @@ class TelegramMessageProcessorTest {
 
         assertThat(result.isPresent(), is(false));
     }
-
-    @Test
-    void tryParseDouble_nullValue_returnsEmpty() {
-        Optional<Double> result = messageProcessor.tryParseDouble(null);
-        assertThat(result.isPresent(), is(false));
-    }
 }
