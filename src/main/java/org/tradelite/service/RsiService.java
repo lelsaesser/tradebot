@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.OptionalLong;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,15 @@ public class RsiService {
 
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+
+    /**
+     * Stores the Telegram message ID of the last sent RSI report so it can be deleted before
+     * sending the next update.
+     */
+    private Long lastTelegramReportMessageId;
+
+    /** Accumulated RSI signals collected during price processing, sent as a batch report. */
+    @Getter private final List<RsiSignal> pendingSignals = new ArrayList<>();
 
     @Autowired
     public RsiService(
@@ -97,26 +107,86 @@ public class RsiService {
         double previousRsi = rsiDailyClosePrice.getPreviousRsi();
         double rsiDiff = rsi - previousRsi;
 
-        String rsiDiffString = "";
-        if (previousRsi != 0) {
-            rsiDiffString = String.format("(%+.1f)", rsiDiff);
-        }
-
         if (rsi >= 70) {
             log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
-            telegramClient.sendMessage(
-                    String.format(
-                            "🔴 RSI for %s is in overbought zone: %.2f %s",
-                            displayName, rsi, rsiDiffString));
+            pendingSignals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERBOUGHT"));
         } else if (rsi <= 30) {
             log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
-            telegramClient.sendMessage(
-                    String.format(
-                            "🟢 RSI for %s is in oversold zone: %.2f %s",
-                            displayName, rsi, rsiDiffString));
+            pendingSignals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERSOLD"));
         }
         rsiDailyClosePrice.setPreviousRsi(rsi);
     }
+
+    /** Sends a consolidated RSI report with all pending signals, deleting the previous report. */
+    public void sendRsiReport() {
+        if (pendingSignals.isEmpty()) {
+            log.info("No RSI signals to report");
+            return;
+        }
+
+        deletePreviousTelegramReport();
+        String report = buildRsiReport(pendingSignals);
+        OptionalLong messageId = telegramClient.sendMessageAndReturnId(report);
+        messageId.ifPresent(id -> lastTelegramReportMessageId = id);
+        log.info("RSI report sent with {} signal(s)", pendingSignals.size());
+        pendingSignals.clear();
+    }
+
+    private void deletePreviousTelegramReport() {
+        if (lastTelegramReportMessageId != null) {
+            log.info(
+                    "Deleting previous Telegram RSI report message {}",
+                    lastTelegramReportMessageId);
+            telegramClient.deleteMessage(lastTelegramReportMessageId);
+            lastTelegramReportMessageId = null;
+        }
+    }
+
+    /** Builds a consolidated RSI report message from the given signals. */
+    protected String buildRsiReport(List<RsiSignal> signals) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 *RSI Signal Report*\n\n");
+
+        List<RsiSignal> overbought =
+                signals.stream().filter(s -> "OVERBOUGHT".equals(s.zone())).toList();
+        List<RsiSignal> oversold =
+                signals.stream().filter(s -> "OVERSOLD".equals(s.zone())).toList();
+
+        if (!overbought.isEmpty()) {
+            sb.append("🔴 *Overbought (RSI ≥ 70):*\n");
+            for (RsiSignal signal : overbought) {
+                sb.append(formatSignalLine(signal)).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!oversold.isEmpty()) {
+            sb.append("🟢 *Oversold (RSI ≤ 30):*\n");
+            for (RsiSignal signal : oversold) {
+                sb.append(formatSignalLine(signal)).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append(
+                String.format(
+                        "_%d signal(s): %d overbought, %d oversold_",
+                        signals.size(), overbought.size(), oversold.size()));
+
+        return sb.toString();
+    }
+
+    private String formatSignalLine(RsiSignal signal) {
+        String rsiDiffString = "";
+        if (signal.previousRsi() != 0) {
+            rsiDiffString = String.format(" (%+.1f)", signal.rsiDiff());
+        }
+        return String.format("  • %s: %.2f%s", signal.displayName(), signal.rsi(), rsiDiffString);
+    }
+
+    /** Represents an RSI signal for a single symbol. */
+    public record RsiSignal(
+            String displayName, double rsi, double previousRsi, double rsiDiff, String zone) {}
 
     public Optional<Double> getCurrentRsi(TickerSymbol symbol) {
         String symbolKey = symbol.getName();

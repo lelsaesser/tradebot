@@ -1,6 +1,22 @@
 # Progress Tracking
 
-## Latest Milestone: Telegram Delete-Before-Send for BB Reports ✅ COMPLETE
+## Latest Milestone: RSI Batched Reporting ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation Complete (March 29, 2026)
+
+#### Feature Overview
+RSI reporting changed from individual Telegram messages per stock to a consolidated hourly report, following the same pattern as Bollinger Bands. Previous report messages are deleted when new ones are sent.
+
+#### Changes
+- **`RsiService`**: `addPrice()` now accumulates signals in `pendingSignals` list instead of sending individual Telegram messages; new `sendRsiReport()` builds consolidated report via `buildRsiReport()` and sends via `sendMessageAndReturnId()`; `deletePreviousTelegramReport()` removes previous report; new `RsiSignal` record
+- **`Scheduler`**: Renamed `hourlyBollingerBandMonitoring()` → `hourlySignalMonitoring()`; now runs both BB and RSI reports hourly; added `RsiService` as constructor dependency
+- **Tests**: 37 RsiServiceTest + 18 SchedulerTest all passing
+
+---
+
+## Previous Milestone: Telegram Delete-Before-Send for BB Reports ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -153,7 +169,8 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 - Momentum ROC sector tracking
 - Tail Risk (Kurtosis + Skewness) analysis
 - **Bollinger Band analysis** (sectors + stocks, squeeze detection, band touches)
-- **Telegram delete-before-send** for recurring BB reports (keeps chat clean)
+- **Telegram delete-before-send** for recurring BB and RSI reports (keeps chat clean)
+- **RSI batched reporting** (consolidated hourly report instead of individual messages)
 
 ### Data Persistence ✅
 - JSON-based storage for target prices and configuration
@@ -182,7 +199,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 | Task | Schedule | Description |
 |------|----------|-------------|
 | stockMarketMonitoring | Every 5 min (9:30-16:00 ET, Mon-Fri) | Stock prices + RS alerts + ROC alerts |
-| hourlyBollingerBandMonitoring | Every 60 min (9:30-16:00 ET, Mon-Fri) | BB alerts (delete previous, send new) |
+| hourlySignalMonitoring | Every 60 min (9:30-16:00 ET, Mon-Fri) | BB + RSI reports (delete previous, send new) |
 | cryptoMarketMonitoring | Every 5 min (24/7) | Crypto price monitoring |
 | rsiStockMonitoring | Daily 23:00 CET (Mon-Fri) | RSI + Relative Strength analysis |
 | rsiCryptoMonitoring | Daily 00:05 ET | RSI calculation for crypto |

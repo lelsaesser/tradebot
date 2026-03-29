@@ -6,14 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.contains;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,34 +54,169 @@ class RsiServiceTest {
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_overbought() throws IOException {
+    void testAddPriceAndCalculateRsi_overbought_accumulatesSignal() throws IOException {
         // Need 15 prices to calculate RSI (14 price changes)
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
-        verify(telegramClient, times(1)).sendMessage(contains(symbol.getDisplayName()));
+        // Signals should be accumulated, not sent directly
+        verify(telegramClient, never()).sendMessage(anyString());
+        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
+        assertThat(rsiService.getPendingSignals(), is(not(empty())));
+        assertThat(
+                rsiService.getPendingSignals().stream()
+                        .anyMatch(s -> "OVERBOUGHT".equals(s.zone())),
+                is(true));
         verify(rsiService, times(15)).savePriceHistory();
     }
 
     @Test
-    void testAddPriceAndCalculateRsi_oversold() throws IOException {
+    void testAddPriceAndCalculateRsi_oversold_accumulatesSignal() throws IOException {
         // Add declining prices to trigger oversold condition (RSI <= 30)
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
         }
 
-        // Verify RSI calculation and notification for oversold (may be called multiple times as we
-        // add prices)
-        verify(telegramClient, atLeastOnce()).sendMessage(contains("🟢"));
-        verify(telegramClient, atLeastOnce()).sendMessage(contains("oversold"));
-        verify(telegramClient, atLeastOnce()).sendMessage(contains(symbol.getDisplayName()));
+        // Signals should be accumulated, not sent directly
+        verify(telegramClient, never()).sendMessage(anyString());
+        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
+        assertThat(rsiService.getPendingSignals(), is(not(empty())));
+        assertThat(
+                rsiService.getPendingSignals().stream().anyMatch(s -> "OVERSOLD".equals(s.zone())),
+                is(true));
         verify(rsiService, times(15)).savePriceHistory();
     }
 
     @Test
+    void testSendRsiReport_sendsConsolidatedReport() throws IOException {
+        when(telegramClient.sendMessageAndReturnId(anyString()))
+                .thenReturn(OptionalLong.of(123L));
+
+        // Generate overbought signals
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+        assertThat(rsiService.getPendingSignals(), is(not(empty())));
+
+        rsiService.sendRsiReport();
+
+        verify(telegramClient, times(1)).sendMessageAndReturnId(contains("RSI Signal Report"));
+        assertThat(rsiService.getPendingSignals(), is(empty()));
+    }
+
+    @Test
+    void testSendRsiReport_noSignals_doesNotSend() {
+        rsiService.sendRsiReport();
+
+        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
+        verify(telegramClient, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void testSendRsiReport_deletesPreviousReport() throws IOException {
+        when(telegramClient.sendMessageAndReturnId(anyString()))
+                .thenReturn(OptionalLong.of(100L))
+                .thenReturn(OptionalLong.of(200L));
+
+        // First report
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+        rsiService.sendRsiReport();
+
+        // Second report - should delete the first
+        rsiService.getPendingSignals().clear();
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(
+                    new StockSymbol("MSFT", "Microsoft"),
+                    100 + i,
+                    LocalDate.now().minusDays(14 - i));
+        }
+        rsiService.sendRsiReport();
+
+        verify(telegramClient, times(1)).deleteMessage(100L);
+    }
+
+    @Test
+    void testSendRsiReport_noDeleteWhenNoPreviousMessage() throws IOException {
+        when(telegramClient.sendMessageAndReturnId(anyString()))
+                .thenReturn(OptionalLong.of(100L));
+
+        for (int i = 0; i < 15; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+        }
+        rsiService.sendRsiReport();
+
+        verify(telegramClient, never()).deleteMessage(anyLong());
+    }
+
+    @Test
+    void testBuildRsiReport_overboughtSignals() {
+        List<RsiService.RsiSignal> signals =
+                List.of(
+                        new RsiService.RsiSignal("Apple", 75.5, 72.0, 3.5, "OVERBOUGHT"),
+                        new RsiService.RsiSignal("Microsoft", 80.2, 78.0, 2.2, "OVERBOUGHT"));
+
+        String report = rsiService.buildRsiReport(signals);
+
+        assertThat(report, containsString("📊 *RSI Signal Report*"));
+        assertThat(report, containsString("🔴 *Overbought (RSI ≥ 70):*"));
+        assertThat(report, containsString("Apple"));
+        assertThat(report, containsString("Microsoft"));
+        assertThat(report, containsString("2 signal(s): 2 overbought, 0 oversold"));
+    }
+
+    @Test
+    void testBuildRsiReport_oversoldSignals() {
+        List<RsiService.RsiSignal> signals =
+                List.of(new RsiService.RsiSignal("Tesla", 25.3, 28.0, -2.7, "OVERSOLD"));
+
+        String report = rsiService.buildRsiReport(signals);
+
+        assertThat(report, containsString("🟢 *Oversold (RSI ≤ 30):*"));
+        assertThat(report, containsString("Tesla"));
+        assertThat(report, containsString("1 signal(s): 0 overbought, 1 oversold"));
+    }
+
+    @Test
+    void testBuildRsiReport_mixedSignals() {
+        List<RsiService.RsiSignal> signals =
+                List.of(
+                        new RsiService.RsiSignal("Apple", 75.5, 72.0, 3.5, "OVERBOUGHT"),
+                        new RsiService.RsiSignal("Tesla", 25.3, 28.0, -2.7, "OVERSOLD"));
+
+        String report = rsiService.buildRsiReport(signals);
+
+        assertThat(report, containsString("🔴 *Overbought (RSI ≥ 70):*"));
+        assertThat(report, containsString("🟢 *Oversold (RSI ≤ 30):*"));
+        assertThat(report, containsString("2 signal(s): 1 overbought, 1 oversold"));
+    }
+
+    @Test
+    void testBuildRsiReport_withNoPreviousRsi() {
+        List<RsiService.RsiSignal> signals =
+                List.of(new RsiService.RsiSignal("Apple", 75.5, 0, 75.5, "OVERBOUGHT"));
+
+        String report = rsiService.buildRsiReport(signals);
+
+        // Should not include diff when previousRsi is 0
+        assertThat(report, containsString("Apple: 75.50"));
+        assertThat(report, not(containsString("(+")));
+    }
+
+    @Test
+    void testBuildRsiReport_withRsiDiff() {
+        List<RsiService.RsiSignal> signals =
+                List.of(new RsiService.RsiSignal("Apple", 75.5, 72.0, 3.5, "OVERBOUGHT"));
+
+        String report = rsiService.buildRsiReport(signals);
+
+        assertThat(report, containsString("Apple: 75.50 (+3.5)"));
+    }
+
+    @Test
     void testCalculateRsi_withLosses() {
-        // Test RSI calculation with declining prices to cover loss calculation
         java.util.List<Double> decliningPrices =
                 java.util.Arrays.asList(
                         100.0, 95.0, 90.0, 85.0, 80.0, 75.0, 70.0, 65.0, 60.0, 55.0, 50.0, 45.0,
@@ -88,43 +224,27 @@ class RsiServiceTest {
 
         double rsi = rsiService.calculateRsi(decliningPrices);
 
-        // RSI should be low for declining prices
         assertThat(rsi, is(closeTo(0.0, 0.1)));
     }
 
     @Test
     void testCalculateRsi_mixedPrices() {
-        // Test RSI calculation with mixed gains and losses to cover RS calculation
         java.util.List<Double> mixedPrices =
                 java.util.Arrays.asList(
-                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0, 110.0,
-                        116.0, 112.0, 118.0, 114.0);
+                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0,
+                        110.0, 116.0, 112.0, 118.0, 114.0);
 
         double rsi = rsiService.calculateRsi(mixedPrices);
 
-        // RSI should be between 0 and 100
         assertThat(rsi, is(both(greaterThanOrEqualTo(0.0)).and(lessThanOrEqualTo(100.0))));
     }
 
     @Test
     void testCalculateRsi_insufficientPrices() {
-        // Test that RSI calculation returns 50 with insufficient prices
         java.util.List<Double> insufficientPrices =
                 java.util.Arrays.asList(
-                        100.0,
-                        105.0,
-                        102.0,
-                        108.0,
-                        104.0,
-                        110.0,
-                        106.0,
-                        112.0,
-                        108.0,
-                        114.0,
-                        110.0,
-                        116.0,
-                        112.0 // Only 13 prices
-                        );
+                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0,
+                        110.0, 116.0, 112.0);
 
         double rsi = rsiService.calculateRsi(insufficientPrices);
         assertEquals(50, rsi);
@@ -200,20 +320,15 @@ class RsiServiceTest {
 
     @Test
     void testObjectMapperCanSerializeLocalDate() throws Exception {
-        // This test ensures the Spring-configured ObjectMapper can handle LocalDate serialization
-        // If the JSR310 module is not registered, this test will fail
         RsiDailyClosePrice priceData = new RsiDailyClosePrice();
         priceData.addPrice(LocalDate.of(2023, 1, 15), 150.0);
 
         Map<String, RsiDailyClosePrice> testData = new HashMap<>();
         testData.put(symbol.getName(), priceData);
 
-        // This should not throw an exception if JSR310 module is properly configured
         String json = objectMapper.writeValueAsString(testData);
-        // LocalDate is serialized as an array [year, month, day] by default with JSR310
         assertThat(json, containsString("[2023,1,15]"));
 
-        // Verify we can also deserialize it back
         Map<String, RsiDailyClosePrice> deserializedData =
                 objectMapper.readValue(
                         json,
@@ -233,20 +348,15 @@ class RsiServiceTest {
     @Test
     void testHolidayDetection_identicalPrices() throws IOException {
         LocalDate firstDay = LocalDate.of(2023, 12, 22);
-        LocalDate secondDay = LocalDate.of(2023, 12, 25); // Christmas Day
+        LocalDate secondDay = LocalDate.of(2023, 12, 25);
         double price = 150.50;
 
-        // Add first price
         rsiService.addPrice(symbol, price, firstDay);
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
 
-        // Add identical price on different day - should trigger holiday detection and skip adding
         rsiService.addPrice(symbol, price, secondDay);
 
-        // Verify holiday was detected but price was NOT added (still only 1 entry)
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
-
-        // Verify the date is still the first day, not the holiday
         assertEquals(
                 firstDay,
                 rsiService
@@ -262,10 +372,7 @@ class RsiServiceTest {
         LocalDate firstDay = LocalDate.of(2023, 12, 22);
         LocalDate secondDay = LocalDate.of(2023, 12, 25);
 
-        // Add first price
         rsiService.addPrice(symbol, 150.50, firstDay);
-
-        // Add slightly different price - should NOT trigger holiday detection
         rsiService.addPrice(symbol, 150.51, secondDay);
 
         assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
@@ -276,10 +383,7 @@ class RsiServiceTest {
         LocalDate sameDay = LocalDate.of(2023, 12, 22);
         double price = 150.50;
 
-        // Add first price
         rsiService.addPrice(symbol, price, sameDay);
-
-        // Add identical price on same day - should be filtered out as duplicate
         rsiService.addPrice(symbol, price, sameDay);
 
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
@@ -290,7 +394,6 @@ class RsiServiceTest {
         LocalDate firstDay = LocalDate.of(2023, 12, 22);
         double price = 150.50;
 
-        // Add first price with no previous data
         rsiService.addPrice(symbol, price, firstDay);
 
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
@@ -301,16 +404,10 @@ class RsiServiceTest {
         LocalDate firstDay = LocalDate.of(2023, 12, 22);
         LocalDate secondDay = LocalDate.of(2023, 12, 25);
 
-        // Add first price
         rsiService.addPrice(symbol, 150.5000, firstDay);
-
-        // Verify we have 1 price entry
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
 
-        // Add price within epsilon (0.0001) - should trigger holiday detection and skip adding
         rsiService.addPrice(symbol, 150.5000, secondDay);
-
-        // Verify holiday was detected but price was NOT added (still only 1 entry)
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
     }
 
@@ -319,28 +416,30 @@ class RsiServiceTest {
         LocalDate firstDay = LocalDate.of(2023, 12, 22);
         LocalDate secondDay = LocalDate.of(2023, 12, 25);
 
-        // Add first price
         rsiService.addPrice(symbol, 150.5000, firstDay);
-
-        // Add price outside epsilon (0.0001) - should NOT trigger holiday detection
         rsiService.addPrice(symbol, 150.5002, secondDay);
 
         assertEquals(2, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
     }
 
     @Test
-    void testRsiDiff_isCalculatedAndSent() throws IOException {
+    void testRsiDiff_isAccumulatedInSignal() throws IOException {
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(15 - i));
         }
         rsiService.getPriceHistory().get(symbol.getName()).setPreviousRsi(10);
+        rsiService.getPendingSignals().clear();
         rsiService.addPrice(symbol, 120, LocalDate.now());
-        verify(telegramClient, atLeastOnce()).sendMessage(contains("(-"));
+
+        // Verify signal was accumulated with rsiDiff
+        assertThat(rsiService.getPendingSignals(), is(not(empty())));
+        RsiService.RsiSignal signal = rsiService.getPendingSignals().getFirst();
+        assertThat(signal.previousRsi(), is(closeTo(10.0, 0.01)));
+        assertThat(signal.rsiDiff(), is(not(closeTo(0.0, 0.01))));
     }
 
     @Test
     void testGetCurrentRsi_withSufficientData() throws IOException {
-        // Add 15 prices to have sufficient data for RSI calculation
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
@@ -353,7 +452,6 @@ class RsiServiceTest {
 
     @Test
     void testGetCurrentRsi_withInsufficientData() throws IOException {
-        // Add only a few prices (less than RSI_PERIOD + 1 = 15)
         for (int i = 0; i < 10; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
         }
@@ -371,17 +469,20 @@ class RsiServiceTest {
     }
 
     @Test
-    void testCryptoSymbolDisplayName() throws IOException {
+    void testCryptoSymbolDisplayName_accumulatesSignal() throws IOException {
         CoinId cryptoSymbol = CoinId.BITCOIN;
 
-        // Add 15 prices to trigger RSI calculation and notification
         for (int i = 0; i < 15; i++) {
             rsiService.addPrice(cryptoSymbol, 100 + i, LocalDate.now().minusDays(14 - i));
         }
 
-        // Verify that crypto symbols use their name directly (no getDisplayName method)
-        verify(telegramClient, times(1)).sendMessage(contains(cryptoSymbol.getName()));
-        verify(telegramClient, times(1)).sendMessage(contains("bitcoin"));
+        // Signals should be accumulated, not sent directly
+        verify(telegramClient, never()).sendMessage(anyString());
+        assertThat(rsiService.getPendingSignals(), is(not(empty())));
+        assertThat(
+                rsiService.getPendingSignals().stream()
+                        .anyMatch(s -> s.displayName().equals(cryptoSymbol.getName())),
+                is(true));
     }
 
     @Test
@@ -398,7 +499,6 @@ class RsiServiceTest {
                         finnhubPriceEvaluator,
                         coinGeckoPriceEvaluator);
 
-        // Adding a price will trigger savePriceHistory, which should throw IOException
         assertThrows(
                 IOException.class,
                 () -> serviceWithFailingMapper.addPrice(symbol, 100.0, LocalDate.now()));
@@ -406,15 +506,13 @@ class RsiServiceTest {
 
     @Test
     void testCalculateRsi_averageLossZero() {
-        // Test the edge case where avgLoss becomes 0 (all gains, no losses)
         java.util.List<Double> allGainsAfterInitial =
                 java.util.Arrays.asList(
-                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0,
-                        111.0, 112.0, 113.0, 114.0);
+                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+                        110.0, 111.0, 112.0, 113.0, 114.0);
 
         double rsi = rsiService.calculateRsi(allGainsAfterInitial);
 
-        // When avgLoss is 0, RSI should be 100
         assertEquals(100.0, rsi, 0.001);
     }
 
@@ -439,7 +537,6 @@ class RsiServiceTest {
 
     @Test
     void testGetCurrentPriceFromCache_nullCaches() {
-        // Test that getCurrentPriceFromCache returns null when caches are empty
         when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
         when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
 
@@ -452,12 +549,10 @@ class RsiServiceTest {
 
     @Test
     void testGetCurrentRsi_withCurrentPriceFromCache() throws IOException {
-        // Set up historical data (14 prices)
         for (int i = 0; i < 14; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
         }
 
-        // Mock current price from cache
         when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 125.0));
 
         var rsi = rsiService.getCurrentRsi(symbol);
@@ -470,13 +565,11 @@ class RsiServiceTest {
     void testGetCurrentRsi_withCurrentPriceFromCache_crypto() throws IOException {
         CoinId cryptoSymbol = CoinId.BITCOIN;
 
-        // Set up historical data (14 prices)
         for (int i = 0; i < 14; i++) {
             rsiService.addPrice(
                     cryptoSymbol, 40000 + (i * 1000), LocalDate.now().minusDays(13 - i));
         }
 
-        // Mock current price from cache
         when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(cryptoSymbol, 55000.0));
 
         var rsi = rsiService.getCurrentRsi(cryptoSymbol);
@@ -487,17 +580,14 @@ class RsiServiceTest {
 
     @Test
     void testGetCurrentRsi_insufficientDataEvenWithCache() throws IOException {
-        // Set up only 10 historical prices (less than RSI_PERIOD)
         for (int i = 0; i < 10; i++) {
             rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
         }
 
-        // Mock current price from cache
         when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 125.0));
 
         var rsi = rsiService.getCurrentRsi(symbol);
 
-        // Even with cached price, we still don't have enough data (only 11 total)
         assertThat(rsi.isEmpty(), is(true));
     }
 }

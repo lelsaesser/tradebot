@@ -17,6 +17,7 @@ import org.tradelite.core.*;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.RsiService;
 import org.tradelite.utils.DateUtil;
 
 @Slf4j
@@ -38,6 +39,7 @@ public class Scheduler {
     private final SectorMomentumRocTracker sectorMomentumRocTracker;
     private final TailRiskTracker tailRiskTracker;
     private final BollingerBandTracker bollingerBandTracker;
+    private final RsiService rsiService;
 
     protected DayOfWeek dayOfWeek = null;
     protected LocalTime localTime = null;
@@ -58,7 +60,8 @@ public class Scheduler {
             SectorRelativeStrengthTracker sectorRelativeStrengthTracker,
             SectorMomentumRocTracker sectorMomentumRocTracker,
             TailRiskTracker tailRiskTracker,
-            BollingerBandTracker bollingerBandTracker) {
+            BollingerBandTracker bollingerBandTracker,
+            RsiService rsiService) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -74,6 +77,7 @@ public class Scheduler {
         this.sectorMomentumRocTracker = sectorMomentumRocTracker;
         this.tailRiskTracker = tailRiskTracker;
         this.bollingerBandTracker = bollingerBandTracker;
+        this.rsiService = rsiService;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -90,13 +94,14 @@ public class Scheduler {
     }
 
     @Scheduled(cron = "0 0 * * * MON-FRI", zone = "CET")
-    protected void hourlyBollingerBandMonitoring() {
+    protected void hourlySignalMonitoring() {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
+            rootErrorHandler.run(rsiService::sendRsiReport);
         } else {
-            log.info("Market is off-hours or it's a weekend. Skipping Bollinger Band monitoring.");
+            log.info("Market is off-hours or it's a weekend. Skipping hourly signal monitoring.");
         }
-        log.info("Hourly Bollinger Band monitoring round completed.");
+        log.info("Hourly signal monitoring round completed.");
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 420000)
@@ -137,7 +142,6 @@ public class Scheduler {
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
     protected void rsiCryptoMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchCryptoClosingPrices);
-
         log.info("RSI daily crypto price data fetch completed.");
     }
 

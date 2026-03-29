@@ -1,9 +1,18 @@
 # Active Context
 
 ## Current Work Focus
-Implemented Telegram message deletion for BB reports — the hourly Bollinger Band report now deletes the previous report message before sending the new one, keeping the chat clean.
+Implemented batched RSI reporting following the same pattern as Bollinger Bands — RSI signals are now accumulated and sent as a consolidated hourly report instead of individual messages per stock. Previous report messages are deleted when new ones are sent.
 
 ## Recent Changes (March 29, 2026)
+
+### RSI Batched Reporting ✅ COMPLETE
+- **`RsiService`** — `addPrice()` no longer sends individual Telegram messages; signals accumulated in `pendingSignals` list
+- New `sendRsiReport()` method builds consolidated report via `buildRsiReport()` and sends with `sendMessageAndReturnId()`
+- Previous report messages deleted when new report sent (same delete-before-send pattern as BB)
+- New `RsiSignal` record holds display name, RSI value, previous RSI, diff, and zone (OVERBOUGHT/OVERSOLD)
+- Report format: header + grouped overbought/oversold sections + summary count
+- **`Scheduler`** — renamed `hourlyBollingerBandMonitoring` → `hourlySignalMonitoring`; now runs both BB and RSI reports hourly
+- **Tests**: 37 RsiServiceTest + 18 SchedulerTest all passing
 
 ### Telegram Delete-Before-Send for BB Reports ✅ COMPLETE
 - **`TelegramClient`** — refactored `sendMessage` to use new `sendMessageAndReturnId(String)` which returns `OptionalLong` with the Telegram message ID; added `deleteMessage(long messageId)` using Telegram Bot API `deleteMessage` endpoint
@@ -46,6 +55,7 @@ Implemented Telegram message deletion for BB reports — the hourly Bollinger Ba
 
 ## Next Steps
 - Consider extending delete-before-send pattern to other recurring reports (tail risk, sector rotation)
+- RSI batched reporting now follows same pattern as BB — pattern can be templated for future indicators
 - Consider MACD indicator as next quant feature (uses same EMA concepts)
 - Consider combining Bollinger + RS + ROC signals for multi-signal confirmation alerts
 - Monitor API rate limits with tracked stocks + 20 ETFs across all tracking systems
