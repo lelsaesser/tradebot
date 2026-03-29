@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -105,6 +106,33 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                     e);
             throw new IllegalStateException("Failed to save price quote", e);
         }
+    }
+
+    @Override
+    public Optional<PriceQuoteEntity> findLatestBySymbol(String symbol) {
+        String sql =
+                """
+                SELECT id, symbol, timestamp, current_price, daily_open, daily_high, daily_low,
+                       change_amount, change_percent, previous_close
+                FROM finnhub_price_quotes
+                WHERE symbol = ?
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """;
+
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, symbol);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapResultSetToEntity(rs));
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to find latest price quote for symbol {}", symbol, e);
+            throw new IllegalStateException("Failed to find latest price quote", e);
+        }
+        return Optional.empty();
     }
 
     @Override

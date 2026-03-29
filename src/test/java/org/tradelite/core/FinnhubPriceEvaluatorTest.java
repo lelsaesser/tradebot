@@ -3,10 +3,14 @@ package org.tradelite.core;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.aMapWithSize;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
+import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +23,7 @@ import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.PriceQuoteEntity;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
 
@@ -348,5 +353,65 @@ class FinnhubPriceEvaluatorTest {
         finnhubPriceEvaluator.evaluatePrice();
 
         verify(priceQuoteRepository, never()).save(any());
+    }
+
+    @Test
+    void isPotentialMarketHoliday_returnsTrueWhenNoTodayEntriesAndPriceUnchanged() {
+        LocalDate today = LocalDate.now();
+        when(priceQuoteRepository.findBySymbolAndDate("AAPL", today))
+                .thenReturn(Collections.emptyList());
+        when(priceQuoteRepository.findLatestBySymbol("AAPL"))
+                .thenReturn(
+                        Optional.of(
+                                PriceQuoteEntity.builder()
+                                        .symbol("AAPL")
+                                        .currentPrice(150.0)
+                                        .timestamp(1000L)
+                                        .build()));
+
+        assertTrue(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.0));
+    }
+
+    @Test
+    void isPotentialMarketHoliday_returnsFalseWhenTodayEntriesExist() {
+        LocalDate today = LocalDate.now();
+        when(priceQuoteRepository.findBySymbolAndDate("AAPL", today))
+                .thenReturn(
+                        List.of(
+                                PriceQuoteEntity.builder()
+                                        .symbol("AAPL")
+                                        .currentPrice(150.0)
+                                        .timestamp(1000L)
+                                        .build()));
+
+        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.0));
+        verify(priceQuoteRepository, never()).findLatestBySymbol(any());
+    }
+
+    @Test
+    void isPotentialMarketHoliday_returnsFalseWhenPriceDiffers() {
+        LocalDate today = LocalDate.now();
+        when(priceQuoteRepository.findBySymbolAndDate("AAPL", today))
+                .thenReturn(Collections.emptyList());
+        when(priceQuoteRepository.findLatestBySymbol("AAPL"))
+                .thenReturn(
+                        Optional.of(
+                                PriceQuoteEntity.builder()
+                                        .symbol("AAPL")
+                                        .currentPrice(148.0)
+                                        .timestamp(1000L)
+                                        .build()));
+
+        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.0));
+    }
+
+    @Test
+    void isPotentialMarketHoliday_returnsFalseWhenNoPersistedEntries() {
+        LocalDate today = LocalDate.now();
+        when(priceQuoteRepository.findBySymbolAndDate("AAPL", today))
+                .thenReturn(Collections.emptyList());
+        when(priceQuoteRepository.findLatestBySymbol("AAPL")).thenReturn(Optional.empty());
+
+        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.0));
     }
 }
