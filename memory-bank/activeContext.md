@@ -1,6 +1,18 @@
 # Active Context
 
 ## Current Work Focus
+
+### Case-Insensitive Subcommands (Issue #144) ✅ COMPLETE
+Made all Telegram command subcommands case insensitive. Previously `/show ALL` or `/set BUY AAPL 150` would fail; now they work correctly.
+
+**Changes:**
+- `TelegramMessageProcessor.parseCommand()` — lowercases subcommand for `/show` and direction for `/set` at parse time
+- `ShowCommandProcessor` — `isValidCommand()` and `processCommand()` use `equalsIgnoreCase()` for defense-in-depth
+- `SetCommandProcessor` — `isValidSetCommand()` uses `equalsIgnoreCase()` for buy/sell direction
+- Tests added: 7 new tests across `TelegramMessageProcessorTest`, `ShowCommandProcessorTest`, `SetCommandProcessorTest`
+- All 164 tests pass
+
+### Previous: RSI Current Price from Cache
 Enhanced RSI analysis to use current price from cache during `analyzeAllSymbols()`, allowing RSI calculation with 14 historical daily prices + 1 live intraday price. This mirrors how Bollinger Bands use live prices.
 
 ## Recent Changes (March 29, 2026)

@@ -87,6 +87,24 @@ class ShowCommandProcessorTest {
         assertThat(isValid, is(true));
     }
 
+    @Test
+    void isValidCommand_upperCaseSubCommand_returnsTrue() {
+        ShowCommand command = new ShowCommand("ALL");
+
+        boolean isValid = showCommandProcessor.isValidCommand(command);
+
+        assertThat(isValid, is(true));
+    }
+
+    @Test
+    void isValidCommand_mixedCaseSubCommand_returnsTrue() {
+        ShowCommand command = new ShowCommand("Coins");
+
+        boolean isValid = showCommandProcessor.isValidCommand(command);
+
+        assertThat(isValid, is(true));
+    }
+
     @ParameterizedTest
     @MethodSource("invalidCommandParamProvider")
     void isValidCommand_invalidCommand_returnsFalse(ShowCommand command) {

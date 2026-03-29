@@ -116,7 +116,7 @@ public class TelegramMessageProcessor {
             telegramClient.sendMessage(errorMessageCommandFormat);
             return Optional.empty();
         }
-        if (!subCommand.equals("buy") && !subCommand.equals("sell")) {
+        if (!subCommand.equalsIgnoreCase("buy") && !subCommand.equalsIgnoreCase("sell")) {
             telegramClient.sendMessage(errorMessageCommandFormat);
             return Optional.empty();
         }

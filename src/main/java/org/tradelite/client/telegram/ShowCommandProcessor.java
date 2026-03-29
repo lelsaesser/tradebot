@@ -36,11 +36,11 @@ public class ShowCommandProcessor implements TelegramCommandProcessor<ShowComman
         List<TargetPrice> coinPrices = targetPriceProvider.getCoinTargetPrices();
         List<TargetPrice> stockPrices = targetPriceProvider.getStockTargetPrices();
 
-        if (command.getSubCommand().equals(ShowCommandOptions.ALL.getName())) {
+        if (command.getSubCommand().equalsIgnoreCase(ShowCommandOptions.ALL.getName())) {
             responseMessage = builtResponseMessage(coinPrices, stockPrices);
-        } else if (command.getSubCommand().equals(ShowCommandOptions.COINS.getName())) {
+        } else if (command.getSubCommand().equalsIgnoreCase(ShowCommandOptions.COINS.getName())) {
             responseMessage = builtResponseMessage(coinPrices, List.of());
-        } else if (command.getSubCommand().equals(ShowCommandOptions.STOCKS.getName())) {
+        } else if (command.getSubCommand().equalsIgnoreCase(ShowCommandOptions.STOCKS.getName())) {
             responseMessage = builtResponseMessage(List.of(), stockPrices);
         }
 
@@ -60,9 +60,9 @@ public class ShowCommandProcessor implements TelegramCommandProcessor<ShowComman
                             + ".";
             return false;
         }
-        if (!command.getSubCommand().equals("coins")
-                && !command.getSubCommand().equals("stocks")
-                && !command.getSubCommand().equals("all")) {
+        if (!command.getSubCommand().equalsIgnoreCase("coins")
+                && !command.getSubCommand().equalsIgnoreCase("stocks")
+                && !command.getSubCommand().equalsIgnoreCase("all")) {
             errorMessage =
                     "Invalid sub-command: "
                             + command.getSubCommand()
