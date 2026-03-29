@@ -127,11 +127,25 @@ public class RsiService {
             String symbolKey = entry.getKey();
             RsiDailyClosePrice rsiDailyClosePrice = entry.getValue();
 
-            if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD + 1) {
+            if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD) {
                 continue;
             }
 
-            double rsi = calculateRsi(rsiDailyClosePrice.getPriceValues());
+            List<Double> prices = new ArrayList<>(rsiDailyClosePrice.getPriceValues());
+            Double currentPrice = getCurrentPriceFromCacheByKey(symbolKey);
+            if (currentPrice != null) {
+                prices.add(currentPrice);
+                log.info(
+                        "Using current price {} from cache for RSI report of {}",
+                        currentPrice,
+                        symbolKey);
+            }
+
+            if (prices.size() < RSI_PERIOD + 1) {
+                continue;
+            }
+
+            double rsi = calculateRsi(prices);
             String displayName = symbolDisplayNames.getOrDefault(symbolKey, symbolKey);
             double previousRsi = rsiDailyClosePrice.getPreviousRsi();
             double rsiDiff = rsi - previousRsi;
@@ -239,6 +253,19 @@ public class RsiService {
             return coinGeckoPriceEvaluator.getLastPriceCache().get(coinId);
         }
         return null;
+    }
+
+    /**
+     * Looks up the current price from the Finnhub or CoinGecko cache using only the symbol key
+     * string. Tries the stock cache first, then checks if it matches a known CoinId.
+     */
+    protected Double getCurrentPriceFromCacheByKey(String symbolKey) {
+        Double stockPrice = finnhubPriceEvaluator.getLastPriceCache().get(symbolKey);
+        if (stockPrice != null) {
+            return stockPrice;
+        }
+        Optional<CoinId> coinId = CoinId.fromString(symbolKey);
+        return coinId.map(id -> coinGeckoPriceEvaluator.getLastPriceCache().get(id)).orElse(null);
     }
 
     public synchronized boolean removeSymbolRsiData(String symbolKey) {

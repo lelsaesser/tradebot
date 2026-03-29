@@ -44,6 +44,8 @@ class RsiServiceTest {
     @BeforeEach
     void setUp() throws IOException {
         new File(rsiDataFile).delete();
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
+        when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
         rsiService =
                 spy(
                         new RsiService(
@@ -677,6 +679,52 @@ class RsiServiceTest {
 
         // After analysis, previousRsi should be updated from its initial value
         assertThat(previousRsiAfter, is(not(closeTo(previousRsiBefore, 0.01))));
+    }
+
+    @Test
+    void testGetCurrentPriceFromCacheByKey_stock() {
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 150.0));
+
+        Double price = rsiService.getCurrentPriceFromCacheByKey("AAPL");
+
+        assertEquals(150.0, price);
+    }
+
+    @Test
+    void testGetCurrentPriceFromCacheByKey_crypto() {
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
+        when(coinGeckoPriceEvaluator.getLastPriceCache())
+                .thenReturn(Map.of(CoinId.BITCOIN, 50000.0));
+
+        Double price = rsiService.getCurrentPriceFromCacheByKey("bitcoin");
+
+        assertEquals(50000.0, price);
+    }
+
+    @Test
+    void testGetCurrentPriceFromCacheByKey_notFound() {
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
+        when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of());
+
+        Double price = rsiService.getCurrentPriceFromCacheByKey("UNKNOWN");
+
+        assertThat(price, is(nullValue()));
+    }
+
+    @Test
+    void testAnalyzeAllSymbols_usesCurrentPriceFromCache() throws IOException {
+        // Add only 14 historical prices (not enough alone for RSI)
+        for (int i = 0; i < 14; i++) {
+            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
+        }
+
+        // Provide a current price via the cache to make 15 total
+        when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 120.0));
+
+        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
+
+        // With 14 historical + 1 cache = 15 prices, RSI should be calculable
+        assertThat(signals, is(not(empty())));
     }
 
     @Test

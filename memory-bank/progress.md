@@ -1,18 +1,18 @@
 # Progress Tracking
 
-## Latest Milestone: RSI Batched Reporting ✅ COMPLETE
+## Latest Milestone: RSI Consolidated Reporting with Live Price Cache ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
 ### Implementation Complete (March 29, 2026)
 
 #### Feature Overview
-RSI reporting changed from individual Telegram messages per stock to a consolidated hourly report, following the same pattern as Bollinger Bands. Previous report messages are deleted when new ones are sent.
+RSI reporting changed from individual Telegram messages per stock to a consolidated hourly report, following the same pattern as Bollinger Bands. Previous report messages are deleted when new ones are sent. RSI analysis now uses live prices from evaluator caches to supplement historical daily closes.
 
 #### Changes
-- **`RsiService`**: `addPrice()` now accumulates signals in `pendingSignals` list instead of sending individual Telegram messages; new `sendRsiReport()` builds consolidated report via `buildRsiReport()` and sends via `sendMessageAndReturnId()`; `deletePreviousTelegramReport()` removes previous report; new `RsiSignal` record
+- **`RsiService`**: `addPrice()` purely stores price data (no RSI calculation); `analyzeAllSymbols()` iterates all price history, appends current price from cache, calculates RSI, returns `List<RsiSignal>`; `sendRsiReport()` builds consolidated report and deletes previous message; `getCurrentPriceFromCacheByKey()` looks up live prices across Finnhub/CoinGecko caches; `getCurrentRsi()` also uses cache for on-demand RSI queries
 - **`Scheduler`**: Renamed `hourlyBollingerBandMonitoring()` → `hourlySignalMonitoring()`; now runs both BB and RSI reports hourly; added `RsiService` as constructor dependency
-- **Tests**: 37 RsiServiceTest + 18 SchedulerTest all passing
+- **Tests**: 50 RsiServiceTest + 713 total tests all passing
 
 ---
 

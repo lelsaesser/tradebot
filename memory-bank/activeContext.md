@@ -1,17 +1,24 @@
 # Active Context
 
 ## Current Work Focus
-Refined RSI batched reporting — separated concerns so `addPrice()` only stores data, and RSI calculation + signal detection happens in `analyzeAllSymbols()` called by `sendRsiReport()`. This follows the same consolidated hourly report pattern as Bollinger Bands.
+Enhanced RSI analysis to use current price from cache during `analyzeAllSymbols()`, allowing RSI calculation with 14 historical daily prices + 1 live intraday price. This mirrors how Bollinger Bands use live prices.
 
 ## Recent Changes (March 29, 2026)
 
+### RSI Current Price from Cache ✅ COMPLETE
+- **`RsiService.analyzeAllSymbols()`** — now appends current live price from evaluator caches (Finnhub/CoinGecko) to historical closing prices before RSI calculation
+- New `getCurrentPriceFromCacheByKey(String symbolKey)` helper method looks up current price by symbol key across both Finnhub (stocks) and CoinGecko (crypto) caches
+- With 14 historical prices + 1 cached live price = 15 total, RSI becomes calculable even before today's close is recorded
+- Early-exit threshold lowered from `< RSI_PERIOD + 1` (15) to `< RSI_PERIOD` (14) to allow cache-supplemented calculation
+- **Tests**: 50 RsiServiceTest + 713 total tests all passing
+- New tests: `testGetCurrentPriceFromCacheByKey_stock/crypto/notFound`, `testAnalyzeAllSymbols_usesCurrentPriceFromCache`
+
 ### RSI Reporting Refinement ✅ COMPLETE
 - **`RsiService`** — removed `pendingSignals` accumulator; `addPrice()` now purely stores price data and display names without calculating RSI
-- New `analyzeAllSymbols()` method iterates all stored price history, calculates RSI for each symbol with sufficient data (≥15 prices), and returns `List<RsiSignal>` for overbought (≥70) / oversold (≤30)
+- `analyzeAllSymbols()` iterates all stored price history, calculates RSI for each symbol with sufficient data, and returns `List<RsiSignal>` for overbought (≥70) / oversold (≤30)
 - `sendRsiReport()` calls `analyzeAllSymbols()`, builds consolidated report, sends via `sendMessageAndReturnId()`, and deletes previous report message
 - `symbolDisplayNames` map tracks display names registered during `addPrice()` calls (used by `analyzeAllSymbols()` for report formatting)
 - **`RsiPriceFetcher`** — `addPrice()` no longer triggers RSI calculation, only stores prices
-- **Tests**: 46 RsiServiceTest + 709 total tests all passing
 
 ### RSI Batched Reporting (Initial) ✅ COMPLETE
 - **`Scheduler`** — `hourlySignalMonitoring()` runs both BB and RSI reports hourly
