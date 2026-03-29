@@ -1,10 +1,12 @@
 package org.tradelite.client.telegram;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.tradelite.client.telegram.TelegramClient.BASE_URL;
+import static org.tradelite.client.telegram.TelegramClient.DELETE_URL;
 
+import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +17,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
+import org.tradelite.client.telegram.dto.TelegramMessage;
+import org.tradelite.client.telegram.dto.TelegramSendMessageResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,17 +34,97 @@ class TelegramClientTest {
     }
 
     @Test
-    void sendMessage_success() {
-        String message = "Test message";
-        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", message);
+    void sendMessageAndReturnId_success() {
+        TelegramMessage message = new TelegramMessage();
+        message.setMessageId(42L);
+        TelegramSendMessageResponse body = new TelegramSendMessageResponse();
+        body.setOk(true);
+        body.setResult(message);
+
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
+
+        OptionalLong result = telegramClient.sendMessageAndReturnId("Test message");
+
+        assertTrue(result.isPresent());
+        assertEquals(42L, result.getAsLong());
+    }
+
+    @Test
+    void sendMessageAndReturnId_apiNotOk_returnsEmpty() {
+        TelegramSendMessageResponse body = new TelegramSendMessageResponse();
+        body.setOk(false);
+
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
+
+        OptionalLong result = telegramClient.sendMessageAndReturnId("Test message");
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void sendMessageAndReturnId_exception_returnsEmpty() {
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenThrow(new RuntimeException("Network error"));
+
+        OptionalLong result = telegramClient.sendMessageAndReturnId("Test message");
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void sendMessage_delegatesToSendMessageAndReturnId() {
+        TelegramMessage message = new TelegramMessage();
+        message.setMessageId(99L);
+        TelegramSendMessageResponse body = new TelegramSendMessageResponse();
+        body.setOk(true);
+        body.setResult(message);
+
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
+
+        telegramClient.sendMessage("Test message");
+
+        verify(restTemplate, times(1))
+                .exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class));
+    }
+
+    @Test
+    void deleteMessage_success() {
+        String expectedUrl = String.format(DELETE_URL, "testToken");
         when(restTemplate.exchange(
                         eq(expectedUrl),
                         eq(HttpMethod.POST),
                         any(HttpEntity.class),
                         eq(String.class)))
-                .thenReturn(new ResponseEntity<>("Success", HttpStatus.OK));
+                .thenReturn(new ResponseEntity<>("ok", HttpStatus.OK));
 
-        telegramClient.sendMessage(message);
+        telegramClient.deleteMessage(123L);
 
         verify(restTemplate, times(1))
                 .exchange(
@@ -51,30 +135,21 @@ class TelegramClientTest {
     }
 
     @Test
-    void sendMessage_failure() {
-        String message = "Test message";
-        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", message);
+    void deleteMessage_failure_doesNotThrow() {
+        String expectedUrl = String.format(DELETE_URL, "testToken");
         when(restTemplate.exchange(
                         eq(expectedUrl),
                         eq(HttpMethod.POST),
                         any(HttpEntity.class),
                         eq(String.class)))
-                .thenReturn(new ResponseEntity<>("Error", HttpStatus.INTERNAL_SERVER_ERROR));
+                .thenReturn(new ResponseEntity<>("error", HttpStatus.BAD_REQUEST));
 
-        telegramClient.sendMessage(message);
-
-        verify(restTemplate, times(1))
-                .exchange(
-                        eq(expectedUrl),
-                        eq(HttpMethod.POST),
-                        any(HttpEntity.class),
-                        eq(String.class));
+        assertDoesNotThrow(() -> telegramClient.deleteMessage(123L));
     }
 
     @Test
-    void sendMessage_exception() {
-        String message = "Test message";
-        String expectedUrl = String.format(BASE_URL, "testToken", "testChatId", message);
+    void deleteMessage_exception_doesNotThrow() {
+        String expectedUrl = String.format(DELETE_URL, "testToken");
         when(restTemplate.exchange(
                         eq(expectedUrl),
                         eq(HttpMethod.POST),
@@ -82,14 +157,7 @@ class TelegramClientTest {
                         eq(String.class)))
                 .thenThrow(new RuntimeException("Network error"));
 
-        telegramClient.sendMessage(message);
-
-        verify(restTemplate, times(1))
-                .exchange(
-                        eq(expectedUrl),
-                        eq(HttpMethod.POST),
-                        any(HttpEntity.class),
-                        eq(String.class));
+        assertDoesNotThrow(() -> telegramClient.deleteMessage(123L));
     }
 
     @Test
@@ -124,12 +192,5 @@ class TelegramClientTest {
                 .thenThrow(new RuntimeException("Network error"));
 
         assertThrows(IllegalStateException.class, () -> telegramClient.getChatUpdates());
-
-        verify(restTemplate, times(1))
-                .exchange(
-                        eq(url),
-                        eq(HttpMethod.GET),
-                        any(HttpEntity.class),
-                        eq(TelegramUpdateResponseWrapper.class));
     }
 }

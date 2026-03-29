@@ -67,6 +67,7 @@ The bot runs continuously in the background, requiring no manual intervention wh
 | Insider Trading | Weekly | Finnhub | Telegram report |
 | **Sector Rotation** | Daily | FinViz | Telegram report **NEW** |
 | **Sector ETF Tracking** | Real-time + Daily | Finnhub | Telegram alerts + daily summary |
+| **Bollinger Band Analysis** | Hourly + Daily | Finnhub (SQLite) | Telegram alerts + daily report |
 
 ## Tracked Sector & Thematic ETFs
 

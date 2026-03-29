@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,6 +33,12 @@ public class BollingerBandTracker {
     private final BollingerBandService bollingerBandService;
     private final TelegramClient telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
+
+    /**
+     * Stores the Telegram message ID of the last sent daily report so it can be deleted before
+     * sending the next update.
+     */
+    private Long lastTelegramReportMessageId;
 
     /** Analyzes Bollinger Bands for all tracked sector ETFs and returns the results. */
     public List<BollingerBandAnalysis> analyzeAllSectors() {
@@ -99,9 +106,20 @@ public class BollingerBandTracker {
 
     /** Sends a full daily report of Bollinger Band state for all sectors and stocks. */
     public void sendDailyReport() {
+        deletePreviousTelegramReport();
         String report = buildSummaryReport();
-        telegramClient.sendMessage(report);
+        OptionalLong messageId = telegramClient.sendMessageAndReturnId(report);
+        messageId.ifPresent(id -> lastTelegramReportMessageId = id);
         log.info("Daily Bollinger Band report sent");
+    }
+
+    private void deletePreviousTelegramReport() {
+        if (lastTelegramReportMessageId != null) {
+            log.info(
+                    "Deleting previous Telegram BB report message {}", lastTelegramReportMessageId);
+            telegramClient.deleteMessage(lastTelegramReportMessageId);
+            lastTelegramReportMessageId = null;
+        }
     }
 
     private String buildAlertMessage(

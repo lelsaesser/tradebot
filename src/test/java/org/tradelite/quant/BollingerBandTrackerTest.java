@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -198,12 +199,42 @@ class BollingerBandTrackerTest {
     void sendDailyReport_sendsReportMessage() {
         when(bollingerBandService.analyze(anyString(), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(100L));
 
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
+        verify(telegramClient).sendMessageAndReturnId(messageCaptor.capture());
         assertThat(messageCaptor.getValue()).contains("Bollinger Band Report");
+    }
+
+    @Test
+    void sendDailyReport_deletesPreviousReportOnSecondCall() {
+        when(bollingerBandService.analyze(anyString(), anyString()))
+                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(100L));
+
+        // First call — no previous message to delete
+        tracker.sendDailyReport();
+        verify(telegramClient, never()).deleteMessage(anyLong());
+
+        // Second call — should delete the message from the first call
+        tracker.sendDailyReport();
+        verify(telegramClient, times(1)).deleteMessage(100L);
+    }
+
+    @Test
+    void sendDailyReport_doesNotDeleteWhenPreviousSendFailed() {
+        when(bollingerBandService.analyze(anyString(), anyString()))
+                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.empty());
+
+        // First call — send failed, no message ID stored
+        tracker.sendDailyReport();
+
+        // Second call — nothing to delete
+        tracker.sendDailyReport();
+        verify(telegramClient, never()).deleteMessage(anyLong());
     }
 
     @Test
