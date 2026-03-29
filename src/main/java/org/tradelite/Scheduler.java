@@ -83,11 +83,21 @@ public class Scheduler {
             // Analyze sector ETFs in real-time for rotation signals
             rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
-            rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
         log.info("Stock market monitoring round completed.");
+    }
+
+    @Scheduled(initialDelay = 0, fixedRate = 3600000)
+    protected void hourlyBollingerBandMonitoring() {
+        if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
+            rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
+        } else {
+            log.info(
+                    "Market is off-hours or it's a weekend. Skipping Bollinger Band monitoring.");
+        }
+        log.info("Hourly Bollinger Band monitoring round completed.");
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 420000)

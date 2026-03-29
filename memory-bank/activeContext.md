@@ -1,9 +1,16 @@
 # Active Context
 
 ## Current Work Focus
-Refined Bollinger Band analysis with split data point thresholds — 20 points for basic band calculation, 40 points for bandwidth percentile history. Added `HISTORICAL_SQUEEZE` signal type and absolute bandwidth squeeze detection. All 677 tests passing.
+Reduced Bollinger Band alert frequency — moved `bollingerBandTracker::analyzeAndSendAlerts` from the 5-minute stock monitoring loop to a dedicated hourly schedule (`fixedRate = 3600000`). This eliminates excessive BB messages during market hours. All 18 Scheduler tests passing.
 
-## Recent Changes (March 27, 2026)
+## Recent Changes (March 29, 2026)
+
+### Bollinger Band Alert Frequency Reduction ✅ COMPLETE
+- **`Scheduler`** — removed `bollingerBandTracker::analyzeAndSendAlerts` from `stockMarketMonitoring()` (5-min loop)
+- **New method**: `hourlyBollingerBandMonitoring()` with `@Scheduled(initialDelay = 0, fixedRate = 3600000)` — runs BB alerts once per hour during market open
+- **Tests updated**: `stockMarketMonitoring_marketOpen_shouldRun` now expects 3 calls (was 4); added `hourlyBollingerBandMonitoring_marketOpen_shouldRun` and `hourlyBollingerBandMonitoring_marketClosed_shouldNotRun`
+
+## Previous Changes (March 27, 2026)
 
 ### Bollinger Band Refinement ✅ COMPLETE
 - **Split MIN_DATA_POINTS**: `MIN_DATA_POINTS = 20` for basic SMA/band calculation, `BANDWIDTH_HISTORY_MIN_DATA_POINTS = 40` for bandwidth percentile history
