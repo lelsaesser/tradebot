@@ -2,6 +2,7 @@ package org.tradelite.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.service.model.DailyPrice;
 
@@ -39,4 +40,12 @@ public interface PriceQuoteRepository {
      * @return List of daily change percentages, sorted by date ascending
      */
     List<Double> findDailyChangePercents(String symbol, int days);
+
+    /**
+     * Finds the most recent price quote for a symbol across all dates.
+     *
+     * @param symbol The stock ticker symbol
+     * @return The latest price quote entity, or empty if none exists
+     */
+    Optional<PriceQuoteEntity> findLatestBySymbol(String symbol);
 }

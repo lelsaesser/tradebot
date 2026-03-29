@@ -465,6 +465,50 @@ class SqlitePriceQuoteRepositoryTest {
                 () -> repoWithMock.findDailyChangePercents("AAPL", 30));
     }
 
+    @Test
+    void findLatestBySymbol_returnsLatestEntry() throws InterruptedException {
+        repository.save(createPriceQuote("AAPL", 175.50));
+        Thread.sleep(1100);
+        repository.save(createPriceQuote("AAPL", 176.00));
+
+        var result = repository.findLatestBySymbol("AAPL");
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().getCurrentPrice(), is(176.00));
+    }
+
+    @Test
+    void findLatestBySymbol_returnsEmptyForUnknownSymbol() {
+        var result = repository.findLatestBySymbol("UNKNOWN");
+        assertThat(result.isPresent(), is(false));
+    }
+
+    @Test
+    void findLatestBySymbol_returnsOnlyMatchingSymbol() {
+        repository.save(createPriceQuote("AAPL", 175.50));
+        repository.save(createPriceQuote("GOOG", 150.25));
+
+        var result = repository.findLatestBySymbol("GOOG");
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().getSymbol(), is("GOOG"));
+        assertThat(result.get().getCurrentPrice(), is(150.25));
+    }
+
+    @Test
+    void findLatestBySymbol_throwsExceptionOnDatabaseError() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        Connection mockConnection = mock(Connection.class);
+
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createStatement())
+                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
+
+        SqlitePriceQuoteRepository repoWithMock = new SqlitePriceQuoteRepository(mockDataSource);
+
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        assertThrows(IllegalStateException.class, () -> repoWithMock.findLatestBySymbol("AAPL"));
+    }
+
     private PriceQuoteResponse createPriceQuote(String symbol, double price) {
         PriceQuoteResponse priceQuote = new PriceQuoteResponse();
         priceQuote.setStockSymbol(new StockSymbol(symbol, symbol + " Inc."));

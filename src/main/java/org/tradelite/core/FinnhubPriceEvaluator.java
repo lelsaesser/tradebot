@@ -1,5 +1,6 @@
 package org.tradelite.core;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
@@ -13,6 +14,7 @@ import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.PriceQuoteEntity;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.StockSymbolRegistry;
@@ -74,9 +76,11 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             lastPriceCache.put(ticker.get().getTicker(), priceQuote.getCurrentPrice());
 
             // Persist price quote to SQLite for historical data collection (if enabled)
-            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)) {
-                priceQuoteRepository.save(priceQuote);
-            }
+            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION) && !isPotentialMarketHoliday(
+                        ticker.get().getTicker(), priceQuote.getCurrentPrice())) {
+                    priceQuoteRepository.save(priceQuote);
+                }
+
 
             finnhubData.add(priceQuote);
         }
@@ -95,6 +99,34 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             }
         }
         return finnhubData.size();
+    }
+
+    boolean isPotentialMarketHoliday(String symbol, double currentPrice) {
+        LocalDate today = LocalDate.now();
+
+        List<PriceQuoteEntity> todayEntries =
+                priceQuoteRepository.findBySymbolAndDate(symbol, today);
+        if (!todayEntries.isEmpty()) {
+            return false;
+        }
+
+        Optional<PriceQuoteEntity> latestPersisted =
+                priceQuoteRepository.findLatestBySymbol(symbol);
+        if (latestPersisted.isEmpty()) {
+            return false;
+        }
+
+        double lastPersistedPrice = latestPersisted.get().getCurrentPrice();
+        if (lastPersistedPrice == currentPrice) {
+            log.info(
+                    "Potential market holiday detected for {}: persisted price {} == current price {}, skipping SQLite persistence",
+                    symbol,
+                    lastPersistedPrice,
+                    currentPrice);
+            return true;
+        }
+
+        return false;
     }
 
     public void evaluateHighPriceChange(PriceQuoteResponse priceQuote) {
