@@ -76,11 +76,11 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             lastPriceCache.put(ticker.get().getTicker(), priceQuote.getCurrentPrice());
 
             // Persist price quote to SQLite for historical data collection (if enabled)
-            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION) && !isPotentialMarketHoliday(
-                        ticker.get().getTicker(), priceQuote.getCurrentPrice())) {
-                    priceQuoteRepository.save(priceQuote);
-                }
-
+            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)
+                    && !isPotentialMarketHoliday(
+                            ticker.get().getTicker(), priceQuote.getCurrentPrice())) {
+                priceQuoteRepository.save(priceQuote);
+            }
 
             finnhubData.add(priceQuote);
         }
