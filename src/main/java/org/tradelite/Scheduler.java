@@ -94,8 +94,7 @@ public class Scheduler {
         if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
         } else {
-            log.info(
-                    "Market is off-hours or it's a weekend. Skipping Bollinger Band monitoring.");
+            log.info("Market is off-hours or it's a weekend. Skipping Bollinger Band monitoring.");
         }
         log.info("Hourly Bollinger Band monitoring round completed.");
     }
