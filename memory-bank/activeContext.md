@@ -2,7 +2,7 @@
 
 ## Current Work Focus
 
-### Case-Insensitive Subcommands (Issue #144) ✅ COMPLETEa
+### Case-Insensitive Subcommands (Issue #144) ✅ COMPLETE
 Made all Telegram command subcommands case insensitive. Previously `/show ALL` or `/set BUY AAPL 150` would fail; now they work correctly.
 
 **Changes:**
