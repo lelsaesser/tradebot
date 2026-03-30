@@ -5,8 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
-import java.time.DayOfWeek;
-import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,8 +76,9 @@ class SchedulerTest {
 
     @Test
     void stockMarketMonitoring_marketOpen_shouldRun() throws Exception {
-        scheduler.dayOfWeek = DayOfWeek.MONDAY;
-        scheduler.localTime = LocalTime.of(17, 0);
+        // Monday 11:00 AM NY time = market open
+        scheduler.marketDateTime =
+                ZonedDateTime.of(2026, 3, 30, 11, 0, 0, 0, ZoneId.of("America/New_York"));
 
         scheduler.stockMarketMonitoring();
 
@@ -102,8 +103,9 @@ class SchedulerTest {
 
     @Test
     void stockMarketMonitoring_marketClosed_shouldNotRun() throws Exception {
-        scheduler.dayOfWeek = DayOfWeek.SATURDAY;
-        scheduler.localTime = LocalTime.of(17, 0);
+        // Saturday 11:00 AM NY time = market closed (weekend)
+        scheduler.marketDateTime =
+                ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, ZoneId.of("America/New_York"));
 
         scheduler.stockMarketMonitoring();
 
@@ -114,8 +116,9 @@ class SchedulerTest {
 
     @Test
     void hourlySignalMonitoring_marketOpen_shouldRun() throws Exception {
-        scheduler.dayOfWeek = DayOfWeek.MONDAY;
-        scheduler.localTime = LocalTime.of(17, 0);
+        // Monday 11:00 AM NY time = market open
+        scheduler.marketDateTime =
+                ZonedDateTime.of(2026, 3, 30, 11, 0, 0, 0, ZoneId.of("America/New_York"));
 
         scheduler.hourlySignalMonitoring();
 
@@ -135,8 +138,9 @@ class SchedulerTest {
 
     @Test
     void hourlySignalMonitoring_marketClosed_shouldNotRun() {
-        scheduler.dayOfWeek = DayOfWeek.SATURDAY;
-        scheduler.localTime = LocalTime.of(17, 0);
+        // Saturday 11:00 AM NY time = market closed (weekend)
+        scheduler.marketDateTime =
+                ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, ZoneId.of("America/New_York"));
 
         scheduler.hourlySignalMonitoring();
 
