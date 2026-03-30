@@ -28,10 +28,10 @@ public class DateUtil {
     }
 
     /**
-     * Checks whether the US stock market (NYSE/NASDAQ) is currently in off-hours.
-     * Market hours are defined as 9:30 AM - 4:00 PM Eastern Time (America/New_York).
-     * Java's ZoneId handles EST/EDT transitions automatically, so this correctly
-     * accounts for DST changes in both the US and the caller's timezone.
+     * Checks whether the US stock market (NYSE/NASDAQ) is currently in off-hours. Market hours are
+     * defined as 9:30 AM - 4:00 PM Eastern Time (America/New_York). Java's ZoneId handles EST/EDT
+     * transitions automatically, so this correctly accounts for DST changes in both the US and the
+     * caller's timezone.
      *
      * @param dateTime the date/time to check, or null to use the current time
      * @return true if the market is in off-hours, false if during trading hours
