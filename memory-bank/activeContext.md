@@ -2,15 +2,21 @@
 
 ## Current Work Focus
 
-### Case-Insensitive Subcommands (Issue #144) ✅ COMPLETE
-Made all Telegram command subcommands case insensitive. Previously `/show ALL` or `/set BUY AAPL 150` would fail; now they work correctly.
+### DST-Aware Market Hours (March 30, 2026) ✅ COMPLETE
+Fixed `isStockMarketOpen` and `isMarketOffHours` to automatically handle US/Europe DST transitions.
+
+**Problem:** Market open time in CET/CEST varied between 14:30 and 15:30 depending on DST "gap weeks" where US and Europe switch clocks on different dates. The old code used hardcoded `LocalTime` in CET which broke during transitions.
+
+**Solution:** All market-hours logic now operates in `America/New_York` timezone using `ZonedDateTime`. Java's `ZoneId` rules handle DST automatically — market is always 9:30–16:00 NY time regardless of caller's timezone.
 
 **Changes:**
-- `TelegramMessageProcessor.parseCommand()` — lowercases subcommand for `/show` and direction for `/set` at parse time
-- `ShowCommandProcessor` — `isValidCommand()` and `processCommand()` use `equalsIgnoreCase()` for defense-in-depth
-- `SetCommandProcessor` — `isValidSetCommand()` uses `equalsIgnoreCase()` for buy/sell direction
-- Tests added: 7 new tests across `TelegramMessageProcessorTest`, `ShowCommandProcessorTest`, `SetCommandProcessorTest`
-- All 164 tests pass
+- `DateUtil.isMarketOffHours(ZonedDateTime)` — converts any timezone input to NY, checks 9:30–16:00
+- `DateUtil.isStockMarketOpen(ZonedDateTime)` — combines weekday check + market hours in NY timezone
+- `DateUtil.NY_ZONE` — public constant `ZoneId.of("America/New_York")`
+- Removed old `isMarketOffHours(LocalTime)` and `isStockMarketOpen(DayOfWeek, LocalTime)` signatures
+- `Scheduler` — uses single `ZonedDateTime marketDateTime` field instead of separate `DayOfWeek`/`LocalTime`
+- Tests: DST transition tests covering all 4 scenarios (both standard, both DST, spring gap, fall gap)
+- All 736 tests pass
 
 ### Previous: RSI Current Price from Cache
 Enhanced RSI analysis to use current price from cache during `analyzeAllSymbols()`, allowing RSI calculation with 14 historical daily prices + 1 live intraday price. This mirrors how Bollinger Bands use live prices.

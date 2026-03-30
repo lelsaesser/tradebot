@@ -5,6 +5,10 @@ import java.time.format.DateTimeFormatter;
 
 public class DateUtil {
 
+    static final ZoneId NY_ZONE = ZoneId.of("America/New_York");
+    private static final LocalTime MARKET_OPEN = LocalTime.of(9, 30);
+    private static final LocalTime MARKET_CLOSE = LocalTime.of(16, 0);
+
     private DateUtil() {}
 
     public static String getDateTwoMonthsAgo(LocalDate date) {
@@ -23,20 +27,35 @@ public class DateUtil {
         return dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY;
     }
 
-    public static boolean isMarketOffHours(LocalTime currentTime) {
-        if (currentTime == null) {
-            ZoneId cetZone = ZoneId.of("Europe/Berlin"); // CET/CEST timezone
-            ZonedDateTime nowInCET = ZonedDateTime.now(cetZone);
-            currentTime = nowInCET.toLocalTime();
+    /**
+     * Checks whether the US stock market (NYSE/NASDAQ) is currently in off-hours.
+     * Market hours are defined as 9:30 AM - 4:00 PM Eastern Time (America/New_York).
+     * Java's ZoneId handles EST/EDT transitions automatically, so this correctly
+     * accounts for DST changes in both the US and the caller's timezone.
+     *
+     * @param dateTime the date/time to check, or null to use the current time
+     * @return true if the market is in off-hours, false if during trading hours
+     */
+    public static boolean isMarketOffHours(ZonedDateTime dateTime) {
+        if (dateTime == null) {
+            dateTime = ZonedDateTime.now(NY_ZONE);
         }
-        LocalTime start = LocalTime.of(22, 30);
-        LocalTime end = LocalTime.of(14, 30);
-
-        // Handles time ranges that go past midnight
-        return currentTime.isAfter(start) || currentTime.isBefore(end);
+        ZonedDateTime nyTime = dateTime.withZoneSameInstant(NY_ZONE);
+        LocalTime time = nyTime.toLocalTime();
+        return time.isBefore(MARKET_OPEN) || !time.isBefore(MARKET_CLOSE);
     }
 
-    public static boolean isStockMarketOpen(DayOfWeek dayOfWeek, LocalTime localTime) {
-        return (DateUtil.isWeekday(dayOfWeek) && !DateUtil.isMarketOffHours(localTime));
+    /**
+     * Checks whether the US stock market is currently open (weekday + trading hours).
+     *
+     * @param dateTime the date/time to check, or null to use the current time
+     * @return true if the market is open
+     */
+    public static boolean isStockMarketOpen(ZonedDateTime dateTime) {
+        if (dateTime == null) {
+            dateTime = ZonedDateTime.now(NY_ZONE);
+        }
+        ZonedDateTime nyTime = dateTime.withZoneSameInstant(NY_ZONE);
+        return isWeekday(nyTime.getDayOfWeek()) && !isMarketOffHours(nyTime);
     }
 }
