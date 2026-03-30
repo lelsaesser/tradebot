@@ -1,6 +1,7 @@
 package org.tradelite.utils;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.isA;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.time.*;
@@ -118,7 +119,7 @@ class DateUtilTest {
     void isMarketOffHours_null_usesCurrentTime() {
         // Should not throw, returns a boolean
         boolean result = DateUtil.isMarketOffHours(null);
-        assertThat(result == true || result == false, is(true));
+        assertThat(result, isA(Boolean.class));
     }
 
     // --- isMarketOffHours with Berlin timezone (auto-converts to NY) ---
@@ -232,7 +233,7 @@ class DateUtilTest {
     @Test
     void isStockMarketOpen_null_usesCurrentTime() {
         boolean result = DateUtil.isStockMarketOpen(null);
-        assertThat(result == true || result == false, is(true));
+        assertThat(result, isA(Boolean.class));
     }
 
     @Test
