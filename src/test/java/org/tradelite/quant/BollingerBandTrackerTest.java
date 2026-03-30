@@ -133,7 +133,7 @@ class BollingerBandTrackerTest {
         tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
+        verify(telegramClient).sendMessageAndReturnId(messageCaptor.capture());
         String message = messageCaptor.getValue();
         assertThat(message).contains("Bollinger Band Alert");
         assertThat(message).contains("Upper Band Touch");
@@ -151,7 +151,7 @@ class BollingerBandTrackerTest {
         tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
+        verify(telegramClient).sendMessageAndReturnId(messageCaptor.capture());
         String message = messageCaptor.getValue();
         assertThat(message).contains("Lower Band Touch");
         assertThat(message).contains("XLE");
@@ -167,7 +167,7 @@ class BollingerBandTrackerTest {
         tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
+        verify(telegramClient).sendMessageAndReturnId(messageCaptor.capture());
         String message = messageCaptor.getValue();
         assertThat(message).contains("Squeeze Detected");
         assertThat(message).contains("XLF");
@@ -189,7 +189,7 @@ class BollingerBandTrackerTest {
         tracker.analyzeAndSendAlerts();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
+        verify(telegramClient).sendMessageAndReturnId(messageCaptor.capture());
         String message = messageCaptor.getValue();
         assertThat(message).contains("TSLA");
         assertThat(message).contains("Upper Band Touch");
@@ -199,42 +199,46 @@ class BollingerBandTrackerTest {
     void sendDailyReport_sendsReportMessage() {
         when(bollingerBandService.analyze(anyString(), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(100L));
 
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessageAndReturnId(messageCaptor.capture());
+        verify(telegramClient).sendMessage(messageCaptor.capture());
         assertThat(messageCaptor.getValue()).contains("Bollinger Band Report");
+        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
+        verify(telegramClient, never()).deleteMessage(anyLong());
     }
 
     @Test
-    void sendDailyReport_deletesPreviousReportOnSecondCall() {
+    void sendDailyReport_doesNotDeletePreviousOnSecondCall() {
         when(bollingerBandService.analyze(anyString(), anyString()))
                 .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(100L));
 
-        // First call — no previous message to delete
+        // First call
+        tracker.sendDailyReport();
+
+        // Second call — should NOT delete anything (daily report doesn't track message IDs)
         tracker.sendDailyReport();
         verify(telegramClient, never()).deleteMessage(anyLong());
-
-        // Second call — should delete the message from the first call
-        tracker.sendDailyReport();
-        verify(telegramClient, times(1)).deleteMessage(100L);
     }
 
     @Test
-    void sendDailyReport_doesNotDeleteWhenPreviousSendFailed() {
-        when(bollingerBandService.analyze(anyString(), anyString()))
-                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.empty());
+    void analyzeAndSendAlerts_deletesPreviousHourlyAlertOnSecondCall() {
+        BollingerBandAnalysis squeezeAnalysis = squeezeAnalysis("XLK", "Technology");
+        when(bollingerBandService.analyze(eq("XLK"), anyString()))
+                .thenReturn(Optional.of(squeezeAnalysis));
+        when(bollingerBandService.analyze(argThat(s -> s != null && !s.equals("XLK")), anyString()))
+                .thenReturn(Optional.empty());
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(42L));
 
-        // First call — send failed, no message ID stored
-        tracker.sendDailyReport();
-
-        // Second call — nothing to delete
-        tracker.sendDailyReport();
+        // First call — sends alert, no previous to delete
+        tracker.analyzeAndSendAlerts();
         verify(telegramClient, never()).deleteMessage(anyLong());
+
+        // Second call — should delete message 42 before sending new alert
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(99L));
+        tracker.analyzeAndSendAlerts();
+        verify(telegramClient, times(1)).deleteMessage(42L);
     }
 
     @Test

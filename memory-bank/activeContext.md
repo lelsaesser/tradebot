@@ -47,7 +47,7 @@ Enhanced RSI analysis to use current price from cache during `analyzeAllSymbols(
 ### Telegram Delete-Before-Send for BB Reports ✅ COMPLETE
 - **`TelegramClient`** — `sendMessageAndReturnId(String)` returns `OptionalLong` with Telegram message ID; `deleteMessage(long messageId)` calls Telegram Bot API
 - **`TelegramSendMessageResponse`** DTO parses `message_id` from API response
-- **`BollingerBandTracker`** — `sendDailyReport()` deletes previous message before sending new one
+- **`BollingerBandTracker`** — `analyzeAndSendAlerts()` (hourly) deletes previous message before sending new one; `sendDailyReport()` sends without deletion
 
 ### Bollinger Band Alert Frequency Reduction ✅ COMPLETE
 - **`Scheduler`** — BB alerts run once per hour via `hourlySignalMonitoring()` (renamed from `hourlyBollingerBandMonitoring`)
