@@ -7,7 +7,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.service.MomentumRocService;
 
@@ -27,7 +27,7 @@ import org.tradelite.service.MomentumRocService;
 public class SectorMomentumRocTracker {
 
     private final MomentumRocService momentumRocService;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
 
     /**
      * Analyzes all sector ETFs for momentum crossovers and sends alerts.

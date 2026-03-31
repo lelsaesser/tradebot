@@ -6,7 +6,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
@@ -33,7 +33,7 @@ import org.tradelite.service.RelativeStrengthService.RsResult;
 public class SectorRelativeStrengthTracker {
 
     private final RelativeStrengthService relativeStrengthService;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final SectorRsStreakPersistence streakPersistence;
 
     /**

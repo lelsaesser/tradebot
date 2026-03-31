@@ -2,10 +2,12 @@ package org.tradelite.client.telegram;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.OptionalLong;
 import org.junit.jupiter.api.Test;
 import org.tradelite.config.TradebotTelegramProperties;
 
@@ -27,6 +29,33 @@ class LocalTelegramGatewayTest {
         assertThat(content.contains("hello-dev"), is(true));
         assertThat(gateway.getChatUpdates(), notNullValue());
         assertThat(gateway.getChatUpdates().isEmpty(), is(true));
+    }
+
+    @Test
+    void sendMessageAndReturnId_returnsSyntheticMessageId() throws Exception {
+        Path sinkFile = Files.createTempFile("telegram-dev-sink-id", ".log");
+        Files.deleteIfExists(sinkFile);
+
+        TradebotTelegramProperties properties = new TradebotTelegramProperties();
+        properties.setLocalSinkFile(sinkFile.toString());
+
+        LocalTelegramGateway gateway = new LocalTelegramGateway(properties);
+        OptionalLong result = gateway.sendMessageAndReturnId("hello-dev");
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.getAsLong(), is(not(0L)));
+    }
+
+    @Test
+    void deleteMessage_isNoOp() throws Exception {
+        Path sinkFile = Files.createTempFile("telegram-dev-sink-delete", ".log");
+        TradebotTelegramProperties properties = new TradebotTelegramProperties();
+        properties.setLocalSinkFile(sinkFile.toString());
+
+        LocalTelegramGateway gateway = new LocalTelegramGateway(properties);
+        gateway.deleteMessage(42L);
+
+        assertThat(Files.exists(sinkFile), is(true));
     }
 
     @Test

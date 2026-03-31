@@ -44,6 +44,7 @@ public class TelegramClient implements TelegramGateway {
      * Sends a message and returns the message ID of the sent message. Returns empty if the message
      * could not be sent or the response could not be parsed.
      */
+    @Override
     public OptionalLong sendMessageAndReturnId(String message) {
         String url = String.format(BASE_URL, botToken);
 
@@ -80,6 +81,7 @@ public class TelegramClient implements TelegramGateway {
      * Deletes a message from the group chat by its message ID. A bot can always delete its own
      * messages.
      */
+    @Override
     public void deleteMessage(long messageId) {
         String url = String.format(DELETE_URL, botToken);
 

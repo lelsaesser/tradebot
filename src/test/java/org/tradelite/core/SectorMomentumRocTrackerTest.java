@@ -11,7 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.core.MomentumRocSignal.SignalType;
 import org.tradelite.service.MomentumRocService;
 
@@ -19,7 +19,7 @@ import org.tradelite.service.MomentumRocService;
 class SectorMomentumRocTrackerTest {
 
     @Mock private MomentumRocService momentumRocService;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
 
     private SectorMomentumRocTracker tracker;
 

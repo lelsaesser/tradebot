@@ -14,7 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.service.StockSymbolRegistry;
 
@@ -22,7 +22,7 @@ import org.tradelite.service.StockSymbolRegistry;
 class BollingerBandTrackerTest {
 
     @Mock private BollingerBandService bollingerBandService;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
     @Mock private StockSymbolRegistry stockSymbolRegistry;
 
     private BollingerBandTracker tracker;
