@@ -4,6 +4,8 @@ spring:
       enabled: false
 
 tradebot:
+  database:
+    path: data/tradebot-dev.db
   api:
     finnhub-key: ${FINNHUB_DEV_API_KEY:}
     coingecko-key: ${COINGECKO_DEV_API_KEY:}

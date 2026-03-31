@@ -380,13 +380,33 @@ class SchedulerTest {
     void manualStockMarketMonitoring_shouldRunRegardlessOfMarketHours() throws Exception {
         scheduler.manualStockMarketMonitoring();
 
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
+        verify(rootErrorHandler, times(3)).run(captor.capture());
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
+        verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
+        verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
+    }
+
+    @Test
+    void manualHourlySignalMonitoring_shouldRunRegardlessOfMarketHours() throws Exception {
+        scheduler.manualHourlySignalMonitoring();
+
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(2)).run(captor.capture());
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
+
+        verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
+        verify(rsiService, times(1)).sendRsiReport();
     }
 
     @Test

@@ -168,7 +168,7 @@ public class Scheduler {
         log.info("Weekly insider trading report generated.");
     }
 
-<<<<<<< HEAD
+    @Scheduled(cron = "0 30 16 * * MON-FRI", zone = "CET")
     public void dailySectorRotationTracking() {
         rootErrorHandler.run(sectorRotationTracker::fetchAndStoreDailyPerformance);
 
@@ -216,6 +216,14 @@ public class Scheduler {
 
     public void manualStockMarketMonitoring() {
         rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+        rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
+        rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
         log.info("Manual stock market monitoring completed.");
+    }
+
+    public void manualHourlySignalMonitoring() {
+        rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
+        rootErrorHandler.run(rsiService::sendRsiReport);
+        log.info("Manual hourly signal monitoring completed.");
     }
 }
