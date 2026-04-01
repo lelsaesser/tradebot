@@ -30,3 +30,7 @@ deploy.sh
 # SQLite database
 /data/
 *.db
+config/coingecko-monthly-requests.txt
+config/finnhub-monthly-requests.txt
+.vscode/settings.json
+backup-db.sh
