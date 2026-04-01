@@ -2,8 +2,7 @@ package org.tradelite;
 
 import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS;
 
-import java.time.DayOfWeek;
-import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,8 +40,7 @@ public class Scheduler {
     private final BollingerBandTracker bollingerBandTracker;
     private final RsiService rsiService;
 
-    protected DayOfWeek dayOfWeek = null;
-    protected LocalTime localTime = null;
+    protected ZonedDateTime marketDateTime = null;
 
     @Autowired
     Scheduler(
@@ -82,7 +80,7 @@ public class Scheduler {
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     public void stockMarketMonitoring() {
-        if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
+        if (DateUtil.isStockMarketOpen(marketDateTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
             // Analyze sector ETFs in real-time for rotation signals
             rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
@@ -95,7 +93,7 @@ public class Scheduler {
 
     @Scheduled(cron = "0 0 * * * MON-FRI", zone = "CET")
     protected void hourlySignalMonitoring() {
-        if (DateUtil.isStockMarketOpen(dayOfWeek, localTime)) {
+        if (DateUtil.isStockMarketOpen(marketDateTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(rsiService::sendRsiReport);
         } else {

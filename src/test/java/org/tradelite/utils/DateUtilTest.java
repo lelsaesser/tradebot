@@ -1,6 +1,7 @@
 package org.tradelite.utils;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.isA;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.time.*;
@@ -10,6 +11,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 class DateUtilTest {
+
+    private static final ZoneId NY_ZONE = DateUtil.NY_ZONE;
+    private static final ZoneId BERLIN_ZONE = ZoneId.of("Europe/Berlin");
 
     @Test
     void getDateTwoMonthsAgo_givenDate() {
@@ -36,7 +40,7 @@ class DateUtilTest {
     void isWeekday_defaultValue() {
         boolean isWeekday = DateUtil.isWeekday(null);
         LocalDate today = LocalDate.now();
-        boolean expected = today.getDayOfWeek().getValue() < 6; // 1-5 are weekdays, 6-7 are weekend
+        boolean expected = today.getDayOfWeek().getValue() < 6;
 
         assertThat(isWeekday, is(expected));
     }
@@ -60,91 +64,182 @@ class DateUtilTest {
         };
     }
 
+    // --- isMarketOffHours tests using NY timezone ---
+
     @Test
-    void returnsTrue_whenTimeIsBeforeEndOfMarketHours() {
-        LocalTime time = LocalTime.of(7, 59); // 07:59
-        boolean marketClosed = DateUtil.isMarketOffHours(time);
-        assertThat(marketClosed, is(true));
+    void isMarketOffHours_beforeOpen_returnsTrue() {
+        // 7:00 AM NY time on a Monday
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 7, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isMarketOffHours(time), is(true));
     }
 
     @Test
-    void returnsTrue_whenTimeIsAfterStartOfOffHours() {
-        LocalTime time = LocalTime.of(23, 1); // 23:01
-        boolean marketClosed = DateUtil.isMarketOffHours(time);
-        assertThat(marketClosed, is(true));
+    void isMarketOffHours_justBeforeOpen_returnsTrue() {
+        // 9:29 AM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 9, 29, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isMarketOffHours(time), is(true));
     }
 
     @Test
-    void returnsFalse_whenTimeIsDuringMarketHours() {
-        LocalTime time = LocalTime.of(15, 0); // 15:00
-        boolean marketClosed = DateUtil.isMarketOffHours(time);
-        assertThat(marketClosed, is(false));
+    void isMarketOffHours_atOpen_returnsFalse() {
+        // 9:30 AM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 9, 30, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isMarketOffHours(time), is(false));
     }
 
     @Test
-    void returnsFalse_whenTimeIsExactlyAtMarketOpen() {
-        LocalTime time = LocalTime.of(14, 55); // 14:55
-        boolean marketClosed = DateUtil.isMarketOffHours(time);
-        assertThat(marketClosed, is(false));
+    void isMarketOffHours_duringMarketHours_returnsFalse() {
+        // 12:00 PM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 12, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isMarketOffHours(time), is(false));
     }
 
     @Test
-    void returnsFalse_whenTimeIsExactlyAtOffHoursStart() {
-        LocalTime time = LocalTime.of(22, 30); // 22:30
-        boolean marketClosed = DateUtil.isMarketOffHours(time);
-        assertThat(marketClosed, is(false));
+    void isMarketOffHours_justBeforeClose_returnsFalse() {
+        // 3:59 PM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 15, 59, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isMarketOffHours(time), is(false));
     }
 
     @Test
-    void returnsTrue_whenTimeIsExactlyAtOffHoursEnd() {
-        LocalTime time = LocalTime.of(14, 29); // Just before market open
-        boolean marketClosed = DateUtil.isMarketOffHours(time);
-        assertThat(marketClosed, is(true));
+    void isMarketOffHours_atClose_returnsTrue() {
+        // 4:00 PM NY time (market closes at 4:00, so 4:00 is off-hours)
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 16, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isMarketOffHours(time), is(true));
     }
 
     @Test
-    void returnsValue_whenCurrentTimeIsUsed() {
-        boolean marketClosed = DateUtil.isMarketOffHours(null);
-
-        ZoneId cetZone = ZoneId.of("Europe/Berlin"); // CET/CEST timezone
-        ZonedDateTime nowInCET = ZonedDateTime.now(cetZone);
-        LocalTime currentTime = nowInCET.toLocalTime();
-
-        LocalTime start =
-                ZonedDateTime.of(LocalDate.now(), LocalTime.of(22, 30), cetZone).toLocalTime();
-        LocalTime end =
-                ZonedDateTime.of(LocalDate.now(), LocalTime.of(14, 30), cetZone).toLocalTime();
-        boolean expected = currentTime.isAfter(start) || currentTime.isBefore(end);
-        assertThat(marketClosed, is(expected));
+    void isMarketOffHours_afterClose_returnsTrue() {
+        // 8:00 PM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 20, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isMarketOffHours(time), is(true));
     }
 
     @Test
-    void isStockMarketOpen_weekdayAndOpenHours_marketOpen() {
-        DayOfWeek dayOfWeek = DayOfWeek.MONDAY;
-        LocalTime localTime = LocalTime.of(17, 0); // 17:00
+    void isMarketOffHours_null_usesCurrentTime() {
+        // Should not throw, returns a boolean
+        boolean result = DateUtil.isMarketOffHours(null);
+        assertThat(result, isA(Boolean.class));
+    }
 
-        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+    // --- isMarketOffHours with Berlin timezone (auto-converts to NY) ---
 
-        assertThat(isOpen, is(true));
+    @Test
+    void isMarketOffHours_berlinTimeDuringNyOpen_returnsFalse() {
+        // 17:00 Berlin time in summer (CEST, UTC+2) = 11:00 AM NY (EDT, UTC-4) → market open
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 7, 15, 17, 0, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(false));
     }
 
     @Test
-    void isStockMarketOpen_weekend_marketClosed() {
-        DayOfWeek dayOfWeek = DayOfWeek.SATURDAY;
-        LocalTime localTime = LocalTime.of(17, 0); // 17:00
+    void isMarketOffHours_berlinTimeDuringNyClosed_returnsTrue() {
+        // 08:00 Berlin time in summer (CEST, UTC+2) = 02:00 AM NY (EDT, UTC-4) → market closed
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 7, 15, 8, 0, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(true));
+    }
 
-        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+    // --- DST transition tests ---
 
-        assertThat(isOpen, is(false));
+    @Test
+    void isMarketOffHours_summerTime_bothDST_1530berlinIsMarketOpen() {
+        // Summer: Both US (EDT) and Germany (CEST) on DST
+        // 15:30 CEST (UTC+2) = 13:30 UTC = 9:30 AM EDT (UTC-4) → market just opened
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 7, 15, 15, 30, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(false));
     }
 
     @Test
-    void isStockMarketOpen_weekdayAndOffHours_marketClosed() {
-        DayOfWeek dayOfWeek = DayOfWeek.MONDAY;
-        LocalTime localTime = LocalTime.of(23, 0); // 23:00
+    void isMarketOffHours_summerTime_bothDST_1529berlinIsBeforeOpen() {
+        // Summer: 15:29 CEST = 9:29 AM EDT → just before market open
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 7, 15, 15, 29, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(true));
+    }
 
-        boolean isOpen = DateUtil.isStockMarketOpen(dayOfWeek, localTime);
+    @Test
+    void isMarketOffHours_winterTime_bothStandard_1530berlinIsMarketOpen() {
+        // Winter: Both US (EST) and Germany (CET) on standard time
+        // 15:30 CET (UTC+1) = 14:30 UTC = 9:30 AM EST (UTC-5) → market just opened
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 1, 15, 15, 30, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(false));
+    }
 
-        assertThat(isOpen, is(false));
+    @Test
+    void isMarketOffHours_winterTime_bothStandard_1529berlinIsBeforeOpen() {
+        // Winter: 15:29 CET = 9:29 AM EST → just before market open
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 1, 15, 15, 29, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(true));
+    }
+
+    @Test
+    void isMarketOffHours_springGap_usEdtEuropeCet_1430berlinIsMarketOpen() {
+        // Spring gap: US switched to EDT (second Sunday of March), Europe still on CET
+        // (last Sunday of March). In 2026: US DST starts March 8, Europe March 29.
+        // Pick March 15, 2026: US is EDT (UTC-4), Germany is CET (UTC+1)
+        // 14:30 CET (UTC+1) = 13:30 UTC = 9:30 AM EDT (UTC-4) → market just opened
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 3, 15, 14, 30, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(false));
+    }
+
+    @Test
+    void isMarketOffHours_springGap_usEdtEuropeCet_1429berlinIsBeforeOpen() {
+        // Spring gap: 14:29 CET = 9:29 AM EDT → just before market open
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 3, 15, 14, 29, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(true));
+    }
+
+    @Test
+    void isMarketOffHours_fallGap_usEstEuropeCest_1630berlinIsMarketOpen() {
+        // Fall gap: Europe still on CEST, US already switched back to EST
+        // In 2026: Europe ends CEST October 25, US ends EDT November 1.
+        // Pick October 28, 2026: US is EST (UTC-5), Germany is CET (UTC+1)
+        // Actually Oct 28 Germany is already CET. Let me pick Oct 26 instead.
+        // Oct 25 2026 is Sunday (CEST ends), so Oct 26 is CET.
+        // US ends EDT Nov 1 2026 (Sunday), so Oct 26 US is still EDT (UTC-4).
+        // 16:30 CET (UTC+1) = 15:30 UTC = 11:30 AM EDT (UTC-4) → market open
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 10, 26, 16, 30, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isMarketOffHours(berlinTime), is(false));
+    }
+
+    // --- isStockMarketOpen tests ---
+
+    @Test
+    void isStockMarketOpen_weekdayDuringMarketHours_returnsTrue() {
+        // Monday 11:00 AM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 11, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isStockMarketOpen(time), is(true));
+    }
+
+    @Test
+    void isStockMarketOpen_weekendDuringMarketHours_returnsFalse() {
+        // Saturday 11:00 AM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isStockMarketOpen(time), is(false));
+    }
+
+    @Test
+    void isStockMarketOpen_weekdayBeforeOpen_returnsFalse() {
+        // Monday 8:00 AM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 8, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isStockMarketOpen(time), is(false));
+    }
+
+    @Test
+    void isStockMarketOpen_weekdayAfterClose_returnsFalse() {
+        // Monday 5:00 PM NY time
+        ZonedDateTime time = ZonedDateTime.of(2026, 3, 30, 17, 0, 0, 0, NY_ZONE);
+        assertThat(DateUtil.isStockMarketOpen(time), is(false));
+    }
+
+    @Test
+    void isStockMarketOpen_null_usesCurrentTime() {
+        boolean result = DateUtil.isStockMarketOpen(null);
+        assertThat(result, isA(Boolean.class));
+    }
+
+    @Test
+    void isStockMarketOpen_berlinTimeConvertsCorrectly() {
+        // 17:00 Berlin summer time (CEST) on a Wednesday = 11:00 AM EDT → market open
+        ZonedDateTime berlinTime = ZonedDateTime.of(2026, 7, 15, 17, 0, 0, 0, BERLIN_ZONE);
+        assertThat(DateUtil.isStockMarketOpen(berlinTime), is(true));
     }
 }

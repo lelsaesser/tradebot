@@ -35,7 +35,7 @@ public class BollingerBandTracker {
     private final StockSymbolRegistry stockSymbolRegistry;
 
     /**
-     * Stores the Telegram message ID of the last sent daily report so it can be deleted before
+     * Stores the Telegram message ID of the last sent hourly alert so it can be deleted before
      * sending the next update.
      */
     private Long lastTelegramReportMessageId;
@@ -74,7 +74,7 @@ public class BollingerBandTracker {
         return results;
     }
 
-    /** Performs daily Bollinger Band check and sends Telegram alerts for actionable signals. */
+    /** Performs hourly Bollinger Band check and sends Telegram alerts for actionable signals. */
     public void analyzeAndSendAlerts() {
         List<BollingerBandAnalysis> sectorAnalyses = analyzeAllSectors();
         List<BollingerBandAnalysis> stockAnalyses = analyzeAllStocks();
@@ -90,9 +90,13 @@ public class BollingerBandTracker {
         List<BollingerBandAnalysis> withSignals =
                 allAnalyses.stream().filter(BollingerBandAnalysis::hasSignals).toList();
 
+        // Delete previous hourly report before sending new one
+        deletePreviousTelegramReport();
+
         if (!withSignals.isEmpty()) {
             String alertMessage = buildAlertMessage(allAnalyses, withSignals);
-            telegramClient.sendMessage(alertMessage);
+            OptionalLong messageId = telegramClient.sendMessageAndReturnId(alertMessage);
+            messageId.ifPresent(id -> lastTelegramReportMessageId = id);
             log.info(
                     "Bollinger Band alert sent: {} symbol(s) with signals out of {} analyzed",
                     withSignals.size(),
@@ -106,10 +110,8 @@ public class BollingerBandTracker {
 
     /** Sends a full daily report of Bollinger Band state for all sectors and stocks. */
     public void sendDailyReport() {
-        deletePreviousTelegramReport();
         String report = buildSummaryReport();
-        OptionalLong messageId = telegramClient.sendMessageAndReturnId(report);
-        messageId.ifPresent(id -> lastTelegramReportMessageId = id);
+        telegramClient.sendMessage(report);
         log.info("Daily Bollinger Band report sent");
     }
 
