@@ -181,15 +181,15 @@ public class Scheduler {
                     int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
 
                     if (finnhubCount > 0 || coingeckoCount > 0) {
-                        String previousMonth = apiRequestMeteringService.getCurrentMonth();
+                        String previousMonth = apiRequestMeteringService.getPreviousMonth();
 
                         String message =
                                 String.format(
                                         """
-                        📊 *Monthly API Usage Report - %s*
-                        "🔹 *Finnhub API*: %,d requests
-                        "🔹 *CoinGecko API*: %,d requests
-                        "🔹 *Total*: %,d requests""",
+                        *Monthly API Usage Report - %s*
+                        🔹 *Finnhub API*: %,d requests
+                        🔹 *CoinGecko API*: %,d requests
+                        🔹 *Total*: %,d requests""",
                                         previousMonth,
                                         finnhubCount,
                                         coingeckoCount,
