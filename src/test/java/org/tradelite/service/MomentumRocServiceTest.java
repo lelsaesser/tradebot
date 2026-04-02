@@ -370,7 +370,9 @@ class MomentumRocServiceTest {
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLV", "Health Care");
 
-        assertTrue(result.isEmpty(), "Should not trigger signal when previous ROC is within dead zone");
+        assertTrue(
+                result.isEmpty(),
+                "Should not trigger signal when previous ROC is within dead zone");
     }
 
     @Test
