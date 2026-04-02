@@ -44,9 +44,9 @@ public class SectorRotationTracker {
 
     void sendDailySummary() {
         StringBuilder report = new StringBuilder();
-        report.append("📊 *Daily Sector Rotation Report*\n\n");
+        report.append("*Daily Sector Rotation Report*\n\n");
 
-        report.append("*🔥 Top 5 Daily Performers:*\n");
+        report.append("*Top 5 Daily Performers:*\n");
         List<IndustryPerformance> topDaily =
                 persistence.getTopPerformers(5, PerformancePeriod.DAILY);
         for (int i = 0; i < topDaily.size(); i++) {
@@ -54,7 +54,7 @@ public class SectorRotationTracker {
             report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
-        report.append("\n*❄️ Bottom 5 Daily Performers:*\n");
+        report.append("\n*❄Bottom 5 Daily Performers:*\n");
         List<IndustryPerformance> bottomDaily =
                 persistence.getBottomPerformers(5, PerformancePeriod.DAILY);
         for (int i = 0; i < bottomDaily.size(); i++) {
@@ -62,7 +62,7 @@ public class SectorRotationTracker {
             report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
-        report.append("\n*📈 Top 5 Weekly Performers:*\n");
+        report.append("\n*Top 5 Weekly Performers:*\n");
         List<IndustryPerformance> topWeekly =
                 persistence.getTopPerformers(5, PerformancePeriod.WEEKLY);
         for (int i = 0; i < topWeekly.size(); i++) {
@@ -70,7 +70,7 @@ public class SectorRotationTracker {
             report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.perfWeek().doubleValue()));
         }
 
-        report.append("\n*📉 Bottom 5 Weekly Performers:*\n");
+        report.append("\n*Bottom 5 Weekly Performers:*\n");
         List<IndustryPerformance> bottomWeekly =
                 persistence.getBottomPerformers(5, PerformancePeriod.WEEKLY);
         for (int i = 0; i < bottomWeekly.size(); i++) {
@@ -91,7 +91,7 @@ public class SectorRotationTracker {
         }
 
         StringBuilder alert = new StringBuilder();
-        alert.append("🚨 *SECTOR ROTATION ALERT*\n\n");
+        alert.append("🚨 *Sector rotation*\n\n");
 
         // Group signals by type
         List<RotationSignal> rotatingIn =
@@ -105,7 +105,7 @@ public class SectorRotationTracker {
                         .toList();
 
         if (!rotatingIn.isEmpty()) {
-            alert.append("*💰 Money Flowing INTO:*\n");
+            alert.append("*💰 Money Flowing into:*\n");
             for (RotationSignal signal : rotatingIn) {
                 alert.append(formatSignal(signal));
             }
@@ -113,7 +113,7 @@ public class SectorRotationTracker {
         }
 
         if (!rotatingOut.isEmpty()) {
-            alert.append("*💸 Money Flowing OUT OF:*\n");
+            alert.append("*💸 Money Flowing out of:*\n");
             for (RotationSignal signal : rotatingOut) {
                 alert.append(formatSignal(signal));
             }

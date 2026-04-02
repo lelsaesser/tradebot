@@ -213,8 +213,8 @@ class ApiRequestMeteringServiceTest {
             Files.deleteIfExists(coingeckoFile);
         }
 
-        // Test the default constructor
-        ApiRequestMeteringService defaultService = new ApiRequestMeteringService();
+        // Test with the default counter directory
+        ApiRequestMeteringService defaultService = new ApiRequestMeteringService("config");
 
         // Should start with 0 counts
         assertEquals(0, defaultService.getFinnhubRequestCount());

@@ -274,7 +274,7 @@ class SectorRelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("SECTOR ETF RELATIVE STRENGTH vs SPY"));
+        assertTrue(message.contains("Sector ETF Relative Strength vs SPY"));
         assertTrue(message.contains("Outperforming SPY"));
         assertTrue(message.contains("Underperforming SPY"));
         assertTrue(message.contains("Technology"));

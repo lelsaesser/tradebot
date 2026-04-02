@@ -142,7 +142,7 @@ public class BollingerBandTracker {
         } else if (hasOverextended || hasUnderextended) {
             sb.append("🟡 *Bollinger Band Alert — Band Touch*\n\n");
         } else {
-            sb.append("📊 *Bollinger Band Alert*\n\n");
+            sb.append("*Bollinger Band Daily Report*\n\n");
         }
 
         // Group by signal type
@@ -201,11 +201,11 @@ public class BollingerBandTracker {
         List<BollingerBandAnalysis> stockAnalyses = analyzeAllStocks();
 
         if (sectorAnalyses.isEmpty() && stockAnalyses.isEmpty()) {
-            return "📊 *Bollinger Band Report*\n\n_Insufficient data for analysis._";
+            return "*Bollinger Band Report*\n\n_Insufficient data for analysis._";
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 *Bollinger Band Report*\n\n");
+        sb.append("*Bollinger Band Report*\n\n");
 
         if (!sectorAnalyses.isEmpty()) {
             sb.append("*Sector ETFs:*\n");
