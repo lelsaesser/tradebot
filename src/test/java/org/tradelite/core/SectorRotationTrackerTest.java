@@ -215,8 +215,8 @@ class SectorRotationTrackerTest {
 
         tracker.analyzeAndSendRotationAlerts();
 
-        verify(telegramClient).sendMessage(contains("SECTOR ROTATION ALERT"));
-        verify(telegramClient).sendMessage(contains("Money Flowing INTO"));
+        verify(telegramClient).sendMessage(contains("Sector rotation"));
+        verify(telegramClient).sendMessage(contains("Money Flowing into"));
         verify(telegramClient).sendMessage(contains("Technology"));
     }
 
@@ -238,8 +238,8 @@ class SectorRotationTrackerTest {
 
         tracker.analyzeAndSendRotationAlerts();
 
-        verify(telegramClient).sendMessage(contains("SECTOR ROTATION ALERT"));
-        verify(telegramClient).sendMessage(contains("Money Flowing OUT OF"));
+        verify(telegramClient).sendMessage(contains("Sector rotation"));
+        verify(telegramClient).sendMessage(contains("Money Flowing out of"));
         verify(telegramClient).sendMessage(contains("Energy"));
     }
 
@@ -269,8 +269,8 @@ class SectorRotationTrackerTest {
 
         tracker.analyzeAndSendRotationAlerts();
 
-        verify(telegramClient).sendMessage(contains("Money Flowing INTO"));
-        verify(telegramClient).sendMessage(contains("Money Flowing OUT OF"));
+        verify(telegramClient).sendMessage(contains("Money Flowing into"));
+        verify(telegramClient).sendMessage(contains("Money Flowing out of"));
         verify(telegramClient).sendMessage(contains("Technology"));
         verify(telegramClient).sendMessage(contains("Energy"));
     }

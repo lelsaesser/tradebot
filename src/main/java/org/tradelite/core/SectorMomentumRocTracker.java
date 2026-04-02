@@ -71,7 +71,7 @@ public class SectorMomentumRocTracker {
      */
     protected String formatAlertMessage(List<MomentumRocSignal> signals) {
         StringBuilder sb = new StringBuilder();
-        sb.append("⚡ *SECTOR MOMENTUM ROC ALERT*\n\n");
+        sb.append("⚡ *Sector Momentum ROC Alert*\n\n");
 
         List<MomentumRocSignal> turningPositive =
                 signals.stream()
@@ -92,7 +92,7 @@ public class SectorMomentumRocTracker {
                         .toList();
 
         if (!turningPositive.isEmpty()) {
-            sb.append("📈 *MOMENTUM TURNING POSITIVE:*\n");
+            sb.append("📈 *Momentum turning positive:*\n");
             for (MomentumRocSignal signal : turningPositive) {
                 sb.append(formatSignalLine(signal));
             }
@@ -100,7 +100,7 @@ public class SectorMomentumRocTracker {
         }
 
         if (!turningNegative.isEmpty()) {
-            sb.append("📉 *MOMENTUM TURNING NEGATIVE:*\n");
+            sb.append("📉 *Momentum turning negative:*\n");
             for (MomentumRocSignal signal : turningNegative) {
                 sb.append(formatSignalLine(signal));
             }
