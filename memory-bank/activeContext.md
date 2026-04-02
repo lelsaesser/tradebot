@@ -2,6 +2,22 @@
 
 ## Current Work Focus
 
+### Sector ROC Dead Zone Filter (April 2, 2026) ✅ COMPLETE
+Fixed false alerts in sector momentum ROC analysis. ROC₁₀ values oscillating near zero (e.g., ±0.0%–0.1%) caused rapid positive/negative crossover alerts — sometimes 4+ per day for the same ETF (e.g., XLV).
+
+**Root Cause:** The crossover detection in `MomentumRocService.detectCrossover()` triggered whenever ROC₁₀ crossed the exact zero line. With intraday price noise, tiny ROC values (e.g., +0.0% → -0.0%) flip-flopped constantly.
+
+**Solution:** Added a ±0.25% dead zone around zero. A signal only fires when:
+- **Positive crossover**: previous ROC₁₀ < -0.25 AND current ROC₁₀ > +0.25
+- **Negative crossover**: previous ROC₁₀ > +0.25 AND current ROC₁₀ < -0.25
+
+Values inside the dead zone are treated as "at zero" — no crossover is detected. This filters noise from range-bound / sideways sector ETFs.
+
+**Changes:**
+- `MomentumRocService` — added `ROC_DEAD_ZONE = 0.25` constant; updated `detectCrossover()` with dead zone logic
+- `MomentumRocServiceTest` — updated existing crossover tests to use values outside dead zone; added 4 new dead zone tests (within zone, boundary, previous-inside/current-outside)
+- All 26 MomentumRocServiceTest tests pass; 739 total tests pass
+
 ### DST-Aware Market Hours (March 30, 2026) ✅ COMPLETE
 Fixed `isStockMarketOpen` and `isMarketOffHours` to automatically handle US/Europe DST transitions.
 
