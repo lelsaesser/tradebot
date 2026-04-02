@@ -321,10 +321,10 @@ class MomentumRocServiceTest {
     }
 
     @Test
-    void detectMomentumShift_zeroToPositive_signalGenerated() {
+    void detectMomentumShift_belowDeadZoneToAboveDeadZone_signalGenerated() {
         MomentumRocData previousData = new MomentumRocData();
-        previousData.setPreviousRoc10(-0.001);
-        previousData.setPreviousRoc20(-0.001);
+        previousData.setPreviousRoc10(-0.5); // Below dead zone (-0.25)
+        previousData.setPreviousRoc20(-0.5);
         previousData.setInitialized(true);
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
@@ -338,10 +338,10 @@ class MomentumRocServiceTest {
     }
 
     @Test
-    void detectMomentumShift_zeroToNegative_signalGenerated() {
+    void detectMomentumShift_aboveDeadZoneToBelowDeadZone_signalGenerated() {
         MomentumRocData previousData = new MomentumRocData();
-        previousData.setPreviousRoc10(0.001);
-        previousData.setPreviousRoc20(0.001);
+        previousData.setPreviousRoc10(0.5); // Above dead zone (+0.25)
+        previousData.setPreviousRoc20(0.5);
         previousData.setInitialized(true);
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
@@ -352,6 +352,61 @@ class MomentumRocServiceTest {
 
         assertTrue(result.isPresent());
         assertEquals(SignalType.MOMENTUM_TURNING_NEGATIVE, result.get().signalType());
+    }
+
+    @Test
+    void detectMomentumShift_withinDeadZone_noSignal() {
+        // Previous ROC10 = -0.1 (inside dead zone), current would be slightly positive
+        // Both are within ±0.25 dead zone → no signal
+        MomentumRocData previousData = new MomentumRocData();
+        previousData.setPreviousRoc10(-0.1);
+        previousData.setPreviousRoc20(-2.0);
+        previousData.setInitialized(true);
+        when(momentumRocRepository.findBySymbol("XLV")).thenReturn(Optional.of(previousData));
+
+        // Create prices that produce a small positive ROC10 (within dead zone)
+        List<DailyPrice> prices = createPriceHistory(25, 100.0, 0.01);
+        when(priceQuoteRepository.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
+
+        Optional<MomentumRocSignal> result = service.detectMomentumShift("XLV", "Health Care");
+
+        assertTrue(result.isEmpty(), "Should not trigger signal when previous ROC is within dead zone");
+    }
+
+    @Test
+    void detectMomentumShift_previousInsideDeadZoneCurrentOutside_noSignal() {
+        // Previous ROC10 = +0.1 (inside dead zone), current = -1.0 (outside dead zone)
+        // No signal because previous was not meaningfully above the dead zone
+        MomentumRocData previousData = new MomentumRocData();
+        previousData.setPreviousRoc10(0.1);
+        previousData.setPreviousRoc20(0.1);
+        previousData.setInitialized(true);
+        when(momentumRocRepository.findBySymbol("XLV")).thenReturn(Optional.of(previousData));
+
+        List<DailyPrice> prices = createPriceHistoryWithTrend(25, 120.0, -1.0);
+        when(priceQuoteRepository.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
+
+        Optional<MomentumRocSignal> result = service.detectMomentumShift("XLV", "Health Care");
+
+        assertTrue(result.isEmpty(), "Should not trigger when previous ROC is inside dead zone");
+    }
+
+    @Test
+    void detectMomentumShift_deadZoneBoundary_noSignal() {
+        // Previous ROC10 = exactly at dead zone boundary (-0.25)
+        // Dead zone check is strict inequality: previousRoc10 < -0.25 is false for -0.25
+        MomentumRocData previousData = new MomentumRocData();
+        previousData.setPreviousRoc10(-MomentumRocService.ROC_DEAD_ZONE);
+        previousData.setPreviousRoc20(-2.0);
+        previousData.setInitialized(true);
+        when(momentumRocRepository.findBySymbol("XLV")).thenReturn(Optional.of(previousData));
+
+        List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 1.0);
+        when(priceQuoteRepository.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
+
+        Optional<MomentumRocSignal> result = service.detectMomentumShift("XLV", "Health Care");
+
+        assertTrue(result.isEmpty(), "Exact dead zone boundary should not trigger signal");
     }
 
     @Test

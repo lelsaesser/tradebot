@@ -37,6 +37,13 @@ public class MomentumRocService {
     /** Minimum data points required for reliable ROC calculation */
     private static final int MIN_DATA_POINTS = 21;
 
+    /**
+     * Dead zone around zero to filter noise. ROC values within ±ROC_DEAD_ZONE are treated as "at
+     * zero" and do not trigger crossover signals. This prevents false alerts when ROC oscillates
+     * around zero in range-bound / sideways markets.
+     */
+    static final double ROC_DEAD_ZONE = 0.25;
+
     private final PriceQuoteRepository priceQuoteRepository;
     private final MomentumRocRepository momentumRocRepository;
 
@@ -160,15 +167,15 @@ public class MomentumRocService {
         double previousRoc10 = momentumData.getPreviousRoc10();
         double currentRoc10 = rocResult.roc10();
 
-        // Crossover positive: was below zero, now above zero
-        boolean wasNegative = previousRoc10 < 0;
-        boolean isPositive = currentRoc10 > 0;
+        // Crossover positive: was meaningfully below zero, now meaningfully above zero
+        boolean wasNegative = previousRoc10 < -ROC_DEAD_ZONE;
+        boolean isPositive = currentRoc10 > ROC_DEAD_ZONE;
         boolean crossoverPositive = wasNegative && isPositive;
 
-        // Crossover negative: was above zero, now below zero
-        boolean wasPositive = previousRoc10 > 0;
-        boolean isNegative = currentRoc10 < 0;
-        boolean crossoverNegative = wasPositive && isNegative;
+        // Crossover negative: was meaningfully above zero, now meaningfully below zero
+        boolean wasAboveZone = previousRoc10 > ROC_DEAD_ZONE;
+        boolean isBelowZone = currentRoc10 < -ROC_DEAD_ZONE;
+        boolean crossoverNegative = wasAboveZone && isBelowZone;
 
         if (crossoverPositive) {
             log.info(
