@@ -212,16 +212,113 @@ public class Scheduler {
         log.info("Monthly API usage report completed.");
     }
 
-    public void manualStockMarketMonitoring() {
-        rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
-        rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
-        rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
+    public boolean manualStockMarketMonitoring() {
+        boolean success = true;
+        success &= rootErrorHandler.runWithStatus(finnhubPriceEvaluator::evaluatePrice);
+        success &= rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
+        success &= rootErrorHandler.runWithStatus(sectorMomentumRocTracker::analyzeAndSendAlerts);
         log.info("Manual stock market monitoring completed.");
+        return success;
     }
 
-    public void manualHourlySignalMonitoring() {
-        rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
-        rootErrorHandler.run(rsiService::sendRsiReport);
+    public boolean manualHourlySignalMonitoring() {
+        boolean success = true;
+        success &= rootErrorHandler.runWithStatus(bollingerBandTracker::analyzeAndSendAlerts);
+        success &= rootErrorHandler.runWithStatus(rsiService::sendRsiReport);
         log.info("Manual hourly signal monitoring completed.");
+        return success;
+    }
+
+    public boolean manualCryptoMarketMonitoring() {
+        boolean success = rootErrorHandler.runWithStatus(coinGeckoPriceEvaluator::evaluatePrice);
+        log.info("Manual crypto market monitoring completed.");
+        return success;
+    }
+
+    public boolean manualRsiStockMonitoring() {
+        boolean success = true;
+        success &= rootErrorHandler.runWithStatus(rsiPriceFetcher::fetchStockClosingPrices);
+        success &= rootErrorHandler.runWithStatus(relativeStrengthTracker::analyzeAndSendAlerts);
+        log.info("Manual RSI stock monitoring completed.");
+        return success;
+    }
+
+    public boolean manualRsiCryptoMonitoring() {
+        boolean success = rootErrorHandler.runWithStatus(rsiPriceFetcher::fetchCryptoClosingPrices);
+        log.info("Manual RSI crypto monitoring completed.");
+        return success;
+    }
+
+    public boolean manualWeeklyInsiderTradingReport() {
+        boolean success = rootErrorHandler.runWithStatus(insiderTracker::trackInsiderTransactions);
+        log.info("Manual insider trading report completed.");
+        return success;
+    }
+
+    public boolean manualDailySectorRotationTracking() {
+        boolean success =
+                rootErrorHandler.runWithStatus(sectorRotationTracker::fetchAndStoreDailyPerformance);
+        log.info("Manual sector rotation tracking completed.");
+        return success;
+    }
+
+    public boolean manualDailySectorRelativeStrengthReport() {
+        boolean success =
+                rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::sendDailySectorRsSummary);
+        log.info("Manual sector relative strength report completed.");
+        return success;
+    }
+
+    public boolean manualDailyTailRiskMonitoring() {
+        boolean success = true;
+        success &= rootErrorHandler.runWithStatus(tailRiskTracker::sendDailyReport);
+        success &= rootErrorHandler.runWithStatus(tailRiskTracker::trackAndAlert);
+        log.info("Manual tail risk monitoring completed.");
+        return success;
+    }
+
+    public boolean manualDailyBollingerBandReport() {
+        boolean success = rootErrorHandler.runWithStatus(bollingerBandTracker::sendDailyReport);
+        log.info("Manual Bollinger Band report completed.");
+        return success;
+    }
+
+    public boolean manualMonthlyApiUsageReport() {
+        boolean success =
+                rootErrorHandler.runWithStatus(
+                        () -> {
+                            int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
+                            int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
+
+                            if (finnhubCount > 0 || coingeckoCount > 0) {
+                                String previousMonth = apiRequestMeteringService.getPreviousMonth();
+
+                                String message =
+                                        String.format(
+                                                """
+                                *Monthly API Usage Report - %s*
+                                🔹 *Finnhub API*: %,d requests
+                                🔹 *CoinGecko API*: %,d requests
+                                🔹 *Total*: %,d requests""",
+                                                previousMonth,
+                                                finnhubCount,
+                                                coingeckoCount,
+                                                finnhubCount + coingeckoCount);
+
+                                telegramClient.sendMessage(message);
+                                log.info(
+                                        "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}",
+                                        previousMonth,
+                                        finnhubCount,
+                                        coingeckoCount);
+                            } else {
+                                log.info(
+                                        "No API requests recorded for the previous month, skipping report");
+                            }
+
+                            apiRequestMeteringService.resetCounters();
+                        });
+        log.info("Manual monthly API usage report completed.");
+        return success;
     }
 }

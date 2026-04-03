@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.core.MomentumRocSignal;
 import org.tradelite.core.MomentumRocSignal.SignalType;
+import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
@@ -115,35 +116,11 @@ public class MomentumRocService {
             return Optional.empty();
         }
 
-        double roc10 = calculateRocValue(prices, ROC_SHORT_PERIOD);
-        double roc20 = calculateRocValue(prices, ROC_LONG_PERIOD);
+        double roc10 = StatisticsUtil.calculateRocValue(prices, ROC_SHORT_PERIOD);
+        double roc20 = StatisticsUtil.calculateRocValue(prices, ROC_LONG_PERIOD);
 
         return Optional.of(
                 new RocResult(roc10, roc20, prices.size(), prices.size() >= MIN_DATA_POINTS));
-    }
-
-    /**
-     * Calculates ROC for a given period.
-     *
-     * <p>ROC = ((Current Price - Price N days ago) / Price N days ago) × 100
-     *
-     * @param prices List of daily prices sorted by date ascending
-     * @param period The ROC period (number of days)
-     * @return The ROC percentage value
-     */
-    protected double calculateRocValue(List<DailyPrice> prices, int period) {
-        if (prices.size() <= period) {
-            return 0;
-        }
-
-        double currentPrice = prices.getLast().getPrice();
-        double pastPrice = prices.get(prices.size() - 1 - period).getPrice();
-
-        if (pastPrice == 0) {
-            return 0;
-        }
-
-        return ((currentPrice - pastPrice) / pastPrice) * 100;
     }
 
     /**

@@ -17,13 +17,19 @@ public class RootErrorHandler {
     }
 
     public void run(ThrowingRunnable body) {
+        runWithStatus(body);
+    }
+
+    public boolean runWithStatus(ThrowingRunnable body) {
         try {
             body.run();
+            return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Operation was interrupted: {}", e.getMessage());
             String message = "⏸️ *Operation Interrupted!* Check application logs for details.";
             telegramClient.sendMessage(message);
+            return false;
         } catch (Exception e) {
             log.error(e.getMessage(), e);
 
@@ -41,6 +47,7 @@ public class RootErrorHandler {
             }
 
             telegramClient.sendMessage(message.toString());
+            return false;
         }
     }
 

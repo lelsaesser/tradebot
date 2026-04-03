@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
@@ -18,7 +19,8 @@ import org.tradelite.config.TradebotTelegramProperties;
 
 @Slf4j
 @Component
-@Profile("!prod")
+@Primary
+@Profile("dev")
 public class LocalTelegramGateway implements TelegramGateway {
 
     private static final AtomicLong MESSAGE_IDS = new AtomicLong(1L);

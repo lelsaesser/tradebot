@@ -1,5 +1,6 @@
 package org.tradelite;
 
+import java.util.function.BooleanSupplier;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
@@ -14,81 +15,81 @@ public class DevJobController {
 
     private final Scheduler scheduler;
     private final DevDataSeeder devDataSeeder;
+    private final RootErrorHandler rootErrorHandler;
 
-    public DevJobController(Scheduler scheduler, DevDataSeeder devDataSeeder) {
+    public DevJobController(
+            Scheduler scheduler, DevDataSeeder devDataSeeder, RootErrorHandler rootErrorHandler) {
         this.scheduler = scheduler;
         this.devDataSeeder = devDataSeeder;
+        this.rootErrorHandler = rootErrorHandler;
     }
 
     @PostMapping("/stock-monitoring")
     public ResponseEntity<Map<String, String>> stockMonitoring() {
-        scheduler.manualStockMarketMonitoring();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "stock-monitoring"));
+        return runJob("stock-monitoring", scheduler::manualStockMarketMonitoring);
     }
 
     @PostMapping("/hourly-signals")
     public ResponseEntity<Map<String, String>> hourlySignals() {
-        scheduler.manualHourlySignalMonitoring();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "hourly-signals"));
+        return runJob("hourly-signals", scheduler::manualHourlySignalMonitoring);
     }
 
     @PostMapping("/crypto-monitoring")
     public ResponseEntity<Map<String, String>> cryptoMonitoring() {
-        scheduler.cryptoMarketMonitoring();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "crypto-monitoring"));
+        return runJob("crypto-monitoring", scheduler::manualCryptoMarketMonitoring);
     }
 
     @PostMapping("/rsi-stock")
     public ResponseEntity<Map<String, String>> rsiStock() {
-        scheduler.rsiStockMonitoring();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "rsi-stock"));
+        return runJob("rsi-stock", scheduler::manualRsiStockMonitoring);
     }
 
     @PostMapping("/rsi-crypto")
     public ResponseEntity<Map<String, String>> rsiCrypto() {
-        scheduler.rsiCryptoMonitoring();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "rsi-crypto"));
+        return runJob("rsi-crypto", scheduler::manualRsiCryptoMonitoring);
     }
 
     @PostMapping("/insider-report")
     public ResponseEntity<Map<String, String>> insiderReport() {
-        scheduler.weeklyInsiderTradingReport();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "insider-report"));
+        return runJob("insider-report", scheduler::manualWeeklyInsiderTradingReport);
     }
 
     @PostMapping("/sector-rotation")
     public ResponseEntity<Map<String, String>> sectorRotation() {
-        scheduler.dailySectorRotationTracking();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "sector-rotation"));
+        return runJob("sector-rotation", scheduler::manualDailySectorRotationTracking);
     }
 
     @PostMapping("/sector-rs-summary")
     public ResponseEntity<Map<String, String>> sectorRelativeStrengthSummary() {
-        scheduler.dailySectorRelativeStrengthReport();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "sector-rs-summary"));
+        return runJob(
+                "sector-rs-summary", scheduler::manualDailySectorRelativeStrengthReport);
     }
 
     @PostMapping("/tail-risk")
     public ResponseEntity<Map<String, String>> tailRisk() {
-        scheduler.dailyTailRiskMonitoring();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "tail-risk"));
+        return runJob("tail-risk", scheduler::manualDailyTailRiskMonitoring);
     }
 
     @PostMapping("/bollinger-report")
     public ResponseEntity<Map<String, String>> bollingerReport() {
-        scheduler.dailyBollingerBandReport();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "bollinger-report"));
+        return runJob("bollinger-report", scheduler::manualDailyBollingerBandReport);
     }
 
     @PostMapping("/monthly-api-usage")
     public ResponseEntity<Map<String, String>> monthlyApiUsage() {
-        scheduler.monthlyApiUsageReport();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "monthly-api-usage"));
+        return runJob("monthly-api-usage", scheduler::manualMonthlyApiUsageReport);
     }
 
     @PostMapping("/seed-analytics")
     public ResponseEntity<Map<String, String>> seedAnalytics() {
-        devDataSeeder.reseed();
-        return ResponseEntity.ok(Map.of("status", "ok", "job", "seed-analytics"));
+        return runJob("seed-analytics", () -> rootErrorHandler.runWithStatus(devDataSeeder::reseed));
+    }
+
+    private ResponseEntity<Map<String, String>> runJob(String job, BooleanSupplier jobRunner) {
+        if (jobRunner.getAsBoolean()) {
+            return ResponseEntity.ok(Map.of("status", "ok", "job", job));
+        }
+        return ResponseEntity.internalServerError()
+                .body(Map.of("status", "error", "job", job, "message", "check logs"));
     }
 }

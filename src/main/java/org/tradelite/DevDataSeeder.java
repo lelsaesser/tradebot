@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -24,6 +25,7 @@ import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
@@ -54,6 +56,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final Path rsiDataFilePath;
     private final Path rsDataFilePath;
 
+    @Autowired
     public DevDataSeeder(
             DataSource dataSource,
             ObjectMapper objectMapper,
@@ -255,7 +258,7 @@ public class DevDataSeeder implements ApplicationRunner {
                                     Math.sin((index + phase) / 5.0) * amplitude
                                             + Math.cos((index + phase) / 11.0) * (amplitude / 2.0);
                             double price =
-                                    roundTo2Decimals(
+                                    StatisticsUtil.roundTo2Decimals(
                                             Math.max(
                                                     15.0,
                                                     basePrice + (index * dailySlope) + seasonal));
@@ -285,16 +288,24 @@ public class DevDataSeeder implements ApplicationRunner {
                     DailyPrice current = series.get(index);
                     double previousClose =
                             index == 0
-                                    ? roundTo2Decimals(current.getPrice() * 0.99)
+                                    ? StatisticsUtil.roundTo2Decimals(current.getPrice() * 0.99)
                                     : series.get(index - 1).getPrice();
-                    double open = roundTo2Decimals((current.getPrice() + previousClose) / 2.0);
-                    double high = roundTo2Decimals(Math.max(open, current.getPrice()) * 1.01);
-                    double low = roundTo2Decimals(Math.min(open, current.getPrice()) * 0.99);
-                    double change = roundTo2Decimals(current.getPrice() - previousClose);
+                    double open =
+                            StatisticsUtil.roundTo2Decimals(
+                                    (current.getPrice() + previousClose) / 2.0);
+                    double high =
+                            StatisticsUtil.roundTo2Decimals(
+                                    Math.max(open, current.getPrice()) * 1.01);
+                    double low =
+                            StatisticsUtil.roundTo2Decimals(
+                                    Math.min(open, current.getPrice()) * 0.99);
+                    double change =
+                            StatisticsUtil.roundTo2Decimals(current.getPrice() - previousClose);
                     double changePercent =
                             previousClose == 0.0
                                     ? 0.0
-                                    : roundTo2Decimals((change / previousClose) * 100.0);
+                                    : StatisticsUtil.roundTo2Decimals(
+                                            (change / previousClose) * 100.0);
                     long timestamp =
                             current.getDate()
                                     .atTime(SEEDED_CLOSE_TIME)
@@ -370,7 +381,7 @@ public class DevDataSeeder implements ApplicationRunner {
 
             int emaPeriod = Math.min(50, rsValues.size());
             rsData.setPreviousRs(rsValues.get(rsValues.size() - 1));
-            rsData.setPreviousEma(calculateEma(rsValues, emaPeriod));
+            rsData.setPreviousEma(StatisticsUtil.calculateEma(rsValues, emaPeriod));
             rsData.setInitialized(true);
             rsHistory.put(entry.getKey(), rsData);
         }
@@ -389,41 +400,11 @@ public class DevDataSeeder implements ApplicationRunner {
             }
 
             MomentumRocData momentumRocData = new MomentumRocData();
-            momentumRocData.setPreviousRoc10(calculateRoc(series, 10));
-            momentumRocData.setPreviousRoc20(calculateRoc(series, 20));
+            momentumRocData.setPreviousRoc10(StatisticsUtil.calculateRocValue(series, 10));
+            momentumRocData.setPreviousRoc20(StatisticsUtil.calculateRocValue(series, 20));
             momentumRocData.setInitialized(true);
             momentumRocRepository.save(symbol, momentumRocData);
         }
-    }
-
-    private double calculateRoc(List<DailyPrice> series, int period) {
-        if (series.size() <= period) {
-            return 0.0;
-        }
-
-        double currentPrice = series.get(series.size() - 1).getPrice();
-        double pastPrice = series.get(series.size() - 1 - period).getPrice();
-        if (pastPrice == 0.0) {
-            return 0.0;
-        }
-        return ((currentPrice - pastPrice) / pastPrice) * 100.0;
-    }
-
-    private double calculateEma(List<Double> values, int period) {
-        if (values.isEmpty() || period <= 0) {
-            return 0.0;
-        }
-
-        double multiplier = 2.0 / (period + 1);
-        double ema =
-                values.subList(0, period).stream()
-                        .mapToDouble(Double::doubleValue)
-                        .average()
-                        .orElse(0.0);
-        for (int index = period; index < values.size(); index++) {
-            ema = (values.get(index) - ema) * multiplier + ema;
-        }
-        return ema;
     }
 
     private void ensureParentDirectories(Path path) throws IOException {
@@ -431,10 +412,6 @@ public class DevDataSeeder implements ApplicationRunner {
         if (parent != null) {
             Files.createDirectories(parent);
         }
-    }
-
-    private double roundTo2Decimals(double value) {
-        return Math.round(value * 100.0) / 100.0;
     }
 
     record SeedBundle(

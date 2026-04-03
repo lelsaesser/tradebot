@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.OptionalLong;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -17,7 +16,6 @@ import org.tradelite.config.TradebotTelegramProperties;
 
 @Slf4j
 @Component
-@Profile("prod")
 public class TelegramClient implements TelegramGateway {
 
     protected static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage";
