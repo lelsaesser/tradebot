@@ -6,7 +6,9 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,8 +21,10 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
@@ -36,14 +40,19 @@ class DevDataSeederTest {
 
     @TempDir Path tempDir;
 
+    private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUpObjectMapper() {
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+    }
+
     @Test
     void reseed_populatesSqliteAndIndicatorState() throws Exception {
         SQLiteDataSource dataSource = new SQLiteDataSource();
         Path dbPath = tempDir.resolve("tradebot-dev.db");
         dataSource.setUrl("jdbc:sqlite:" + dbPath);
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
         RsiService rsiService = mock(RsiService.class);
@@ -100,8 +109,6 @@ class DevDataSeederTest {
     @Test
     void seedIfMissing_skipsWhenFilesAndBenchmarkDataAlreadyExist() throws Exception {
         DataSource dataSource = createPreseededDataSource();
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
 
         Files.writeString(tempDir.resolve("rsi-data.json"), "{}");
         Files.writeString(tempDir.resolve("rs-data.json"), "{}");
@@ -131,6 +138,160 @@ class DevDataSeederTest {
                         tempDir.resolve("rs-data.json"));
 
         assertThat(seeder.seedIfMissing(), is(false));
+    }
+
+    @Test
+    void run_delegatesToSeedIfMissing() {
+        DevDataSeeder seeder = spy(createSeederWithEmptySources());
+        doReturn(false).when(seeder).seedIfMissing();
+
+        seeder.run(new DefaultApplicationArguments(new String[0]));
+
+        verify(seeder).seedIfMissing();
+    }
+
+    @Test
+    void seedIfMissing_reseedsWhenFilesAreAbsent() {
+        Path rsiPath = tempDir.resolve("seed-if-missing-rsi.json");
+        Path rsPath = tempDir.resolve("seed-if-missing-rs.json");
+        DevDataSeeder seeder = createSeederWithEmptySources(rsiPath, rsPath);
+
+        boolean seeded = seeder.seedIfMissing();
+
+        assertThat(seeded, is(true));
+        assertThat(Files.exists(rsiPath), is(true));
+        assertThat(Files.exists(rsPath), is(true));
+    }
+
+    @Test
+    void reseed_usesStockRegistryFallbackAndLimitsToFiveNonEtfs() {
+        SQLiteDataSource dataSource = new SQLiteDataSource();
+        Path dbPath = tempDir.resolve("fallback.db");
+        dataSource.setUrl("jdbc:sqlite:" + dbPath);
+
+        MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
+        RsiService rsiService = mock(RsiService.class);
+        RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
+        TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
+        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+
+        var rsiHistory = new java.util.HashMap<String, RsiDailyClosePrice>();
+        var symbolDisplayNames = new java.util.HashMap<String, String>();
+        var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
+
+        when(rsiService.getPriceHistory()).thenReturn(rsiHistory);
+        when(rsiService.getSymbolDisplayNames()).thenReturn(symbolDisplayNames);
+        when(relativeStrengthService.getRsHistory()).thenReturn(rsHistory);
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
+        when(stockSymbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("ETF1", "ETF One"),
+                                new StockSymbol("AAPL", "Apple Inc"),
+                                new StockSymbol("MSFT", "Microsoft Corp"),
+                                new StockSymbol("NVDA", "NVIDIA Corp"),
+                                new StockSymbol("AMZN", "Amazon.com"),
+                                new StockSymbol("META", "Meta Platforms"),
+                                new StockSymbol("GOOG", "Alphabet Inc")));
+        when(stockSymbolRegistry.isEtf("ETF1")).thenReturn(true);
+        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
+        when(stockSymbolRegistry.isEtf("MSFT")).thenReturn(false);
+        when(stockSymbolRegistry.isEtf("NVDA")).thenReturn(false);
+        when(stockSymbolRegistry.isEtf("AMZN")).thenReturn(false);
+        when(stockSymbolRegistry.isEtf("META")).thenReturn(false);
+        when(stockSymbolRegistry.isEtf("GOOG")).thenReturn(false);
+
+        DevDataSeeder seeder =
+                new DevDataSeeder(
+                        dataSource,
+                        objectMapper,
+                        momentumRocRepository,
+                        rsiService,
+                        relativeStrengthService,
+                        targetPriceProvider,
+                        stockSymbolRegistry,
+                        tempDir.resolve("rsi-fallback.json"),
+                        tempDir.resolve("rs-fallback.json"));
+
+        seeder.reseed();
+
+        assertThat(symbolDisplayNames, hasKey("AAPL"));
+        assertThat(symbolDisplayNames, hasKey("MSFT"));
+        assertThat(symbolDisplayNames, hasKey("NVDA"));
+        assertThat(symbolDisplayNames, hasKey("AMZN"));
+        assertThat(symbolDisplayNames, hasKey("META"));
+        assertThat(symbolDisplayNames.containsKey("GOOG"), is(false));
+        assertThat(symbolDisplayNames.containsKey("ETF1"), is(false));
+    }
+
+    @Test
+    void reseed_wrapsSqlExceptions() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        when(dataSource.getConnection()).thenThrow(new java.sql.SQLException("db down"));
+
+        MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
+        RsiService rsiService = mock(RsiService.class);
+        RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
+        TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
+        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+
+        when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
+        when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
+        when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+
+        DevDataSeeder seeder =
+                new DevDataSeeder(
+                        dataSource,
+                        objectMapper,
+                        momentumRocRepository,
+                        rsiService,
+                        relativeStrengthService,
+                        targetPriceProvider,
+                        stockSymbolRegistry,
+                        tempDir.resolve("rsi-error.json"),
+                        tempDir.resolve("rs-error.json"));
+
+        IllegalStateException exception =
+                org.junit.jupiter.api.Assertions.assertThrows(
+                        IllegalStateException.class, seeder::reseed);
+
+        assertThat(exception.getMessage(), is("Failed to seed dev analytics data"));
+    }
+
+    private DevDataSeeder createSeederWithEmptySources() {
+        return createSeederWithEmptySources(
+                tempDir.resolve("generic-rsi.json"), tempDir.resolve("generic-rs.json"));
+    }
+
+    private DevDataSeeder createSeederWithEmptySources(Path rsiPath, Path rsPath) {
+        SQLiteDataSource dataSource = new SQLiteDataSource();
+        Path dbPath = tempDir.resolve("generic.db");
+        dataSource.setUrl("jdbc:sqlite:" + dbPath);
+
+        MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
+        RsiService rsiService = mock(RsiService.class);
+        RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
+        TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
+        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+
+        when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
+        when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
+        when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+
+        return new DevDataSeeder(
+                dataSource,
+                objectMapper,
+                momentumRocRepository,
+                rsiService,
+                relativeStrengthService,
+                targetPriceProvider,
+                stockSymbolRegistry,
+                rsiPath,
+                rsPath);
     }
 
     private DataSource createPreseededDataSource() throws Exception {

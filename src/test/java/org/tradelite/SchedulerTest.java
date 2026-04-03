@@ -1,5 +1,6 @@
 package org.tradelite;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -7,7 +8,9 @@ import static org.mockito.Mockito.*;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayDeque;
 import java.util.Objects;
+import java.util.Queue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -420,6 +423,138 @@ class SchedulerTest {
     }
 
     @Test
+    void manualCryptoMarketMonitoring_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualCryptoMarketMonitoring();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(coinGeckoPriceEvaluator).evaluatePrice();
+    }
+
+    @Test
+    void manualRsiStockMonitoring_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true, true);
+
+        boolean success = scheduler.manualRsiStockMonitoring();
+
+        assertTrue(success);
+        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
+        verify(rsiPriceFetcher).fetchStockClosingPrices();
+        verify(relativeStrengthTracker).analyzeAndSendAlerts();
+    }
+
+    @Test
+    void manualRsiStockMonitoring_returnsFalseWhenOneStepFailsButStillRunsBoth() throws Exception {
+        stubRunWithStatus(true, false);
+
+        boolean success = scheduler.manualRsiStockMonitoring();
+
+        assertFalse(success);
+        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
+        verify(rsiPriceFetcher).fetchStockClosingPrices();
+        verify(relativeStrengthTracker).analyzeAndSendAlerts();
+    }
+
+    @Test
+    void manualRsiCryptoMonitoring_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualRsiCryptoMonitoring();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(rsiPriceFetcher).fetchCryptoClosingPrices();
+    }
+
+    @Test
+    void manualWeeklyInsiderTradingReport_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualWeeklyInsiderTradingReport();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(insiderTracker).trackInsiderTransactions();
+    }
+
+    @Test
+    void manualDailySectorRotationTracking_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualDailySectorRotationTracking();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(sectorRotationTracker).fetchAndStoreDailyPerformance();
+    }
+
+    @Test
+    void manualDailySectorRelativeStrengthReport_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualDailySectorRelativeStrengthReport();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(sectorRelativeStrengthTracker).sendDailySectorRsSummary();
+    }
+
+    @Test
+    void manualDailyTailRiskMonitoring_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true, true);
+
+        boolean success = scheduler.manualDailyTailRiskMonitoring();
+
+        assertTrue(success);
+        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
+        verify(tailRiskTracker).sendDailyReport();
+        verify(tailRiskTracker).trackAndAlert();
+    }
+
+    @Test
+    void manualDailyBollingerBandReport_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualDailyBollingerBandReport();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(bollingerBandTracker).sendDailyReport();
+    }
+
+    @Test
+    void manualMonthlyApiUsageReport_withRequestsShouldSendReportAndReset() throws Exception {
+        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(10);
+        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(5);
+        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2026-03");
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualMonthlyApiUsageReport();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(telegramClient).sendMessage(contains("*Monthly API Usage Report - 2026-03*"));
+        verify(apiRequestMeteringService).resetCounters();
+    }
+
+    @Test
+    void manualMonthlyApiUsageReport_withNoRequestsShouldStillResetCounters() throws Exception {
+        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
+        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualMonthlyApiUsageReport();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(telegramClient, never()).sendMessage(anyString());
+        verify(apiRequestMeteringService).resetCounters();
+        verify(apiRequestMeteringService, never()).getPreviousMonth();
+    }
+
+    @Test
     void dailyBollingerBandReport_shouldSendReport() throws Exception {
         scheduler.dailyBollingerBandReport();
 
@@ -447,5 +582,20 @@ class SchedulerTest {
 
         verify(tailRiskTracker, times(1)).sendDailyReport();
         verify(tailRiskTracker, times(1)).trackAndAlert();
+    }
+
+    private void stubRunWithStatus(boolean... results) {
+        Queue<Boolean> remaining = new ArrayDeque<>();
+        for (boolean result : results) {
+            remaining.add(result);
+        }
+
+        when(rootErrorHandler.runWithStatus(any()))
+                .thenAnswer(
+                        invocation -> {
+                            ThrowingRunnable runnable = invocation.getArgument(0);
+                            runnable.run();
+                            return remaining.isEmpty() ? true : remaining.remove();
+                        });
     }
 }

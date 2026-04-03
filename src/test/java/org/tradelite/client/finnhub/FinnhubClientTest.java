@@ -3,10 +3,12 @@ package org.tradelite.client.finnhub;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -172,5 +174,72 @@ class FinnhubClientTest {
                         () -> finnhubClient.getInsiderTransactions(ticker));
 
         assertThat(exception.getMessage(), is("Error fetching insider transactions"));
+    }
+
+    @Test
+    void getInsiderTransactions_missingKey_throws() {
+        StockSymbol ticker = new StockSymbol("META", "Meta Platforms");
+        properties.setFinnhubKey(" ");
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> finnhubClient.getInsiderTransactions(ticker));
+
+        assertThat(exception.getMessage(), is("FINNHUB key not configured"));
+        verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void getInsiderTransactions_no2xxResponse_throws() {
+        StockSymbol ticker = new StockSymbol("META", "Meta Platforms");
+
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class)))
+                .thenReturn(ResponseEntity.notFound().build());
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> finnhubClient.getInsiderTransactions(ticker));
+
+        assertThat(
+                exception.getMessage(),
+                is("Failed to fetch insider transactions for META: 404 NOT_FOUND"));
+    }
+
+    @Test
+    void getInsiderTransactions_nullBody_throws() {
+        StockSymbol ticker = new StockSymbol("META", "Meta Platforms");
+
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(InsiderTransactionResponse.class)))
+                .thenReturn(ResponseEntity.ok().build());
+
+        IllegalStateException exception =
+                assertThrows(
+                        IllegalStateException.class,
+                        () -> finnhubClient.getInsiderTransactions(ticker));
+
+        assertThat(
+                exception.getMessage(),
+                is("Failed to fetch insider transactions for META: 200 OK"));
+    }
+
+    @Test
+    void toRuntime_wrapsCheckedExceptions() throws Exception {
+        Method toRuntime = FinnhubClient.class.getDeclaredMethod("toRuntime", Exception.class);
+        toRuntime.setAccessible(true);
+
+        Object result = toRuntime.invoke(finnhubClient, new Exception("checked"));
+
+        assertThat(result, is(instanceOf(IllegalStateException.class)));
+        assertThat(((IllegalStateException) result).getMessage(), is("checked"));
     }
 }

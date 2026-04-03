@@ -699,4 +699,38 @@ class RsiServiceTest {
                                                 && report.contains("Overbought")
                                                 && report.contains("Oversold")));
     }
+
+    @Test
+    void testRemoveSymbolRsiData_success() throws IOException {
+        rsiService.addPrice(symbol, 100.0, LocalDate.now());
+
+        boolean removed = rsiService.removeSymbolRsiData("AAPL");
+
+        assertThat(removed, is(true));
+        assertThat(rsiService.getPriceHistory().containsKey("AAPL"), is(false));
+    }
+
+    @Test
+    void testRemoveSymbolRsiData_unknownSymbol() {
+        boolean removed = rsiService.removeSymbolRsiData("UNKNOWN");
+
+        assertThat(removed, is(false));
+    }
+
+    @Test
+    void testRemoveSymbolRsiData_blankOrNullSymbol() {
+        assertThat(rsiService.removeSymbolRsiData(""), is(false));
+        assertThat(rsiService.removeSymbolRsiData(null), is(false));
+    }
+
+    @Test
+    void testRemoveSymbolRsiData_returnsFalseWhenSaveFails() throws Exception {
+        rsiService.addPrice(symbol, 100.0, LocalDate.now());
+        doThrow(new IOException("save failed")).when(rsiService).savePriceHistory();
+
+        boolean removed = rsiService.removeSymbolRsiData("AAPL");
+
+        assertThat(removed, is(false));
+        assertThat(rsiService.getPriceHistory().containsKey("AAPL"), is(false));
+    }
 }

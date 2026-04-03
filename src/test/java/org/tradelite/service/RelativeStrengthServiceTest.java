@@ -3,6 +3,9 @@ package org.tradelite.service;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -353,6 +356,53 @@ class RelativeStrengthServiceTest {
 
         // Cleanup
         rsFile.delete();
+    }
+
+    @Test
+    void testLoadRsHistory_missingFile_isNoOp() throws IOException {
+        new File(rsDataFile).delete();
+
+        relativeStrengthService.loadRsHistory();
+
+        assertThat(relativeStrengthService.getRsHistory().isEmpty(), is(true));
+    }
+
+    @Test
+    void testLoadRsHistory_invalidFile_throws() throws Exception {
+        File rsFile = new File(rsDataFile);
+        rsFile.getParentFile().mkdirs();
+        rsFile.createNewFile();
+
+        ObjectMapper failingMapper = org.mockito.Mockito.spy(new ObjectMapper());
+        doThrow(new IOException("bad rs data"))
+                .when(failingMapper)
+                .readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
+
+        assertEquals(
+                IOException.class,
+                assertThrows(
+                                IOException.class,
+                                () ->
+                                        new RelativeStrengthService(
+                                                failingMapper, rsiService, priceQuoteRepository))
+                        .getClass());
+
+        rsFile.delete();
+    }
+
+    @Test
+    void testSaveRsHistory_writeFailure_throws() throws Exception {
+        ObjectMapper failingMapper = org.mockito.Mockito.spy(new ObjectMapper());
+        doThrow(new IOException("write failed"))
+                .when(failingMapper)
+                .writeValue(any(File.class), any());
+
+        RelativeStrengthService service =
+                new RelativeStrengthService(failingMapper, rsiService, priceQuoteRepository);
+
+        assertEquals(
+                IOException.class,
+                assertThrows(IOException.class, service::saveRsHistory).getClass());
     }
 
     @Test
