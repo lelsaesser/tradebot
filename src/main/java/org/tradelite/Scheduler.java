@@ -215,7 +215,8 @@ public class Scheduler {
     public boolean manualStockMarketMonitoring() {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(finnhubPriceEvaluator::evaluatePrice);
-        success &= rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
+        success &=
+                rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
         success &= rootErrorHandler.runWithStatus(sectorMomentumRocTracker::analyzeAndSendAlerts);
         log.info("Manual stock market monitoring completed.");
         return success;
@@ -257,14 +258,16 @@ public class Scheduler {
 
     public boolean manualDailySectorRotationTracking() {
         boolean success =
-                rootErrorHandler.runWithStatus(sectorRotationTracker::fetchAndStoreDailyPerformance);
+                rootErrorHandler.runWithStatus(
+                        sectorRotationTracker::fetchAndStoreDailyPerformance);
         log.info("Manual sector rotation tracking completed.");
         return success;
     }
 
     public boolean manualDailySectorRelativeStrengthReport() {
         boolean success =
-                rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::sendDailySectorRsSummary);
+                rootErrorHandler.runWithStatus(
+                        sectorRelativeStrengthTracker::sendDailySectorRsSummary);
         log.info("Manual sector relative strength report completed.");
         return success;
     }
@@ -288,7 +291,8 @@ public class Scheduler {
                 rootErrorHandler.runWithStatus(
                         () -> {
                             int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
-                            int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
+                            int coingeckoCount =
+                                    apiRequestMeteringService.getCoingeckoRequestCount();
 
                             if (finnhubCount > 0 || coingeckoCount > 0) {
                                 String previousMonth = apiRequestMeteringService.getPreviousMonth();

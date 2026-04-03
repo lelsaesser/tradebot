@@ -3,12 +3,12 @@ package org.tradelite.quant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.tradelite.service.model.DailyPrice;
-import java.time.LocalDate;
 
 class StatisticsUtilTest {
 

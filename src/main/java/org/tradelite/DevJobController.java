@@ -1,7 +1,7 @@
 package org.tradelite;
 
-import java.util.function.BooleanSupplier;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,8 +61,7 @@ public class DevJobController {
 
     @PostMapping("/sector-rs-summary")
     public ResponseEntity<Map<String, String>> sectorRelativeStrengthSummary() {
-        return runJob(
-                "sector-rs-summary", scheduler::manualDailySectorRelativeStrengthReport);
+        return runJob("sector-rs-summary", scheduler::manualDailySectorRelativeStrengthReport);
     }
 
     @PostMapping("/tail-risk")
@@ -82,7 +81,8 @@ public class DevJobController {
 
     @PostMapping("/seed-analytics")
     public ResponseEntity<Map<String, String>> seedAnalytics() {
-        return runJob("seed-analytics", () -> rootErrorHandler.runWithStatus(devDataSeeder::reseed));
+        return runJob(
+                "seed-analytics", () -> rootErrorHandler.runWithStatus(devDataSeeder::reseed));
     }
 
     private ResponseEntity<Map<String, String>> runJob(String job, BooleanSupplier jobRunner) {

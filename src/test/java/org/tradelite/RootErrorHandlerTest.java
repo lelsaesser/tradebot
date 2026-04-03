@@ -29,9 +29,9 @@ class RootErrorHandlerTest {
     void testRun_withInterruptedException() {
         boolean success =
                 rootErrorHandler.runWithStatus(
-                () -> {
-                    throw new InterruptedException();
-                });
+                        () -> {
+                            throw new InterruptedException();
+                        });
 
         assertFalse(success);
         String expectedMessage = "⏸️ *Operation Interrupted!* Check application logs for details.";
@@ -42,9 +42,9 @@ class RootErrorHandlerTest {
     void testRun_withException() {
         boolean success =
                 rootErrorHandler.runWithStatus(
-                () -> {
-                    throw new RuntimeException("Test exception");
-                });
+                        () -> {
+                            throw new RuntimeException("Test exception");
+                        });
         assertFalse(success);
         verify(telegramClient).sendMessage(anyString());
     }
@@ -53,9 +53,9 @@ class RootErrorHandlerTest {
     void testRun_withNoException() {
         boolean success =
                 rootErrorHandler.runWithStatus(
-                () -> {
-                    // No exception thrown
-                });
+                        () -> {
+                            // No exception thrown
+                        });
 
         assertTrue(success);
         verify(telegramClient, never()).sendMessage(anyString());
