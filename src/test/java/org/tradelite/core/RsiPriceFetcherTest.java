@@ -47,7 +47,8 @@ class RsiPriceFetcherTest {
 
         rsiPriceFetcher.fetchStockClosingPrices();
 
-        verify(rsiService, times(1)).addPrice(any(StockSymbol.class), anyDouble(), any());
+        verify(rsiService, times(1))
+                .addPrice(any(StockSymbol.class), anyDouble(), anyDouble(), any());
     }
 
     @Test
@@ -61,7 +62,8 @@ class RsiPriceFetcherTest {
 
         assertThrows(RuntimeException.class, () -> rsiPriceFetcher.fetchStockClosingPrices());
 
-        verify(rsiService, never()).addPrice(any(StockSymbol.class), anyDouble(), any());
+        verify(rsiService, never())
+                .addPrice(any(StockSymbol.class), anyDouble(), anyDouble(), any());
     }
 
     @Test
@@ -74,7 +76,7 @@ class RsiPriceFetcherTest {
 
         rsiPriceFetcher.fetchCryptoClosingPrices();
 
-        verify(rsiService, times(1)).addPrice(any(CoinId.class), anyDouble(), any());
+        verify(rsiService, times(1)).addPrice(any(CoinId.class), anyDouble(), anyDouble(), any());
     }
 
     @Test
@@ -85,7 +87,7 @@ class RsiPriceFetcherTest {
         rsiPriceFetcher.fetchCryptoClosingPrices();
 
         verify(coinGeckoClient, never()).getCoinPriceData(any(CoinId.class));
-        verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), any());
+        verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), anyDouble(), any());
     }
 
     @Test
@@ -98,7 +100,8 @@ class RsiPriceFetcherTest {
         rsiPriceFetcher.fetchStockClosingPrices();
 
         verify(finnhubClient, never()).getPriceQuote(any(StockSymbol.class));
-        verify(rsiService, never()).addPrice(any(StockSymbol.class), anyDouble(), any());
+        verify(rsiService, never())
+                .addPrice(any(StockSymbol.class), anyDouble(), anyDouble(), any());
     }
 
     @Test
@@ -110,6 +113,6 @@ class RsiPriceFetcherTest {
 
         assertThrows(RuntimeException.class, () -> rsiPriceFetcher.fetchCryptoClosingPrices());
 
-        verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), any());
+        verify(rsiService, never()).addPrice(any(CoinId.class), anyDouble(), anyDouble(), any());
     }
 }

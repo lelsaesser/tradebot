@@ -56,12 +56,13 @@ public class RsiService {
         loadPriceHistory();
     }
 
-    public void addPrice(TickerSymbol symbol, double price, LocalDate date) throws IOException {
+    public void addPrice(TickerSymbol symbol, double price, double previousClose, LocalDate date)
+            throws IOException {
         String symbolKey = symbol.getName();
         RsiDailyClosePrice rsiDailyClosePrice =
                 priceHistory.getOrDefault(symbolKey, new RsiDailyClosePrice());
 
-        if (finnhubPriceEvaluator.isPotentialMarketHoliday(symbolKey, price)) {
+        if (finnhubPriceEvaluator.isPotentialMarketHoliday(symbolKey, price, previousClose)) {
             log.info(
                     "Potential market holiday detected for {}: price {} on {} is identical to previous trading day. Skipping price update.",
                     symbol,
