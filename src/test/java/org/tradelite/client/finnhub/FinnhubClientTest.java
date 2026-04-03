@@ -72,9 +72,11 @@ class FinnhubClientTest {
                 .thenReturn(ResponseEntity.notFound().build());
 
         IllegalStateException exception =
-                assertThrows(IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
+                assertThrows(
+                        IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
 
-        assertThat(exception.getMessage(), is("Failed to fetch price quote for META: 404 NOT_FOUND"));
+        assertThat(
+                exception.getMessage(), is("Failed to fetch price quote for META: 404 NOT_FOUND"));
     }
 
     @Test
@@ -100,7 +102,8 @@ class FinnhubClientTest {
         properties.setFinnhubKey("");
 
         IllegalStateException exception =
-                assertThrows(IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
+                assertThrows(
+                        IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
 
         assertThat(exception.getMessage(), is("FINNHUB key not configured"));
         verifyNoInteractions(restTemplate);
@@ -118,7 +121,8 @@ class FinnhubClientTest {
                 .thenReturn(ResponseEntity.ok().build());
 
         IllegalStateException exception =
-                assertThrows(IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
+                assertThrows(
+                        IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
 
         assertThat(exception.getMessage(), is("Failed to fetch price quote for META: 200 OK"));
     }
