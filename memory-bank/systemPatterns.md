@@ -22,15 +22,17 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values. Uses `SectorEtfRegistry` for ETF list.
 -   **`TailRiskService`:** Calculates excess kurtosis and skewness from daily price changes to detect fat tail risk and directional bias.
 -   **`TailRiskTracker`:** Monitors sector ETFs for elevated tail risk (fat tails) with directional context (crash vs rally bias). Uses `SectorEtfRegistry` for ETF list.
--   **`StatisticsUtil`:** Shared utility class providing `mean()`, `standardDeviation()`, `zScore()`, `percentileRank()`, `populationStdDev()`, and `percentile()` (including range-based overloads). Used by `SectorRotationAnalyzer`, `TailRiskService`, and `BollingerBandService` to eliminate code duplication.
+-   **`StatisticsUtil`:** Shared utility class providing `mean()`, `standardDeviation()`, `zScore()`, `percentileRank()`, `populationStdDev()`, `percentile()`, `calculateEma()`, `calculateRocValue()`, and `roundTo2Decimals()`. Used by quant services plus `DevDataSeeder` to keep indicator math consistent.
 -   **`BollingerBandService`:** Calculates Bollinger Bands (20-period SMA ± 2σ), %B positioning, bandwidth, and bandwidth percentile for squeeze detection. Uses split data thresholds: 20 points for basic bands, 40+ for bandwidth percentile history. Detects both absolute squeezes (bandwidth ≤ 4%) and historical squeezes (percentile ≤ 10%). Uses `StatisticsUtil` and reads prices from `PriceQuoteRepository`.
 -   **`BollingerBandTracker`:** Orchestrates Bollinger Band analysis across all sector ETFs and tracked stocks. Sends Telegram alerts for band touches and squeezes, plus daily summary reports. Uses `SectorEtfRegistry` for ETFs and `StockSymbolRegistry` for individual stocks (excluding ETFs to avoid duplication).
--   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern. `TelegramClient` supports `sendMessage()`, `sendMessageAndReturnId()` (returns `OptionalLong` with message ID), and `deleteMessage(long)` for the delete-before-send pattern.
+-   **`TelegramClient` / `LocalTelegramGateway` / `TelegramMessageProcessor`:** Telegram integration is profile-aware. `TelegramClient` is the default production-style gateway outside `dev`; `LocalTelegramGateway` is active only in `dev` and writes messages to a local sink file. `TelegramClient` supports `sendMessage()`, `sendMessageAndReturnId()` (returns `OptionalLong` with message ID), and `deleteMessage(long)` for delete-before-send report flows.
 -   **`TelegramSendMessageResponse`:** DTO for parsing Telegram `sendMessage` API responses, extracting `message_id` from the `result` object.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
 -   **`RsiCommandProcessor`**: Handles the `/rsi` command from Telegram, allowing users to get current RSI values for any symbol.
 -   **`TargetPriceProvider`:** Manages the watchlist of symbols to be monitored, including those to be ignored. Allows dynamic configuration.
--   **`RootErrorHandler`:** Centralized error handler wrapping all scheduled tasks. Ensures that failures in one task don't bring down the entire application.
+-   **`RootErrorHandler`:** Centralized error handler wrapping all scheduled tasks. `run()` preserves fire-and-log scheduled behavior; `runWithStatus()` adds boolean success/failure reporting for dev-triggered manual jobs.
+-   **`DevDataSeeder`:** `dev`-only startup seeder that populates SQLite quote history and persisted RSI / RS / ROC state so quant features are usable locally on first run.
+-   **`DevJobController`:** `dev`-only manual trigger surface for scheduled workflows. Returns HTTP 200/500 based on the new status-returning scheduler execution path.
 
 ## External API Clients
 
@@ -54,6 +56,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **Repository Pattern (NEW):** The data persistence layer uses the Repository pattern with interface-implementation separation. `PriceQuoteRepository` defines the contract, `SqlitePriceQuoteRepository` provides SQLite implementation. This allows easy swapping of database backends.
 -   **Command Pattern**: The Telegram command processing framework exemplifies the Command pattern. Each command (`/add`, `/remove`, `/rsi`, `/show`, etc.) is encapsulated in its own class (`RsiCommand`, `AddCommand`, etc.) with a corresponding processor (`RsiCommandProcessor`, `AddCommandProcessor`, etc.). The `TelegramCommandDispatcher` routes commands to appropriate processors via the `canProcess()` method.
 -   **Dependency Injection**: Used extensively by Spring to manage component dependencies, promoting loose coupling and testability. All major components are injected via constructor injection.
+-   **Profile Gating**: Default profile is production-like. `dev` is the only opt-in local profile and gates local Telegram behavior, dev-only controllers, and analytics seeding.
 -   **Scheduler Pattern**: The `Scheduler` component uses Spring's `@Scheduled` annotation to run tasks at fixed intervals. Separate schedulers exist for `stockMarketMonitoring`, `cryptoMarketMonitoring`, `dailyRsiFetching`, `weeklyInsiderReporting`, `telegramMessagePolling`, and `dailySectorRotationTracking`.
 -   **Strategy Pattern**: Different `PriceEvaluator` implementations for different data sources (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) demonstrate the Strategy pattern. This allows price evaluation logic to be easily swapped or extended.
 -   **Caching Pattern**: Price evaluators maintain `lastPriceCache` maps to store recently fetched prices. The `RsiService` leverages these caches via `getCurrentPriceFromCache()` for real-time RSI calculations. The `FeatureToggleService` uses a time-based cache with 3-minute TTL for feature toggles.
@@ -102,7 +105,14 @@ Scheduler
 ├── SectorRotationTracker → FinvizClient → FinViz website
 │   ├── SectorPerformancePersistence → JSON file
 │   └── SectorRotationAnalyzer
-└── TelegramMessageProcessor → TelegramClient → Telegram API
+├── RootErrorHandler
+│   ├── Scheduled path → fire-and-log via run()
+│   └── Dev manual path → boolean status via runWithStatus()
+├── DevDataSeeder (profile: dev) → seeds SQLite + JSON indicator state
+├── DevJobController (profile: dev) → manual job endpoints returning 200/500
+└── TelegramMessageProcessor → TelegramGateway
+    ├── TelegramClient (default / non-dev) → Telegram API
+    ├── LocalTelegramGateway (dev) → local sink file
     └── TelegramCommandDispatcher
         ├── AddCommandProcessor
         ├── RemoveCommandProcessor

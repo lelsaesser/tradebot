@@ -45,6 +45,7 @@ Users interact with the bot through Telegram commands:
 - **JSON Persistence:** Stores RSI history, target prices, insider transactions, and sector performance in local config files
 - **Graceful Error Handling:** Continues operating even with invalid configuration data
 - **Historical Data:** Maintains sector performance history for trend analysis
+- **Local Development Mode:** Optional `dev` profile disables schedulers, keeps Telegram output local, and exposes manual job endpoints for safe local iteration
 
 ## User Experience Goals
 The primary goal is to provide a hands-off monitoring experience where users:

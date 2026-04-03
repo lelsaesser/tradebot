@@ -1,5 +1,26 @@
 # Progress Tracking
 
+## Latest Milestone: PR #161 Review Feedback Addressed ✅ COMPLETE
+
+**Status**: ✅ **READY FOR RE-REVIEW**
+
+### Implementation Complete (April 3, 2026)
+
+#### Review Requests Addressed
+- Default Spring profile now behaves as production; `application-prod.yaml` removed
+- `dev` is the only opt-in local profile
+- `LocalTelegramGateway` is restricted to `dev`; the real Telegram client is the default gateway outside `dev`
+- `DevDataSeeder` constructor wiring was made unambiguous for Spring
+- Shared EMA / ROC / rounding helpers were consolidated into `StatisticsUtil`
+- Dev manual job endpoints now return real success/failure responses
+- README, `.env.example`, and Memory Bank updated to reflect the final profile model
+
+#### Verification
+- `mvn -q -DskipTests test-compile` passes
+- full `mvn -q test` is the final verification step for this change set
+
+---
+
 ## Latest Milestone: Sector ROC Dead Zone Filter ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
