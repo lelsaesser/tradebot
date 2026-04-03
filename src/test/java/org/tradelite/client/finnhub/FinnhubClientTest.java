@@ -3,6 +3,7 @@ package org.tradelite.client.finnhub;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -28,7 +29,6 @@ class FinnhubClientTest {
 
     @Mock private RestTemplate restTemplate;
     @Mock private ApiRequestMeteringService meteringService;
-    @Mock private FinnhubFallbackStrategy fallbackStrategy;
 
     private TradebotApiProperties properties;
     private FinnhubClient finnhubClient;
@@ -37,8 +37,7 @@ class FinnhubClientTest {
     void setUp() {
         properties = new TradebotApiProperties();
         properties.setFinnhubKey("test-key");
-        finnhubClient =
-                new FinnhubClient(restTemplate, meteringService, properties, fallbackStrategy);
+        finnhubClient = new FinnhubClient(restTemplate, meteringService, properties);
     }
 
     @Test
@@ -59,15 +58,11 @@ class FinnhubClientTest {
         assertThat(result, notNullValue());
         assertThat(result.getCurrentPrice(), is(300.0));
         assertThat(result.getStockSymbol(), notNullValue());
-        verifyNoInteractions(fallbackStrategy);
     }
 
     @Test
-    void getPriceQuote_no2xxResponse_delegatesToFallbackStrategy() {
+    void getPriceQuote_no2xxResponse_throws() {
         StockSymbol ticker = new StockSymbol("META", "Meta Platforms");
-        PriceQuoteResponse fallback = new PriceQuoteResponse();
-        fallback.setCurrentPrice(101.0);
-        fallback.setStockSymbol(ticker);
 
         when(restTemplate.exchange(
                         anyString(),
@@ -75,21 +70,16 @@ class FinnhubClientTest {
                         any(HttpEntity.class),
                         eq(PriceQuoteResponse.class)))
                 .thenReturn(ResponseEntity.notFound().build());
-        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class)))
-                .thenReturn(fallback);
 
-        PriceQuoteResponse result = finnhubClient.getPriceQuote(ticker);
+        IllegalStateException exception =
+                assertThrows(IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
 
-        assertThat(result.getCurrentPrice(), is(101.0));
-        verify(fallbackStrategy, times(1)).onQuoteFailure(eq(ticker), any(Exception.class));
+        assertThat(exception.getMessage(), is("Failed to fetch price quote for META: 404 NOT_FOUND"));
     }
 
     @Test
-    void getPriceQuote_restClientException_delegatesToFallbackStrategy() {
+    void getPriceQuote_restClientException_throws() {
         StockSymbol ticker = new StockSymbol("META", "Meta Platforms");
-        PriceQuoteResponse fallback = new PriceQuoteResponse();
-        fallback.setCurrentPrice(102.0);
-        fallback.setStockSymbol(ticker);
 
         when(restTemplate.exchange(
                         anyString(),
@@ -97,31 +87,40 @@ class FinnhubClientTest {
                         any(HttpEntity.class),
                         eq(PriceQuoteResponse.class)))
                 .thenThrow(new RestClientException("Error fetching price quote"));
-        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class)))
-                .thenReturn(fallback);
 
-        PriceQuoteResponse result = finnhubClient.getPriceQuote(ticker);
+        RestClientException exception =
+                assertThrows(RestClientException.class, () -> finnhubClient.getPriceQuote(ticker));
 
-        assertThat(result.getCurrentPrice(), is(102.0));
-        verify(fallbackStrategy, times(1)).onQuoteFailure(eq(ticker), any(Exception.class));
+        assertThat(exception.getMessage(), is("Error fetching price quote"));
     }
 
     @Test
-    void getPriceQuote_missingKey_delegatesToFallbackStrategy() {
+    void getPriceQuote_missingKey_throws() {
         StockSymbol ticker = new StockSymbol("AAPL", "Apple");
         properties.setFinnhubKey("");
 
-        PriceQuoteResponse fallback = new PriceQuoteResponse();
-        fallback.setCurrentPrice(99.0);
-        fallback.setStockSymbol(ticker);
-        when(fallbackStrategy.onQuoteFailure(eq(ticker), any(Exception.class)))
-                .thenReturn(fallback);
+        IllegalStateException exception =
+                assertThrows(IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
 
-        PriceQuoteResponse result = finnhubClient.getPriceQuote(ticker);
-
-        assertThat(result.getCurrentPrice(), is(99.0));
-        verify(fallbackStrategy, times(1)).onQuoteFailure(eq(ticker), any(Exception.class));
+        assertThat(exception.getMessage(), is("FINNHUB key not configured"));
         verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void getPriceQuote_nullBody_throws() {
+        StockSymbol ticker = new StockSymbol("META", "Meta Platforms");
+
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class)))
+                .thenReturn(ResponseEntity.ok().build());
+
+        IllegalStateException exception =
+                assertThrows(IllegalStateException.class, () -> finnhubClient.getPriceQuote(ticker));
+
+        assertThat(exception.getMessage(), is("Failed to fetch price quote for META: 200 OK"));
     }
 
     @Test
@@ -150,13 +149,11 @@ class FinnhubClientTest {
 
         assertThat(result, notNullValue());
         assertThat(result.data().size(), is(1));
-        verifyNoInteractions(fallbackStrategy);
     }
 
     @Test
-    void getInsiderTransactions_failure_delegatesToFallbackStrategy() {
+    void getInsiderTransactions_failure_throws() {
         StockSymbol ticker = new StockSymbol("META", "Meta Platforms");
-        InsiderTransactionResponse fallback = new InsiderTransactionResponse(List.of());
 
         when(restTemplate.exchange(
                         anyString(),
@@ -164,12 +161,12 @@ class FinnhubClientTest {
                         any(HttpEntity.class),
                         eq(InsiderTransactionResponse.class)))
                 .thenThrow(new RestClientException("Error fetching insider transactions"));
-        when(fallbackStrategy.onInsiderFailure(eq(ticker), any(Exception.class)))
-                .thenReturn(fallback);
 
-        InsiderTransactionResponse result = finnhubClient.getInsiderTransactions(ticker);
+        RestClientException exception =
+                assertThrows(
+                        RestClientException.class,
+                        () -> finnhubClient.getInsiderTransactions(ticker));
 
-        assertThat(result, notNullValue());
-        verify(fallbackStrategy, times(1)).onInsiderFailure(eq(ticker), any(Exception.class));
+        assertThat(exception.getMessage(), is("Error fetching insider transactions"));
     }
 }

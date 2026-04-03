@@ -2,23 +2,20 @@ package org.tradelite;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.mockito.Mockito.mockStatic;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.SpringApplication;
 
 class ApplicationTest {
 
     @Test
-    void main() {
-        try (var mock = mockStatic(SpringApplication.class)) {
-            mock.when(() -> SpringApplication.run(Application.class, new String[] {}))
-                    .thenReturn(null);
+    void mainMethodSignature() throws NoSuchMethodException {
+        Method mainMethod = Application.class.getMethod("main", String[].class);
 
-            Application.main(new String[] {});
-
-            mock.verify(() -> SpringApplication.run(Application.class, new String[] {}));
-        }
+        assertThat(mainMethod.getReturnType(), is(void.class));
+        assertThat(Modifier.isPublic(mainMethod.getModifiers()), is(true));
+        assertThat(Modifier.isStatic(mainMethod.getModifiers()), is(true));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package org.tradelite.client.coingecko;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +14,7 @@ import org.tradelite.common.CoinId;
 import org.tradelite.config.TradebotApiProperties;
 import org.tradelite.service.ApiRequestMeteringService;
 
+@Slf4j
 @Component
 public class CoinGeckoClient {
 
@@ -21,24 +23,20 @@ public class CoinGeckoClient {
     private final RestTemplate restTemplate;
     private final ApiRequestMeteringService meteringService;
     private final TradebotApiProperties apiProperties;
-    private final CoinGeckoFallbackStrategy fallbackStrategy;
 
     @Autowired
     public CoinGeckoClient(
             RestTemplate restTemplate,
             ApiRequestMeteringService meteringService,
-            TradebotApiProperties apiProperties,
-            CoinGeckoFallbackStrategy fallbackStrategy) {
+            TradebotApiProperties apiProperties) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
         this.apiProperties = apiProperties;
-        this.fallbackStrategy = fallbackStrategy;
     }
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
         if (apiProperties.getCoingeckoKey() == null || apiProperties.getCoingeckoKey().isBlank()) {
-            return fallbackStrategy.onPriceFailure(
-                    coinId, new IllegalStateException("COINGECKO key not configured"));
+            throw priceFailure(coinId, new IllegalStateException("COINGECKO key not configured"));
         }
 
         String endpointUrl = "/simple/price";
@@ -56,30 +54,43 @@ public class CoinGeckoClient {
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
+        ResponseEntity<CoinGeckoPriceResponse> response;
         try {
             meteringService.incrementCoingeckoRequests();
-            ResponseEntity<CoinGeckoPriceResponse> response =
+            response =
                     restTemplate.exchange(
                             url, HttpMethod.GET, entity, CoinGeckoPriceResponse.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                CoinGeckoPriceResponse.CoinData data =
-                        response.getBody().getCoinData().get(coinId.getId());
-                if (data == null) {
-                    return fallbackStrategy.onPriceFailure(
-                            coinId,
-                            new IllegalStateException(
-                                    "CoinGecko response missing payload for " + coinId.getId()));
-                }
-                data.setCoinId(coinId);
-                return data;
-            } else {
-                return fallbackStrategy.onPriceFailure(
-                        coinId,
-                        new IllegalStateException(
-                                "Failed to fetch coin price data: " + response.getStatusCode()));
-            }
         } catch (RestClientException e) {
-            return fallbackStrategy.onPriceFailure(coinId, e);
+            throw priceFailure(coinId, e);
         }
+
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw priceFailure(
+                    coinId,
+                    new IllegalStateException(
+                            "Failed to fetch coin price data: " + response.getStatusCode()));
+        }
+
+        CoinGeckoPriceResponse.CoinData data = response.getBody().getCoinData().get(coinId.getId());
+        if (data == null) {
+            throw priceFailure(
+                    coinId,
+                    new IllegalStateException(
+                            "CoinGecko response missing payload for " + coinId.getId()));
+        }
+        data.setCoinId(coinId);
+        return data;
+    }
+
+    private RuntimeException priceFailure(CoinId coinId, Exception cause) {
+        log.error("Failed to fetch CoinGecko price data for {}", coinId.getId(), cause);
+        return toRuntime(cause);
+    }
+
+    private RuntimeException toRuntime(Exception exception) {
+        if (exception instanceof RuntimeException runtimeException) {
+            return runtimeException;
+        }
+        return new IllegalStateException(exception.getMessage(), exception);
     }
 }

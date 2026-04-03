@@ -18,7 +18,7 @@ Crypto market and price data by CoinGecko (https://www.coingecko.com/)
 ## Profiles
 
 - `prod`: uses `FINNHUB_API_KEY`, `COINGECKO_API_KEY`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_BOT_GROUP_CHAT_ID`.
-- `dev`: uses `FINNHUB_DEV_API_KEY` and `COINGECKO_DEV_API_KEY`, disables schedulers, and routes Telegram output to `config/dev-telegram-messages.log`.
+- `dev`: uses live Finnhub/CoinGecko calls via `FINNHUB_DEV_API_KEY` and `COINGECKO_DEV_API_KEY`, disables schedulers, and routes Telegram output to `config/dev-telegram-messages.log`.
 
 Run with:
 

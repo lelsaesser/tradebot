@@ -7,7 +7,6 @@ public class TradebotApiProperties {
 
     private String finnhubKey;
     private String coingeckoKey;
-    private String fixtureBasePath = "config/dev-fixtures";
 
     public String getFinnhubKey() {
         return finnhubKey;
@@ -23,13 +22,5 @@ public class TradebotApiProperties {
 
     public void setCoingeckoKey(String coingeckoKey) {
         this.coingeckoKey = coingeckoKey;
-    }
-
-    public String getFixtureBasePath() {
-        return fixtureBasePath;
-    }
-
-    public void setFixtureBasePath(String fixtureBasePath) {
-        this.fixtureBasePath = fixtureBasePath;
     }
 }
