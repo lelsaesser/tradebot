@@ -232,7 +232,7 @@ public class SectorRelativeStrengthTracker {
                 sectorData.stream().filter(s -> thematicSymbols.contains(s.symbol())).toList();
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 *SECTOR ETF RELATIVE STRENGTH vs SPY*\n\n");
+        sb.append("*Sector ETF Relative Strength vs SPY*\n\n");
 
         // Format broad sectors
         formatSection(sb, broadData, "Sectors");

@@ -1,6 +1,27 @@
 # Progress Tracking
 
-## Latest Milestone: RSI Consolidated Reporting with Live Price Cache ✅ COMPLETE
+## Latest Milestone: Sector ROC Dead Zone Filter ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation Complete (April 2, 2026)
+
+#### Problem
+Sector Momentum ROC alerts were generating excessive false alerts — up to 4+ per day for the same ETF (e.g., XLV). ROC₁₀ values oscillating near zero (±0.0%–0.1%) caused rapid positive/negative crossover flip-flops.
+
+#### Solution
+Added a ±0.25% dead zone around zero in `MomentumRocService.detectCrossover()`. Crossover signals only fire when ROC₁₀ moves from outside the dead zone on one side to outside on the other side:
+- **Positive**: previous < -0.25 AND current > +0.25
+- **Negative**: previous > +0.25 AND current < -0.25
+
+#### Changes
+- `MomentumRocService` — `ROC_DEAD_ZONE = 0.25` constant; updated `detectCrossover()` logic
+- `MomentumRocServiceTest` — 4 new dead zone tests; existing crossover tests updated to use values outside zone
+- All 739 tests pass
+
+---
+
+## Previous Milestone: RSI Consolidated Reporting with Live Price Cache ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -13,6 +34,23 @@ RSI reporting changed from individual Telegram messages per stock to a consolida
 - **`RsiService`**: `addPrice()` purely stores price data (no RSI calculation); `analyzeAllSymbols()` iterates all price history, appends current price from cache, calculates RSI, returns `List<RsiSignal>`; `sendRsiReport()` builds consolidated report and deletes previous message; `getCurrentPriceFromCacheByKey()` looks up live prices across Finnhub/CoinGecko caches; `getCurrentRsi()` also uses cache for on-demand RSI queries
 - **`Scheduler`**: Renamed `hourlyBollingerBandMonitoring()` → `hourlySignalMonitoring()`; now runs both BB and RSI reports hourly; added `RsiService` as constructor dependency
 - **Tests**: 50 RsiServiceTest + 713 total tests all passing
+
+---
+
+## Previous Milestone: DST-Aware Market Hours ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation Complete (March 30, 2026)
+
+#### Feature Overview
+All market-hours logic now operates in `America/New_York` timezone using `ZonedDateTime`. Java's `ZoneId` rules handle DST automatically — market is always 9:30–16:00 NY time regardless of caller's timezone.
+
+#### Changes
+- `DateUtil` — `isMarketOffHours(ZonedDateTime)` converts to NY; `isStockMarketOpen(ZonedDateTime)` combines weekday + hours; `NY_ZONE` constant
+- `Scheduler` — uses single `ZonedDateTime marketDateTime` field
+- Tests: DST transition tests covering all 4 scenarios
+- All 736 tests pass
 
 ---
 
@@ -227,7 +265,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: March 29, 2026
+- Date: April 2, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
 - Code coverage: 97%

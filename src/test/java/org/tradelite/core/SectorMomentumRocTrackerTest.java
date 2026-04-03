@@ -65,8 +65,8 @@ class SectorMomentumRocTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("SECTOR MOMENTUM ROC ALERT"));
-        assertTrue(message.contains("MOMENTUM TURNING POSITIVE"));
+        assertTrue(message.contains("Sector Momentum ROC Alert"));
+        assertTrue(message.contains("Momentum turning positive"));
         assertTrue(message.contains("Technology"));
         assertTrue(message.contains("XLK"));
     }
@@ -91,7 +91,7 @@ class SectorMomentumRocTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("MOMENTUM TURNING NEGATIVE"));
+        assertTrue(message.contains("Momentum turning negative"));
         assertTrue(message.contains("Energy"));
     }
 
@@ -127,8 +127,8 @@ class SectorMomentumRocTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("MOMENTUM TURNING POSITIVE"));
-        assertTrue(message.contains("MOMENTUM TURNING NEGATIVE"));
+        assertTrue(message.contains("Momentum turning positive"));
+        assertTrue(message.contains("Momentum turning negative"));
         assertTrue(message.contains("Technology"));
         assertTrue(message.contains("Energy"));
     }
@@ -228,10 +228,10 @@ class SectorMomentumRocTrackerTest {
 
         String message = tracker.formatAlertMessage(java.util.List.of(signal1, signal2));
 
-        assertTrue(message.contains("MOMENTUM TURNING POSITIVE"));
+        assertTrue(message.contains("Momentum turning positive"));
         assertTrue(message.contains("Technology"));
         assertTrue(message.contains("Financials"));
-        assertFalse(message.contains("MOMENTUM TURNING NEGATIVE"));
+        assertFalse(message.contains("Momentum turning negative"));
     }
 
     @Test
@@ -248,9 +248,9 @@ class SectorMomentumRocTrackerTest {
 
         String message = tracker.formatAlertMessage(java.util.List.of(signal));
 
-        assertTrue(message.contains("MOMENTUM TURNING NEGATIVE"));
+        assertTrue(message.contains("Momentum turning negative"));
         assertTrue(message.contains("Energy"));
-        assertFalse(message.contains("MOMENTUM TURNING POSITIVE:"));
+        assertFalse(message.contains("Momentum turning positive:"));
     }
 
     @Test
@@ -277,8 +277,8 @@ class SectorMomentumRocTrackerTest {
         String message =
                 tracker.formatAlertMessage(java.util.List.of(positiveSignal, negativeSignal));
 
-        assertTrue(message.contains("MOMENTUM TURNING POSITIVE"));
-        assertTrue(message.contains("MOMENTUM TURNING NEGATIVE"));
+        assertTrue(message.contains("Momentum turning positive"));
+        assertTrue(message.contains("Momentum turning negative"));
         assertTrue(message.contains("ROC"));
     }
 }

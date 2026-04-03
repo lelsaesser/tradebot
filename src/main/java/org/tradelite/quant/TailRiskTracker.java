@@ -152,11 +152,11 @@ public class TailRiskTracker {
         List<TailRiskAnalysis> analyses = analyzeAllSectors();
 
         if (analyses.isEmpty()) {
-            return "📊 *Tail Risk Report*\n\n_Insufficient data for analysis._";
+            return "*Tail Risk Report*\n\n_Insufficient data for analysis._";
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 *Tail Risk Report*\n\n");
+        sb.append("*Tail Risk Report*\n\n");
 
         for (TailRiskAnalysis analysis : analyses) {
             sb.append(analysis.toSummaryLine()).append("\n");

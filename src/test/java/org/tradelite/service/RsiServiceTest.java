@@ -232,7 +232,7 @@ class RsiServiceTest {
 
         String report = rsiService.buildRsiReport(signals);
 
-        assertThat(report, containsString("📊 *RSI Signal Report*"));
+        assertThat(report, containsString("*RSI Signal Report*"));
         assertThat(report, containsString("🔴 *Overbought (RSI ≥ 70):*"));
         assertThat(report, containsString("Apple"));
         assertThat(report, containsString("Microsoft"));

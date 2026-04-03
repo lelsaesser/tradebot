@@ -160,7 +160,7 @@ public class RsiService {
     /** Builds a consolidated RSI report message from the given signals. */
     protected String buildRsiReport(List<RsiSignal> signals) {
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 *RSI Signal Report*\n\n");
+        sb.append("*RSI Signal Report*\n\n");
 
         List<RsiSignal> overbought =
                 signals.stream().filter(s -> "OVERBOUGHT".equals(s.zone())).toList();

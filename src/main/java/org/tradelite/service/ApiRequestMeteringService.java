@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -21,15 +22,11 @@ public class ApiRequestMeteringService {
 
     private final AtomicInteger finnhubCounter = new AtomicInteger(0);
     private final AtomicInteger coingeckoCounter = new AtomicInteger(0);
-    private volatile String currentMonth;
+    private final String currentMonth;
     private final String counterDir;
 
-    public ApiRequestMeteringService() {
-        this(DEFAULT_COUNTER_DIR);
-    }
-
-    // Package-private constructor for testing
-    ApiRequestMeteringService(String counterDir) {
+    ApiRequestMeteringService(
+            @Value("${metering.counter-dir:" + DEFAULT_COUNTER_DIR + "}") String counterDir) {
         this.counterDir = counterDir;
         this.currentMonth = getCurrentMonth();
         initializeCounters();
@@ -58,6 +55,11 @@ public class ApiRequestMeteringService {
     /** Get the current month in YYYY-MM format */
     public String getCurrentMonth() {
         return LocalDateTime.now().format(MONTH_FORMATTER);
+    }
+
+    /** Get the previous month in YYYY-MM format (for reports that run on the 1st of each month) */
+    public String getPreviousMonth() {
+        return LocalDateTime.now().minusMonths(1).format(MONTH_FORMATTER);
     }
 
     public String getRequestCountSummary() {

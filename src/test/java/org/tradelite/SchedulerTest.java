@@ -243,7 +243,7 @@ class SchedulerTest {
         // Setup: Mock API request counts
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(150);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(75);
-        when(apiRequestMeteringService.getCurrentMonth()).thenReturn("2025-09");
+        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-09");
 
         scheduler.monthlyApiUsageReport();
 
@@ -256,14 +256,14 @@ class SchedulerTest {
         // Verify that counts were retrieved
         verify(apiRequestMeteringService, times(1)).getFinnhubRequestCount();
         verify(apiRequestMeteringService, times(1)).getCoingeckoRequestCount();
-        verify(apiRequestMeteringService, times(1)).getCurrentMonth();
+        verify(apiRequestMeteringService, times(1)).getPreviousMonth();
 
         // Verify Telegram message was sent
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
 
         String sentMessage = messageCaptor.getValue();
-        assertTrue(sentMessage.contains("📊 *Monthly API Usage Report - 2025-09*"));
+        assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-09*"));
         assertTrue(sentMessage.contains("🔹 *Finnhub API*: 150 requests"));
         assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 75 requests"));
         assertTrue(sentMessage.contains("🔹 *Total*: 225 requests"));
@@ -292,7 +292,7 @@ class SchedulerTest {
 
         // Verify NO Telegram message was sent (since no requests)
         verify(telegramClient, never()).sendMessage(anyString());
-        verify(apiRequestMeteringService, never()).getCurrentMonth();
+        verify(apiRequestMeteringService, never()).getPreviousMonth();
 
         // Verify counters were still reset
         verify(apiRequestMeteringService, times(1)).resetCounters();
@@ -303,7 +303,7 @@ class SchedulerTest {
         // Setup: Mock only Finnhub requests
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(100);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getCurrentMonth()).thenReturn("2025-08");
+        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-08");
 
         scheduler.monthlyApiUsageReport();
 
@@ -318,7 +318,7 @@ class SchedulerTest {
         verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
 
         String sentMessage = messageCaptor.getValue();
-        assertTrue(sentMessage.contains("📊 *Monthly API Usage Report - 2025-08*"));
+        assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-08*"));
         assertTrue(sentMessage.contains("🔹 *Finnhub API*: 100 requests"));
         assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 0 requests"));
         assertTrue(sentMessage.contains("🔹 *Total*: 100 requests"));
@@ -331,7 +331,7 @@ class SchedulerTest {
         // Setup: Mock only CoinGecko requests
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(50);
-        when(apiRequestMeteringService.getCurrentMonth()).thenReturn("2025-07");
+        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-07");
 
         scheduler.monthlyApiUsageReport();
 
@@ -346,7 +346,7 @@ class SchedulerTest {
         verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
 
         String sentMessage = messageCaptor.getValue();
-        assertTrue(sentMessage.contains("📊 *Monthly API Usage Report - 2025-07*"));
+        assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-07*"));
         assertTrue(sentMessage.contains("🔹 *Finnhub API*: 0 requests"));
         assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 50 requests"));
         assertTrue(sentMessage.contains("🔹 *Total*: 50 requests"));
