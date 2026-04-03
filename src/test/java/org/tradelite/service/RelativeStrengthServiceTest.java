@@ -21,6 +21,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.RelativeStrengthSignal;
+import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
@@ -63,7 +64,7 @@ class RelativeStrengthServiceTest {
             values.add(1.0 + (i * 0.01)); // Gradually increasing RS values
         }
 
-        double ema = relativeStrengthService.calculateEma(values, 50);
+        double ema = StatisticsUtil.calculateEma(values, 50);
 
         assertThat(ema, is(greaterThan(1.0)));
         assertThat(ema, is(lessThan(2.0)));
@@ -77,7 +78,7 @@ class RelativeStrengthServiceTest {
             values.add(1.0); // Constant values
         }
 
-        double ema = relativeStrengthService.calculateEma(values, 50);
+        double ema = StatisticsUtil.calculateEma(values, 50);
 
         // EMA of constant values should equal the constant
         assertThat(ema, is(closeTo(1.0, 0.001)));
@@ -90,7 +91,7 @@ class RelativeStrengthServiceTest {
             values.add(1.0);
         }
 
-        double ema = relativeStrengthService.calculateEma(values, 50);
+        double ema = StatisticsUtil.calculateEma(values, 50);
 
         assertEquals(0, ema);
     }

@@ -1,5 +1,7 @@
 package org.tradelite;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,30 +27,43 @@ class RootErrorHandlerTest {
 
     @Test
     void testRun_withInterruptedException() {
-        rootErrorHandler.run(
+        boolean success =
+                rootErrorHandler.runWithStatus(
                 () -> {
                     throw new InterruptedException();
                 });
 
+        assertFalse(success);
         String expectedMessage = "⏸️ *Operation Interrupted!* Check application logs for details.";
         verify(telegramClient).sendMessage(expectedMessage);
     }
 
     @Test
     void testRun_withException() {
-        rootErrorHandler.run(
+        boolean success =
+                rootErrorHandler.runWithStatus(
                 () -> {
                     throw new RuntimeException("Test exception");
                 });
+        assertFalse(success);
         verify(telegramClient).sendMessage(anyString());
     }
 
     @Test
     void testRun_withNoException() {
-        rootErrorHandler.run(
+        boolean success =
+                rootErrorHandler.runWithStatus(
                 () -> {
                     // No exception thrown
                 });
+
+        assertTrue(success);
+        verify(telegramClient, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void run_delegatesToStatusPath() {
+        rootErrorHandler.run(() -> {});
 
         verify(telegramClient, never()).sendMessage(anyString());
     }

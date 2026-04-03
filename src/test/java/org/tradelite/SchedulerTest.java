@@ -382,16 +382,19 @@ class SchedulerTest {
 
     @Test
     void manualStockMarketMonitoring_shouldRunRegardlessOfMarketHours() throws Exception {
-        scheduler.manualStockMarketMonitoring();
+        when(rootErrorHandler.runWithStatus(any())).thenReturn(true);
 
-        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
+        boolean success = scheduler.manualStockMarketMonitoring();
+
+        verify(rootErrorHandler, times(3)).runWithStatus(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(3)).run(captor.capture());
+        verify(rootErrorHandler, times(3)).runWithStatus(captor.capture());
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
         }
 
+        assertTrue(success);
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
@@ -399,16 +402,19 @@ class SchedulerTest {
 
     @Test
     void manualHourlySignalMonitoring_shouldRunRegardlessOfMarketHours() throws Exception {
-        scheduler.manualHourlySignalMonitoring();
+        when(rootErrorHandler.runWithStatus(any())).thenReturn(true);
 
-        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
+        boolean success = scheduler.manualHourlySignalMonitoring();
+
+        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).run(captor.capture());
+        verify(rootErrorHandler, times(2)).runWithStatus(captor.capture());
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
         }
 
+        assertTrue(success);
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
         verify(rsiService, times(1)).sendRsiReport();
     }

@@ -7,6 +7,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.tradelite.service.model.DailyPrice;
+import java.time.LocalDate;
 
 class StatisticsUtilTest {
 
@@ -160,5 +162,51 @@ class StatisticsUtilTest {
         List<Double> values = Arrays.asList(1.0, 2.0, 3.0, 4.0, 5.0);
         // 2 values below 3.0 → 40%
         assertThat(StatisticsUtil.percentile(values, 3.0)).isCloseTo(40.0, within(0.001));
+    }
+
+    @Test
+    void calculateEma_returnsZeroForInsufficientHistory() {
+        assertThat(StatisticsUtil.calculateEma(List.of(1.0, 2.0, 3.0), 5)).isZero();
+    }
+
+    @Test
+    void calculateEma_returnsConstantValueForFlatSeries() {
+        assertThat(StatisticsUtil.calculateEma(List.of(5.0, 5.0, 5.0, 5.0, 5.0), 5))
+                .isCloseTo(5.0, within(0.001));
+    }
+
+    @Test
+    void calculateRocValue_usesChronologicalPrices() {
+        List<DailyPrice> prices =
+                List.of(
+                        new DailyPrice(LocalDate.of(2026, 1, 1), 100.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 2), 101.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 3), 102.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 4), 103.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 5), 104.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 6), 105.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 7), 106.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 8), 107.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 9), 108.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 10), 109.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 11), 110.0));
+
+        assertThat(StatisticsUtil.calculateRocValue(prices, 10)).isCloseTo(10.0, within(0.001));
+    }
+
+    @Test
+    void calculateRocValue_returnsZeroWhenBasePriceIsZero() {
+        List<DailyPrice> prices =
+                List.of(
+                        new DailyPrice(LocalDate.of(2026, 1, 1), 0.0),
+                        new DailyPrice(LocalDate.of(2026, 1, 2), 110.0));
+
+        assertThat(StatisticsUtil.calculateRocValue(prices, 1)).isZero();
+    }
+
+    @Test
+    void roundTo2Decimals_roundsHalfUp() {
+        assertThat(StatisticsUtil.roundTo2Decimals(12.345)).isEqualTo(12.35);
+        assertThat(StatisticsUtil.roundTo2Decimals(12.344)).isEqualTo(12.34);
     }
 }
