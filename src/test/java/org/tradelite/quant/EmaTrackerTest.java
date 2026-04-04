@@ -193,6 +193,6 @@ class EmaTrackerTest {
         List<EmaAnalysis> results = tracker.analyzeAllStocks();
 
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).symbol()).isEqualTo("AAPL");
+        assertThat(results.getFirst().symbol()).isEqualTo("AAPL");
     }
 }

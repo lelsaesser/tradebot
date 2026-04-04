@@ -20,9 +20,6 @@ import org.tradelite.service.model.DailyPrice;
 @RequiredArgsConstructor
 public class EmaService {
 
-    /** EMA periods to calculate. */
-    static final int[] EMA_PERIODS = {9, 21, 50, 100, 200};
-
     /** Minimum number of data points needed for the longest EMA (200-day). */
     static final int MIN_DATA_POINTS = 200;
 
