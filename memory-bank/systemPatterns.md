@@ -22,9 +22,11 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values. Uses `SectorEtfRegistry` for ETF list.
 -   **`TailRiskService`:** Calculates excess kurtosis and skewness from daily price changes to detect fat tail risk and directional bias.
 -   **`TailRiskTracker`:** Monitors sector ETFs for elevated tail risk (fat tails) with directional context (crash vs rally bias). Uses `SectorEtfRegistry` for ETF list.
--   **`StatisticsUtil`:** Shared utility class providing `mean()`, `standardDeviation()`, `zScore()`, `percentileRank()`, `populationStdDev()`, and `percentile()` (including range-based overloads). Used by `SectorRotationAnalyzer`, `TailRiskService`, and `BollingerBandService` to eliminate code duplication.
+-   **`StatisticsUtil`:** Shared utility class providing `mean()`, `standardDeviation()`, `zScore()`, `percentileRank()`, `populationStdDev()`, `percentile()` (including range-based overloads), and `calculateEma()`. Used by `SectorRotationAnalyzer`, `TailRiskService`, `BollingerBandService`, and `EmaService` to eliminate code duplication.
 -   **`BollingerBandService`:** Calculates Bollinger Bands (20-period SMA ± 2σ), %B positioning, bandwidth, and bandwidth percentile for squeeze detection. Uses split data thresholds: 20 points for basic bands, 40+ for bandwidth percentile history. Detects both absolute squeezes (bandwidth ≤ 4%) and historical squeezes (percentile ≤ 10%). Uses `StatisticsUtil` and reads prices from `PriceQuoteRepository`.
 -   **`BollingerBandTracker`:** Orchestrates Bollinger Band analysis across all sector ETFs and tracked stocks. Sends Telegram alerts for band touches and squeezes, plus daily summary reports. Uses `SectorEtfRegistry` for ETFs and `StockSymbolRegistry` for individual stocks (excluding ETFs to avoid duplication).
+-   **`EmaService`:** Calculates 9, 21, 50, 100, and 200-day EMAs for a given stock symbol using `StatisticsUtil.calculateEma()`. Compares current price against all 5 EMAs and classifies as GREEN (above all), YELLOW (below 2–4), or RED (below all). Returns `Optional<EmaAnalysis>`.
+-   **`EmaTracker`:** Orchestrates daily EMA report across all tracked stocks. Iterates symbols, calls `EmaService.analyze()`, groups results by signal type (RED→YELLOW→GREEN), formats Telegram message, and sends via `TelegramClient`. Gated by `FeatureToggle.EMA_REPORT`.
 -   **`TelegramClient` & `TelegramMessageProcessor`:** Handle all Telegram Bot API interactions, from sending alerts to processing user commands via the command dispatcher pattern. `TelegramClient` supports `sendMessage()`, `sendMessageAndReturnId()` (returns `OptionalLong` with message ID), and `deleteMessage(long)` for the delete-before-send pattern.
 -   **`TelegramSendMessageResponse`:** DTO for parsing Telegram `sendMessage` API responses, extracting `message_id` from the `result` object.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern. Easily extensible for new commands.
@@ -75,6 +77,8 @@ The application follows a modular, component-based architecture built on the Spr
 | `dailySectorRotationTracking` | Daily 22:30 (Mon-Fri) | America/New_York | Sector performance + Z-score alerts |
 | `dailySectorRsSummary` | Daily 12:00 | CET | Sector RS vs SPY daily summary |
 | `dailyTailRiskMonitoring` | Daily 10:00 (Mon-Fri) | CET | **Tail risk kurtosis + skewness alerts** |
+| `dailyBollingerBandReport` | Daily 15:40 (Mon-Fri) | CET | Bollinger Band daily summary |
+| `dailyEmaReport` | Daily 15:50 (Mon-Fri) | CET | EMA classification report (green/yellow/red) |
 | `telegramMessagePolling` | Every 60 seconds | UTC | Process Telegram commands |
 
 ## Component Relationships
@@ -97,7 +101,9 @@ Scheduler
 │   └── PriceQuoteRepository.findDailyChangePercents()
 ├── BollingerBandTracker → BollingerBandService + SectorEtfRegistry
 │   └── PriceQuoteRepository.findBySymbol()
-├── StatisticsUtil (shared by SectorRotationAnalyzer, TailRiskService, BollingerBandService)
+├── EmaTracker → EmaService + StockSymbolRegistry
+│   └── StatisticsUtil.calculateEma() + PriceQuoteRepository
+├── StatisticsUtil (shared by SectorRotationAnalyzer, TailRiskService, BollingerBandService, EmaService)
 ├── InsiderTracker → InsiderPersistence → JSON file
 ├── SectorRotationTracker → FinvizClient → FinViz website
 │   ├── SectorPerformancePersistence → JSON file
@@ -285,7 +291,7 @@ CREATE TABLE IF NOT EXISTS momentum_roc_state (
 - `MOMENTUM_TURNING_POSITIVE` - ROC crossed from negative to positive (bullish)
 - `MOMENTUM_TURNING_NEGATIVE` - ROC crossed from positive to negative (bearish)
 
-## Four-Pronged Statistical Analysis
+## Six-Pronged Statistical Analysis
 
 The system now uses four complementary approaches for market analysis:
 
@@ -296,6 +302,7 @@ The system now uses four complementary approaches for market analysis:
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
 | **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Hourly (delete-before-send) |
+| **EMA Classification** | `EmaTracker` | Price vs 5 EMAs (green/yellow/red) | Daily 15:50 CET |
 
 **Stock Market Monitoring Flow:**
 ```java

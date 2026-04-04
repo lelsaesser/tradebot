@@ -68,6 +68,7 @@ The bot runs continuously in the background, requiring no manual intervention wh
 | **Sector Rotation** | Daily | FinViz | Telegram report **NEW** |
 | **Sector ETF Tracking** | Real-time + Daily | Finnhub | Telegram alerts + daily summary |
 | **Bollinger Band Analysis** | Hourly + Daily | Finnhub (SQLite) | Telegram alerts + daily report |
+| **EMA Classification** | Daily | Finnhub (SQLite) | Telegram report (green/yellow/red) |
 
 ## Tracked Sector & Thematic ETFs
 
@@ -93,6 +94,9 @@ All 20 ETFs are tracked by three analysis systems:
 - **Relative Strength vs SPY** — daily summary splits into "Sectors" and "Thematic / Industry" sections
 - **Momentum ROC** — zero-line crossover detection
 - **Tail Risk (Kurtosis + Skewness)** — fat tail and directional bias analysis
+
+Additionally, all tracked stocks are analyzed by:
+- **EMA Classification** — daily report comparing price vs 5 EMAs (9/21/50/100/200 day), classifying each stock as 🟢 GREEN (above all), 🟡 YELLOW (below 2–4), or 🔴 RED (below all)
 
 ## Sector Rotation Feature (NEW)
 

@@ -107,7 +107,11 @@ src/main/java/org/tradelite/
 │   ├── TailRiskLevel.java      # Risk level enum
 │   ├── TailRiskAnalysis.java   # Analysis result record (kurtosis + skewness)
 │   ├── TailRiskService.java    # Kurtosis + skewness calculation
-│   └── TailRiskTracker.java    # Sector tail risk monitoring (uses SectorEtfRegistry)
+│   ├── TailRiskTracker.java    # Sector tail risk monitoring (uses SectorEtfRegistry)
+│   ├── EmaSignalType.java      # GREEN/YELLOW/RED classification enum
+│   ├── EmaAnalysis.java        # Analysis result record (symbol, price, EMAs, signal)
+│   ├── EmaService.java         # 9/21/50/100/200-day EMA calculation + classification
+│   └── EmaTracker.java         # Daily EMA report orchestrator
 ├── repository/                  # Data persistence layer
 │   ├── PriceQuoteEntity.java   # Entity class
 │   ├── PriceQuoteRepository.java # Interface (includes findDailyChangePercents)
@@ -124,7 +128,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** 466
+- **Total Tests:** 487
 
 ### Testing Libraries
 ```xml

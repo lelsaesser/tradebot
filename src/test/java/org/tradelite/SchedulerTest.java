@@ -26,6 +26,7 @@ import org.tradelite.core.SectorMomentumRocTracker;
 import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.quant.BollingerBandTracker;
+import org.tradelite.quant.EmaTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.service.RsiService;
@@ -49,6 +50,7 @@ class SchedulerTest {
     @Mock private TailRiskTracker tailRiskTracker;
     @Mock private BollingerBandTracker bollingerBandTracker;
     @Mock private RsiService rsiService;
+    @Mock private EmaTracker emaTracker;
 
     private Scheduler scheduler;
 
@@ -71,7 +73,8 @@ class SchedulerTest {
                         sectorMomentumRocTracker,
                         tailRiskTracker,
                         bollingerBandTracker,
-                        rsiService);
+                        rsiService,
+                        emaTracker);
     }
 
     @Test
@@ -391,6 +394,19 @@ class SchedulerTest {
         captor.getValue().run();
 
         verify(bollingerBandTracker, times(1)).sendDailyReport();
+    }
+
+    @Test
+    void dailyEmaReport_shouldSendReport() throws Exception {
+        scheduler.dailyEmaReport();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(emaTracker, times(1)).sendDailyReport();
     }
 
     @Test

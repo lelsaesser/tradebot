@@ -136,4 +136,43 @@ public final class StatisticsUtil {
         long countBelow = values.stream().filter(v -> v < currentValue).count();
         return (countBelow * 100.0) / values.size();
     }
+
+    /**
+     * Calculates the Exponential Moving Average (EMA) for a given period.
+     *
+     * <p>Formula: EMA_today = Price_today × k + EMA_yesterday × (1 - k) where k = 2 / (period + 1)
+     *
+     * <p>The first EMA value is seeded with the Simple Moving Average (SMA) of the first 'period'
+     * prices.
+     *
+     * @param prices List of daily closing prices, sorted ascending by date (oldest first)
+     * @param period The EMA period (e.g., 9, 21, 50, 100, 200)
+     * @return The current EMA value
+     * @throws IllegalArgumentException if prices is null or has fewer elements than period
+     */
+    public static double calculateEma(List<Double> prices, int period) {
+        if (prices == null || prices.size() < period) {
+            throw new IllegalArgumentException(
+                    "Need at least "
+                            + period
+                            + " data points, got "
+                            + (prices == null ? 0 : prices.size()));
+        }
+
+        double multiplier = 2.0 / (period + 1);
+
+        // Seed EMA with SMA of first 'period' prices
+        double ema = 0.0;
+        for (int i = 0; i < period; i++) {
+            ema += prices.get(i);
+        }
+        ema /= period;
+
+        // Calculate EMA for remaining prices
+        for (int i = period; i < prices.size(); i++) {
+            ema = (prices.get(i) - ema) * multiplier + ema;
+        }
+
+        return ema;
+    }
 }

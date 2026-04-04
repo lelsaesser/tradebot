@@ -14,6 +14,7 @@ import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
 import org.tradelite.quant.BollingerBandTracker;
+import org.tradelite.quant.EmaTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.service.RsiService;
@@ -39,6 +40,7 @@ public class Scheduler {
     private final TailRiskTracker tailRiskTracker;
     private final BollingerBandTracker bollingerBandTracker;
     private final RsiService rsiService;
+    private final EmaTracker emaTracker;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -59,7 +61,8 @@ public class Scheduler {
             SectorMomentumRocTracker sectorMomentumRocTracker,
             TailRiskTracker tailRiskTracker,
             BollingerBandTracker bollingerBandTracker,
-            RsiService rsiService) {
+            RsiService rsiService,
+            EmaTracker emaTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -76,6 +79,7 @@ public class Scheduler {
         this.tailRiskTracker = tailRiskTracker;
         this.bollingerBandTracker = bollingerBandTracker;
         this.rsiService = rsiService;
+        this.emaTracker = emaTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -135,6 +139,12 @@ public class Scheduler {
     protected void dailyBollingerBandReport() {
         rootErrorHandler.run(bollingerBandTracker::sendDailyReport);
         log.info("Daily Bollinger Band report completed.");
+    }
+
+    @Scheduled(cron = "0 50 15 * * MON-FRI", zone = "CET")
+    protected void dailyEmaReport() {
+        rootErrorHandler.run(emaTracker::sendDailyReport);
+        log.info("Daily EMA report completed.");
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
