@@ -148,7 +148,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** 487
+- **Total Tests:** 813
 
 ### Testing Libraries
 ```xml
