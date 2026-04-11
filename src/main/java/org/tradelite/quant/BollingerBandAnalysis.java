@@ -122,42 +122,4 @@ public record BollingerBandAnalysis(
 
         return String.format("%s %s", signalEmojis, symbol);
     }
-
-    /**
-     * Returns a human-readable interpretation of the Bollinger Band state.
-     *
-     * @return Interpretation string
-     */
-    public String getInterpretation() {
-        if (signals.isEmpty()) {
-            return "Trading within normal Bollinger Band range";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        for (BollingerSignalType signal : signals) {
-            if (!sb.isEmpty()) {
-                sb.append(" + ");
-            }
-            sb.append(
-                    switch (signal) {
-                        case UPPER_BAND_TOUCH ->
-                                String.format(
-                                        "Price above upper band (%%B=%.2f) — overextended",
-                                        percentB);
-                        case LOWER_BAND_TOUCH ->
-                                String.format(
-                                        "Price below lower band (%%B=%.2f) — underextended",
-                                        percentB);
-                        case SQUEEZE ->
-                                String.format(
-                                        "Bandwidth squeeze (BW=%.1f%%) — bands compressed, breakout expected",
-                                        bandwidth * 100);
-                        case HISTORICAL_SQUEEZE ->
-                                String.format(
-                                        "Historical squeeze (P%.0f) — bandwidth at historic lows",
-                                        bandwidthPercentile);
-                    });
-        }
-        return sb.toString();
-    }
 }

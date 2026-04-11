@@ -416,53 +416,6 @@ class BollingerBandServiceTest {
     }
 
     @Test
-    void bollingerBandAnalysis_getInterpretationForNoSignals() {
-        BollingerBandAnalysis analysis =
-                new BollingerBandAnalysis(
-                        "SPY", "S&P 500", 100.0, 99.0, 101.0, 97.0, 0.5, 0.05, 50.0, List.of(), 50);
-
-        assertThat(analysis.getInterpretation()).contains("normal");
-    }
-
-    @Test
-    void bollingerBandAnalysis_getInterpretationForSqueeze() {
-        BollingerBandAnalysis analysis =
-                new BollingerBandAnalysis(
-                        "SPY",
-                        "S&P 500",
-                        100.0,
-                        99.0,
-                        101.0,
-                        97.0,
-                        0.5,
-                        0.02,
-                        50.0,
-                        List.of(BollingerSignalType.SQUEEZE),
-                        25);
-
-        assertThat(analysis.getInterpretation()).contains("squeeze").contains("breakout");
-    }
-
-    @Test
-    void bollingerBandAnalysis_getInterpretationForHistoricalSqueeze() {
-        BollingerBandAnalysis analysis =
-                new BollingerBandAnalysis(
-                        "SPY",
-                        "S&P 500",
-                        100.0,
-                        99.0,
-                        101.0,
-                        97.0,
-                        0.5,
-                        0.03,
-                        5.0,
-                        List.of(BollingerSignalType.HISTORICAL_SQUEEZE),
-                        50);
-
-        assertThat(analysis.getInterpretation()).contains("Historic");
-    }
-
-    @Test
     void bollingerBandAnalysis_isOverextended() {
         BollingerBandAnalysis analysis =
                 new BollingerBandAnalysis(
