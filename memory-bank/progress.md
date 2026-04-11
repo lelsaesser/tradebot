@@ -1,44 +1,55 @@
 # Progress Tracking
 
-## Latest Milestone: PR #161 Review Feedback Addressed ✅ COMPLETE
+## Latest Milestone: Partial EMA Calculation ✅ COMPLETE
 
-**Status**: ✅ **READY FOR RE-REVIEW**
+**Status**: ✅ **PRODUCTION READY**
 
-### Implementation Complete (April 3, 2026)
+### Implementation Complete (April 11, 2026)
 
-#### Review Requests Addressed
-- Default Spring profile now behaves as production; `application-prod.yaml` removed
-- `dev` is the only opt-in local profile
-- `LocalTelegramGateway` is restricted to `dev`; the real Telegram client is the default gateway outside `dev`
-- `DevDataSeeder` constructor wiring was made unambiguous for Spring
-- Shared EMA / ROC / rounding helpers were consolidated into `StatisticsUtil`
-- Dev manual job endpoints now return real success/failure responses
-- README, `.env.example`, and Memory Bank updated to reflect the final profile model
+#### Problem
+`EmaService` required 200 data points (longest EMA period) and returned `Optional.empty()` for symbols with less history, excluding them entirely from the daily report.
 
-#### Verification
-- `mvn -q -DskipTests test-compile` passes
-- full `mvn -q test` is the final verification step for this change set
+#### Solution
+Calculate every EMA for which enough data exists. Minimum requirement lowered to 9 data points (shortest EMA). Unavailable EMAs are `Double.NaN`. Signal classification adapts to the number of available EMAs.
+
+#### Changes
+- `EmaAnalysis` — added `emasAvailable` field; EMA values `Double.NaN` when insufficient data
+- `EmaService` — `MIN_DATA_POINTS` 200→9; `computeEmaOrNaN()`, `countAvailable()` helpers; `countEmasBelow()` skips NaN
+- `EmaSignalType.fromEmasBelow(int, int)` — RED = below all *available* EMAs (dynamic, not hardcoded 5)
+- `EmaTracker.formatLine()` — `(X/N below)` where N = available EMAs
+- `EmaServiceTest` — 17 tests (was 7): partial data scenarios (10/25/53 points), NaN handling
+- `EmaTrackerTest` — 7 tests (was 6): partial EMA report format
 
 ---
 
-## Latest Milestone: PR #161 Review Feedback Addressed ✅ COMPLETE
+## Previous Milestone: EMA Daily Report + TelegramGateway Refactor ✅ COMPLETE
 
-**Status**: ✅ **READY FOR RE-REVIEW**
+**Status**: ✅ **PRODUCTION READY**
 
-### Implementation Complete (April 3, 2026)
+### Implementation Complete (April 4–11, 2026)
 
-#### Review Requests Addressed
-- Default Spring profile now behaves as production; `application-prod.yaml` removed
-- `dev` is the only opt-in local profile
-- `LocalTelegramGateway` is restricted to `dev`; the real Telegram client is the default gateway outside `dev`
-- `DevDataSeeder` constructor wiring was made unambiguous for Spring
-- Shared EMA / ROC / rounding helpers were consolidated into `StatisticsUtil`
-- Dev manual job endpoints now return real success/failure responses
-- README, `.env.example`, and Memory Bank updated to reflect the final profile model
+#### Feature Overview
+Daily EMA (Exponential Moving Average) report classifies each tracked stock by its position relative to 5 EMAs (9, 21, 50, 100, 200 day):
+- 🟢 GREEN: Above all or 4/5 EMAs (healthy trend)
+- 🟡 YELLOW: Below 2–4 EMAs (weakening)
+- 🔴 RED: Below all 5 EMAs (bearish)
 
-#### Verification
-- `mvn -q -DskipTests test-compile` passes
-- full `mvn -q test` is the final verification step for this change set
+#### Components
+- `EmaSignalType` — enum: GREEN, YELLOW, RED with classification logic (dynamic based on available EMAs)
+- `EmaAnalysis` — record: symbol, displayName, currentPrice, EMA values (NaN if unavailable), emasAvailable, emasBelow, signalType
+- `EmaService` — calculates available EMAs using `StatisticsUtil.calculateEma()`, classifies signal; requires minimum 9 data points
+- `EmaTracker` — orchestrates daily report: iterates all tracked stocks via `StockSymbolRegistry`, groups by signal type, sends formatted Telegram message via `TelegramGateway`
+- `FeatureToggle.EMA_REPORT` — runtime toggle
+- `Scheduler.dailyEmaReport()` — 15:50 CET Mon–Fri
+
+#### TelegramGateway Refactor (April 11, 2026)
+`EmaTracker` updated to inject `TelegramGateway` interface instead of concrete `TelegramClient`, aligning with the profile-aware Telegram pattern.
+
+#### Tests
+- `EmaServiceTest` — 17 tests
+- `EmaTrackerTest` — 7 tests
+- `SchedulerTest` — added `dailyEmaReport_shouldSendReport` test
+- All 813 tests pass
 
 ---
 
@@ -241,7 +252,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 
 ---
 
-## Five-Pronged Statistical Analysis
+## Five-Pronged Statistical Analysis + EMA Classification
 
 | Approach | Component | Signal | Schedule |
 |----------|-----------|--------|----------|
@@ -250,6 +261,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
 | **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Hourly + Daily 15:40 CET |
+| **EMA Classification** | `EmaTracker` | Price vs 5 EMAs (green/yellow/red) | Daily 15:50 CET |
 
 ---
 
@@ -272,6 +284,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 - **Bollinger Band analysis** (sectors + stocks, squeeze detection, band touches)
 - **Telegram delete-before-send** for recurring BB and RSI reports (keeps chat clean)
 - **RSI batched reporting** (consolidated hourly report instead of individual messages)
+- **EMA daily report** (partial EMAs: calculates available EMAs per symbol, green/yellow/red classification)
 
 ### Data Persistence ✅
 - JSON-based storage for target prices and configuration
@@ -310,6 +323,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 | dailySectorRsSummary | Daily 12:00 CET (Mon-Fri) | Sector RS vs SPY summary |
 | dailyTailRiskMonitoring | Daily 13:00 CET (Mon-Fri) | Tail risk kurtosis + skewness alerts |
 | dailyBollingerBandReport | Daily 15:40 CET (Mon-Fri) | Bollinger Band daily summary |
+| dailyEmaReport | Daily 15:50 CET (Mon-Fri) | EMA classification report (green/yellow/red) |
 
 ## Future Enhancements
 
@@ -328,7 +342,8 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: April 2, 2026
+- Date: April 11, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
 - Code coverage: 97%
+- Total tests: 813

@@ -2,118 +2,71 @@
 
 ## Current Work Focus
 
-### Market Holiday Detection Fix (April 3, 2026) ✅ COMPLETE
-Fixed market holiday detection that was broken due to timing gap between last price fetch and actual market close.
-
-**Root Cause:** The scheduler runs on a `fixedRate` interval (every 5 min), not aligned to clock boundaries. `MARKET_CLOSE = LocalTime.of(16, 0)` NY time meant the last fetch before close was typically at ~15:57, and the next fetch at ~16:02 was already skipped (market closed). This meant our last recorded price for the day was the 15:57 quote — NOT the actual closing price. The holiday detection compared this last recorded price against the next day's current price (Finnhub returns `previousClose` as current price when market is closed). Since the 15:57 price ≠ actual close price, the comparison almost never matched, so holidays were never detected.
-
-**Solution:** Changed `isPotentialMarketHoliday()` to use Finnhub's `previousClose` field (`pc`) from the `PriceQuoteResponse` instead of comparing against our last SQLite-stored price from the previous day.
-
-- `previousClose` is the official closing price from the exchange, always accurate
-- When market is closed (holiday), Finnhub returns `currentPrice == previousClose`
-- Comparing `currentPrice == previousClose` reliably detects holidays regardless of fetch timing
+### Partial EMA Calculation (April 11, 2026) ✅ COMPLETE
+Changed `EmaService` to calculate every EMA for which enough data exists, instead of requiring all 200 data points. With fewer than 200 data points, shorter EMAs are still computed (e.g., 53 data points → EMA 9, 21, 50; EMA 100/200 = NaN).
 
 **Changes:**
-- `FinnhubPriceEvaluator.isPotentialMarketHoliday(String, double, double)` — now takes `previousClose` as 3rd param; compares `currentPrice == previousClose` directly instead of looking up last stored price from SQLite
-- `FinnhubPriceEvaluator.evaluatePrice()` — passes `previousClose` from `PriceQuoteResponse` to `isPotentialMarketHoliday()`
-- `RsiService.addPrice(TickerSymbol, double, double, LocalDate)` — new `previousClose` param, forwarded to `isPotentialMarketHoliday()`
-- `RsiPriceFetcher.fetchStockClosingPrices()` — passes `quote.getPreviousClose()` to `rsiService.addPrice()`
-- `RsiPriceFetcher.fetchCryptoClosingPrices()` — passes `0.0` for `previousClose` (crypto has no holiday detection)
-- All tests updated for new signatures; 739 total tests pass
+- `EmaAnalysis` — added `emasAvailable` field; EMA values are `Double.NaN` when insufficient data
+- `EmaService` — `MIN_DATA_POINTS` changed from 200 to 9 (shortest EMA); each EMA calculated independently via `computeEmaOrNaN()`; new `countAvailable()` helper; `countEmasBelow()` skips NaN values
+- `EmaSignalType.fromEmasBelow(int, int)` — now takes `emasAvailable` param; RED = below all *available* EMAs (not hardcoded 5)
+- `EmaTracker.formatLine()` — shows `(X/N below)` where N is available EMAs
+- `EmaServiceTest` — expanded from 7 to 17 tests (partial data: 10/25/53 points, NaN handling, helper methods)
+- `EmaTrackerTest` — expanded from 6 to 7 tests (added partial EMA report format test)
 
-### PR #161 Review Follow-Up (April 3, 2026) ✅ COMPLETE
-Aligned the dev-environment branch with the remaining PR review feedback.
+### TelegramGateway Refactor in EmaTracker (April 11, 2026) ✅ COMPLETE
+Refactored `EmaTracker` to inject the `TelegramGateway` interface instead of the concrete `TelegramClient`. This aligns with the existing profile-aware Telegram pattern where `TelegramClient` is the default production gateway and `LocalTelegramGateway` is active only in `dev`.
 
-**Key outcomes:**
-- Default Spring behavior is now production-like via `application.yaml`; `application-prod.yaml` was removed
-- `dev` is the only opt-in local profile and owns local Telegram mocking, scheduler disablement, dev DB isolation, and analytics seeding
-- `LocalTelegramGateway` is active only in `dev`; the real `TelegramClient` is the default gateway outside `dev`
-- `DevDataSeeder` constructor wiring is explicit, avoiding Spring constructor ambiguity
-- Shared EMA / ROC / rounding helpers now live in `StatisticsUtil`
-- Dev manual job endpoints now return real HTTP success/failure based on job execution status
+### EMA Daily Report Feature (April 4, 2026) ✅ COMPLETE
+Added Exponential Moving Average (EMA) analysis with a once-per-day scheduled report that classifies stocks by their position relative to 5 EMAs (9, 21, 50, 100, 200 day).
 
-**Verification:**
-- `mvn -q -DskipTests test-compile` passes
-- full `mvn -q test` pending after final doc updates in this pass
+**Classification:**
+- 🟢 GREEN: Price above all 5 EMAs (strong uptrend)
+- 🟡 YELLOW: Price below 2–4 EMAs (mixed/cautionary)
+- 🔴 RED: Price below all 5 EMAs (downtrend)
 
-### Sector ROC Dead Zone Filter (April 2, 2026) ✅ COMPLETE
-Fixed false alerts in sector momentum ROC analysis. ROC₁₀ values oscillating near zero (e.g., ±0.0%–0.1%) caused rapid positive/negative crossover alerts — sometimes 4+ per day for the same ETF (e.g., XLV).
+**New Files:**
+- `EmaSignalType` — enum: GREEN, YELLOW, RED
+- `EmaAnalysis` — record: symbol, displayName, currentPrice, ema values (9/21/50/100/200), emasBelow count, signalType
+- `EmaService` — calculates all 5 EMAs for a symbol using `StatisticsUtil.calculateEma()`, determines signal classification; returns `Optional<EmaAnalysis>`
+- `EmaTracker` — orchestrates daily report: iterates all stock symbols, calls `EmaService.analyze()`, groups results by signal type (GREEN, then YELLOW, then RED), formats Telegram message, sends via `TelegramGateway`
 
-**Root Cause:** The crossover detection in `MomentumRocService.detectCrossover()` triggered whenever ROC₁₀ crossed the exact zero line. With intraday price noise, tiny ROC values (e.g., +0.0% → -0.0%) flip-flopped constantly.
+**Modified Files:**
+- `FeatureToggle` — added `EMA_REPORT` enum value
+- `feature-toggles.json` — added `"emaReport": true`
+- `Scheduler` — added `dailyEmaReport()` scheduled at 15:50 CET Mon–Fri; injected `EmaTracker`
+- `SchedulerTest` — added `EmaTracker` mock + `dailyEmaReport_shouldSendReport` test
 
-**Solution:** Added a ±0.25% dead zone around zero. A signal only fires when:
-- **Positive crossover**: previous ROC₁₀ < -0.25 AND current ROC₁₀ > +0.25
-- **Negative crossover**: previous ROC₁₀ > +0.25 AND current ROC₁₀ < -0.25
+**Test Files:**
+- `EmaServiceTest` — 7 tests: green/yellow/red classification, insufficient data, edge cases
+- `EmaTrackerTest` — 6 tests: report formatting, no data, empty symbols
+- `StatisticsUtilTest` — added `calculateEma` tests (basic, insufficient data, single value)
 
-Values inside the dead zone are treated as "at zero" — no crossover is detected. This filters noise from range-bound / sideways sector ETFs.
+**Design Decisions:**
+- EMA calculation uses standard formula: multiplier = 2/(period+1), seed = SMA of first N prices
+- Reuses existing `PriceQuoteRepository` for historical daily prices (same data source as Bollinger/RSI)
+- Report groups: GREEN → YELLOW → RED sections with summary counts
+- Feature toggle gated via `FeatureToggle.EMA_REPORT` for easy enable/disable
+- Scheduled at 15:50 CET (10 min after Bollinger report) to stagger API load
 
-**Changes:**
-- `MomentumRocService` — added `ROC_DEAD_ZONE = 0.25` constant; updated `detectCrossover()` with dead zone logic
-- `MomentumRocServiceTest` — updated existing crossover tests to use values outside dead zone; added 4 new dead zone tests (within zone, boundary, previous-inside/current-outside)
-- All 26 MomentumRocServiceTest tests pass; 739 total tests pass
-
-### DST-Aware Market Hours (March 30, 2026) ✅ COMPLETE
-Fixed `isStockMarketOpen` and `isMarketOffHours` to automatically handle US/Europe DST transitions.
-
-**Problem:** Market open time in CET/CEST varied between 14:30 and 15:30 depending on DST "gap weeks" where US and Europe switch clocks on different dates. The old code used hardcoded `LocalTime` in CET which broke during transitions.
-
-**Solution:** All market-hours logic now operates in `America/New_York` timezone using `ZonedDateTime`. Java's `ZoneId` rules handle DST automatically — market is always 9:30–16:00 NY time regardless of caller's timezone.
-
-**Changes:**
-- `DateUtil.isMarketOffHours(ZonedDateTime)` — converts any timezone input to NY, checks 9:30–16:00
-- `DateUtil.isStockMarketOpen(ZonedDateTime)` — combines weekday check + market hours in NY timezone
-- `DateUtil.NY_ZONE` — public constant `ZoneId.of("America/New_York")`
-- Removed old `isMarketOffHours(LocalTime)` and `isStockMarketOpen(DayOfWeek, LocalTime)` signatures
-- `Scheduler` — uses single `ZonedDateTime marketDateTime` field instead of separate `DayOfWeek`/`LocalTime`
-- Tests: DST transition tests covering all 4 scenarios (both standard, both DST, spring gap, fall gap)
-- All 736 tests pass
-
-### Previous: RSI Current Price from Cache
-Enhanced RSI analysis to use current price from cache during `analyzeAllSymbols()`, allowing RSI calculation with 14 historical daily prices + 1 live intraday price. This mirrors how Bollinger Bands use live prices.
-
-## Recent Changes (March 29, 2026)
-
-### RSI Current Price from Cache ✅ COMPLETE
-- **`RsiService.analyzeAllSymbols()`** — now appends current live price from evaluator caches (Finnhub/CoinGecko) to historical closing prices before RSI calculation
-- New `getCurrentPriceFromCacheByKey(String symbolKey)` helper method looks up current price by symbol key across both Finnhub (stocks) and CoinGecko (crypto) caches
-- With 14 historical prices + 1 cached live price = 15 total, RSI becomes calculable even before today's close is recorded
-- Early-exit threshold lowered from `< RSI_PERIOD + 1` (15) to `< RSI_PERIOD` (14) to allow cache-supplemented calculation
-- **Tests**: 50 RsiServiceTest + 713 total tests all passing
-- New tests: `testGetCurrentPriceFromCacheByKey_stock/crypto/notFound`, `testAnalyzeAllSymbols_usesCurrentPriceFromCache`
-
-### RSI Reporting Refinement ✅ COMPLETE
-- **`RsiService`** — removed `pendingSignals` accumulator; `addPrice()` now purely stores price data and display names without calculating RSI
-- `analyzeAllSymbols()` iterates all stored price history, calculates RSI for each symbol with sufficient data, and returns `List<RsiSignal>` for overbought (≥70) / oversold (≤30)
-- `sendRsiReport()` calls `analyzeAllSymbols()`, builds consolidated report, sends via `sendMessageAndReturnId()`, and deletes previous report message
-- `symbolDisplayNames` map tracks display names registered during `addPrice()` calls (used by `analyzeAllSymbols()` for report formatting)
-- **`RsiPriceFetcher`** — `addPrice()` no longer triggers RSI calculation, only stores prices
-
-### RSI Batched Reporting (Initial) ✅ COMPLETE
-- **`Scheduler`** — `hourlySignalMonitoring()` runs both BB and RSI reports hourly
-- `sendRsiReport()` builds consolidated report via `buildRsiReport()` with grouped overbought/oversold sections
-- `RsiSignal` record holds display name, RSI value, previous RSI, diff, and zone
-- Delete-before-send pattern: previous report message deleted when new report sent
-
-### Telegram Delete-Before-Send for BB Reports ✅ COMPLETE
-- **`TelegramClient`** — `sendMessageAndReturnId(String)` returns `OptionalLong` with Telegram message ID; `deleteMessage(long messageId)` calls Telegram Bot API
-- **`TelegramSendMessageResponse`** DTO parses `message_id` from API response
-- **`BollingerBandTracker`** — `analyzeAndSendAlerts()` (hourly) deletes previous message before sending new one; `sendDailyReport()` sends without deletion
-
-### Bollinger Band Alert Frequency Reduction ✅ COMPLETE
-- **`Scheduler`** — BB alerts run once per hour via `hourlySignalMonitoring()` (renamed from `hourlyBollingerBandMonitoring`)
+### Previous Completed Work (Summarized)
+- **Market Holiday Detection Fix** (April 3) — uses Finnhub `previousClose` instead of SQLite stored price
+- **PR #161 Review Follow-Up** (April 3) — default profile = production; `dev` opt-in only
+- **Sector ROC Dead Zone Filter** (April 2) — ±0.25% dead zone filters noise near zero
+- **DST-Aware Market Hours** (March 30) — all market-hours logic in `America/New_York` timezone
 
 ## Architecture Decisions
 - **Separation of concerns**: `addPrice()` is purely a data collection method; RSI analysis happens separately in `analyzeAllSymbols()`
 - **Delete-before-send pattern**: Hourly report messages are treated as updates — previous message is deleted before sending the new one
 - **In-memory message ID tracking**: `lastTelegramReportMessageId` stored as instance field; resets on app restart
 - **Display name registry**: `symbolDisplayNames` map populated during `addPrice()`, used by `analyzeAllSymbols()` for human-readable report names
-- **Shared `StatisticsUtil`**: Eliminates statistical code duplication across services and now owns EMA / ROC / round-to-2-decimals helpers used by RS, momentum ROC, and dev seeding
+- **Shared `StatisticsUtil`**: Eliminates statistical code duplication across services and now owns EMA / ROC / round-to-2-decimals helpers used by RS, momentum ROC, EMA, and dev seeding
 - **Default profile = production**: production settings live in `application.yaml`; `dev` is opt-in and only used for local overrides / tooling
 - **`quant` package**: All quantitative analysis components live in `org.tradelite.quant`
+- **`TelegramGateway` interface**: All Telegram-sending components inject the `TelegramGateway` interface, allowing profile-based switching between `TelegramClient` (production) and `LocalTelegramGateway` (dev)
 
 ## Next Steps
 - Consider extending delete-before-send pattern to other recurring reports (tail risk, sector rotation)
 - RSI + BB batched reporting pattern can be templated for future indicators
-- Consider MACD indicator as next quant feature (uses same EMA concepts)
-- Consider combining Bollinger + RS + ROC signals for multi-signal confirmation alerts
+- Consider MACD indicator as next quant feature (uses same EMA concepts from StatisticsUtil)
+- Consider combining Bollinger + RS + ROC + EMA signals for multi-signal confirmation alerts
 - Monitor API rate limits with tracked stocks + 20 ETFs across all tracking systems

@@ -13,7 +13,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum FeatureToggle {
     /** Controls whether Finnhub price quotes are persisted to SQLite for historical data */
-    FINNHUB_PRICE_COLLECTION("finnhubPriceCollection");
+    FINNHUB_PRICE_COLLECTION("finnhubPriceCollection"),
+
+    /** Controls whether the daily EMA report is sent via Telegram */
+    EMA_REPORT("emaReport");
 
     private final String key;
 }
