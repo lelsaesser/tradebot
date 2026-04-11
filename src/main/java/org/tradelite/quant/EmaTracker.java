@@ -6,7 +6,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.service.StockSymbolRegistry;
 
@@ -27,7 +27,7 @@ import org.tradelite.service.StockSymbolRegistry;
 public class EmaTracker {
 
     private final EmaService emaService;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
 
     /** Analyzes all tracked stocks and sends a daily EMA report via Telegram. */

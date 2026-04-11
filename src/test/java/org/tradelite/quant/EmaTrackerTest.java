@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.service.StockSymbolRegistry;
 
@@ -19,7 +19,7 @@ import org.tradelite.service.StockSymbolRegistry;
 class EmaTrackerTest {
 
     @Mock private EmaService emaService;
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
     @Mock private StockSymbolRegistry stockSymbolRegistry;
 
     private EmaTracker tracker;
