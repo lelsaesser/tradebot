@@ -2,6 +2,17 @@
 
 ## Current Work Focus
 
+### Partial EMA Calculation (April 11, 2026) ✅ COMPLETE
+Changed `EmaService` to calculate every EMA for which enough data exists, instead of requiring all 200 data points. With fewer than 200 data points, shorter EMAs are still computed (e.g., 53 data points → EMA 9, 21, 50; EMA 100/200 = NaN).
+
+**Changes:**
+- `EmaAnalysis` — added `emasAvailable` field; EMA values are `Double.NaN` when insufficient data
+- `EmaService` — `MIN_DATA_POINTS` changed from 200 to 9 (shortest EMA); each EMA calculated independently via `computeEmaOrNaN()`; new `countAvailable()` helper; `countEmasBelow()` skips NaN values
+- `EmaSignalType.fromEmasBelow(int, int)` — now takes `emasAvailable` param; RED = below all *available* EMAs (not hardcoded 5)
+- `EmaTracker.formatLine()` — shows `(X/N below)` where N is available EMAs
+- `EmaServiceTest` — expanded from 7 to 17 tests (partial data: 10/25/53 points, NaN handling, helper methods)
+- `EmaTrackerTest` — expanded from 6 to 7 tests (added partial EMA report format test)
+
 ### TelegramGateway Refactor in EmaTracker (April 11, 2026) ✅ COMPLETE
 Refactored `EmaTracker` to inject the `TelegramGateway` interface instead of the concrete `TelegramClient`. This aligns with the existing profile-aware Telegram pattern where `TelegramClient` is the default production gateway and `LocalTelegramGateway` is active only in `dev`.
 

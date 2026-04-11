@@ -97,7 +97,7 @@ All 20 ETFs are tracked by three analysis systems:
 - **Tail Risk (Kurtosis + Skewness)** — fat tail and directional bias analysis
 
 Additionally, all tracked stocks are analyzed by:
-- **EMA Classification** — daily report comparing price vs 5 EMAs (9/21/50/100/200 day), classifying each stock as 🟢 GREEN (above all), 🟡 YELLOW (below 2–4), or 🔴 RED (below all)
+- **EMA Classification** — daily report comparing price vs available EMAs (9/21/50/100/200 day), calculating only those for which enough data exists. Classifies each stock as 🟢 GREEN (above all), 🟡 YELLOW (below some), or 🔴 RED (below all available)
 
 ## Sector Rotation Feature (NEW)
 
