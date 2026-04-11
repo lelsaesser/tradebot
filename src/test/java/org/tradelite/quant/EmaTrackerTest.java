@@ -45,6 +45,7 @@ class EmaTrackerTest {
                                         140.0,
                                         135.0,
                                         130.0,
+                                        5,
                                         0,
                                         EmaSignalType.GREEN)));
 
@@ -77,6 +78,7 @@ class EmaTrackerTest {
                                 140.0,
                                 135.0,
                                 130.0,
+                                5,
                                 0,
                                 EmaSignalType.GREEN),
                         new EmaAnalysis(
@@ -88,6 +90,7 @@ class EmaTrackerTest {
                                 320.0,
                                 290.0,
                                 280.0,
+                                5,
                                 3,
                                 EmaSignalType.YELLOW),
                         new EmaAnalysis(
@@ -99,6 +102,7 @@ class EmaTrackerTest {
                                 130.0,
                                 140.0,
                                 150.0,
+                                5,
                                 5,
                                 EmaSignalType.RED));
 
@@ -127,6 +131,7 @@ class EmaTrackerTest {
                                 140.0,
                                 135.0,
                                 130.0,
+                                5,
                                 0,
                                 EmaSignalType.GREEN));
 
@@ -150,6 +155,7 @@ class EmaTrackerTest {
                                 140.0,
                                 135.0,
                                 130.0,
+                                5,
                                 0,
                                 EmaSignalType.GREEN),
                         new EmaAnalysis(
@@ -162,11 +168,34 @@ class EmaTrackerTest {
                                 140.0,
                                 150.0,
                                 5,
+                                5,
                                 EmaSignalType.RED));
 
         String report = tracker.buildReport(analyses);
 
         assertThat(report).contains("2 symbols: 1 🟢 | 0 🟡 | 1 🔴");
+    }
+
+    @Test
+    void buildReport_showsPartialEmaCount() {
+        List<EmaAnalysis> analyses =
+                List.of(
+                        new EmaAnalysis(
+                                "AAPL",
+                                "Apple",
+                                150.0,
+                                148.0,
+                                145.0,
+                                140.0,
+                                Double.NaN,
+                                Double.NaN,
+                                3,
+                                0,
+                                EmaSignalType.GREEN));
+
+        String report = tracker.buildReport(analyses);
+
+        assertThat(report).contains("(0/3 below)");
     }
 
     @Test
@@ -186,6 +215,7 @@ class EmaTrackerTest {
                                         140.0,
                                         135.0,
                                         130.0,
+                                        5,
                                         0,
                                         EmaSignalType.GREEN)));
         when(emaService.analyze("MSFT", "Microsoft")).thenReturn(Optional.empty());

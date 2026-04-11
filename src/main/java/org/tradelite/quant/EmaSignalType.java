@@ -23,15 +23,19 @@ public enum EmaSignalType {
     private final String label;
 
     /**
-     * Classifies the signal type based on how many EMAs the price is below.
+     * Classifies the signal type based on how many available EMAs the price is below.
      *
-     * @param emasBelow Number of EMAs the current price is below (0-5)
+     * @param emasBelow Number of available EMAs the current price is below
+     * @param emasAvailable Total number of EMAs that could be calculated
      * @return The signal classification
      */
-    public static EmaSignalType fromEmasBelow(int emasBelow) {
+    public static EmaSignalType fromEmasBelow(int emasBelow, int emasAvailable) {
+        if (emasAvailable == 0) {
+            return YELLOW;
+        }
         if (emasBelow <= 1) {
             return GREEN;
-        } else if (emasBelow >= 5) {
+        } else if (emasBelow >= emasAvailable) {
             return RED;
         } else {
             return YELLOW;

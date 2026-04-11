@@ -104,7 +104,11 @@ public class EmaTracker {
 
     private String formatLine(EmaAnalysis a) {
         return String.format(
-                "%s `%s` $%.2f (%d/5 below)",
-                a.signalType().getEmoji(), a.symbol(), a.currentPrice(), a.emasBelow());
+                "%s `%s` $%.2f (%d/%d below)",
+                a.signalType().getEmoji(),
+                a.symbol(),
+                a.currentPrice(),
+                a.emasBelow(),
+                a.emasAvailable());
     }
 }

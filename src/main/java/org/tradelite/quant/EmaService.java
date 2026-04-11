@@ -20,8 +20,8 @@ import org.tradelite.service.model.DailyPrice;
 @RequiredArgsConstructor
 public class EmaService {
 
-    /** Minimum number of data points needed for the longest EMA (200-day). */
-    static final int MIN_DATA_POINTS = 200;
+    /** Minimum number of data points needed for the shortest EMA (9-day). */
+    static final int MIN_DATA_POINTS = 9;
 
     /**
      * Number of calendar days to fetch from the repository. 400 calendar days yields roughly 280+
@@ -32,11 +32,14 @@ public class EmaService {
     private final PriceQuoteRepository priceQuoteRepository;
 
     /**
-     * Analyzes EMA positions for a symbol and returns the result.
+     * Analyzes EMA positions for a symbol, calculating every EMA for which enough data exists.
+     *
+     * <p>With fewer than 200 data points, only the shorter EMAs are calculated; the rest are {@code
+     * Double.NaN}. For example, 53 data points yield EMA 9, 21, and 50.
      *
      * @param symbol The stock or ETF ticker symbol
      * @param displayName Human-readable name for reporting
-     * @return Analysis result, or empty if insufficient data
+     * @return Analysis result, or empty if insufficient data even for the shortest EMA (9-day)
      */
     public Optional<EmaAnalysis> analyze(String symbol, String displayName) {
         List<DailyPrice> dailyPrices =
@@ -44,7 +47,7 @@ public class EmaService {
 
         if (dailyPrices.size() < MIN_DATA_POINTS) {
             log.debug(
-                    "Insufficient data for EMA analysis on {}: {} points (need {})",
+                    "Insufficient data for EMA analysis on {}: {} points (need at least {})",
                     symbol,
                     dailyPrices.size(),
                     MIN_DATA_POINTS);
@@ -54,14 +57,15 @@ public class EmaService {
         List<Double> prices = dailyPrices.stream().map(DailyPrice::getPrice).toList();
         double currentPrice = prices.getLast();
 
-        double ema9 = StatisticsUtil.calculateEma(prices, 9);
-        double ema21 = StatisticsUtil.calculateEma(prices, 21);
-        double ema50 = StatisticsUtil.calculateEma(prices, 50);
-        double ema100 = StatisticsUtil.calculateEma(prices, 100);
-        double ema200 = StatisticsUtil.calculateEma(prices, 200);
+        double ema9 = computeEmaOrNaN(prices, 9);
+        double ema21 = computeEmaOrNaN(prices, 21);
+        double ema50 = computeEmaOrNaN(prices, 50);
+        double ema100 = computeEmaOrNaN(prices, 100);
+        double ema200 = computeEmaOrNaN(prices, 200);
 
+        int emasAvailable = countAvailable(ema9, ema21, ema50, ema100, ema200);
         int emasBelow = countEmasBelow(currentPrice, ema9, ema21, ema50, ema100, ema200);
-        EmaSignalType signalType = EmaSignalType.fromEmasBelow(emasBelow);
+        EmaSignalType signalType = EmaSignalType.fromEmasBelow(emasBelow, emasAvailable);
 
         return Optional.of(
                 new EmaAnalysis(
@@ -73,21 +77,52 @@ public class EmaService {
                         ema50,
                         ema100,
                         ema200,
+                        emasAvailable,
                         emasBelow,
                         signalType));
     }
 
     /**
-     * Counts how many of the 5 EMAs the current price is below.
+     * Returns the calculated EMA if enough data is available, otherwise {@code Double.NaN}.
+     *
+     * @param prices The price series
+     * @param period The EMA period
+     * @return The EMA value, or NaN if insufficient data
+     */
+    static double computeEmaOrNaN(List<Double> prices, int period) {
+        if (prices.size() < period) {
+            return Double.NaN;
+        }
+        return StatisticsUtil.calculateEma(prices, period);
+    }
+
+    /**
+     * Counts how many of the given EMAs are available (non-NaN).
+     *
+     * @param emas The EMA values to check
+     * @return Number of available EMAs
+     */
+    static int countAvailable(double... emas) {
+        int count = 0;
+        for (double ema : emas) {
+            if (!Double.isNaN(ema)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Counts how many of the available EMAs the current price is below. NaN EMAs are skipped.
      *
      * @param currentPrice The current price
      * @param emas The EMA values to compare against
-     * @return Number of EMAs the price is below (0-5)
+     * @return Number of available EMAs the price is below
      */
     static int countEmasBelow(double currentPrice, double... emas) {
         int count = 0;
         for (double ema : emas) {
-            if (currentPrice < ema) {
+            if (!Double.isNaN(ema) && currentPrice < ema) {
                 count++;
             }
         }

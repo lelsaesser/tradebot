@@ -30,7 +30,7 @@ class EmaServiceTest {
 
     @Test
     void analyze_returnsEmptyWhenInsufficientData() {
-        List<DailyPrice> prices = generateDailyPrices(100, 150.0);
+        List<DailyPrice> prices = generateDailyPrices(5, 150.0);
         when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
@@ -40,7 +40,7 @@ class EmaServiceTest {
     }
 
     @Test
-    void analyze_returnsAnalysisWithSufficientData() {
+    void analyze_returnsAnalysisWithFullData() {
         List<DailyPrice> prices = generateDailyPrices(250, 150.0);
         when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
@@ -57,11 +57,65 @@ class EmaServiceTest {
         assertThat(analysis.ema50()).isGreaterThan(0);
         assertThat(analysis.ema100()).isGreaterThan(0);
         assertThat(analysis.ema200()).isGreaterThan(0);
+        assertThat(analysis.emasAvailable()).isEqualTo(5);
+    }
+
+    @Test
+    void analyze_partialEmas_53DataPoints() {
+        List<DailyPrice> prices = generateDailyPrices(53, 150.0);
+        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(prices);
+
+        Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
+
+        assertThat(result).isPresent();
+        EmaAnalysis analysis = result.get();
+        assertThat(analysis.ema9()).isGreaterThan(0);
+        assertThat(analysis.ema21()).isGreaterThan(0);
+        assertThat(analysis.ema50()).isGreaterThan(0);
+        assertThat(analysis.ema100()).isNaN();
+        assertThat(analysis.ema200()).isNaN();
+        assertThat(analysis.emasAvailable()).isEqualTo(3);
+    }
+
+    @Test
+    void analyze_partialEmas_25DataPoints() {
+        List<DailyPrice> prices = generateDailyPrices(25, 150.0);
+        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(prices);
+
+        Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
+
+        assertThat(result).isPresent();
+        EmaAnalysis analysis = result.get();
+        assertThat(analysis.ema9()).isGreaterThan(0);
+        assertThat(analysis.ema21()).isGreaterThan(0);
+        assertThat(analysis.ema50()).isNaN();
+        assertThat(analysis.ema100()).isNaN();
+        assertThat(analysis.ema200()).isNaN();
+        assertThat(analysis.emasAvailable()).isEqualTo(2);
+    }
+
+    @Test
+    void analyze_partialEmas_10DataPoints() {
+        List<DailyPrice> prices = generateDailyPrices(10, 150.0);
+        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(prices);
+
+        Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
+
+        assertThat(result).isPresent();
+        EmaAnalysis analysis = result.get();
+        assertThat(analysis.ema9()).isGreaterThan(0);
+        assertThat(analysis.ema21()).isNaN();
+        assertThat(analysis.ema50()).isNaN();
+        assertThat(analysis.ema100()).isNaN();
+        assertThat(analysis.ema200()).isNaN();
+        assertThat(analysis.emasAvailable()).isEqualTo(1);
     }
 
     @Test
     void analyze_greenSignalWhenPriceAboveAllEmas() {
-        // Rising prices: current price will be above all EMAs
         List<DailyPrice> prices = generateRisingPrices(250, 100.0, 1.0);
         when(priceQuoteRepository.findDailyClosingPrices("MSFT", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
@@ -72,11 +126,11 @@ class EmaServiceTest {
         EmaAnalysis analysis = result.get();
         assertThat(analysis.signalType()).isEqualTo(EmaSignalType.GREEN);
         assertThat(analysis.emasBelow()).isLessThanOrEqualTo(1);
+        assertThat(analysis.emasAvailable()).isEqualTo(5);
     }
 
     @Test
     void analyze_redSignalWhenPriceBelowAllEmas() {
-        // Falling prices: current price will be below all EMAs
         List<DailyPrice> prices = generateFallingPrices(250, 300.0, 0.5);
         when(priceQuoteRepository.findDailyClosingPrices("TSLA", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
@@ -87,6 +141,23 @@ class EmaServiceTest {
         EmaAnalysis analysis = result.get();
         assertThat(analysis.signalType()).isEqualTo(EmaSignalType.RED);
         assertThat(analysis.emasBelow()).isEqualTo(5);
+        assertThat(analysis.emasAvailable()).isEqualTo(5);
+    }
+
+    @Test
+    void analyze_redSignalWithPartialEmas() {
+        // Falling prices with only 25 data points — 2 EMAs available, below both = RED
+        List<DailyPrice> prices = generateFallingPrices(25, 300.0, 5.0);
+        when(priceQuoteRepository.findDailyClosingPrices("TSLA", EmaService.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(prices);
+
+        Optional<EmaAnalysis> result = service.analyze("TSLA", "Tesla");
+
+        assertThat(result).isPresent();
+        EmaAnalysis analysis = result.get();
+        assertThat(analysis.signalType()).isEqualTo(EmaSignalType.RED);
+        assertThat(analysis.emasAvailable()).isEqualTo(2);
+        assertThat(analysis.emasBelow()).isEqualTo(2);
     }
 
     @Test
@@ -105,6 +176,43 @@ class EmaServiceTest {
     void countEmasBelow_priceBelowSome() {
         int count = EmaService.countEmasBelow(130.0, 100.0, 120.0, 150.0, 160.0, 190.0);
         assertThat(count).isEqualTo(3);
+    }
+
+    @Test
+    void countEmasBelow_skipsNaN() {
+        int count =
+                EmaService.countEmasBelow(130.0, 100.0, 120.0, Double.NaN, Double.NaN, Double.NaN);
+        assertThat(count).isZero();
+    }
+
+    @Test
+    void computeEmaOrNaN_returnsNaNWhenInsufficientData() {
+        List<Double> prices = List.of(1.0, 2.0, 3.0);
+        assertThat(EmaService.computeEmaOrNaN(prices, 50)).isNaN();
+    }
+
+    @Test
+    void computeEmaOrNaN_returnsValueWhenSufficientData() {
+        List<Double> prices = IntStream.range(0, 50).mapToDouble(i -> 100.0).boxed().toList();
+        assertThat(EmaService.computeEmaOrNaN(prices, 50)).isGreaterThan(0);
+    }
+
+    @Test
+    void countAvailable_allPresent() {
+        assertThat(EmaService.countAvailable(1.0, 2.0, 3.0, 4.0, 5.0)).isEqualTo(5);
+    }
+
+    @Test
+    void countAvailable_someNaN() {
+        assertThat(EmaService.countAvailable(1.0, 2.0, 3.0, Double.NaN, Double.NaN)).isEqualTo(3);
+    }
+
+    @Test
+    void countAvailable_allNaN() {
+        assertThat(
+                        EmaService.countAvailable(
+                                Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN))
+                .isZero();
     }
 
     // ========== Helper methods ==========
