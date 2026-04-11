@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
@@ -30,7 +30,7 @@ import org.tradelite.service.model.RsiDailyClosePrice;
 @SpringBootTest
 class RsiServiceTest {
 
-    @MockitoBean private TelegramClient telegramClient;
+    @MockitoBean private TelegramGateway telegramClient;
     @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
     @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
@@ -726,5 +726,39 @@ class RsiServiceTest {
                                         report.contains("RSI Signal Report")
                                                 && report.contains("Overbought")
                                                 && report.contains("Oversold")));
+    }
+
+    @Test
+    void testRemoveSymbolRsiData_success() throws IOException {
+        rsiService.addPrice(symbol, 100.0, 0.0, LocalDate.now());
+
+        boolean removed = rsiService.removeSymbolRsiData("AAPL");
+
+        assertThat(removed, is(true));
+        assertThat(rsiService.getPriceHistory().containsKey("AAPL"), is(false));
+    }
+
+    @Test
+    void testRemoveSymbolRsiData_unknownSymbol() {
+        boolean removed = rsiService.removeSymbolRsiData("UNKNOWN");
+
+        assertThat(removed, is(false));
+    }
+
+    @Test
+    void testRemoveSymbolRsiData_blankOrNullSymbol() {
+        assertThat(rsiService.removeSymbolRsiData(""), is(false));
+        assertThat(rsiService.removeSymbolRsiData(null), is(false));
+    }
+
+    @Test
+    void testRemoveSymbolRsiData_returnsFalseWhenSaveFails() throws Exception {
+        rsiService.addPrice(symbol, 100.0, 0.0, LocalDate.now());
+        doThrow(new IOException("save failed")).when(rsiService).savePriceHistory();
+
+        boolean removed = rsiService.removeSymbolRsiData("AAPL");
+
+        assertThat(removed, is(false));
+        assertThat(rsiService.getPriceHistory().containsKey("AAPL"), is(false));
     }
 }

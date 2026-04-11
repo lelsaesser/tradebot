@@ -42,6 +42,33 @@ Fixed market holiday detection that was broken due to timing gap between last pr
 
 **Solution:** Changed `isPotentialMarketHoliday()` to use Finnhub's `previousClose` field (`pc`) from the `PriceQuoteResponse` instead of comparing against our last SQLite-stored price from the previous day.
 
+- `previousClose` is the official closing price from the exchange, always accurate
+- When market is closed (holiday), Finnhub returns `currentPrice == previousClose`
+- Comparing `currentPrice == previousClose` reliably detects holidays regardless of fetch timing
+
+**Changes:**
+- `FinnhubPriceEvaluator.isPotentialMarketHoliday(String, double, double)` — now takes `previousClose` as 3rd param; compares `currentPrice == previousClose` directly instead of looking up last stored price from SQLite
+- `FinnhubPriceEvaluator.evaluatePrice()` — passes `previousClose` from `PriceQuoteResponse` to `isPotentialMarketHoliday()`
+- `RsiService.addPrice(TickerSymbol, double, double, LocalDate)` — new `previousClose` param, forwarded to `isPotentialMarketHoliday()`
+- `RsiPriceFetcher.fetchStockClosingPrices()` — passes `quote.getPreviousClose()` to `rsiService.addPrice()`
+- `RsiPriceFetcher.fetchCryptoClosingPrices()` — passes `0.0` for `previousClose` (crypto has no holiday detection)
+- All tests updated for new signatures; 739 total tests pass
+
+### PR #161 Review Follow-Up (April 3, 2026) ✅ COMPLETE
+Aligned the dev-environment branch with the remaining PR review feedback.
+
+**Key outcomes:**
+- Default Spring behavior is now production-like via `application.yaml`; `application-prod.yaml` was removed
+- `dev` is the only opt-in local profile and owns local Telegram mocking, scheduler disablement, dev DB isolation, and analytics seeding
+- `LocalTelegramGateway` is active only in `dev`; the real `TelegramClient` is the default gateway outside `dev`
+- `DevDataSeeder` constructor wiring is explicit, avoiding Spring constructor ambiguity
+- Shared EMA / ROC / rounding helpers now live in `StatisticsUtil`
+- Dev manual job endpoints now return real HTTP success/failure based on job execution status
+
+**Verification:**
+- `mvn -q -DskipTests test-compile` passes
+- full `mvn -q test` pending after final doc updates in this pass
+
 ### Sector ROC Dead Zone Filter (April 2, 2026) ✅ COMPLETE
 Fixed false alerts in sector momentum ROC analysis. ROC₁₀ values oscillating near zero caused rapid positive/negative crossover alerts.
 
@@ -53,7 +80,8 @@ Fixed `isStockMarketOpen` and `isMarketOffHours` to automatically handle US/Euro
 - **Delete-before-send pattern**: Hourly report messages are treated as updates — previous message is deleted before sending the new one
 - **In-memory message ID tracking**: `lastTelegramReportMessageId` stored as instance field; resets on app restart
 - **Display name registry**: `symbolDisplayNames` map populated during `addPrice()`, used by `analyzeAllSymbols()` for human-readable report names
-- **Shared `StatisticsUtil`**: Eliminates statistical code duplication across services (EMA, Bollinger, etc.)
+- **Shared `StatisticsUtil`**: Eliminates statistical code duplication across services and now owns EMA / ROC / round-to-2-decimals helpers used by RS, momentum ROC, and dev seeding
+- **Default profile = production**: production settings live in `application.yaml`; `dev` is opt-in and only used for local overrides / tooling
 - **`quant` package**: All quantitative analysis components live in `org.tradelite.quant`
 
 ## Next Steps

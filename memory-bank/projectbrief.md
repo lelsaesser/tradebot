@@ -16,3 +16,4 @@ The goal of this project is to create an automated trading bot that monitors fin
 - It should be able to connect to external APIs (Finnhub, CoinGecko) to fetch financial data.
 - It must provide a command-line interface through a Telegram bot for user interaction.
 - The system should be robust and handle errors gracefully.
+- It should support an opt-in local `dev` profile with mocked Telegram output and manual job execution while leaving the default runtime behavior production-like.

@@ -1,0 +1,15 @@
+info:
+  name: monthlyApiUsage
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: http://localhost:9090/dev/jobs/monthly-api-usage
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

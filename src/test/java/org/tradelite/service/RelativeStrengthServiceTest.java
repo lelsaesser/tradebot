@@ -3,6 +3,9 @@ package org.tradelite.service;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,10 +20,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.RelativeStrengthSignal;
+import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
@@ -28,7 +32,7 @@ import org.tradelite.service.model.RsiDailyClosePrice;
 @SpringBootTest
 class RelativeStrengthServiceTest {
 
-    @MockitoBean private TelegramClient telegramClient;
+    @MockitoBean private TelegramGateway telegramClient;
     @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
     @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
     @MockitoBean private PriceQuoteRepository priceQuoteRepository;
@@ -63,7 +67,7 @@ class RelativeStrengthServiceTest {
             values.add(1.0 + (i * 0.01)); // Gradually increasing RS values
         }
 
-        double ema = relativeStrengthService.calculateEma(values, 50);
+        double ema = StatisticsUtil.calculateEma(values, 50);
 
         assertThat(ema, is(greaterThan(1.0)));
         assertThat(ema, is(lessThan(2.0)));
@@ -77,7 +81,7 @@ class RelativeStrengthServiceTest {
             values.add(1.0); // Constant values
         }
 
-        double ema = relativeStrengthService.calculateEma(values, 50);
+        double ema = StatisticsUtil.calculateEma(values, 50);
 
         // EMA of constant values should equal the constant
         assertThat(ema, is(closeTo(1.0, 0.001)));
@@ -90,7 +94,7 @@ class RelativeStrengthServiceTest {
             values.add(1.0);
         }
 
-        double ema = relativeStrengthService.calculateEma(values, 50);
+        double ema = StatisticsUtil.calculateEma(values, 50);
 
         assertEquals(0, ema);
     }
@@ -352,6 +356,53 @@ class RelativeStrengthServiceTest {
 
         // Cleanup
         rsFile.delete();
+    }
+
+    @Test
+    void testLoadRsHistory_missingFile_isNoOp() throws IOException {
+        new File(rsDataFile).delete();
+
+        relativeStrengthService.loadRsHistory();
+
+        assertThat(relativeStrengthService.getRsHistory().isEmpty(), is(true));
+    }
+
+    @Test
+    void testLoadRsHistory_invalidFile_throws() throws Exception {
+        File rsFile = new File(rsDataFile);
+        rsFile.getParentFile().mkdirs();
+        rsFile.createNewFile();
+
+        ObjectMapper failingMapper = org.mockito.Mockito.spy(new ObjectMapper());
+        doThrow(new IOException("bad rs data"))
+                .when(failingMapper)
+                .readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
+
+        assertEquals(
+                IOException.class,
+                assertThrows(
+                                IOException.class,
+                                () ->
+                                        new RelativeStrengthService(
+                                                failingMapper, rsiService, priceQuoteRepository))
+                        .getClass());
+
+        rsFile.delete();
+    }
+
+    @Test
+    void testSaveRsHistory_writeFailure_throws() throws Exception {
+        ObjectMapper failingMapper = org.mockito.Mockito.spy(new ObjectMapper());
+        doThrow(new IOException("write failed"))
+                .when(failingMapper)
+                .writeValue(any(File.class), any());
+
+        RelativeStrengthService service =
+                new RelativeStrengthService(failingMapper, rsiService, priceQuoteRepository);
+
+        assertEquals(
+                IOException.class,
+                assertThrows(IOException.class, service::saveRsHistory).getClass());
     }
 
     @Test

@@ -1,38 +1,48 @@
 # Progress Tracking
 
-## Latest Milestone: EMA Daily Report ✅ COMPLETE
+## Latest Milestone: PR #161 Review Feedback Addressed ✅ COMPLETE
 
-**Status**: ✅ **PRODUCTION READY**
+**Status**: ✅ **READY FOR RE-REVIEW**
 
-### Implementation Complete (April 4, 2026)
+### Implementation Complete (April 3, 2026)
 
-#### Feature Overview
-Added EMA (Exponential Moving Average) daily report that classifies stocks by their position relative to 5 EMAs (9, 21, 50, 100, 200 day). Scheduled once per day at 15:50 CET Mon–Fri.
+#### Review Requests Addressed
+- Default Spring profile now behaves as production; `application-prod.yaml` removed
+- `dev` is the only opt-in local profile
+- `LocalTelegramGateway` is restricted to `dev`; the real Telegram client is the default gateway outside `dev`
+- `DevDataSeeder` constructor wiring was made unambiguous for Spring
+- Shared EMA / ROC / rounding helpers were consolidated into `StatisticsUtil`
+- Dev manual job endpoints now return real success/failure responses
+- README, `.env.example`, and Memory Bank updated to reflect the final profile model
 
-#### Classification
-- 🟢 GREEN: Price above all 5 EMAs (strong uptrend)
-- 🟡 YELLOW: Price below 2–4 EMAs (mixed/cautionary)
-- 🔴 RED: Price below all 5 EMAs (downtrend)
-
-#### New Components
-- `EmaSignalType` — enum: GREEN, YELLOW, RED
-- `EmaAnalysis` — record with symbol, display name, current price, 5 EMA values, counts, signal type
-- `EmaService` — calculates all 5 EMAs using `StatisticsUtil.calculateEma()`, returns `Optional<EmaAnalysis>`
-- `EmaTracker` — orchestrates daily report: iterates stocks, groups by signal (RED→YELLOW→GREEN), sends via Telegram; gated by `FeatureToggle.EMA_REPORT`
-
-#### Modified Components
-- `StatisticsUtil` — added `calculateEma(List<Double>, int)` static method
-- `FeatureToggle` — added `EMA_REPORT`
-- `feature-toggles.json` — added `"EMA_REPORT": true`
-- `Scheduler` — added `dailyEmaReport()` at 15:50 CET; injected `EmaTracker`
-
-#### Tests
-- `EmaServiceTest` (7 tests), `EmaTrackerTest` (6 tests), `StatisticsUtilTest` (3 new EMA tests), `SchedulerTest` (1 new test)
-- All 54 targeted tests pass; full suite passing
+#### Verification
+- `mvn -q -DskipTests test-compile` passes
+- full `mvn -q test` is the final verification step for this change set
 
 ---
 
-## Previous Milestone: Market Holiday Detection Fix ✅ COMPLETE
+## Latest Milestone: PR #161 Review Feedback Addressed ✅ COMPLETE
+
+**Status**: ✅ **READY FOR RE-REVIEW**
+
+### Implementation Complete (April 3, 2026)
+
+#### Review Requests Addressed
+- Default Spring profile now behaves as production; `application-prod.yaml` removed
+- `dev` is the only opt-in local profile
+- `LocalTelegramGateway` is restricted to `dev`; the real Telegram client is the default gateway outside `dev`
+- `DevDataSeeder` constructor wiring was made unambiguous for Spring
+- Shared EMA / ROC / rounding helpers were consolidated into `StatisticsUtil`
+- Dev manual job endpoints now return real success/failure responses
+- README, `.env.example`, and Memory Bank updated to reflect the final profile model
+
+#### Verification
+- `mvn -q -DskipTests test-compile` passes
+- full `mvn -q test` is the final verification step for this change set
+
+---
+
+## Latest Milestone: Market Holiday Detection Fix ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -240,7 +250,6 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 | **Momentum ROC** | `SectorMomentumRocTracker` | Zero-line crossovers | Real-time (5 min) |
 | **Tail Risk (Kurtosis + Skewness)** | `TailRiskTracker` | Fat tail + directional bias | Daily 10:00 CET |
 | **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Hourly + Daily 15:40 CET |
-| **EMA Classification** | `EmaTracker` | Price vs 5 EMAs (green/yellow/red) | Daily 15:50 CET |
 
 ---
 
@@ -261,7 +270,6 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 - Momentum ROC sector tracking
 - Tail Risk (Kurtosis + Skewness) analysis
 - **Bollinger Band analysis** (sectors + stocks, squeeze detection, band touches)
-- **EMA daily report** (9/21/50/100/200 day EMAs, green/yellow/red classification)
 - **Telegram delete-before-send** for recurring BB and RSI reports (keeps chat clean)
 - **RSI batched reporting** (consolidated hourly report instead of individual messages)
 
@@ -302,12 +310,11 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 | dailySectorRsSummary | Daily 12:00 CET (Mon-Fri) | Sector RS vs SPY summary |
 | dailyTailRiskMonitoring | Daily 13:00 CET (Mon-Fri) | Tail risk kurtosis + skewness alerts |
 | dailyBollingerBandReport | Daily 15:40 CET (Mon-Fri) | Bollinger Band daily summary |
-| dailyEmaReport | Daily 15:50 CET (Mon-Fri) | EMA classification report (green/yellow/red) |
 
 ## Future Enhancements
 
 ### Statistical Enhancements (Future)
-- MACD indicator (uses same EMA concepts from StatisticsUtil)
+- MACD indicator (uses same EMA concepts)
 - Multi-signal confirmation alerts (Bollinger + RS + ROC)
 - Historical kurtosis/skewness tracking for trend detection
 - VIX integration for additional volatility context
@@ -321,7 +328,7 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: April 4, 2026
+- Date: April 2, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
 - Code coverage: 97%

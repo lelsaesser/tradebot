@@ -1,0 +1,15 @@
+info:
+  name: stockMonitoring
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:9090/dev/jobs/stock-monitoring
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

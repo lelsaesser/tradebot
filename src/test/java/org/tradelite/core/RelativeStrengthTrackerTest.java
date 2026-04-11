@@ -10,7 +10,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -22,7 +22,7 @@ class RelativeStrengthTrackerTest {
     private RelativeStrengthService relativeStrengthService;
     private TargetPriceProvider targetPriceProvider;
     private StockSymbolRegistry stockSymbolRegistry;
-    private TelegramClient telegramClient;
+    private TelegramGateway telegramClient;
 
     private RelativeStrengthTracker tracker;
 
@@ -31,7 +31,7 @@ class RelativeStrengthTrackerTest {
         relativeStrengthService = mock(RelativeStrengthService.class);
         targetPriceProvider = mock(TargetPriceProvider.class);
         stockSymbolRegistry = mock(StockSymbolRegistry.class);
-        telegramClient = mock(TelegramClient.class);
+        telegramClient = mock(TelegramGateway.class);
 
         tracker =
                 new RelativeStrengthTracker(

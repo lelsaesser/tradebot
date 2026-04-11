@@ -8,7 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.common.TickerSymbol;
@@ -16,7 +16,7 @@ import org.tradelite.common.TickerSymbol;
 @ExtendWith(MockitoExtension.class)
 class BasePriceEvaluatorTest {
 
-    @Mock private TelegramClient telegramClient;
+    @Mock private TelegramGateway telegramClient;
 
     @Mock private TargetPriceProvider targetPriceProvider;
 
@@ -31,7 +31,7 @@ class BasePriceEvaluatorTest {
 
     static class TestPriceEvaluator extends BasePriceEvaluator {
         public TestPriceEvaluator(
-                TelegramClient telegramClient, TargetPriceProvider targetPriceProvider) {
+                TelegramGateway telegramClient, TargetPriceProvider targetPriceProvider) {
             super(telegramClient, targetPriceProvider);
         }
 

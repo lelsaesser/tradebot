@@ -8,7 +8,7 @@ import java.util.OptionalLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.service.StockSymbolRegistry;
@@ -31,7 +31,7 @@ import org.tradelite.service.StockSymbolRegistry;
 public class BollingerBandTracker {
 
     private final BollingerBandService bollingerBandService;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
     private final StockSymbolRegistry stockSymbolRegistry;
 
     /**
@@ -159,7 +159,6 @@ public class BollingerBandTracker {
             sb.append("*Volatility Squeeze* (breakout expected):\n");
             for (BollingerBandAnalysis analysis : squeezes) {
                 sb.append(analysis.toSummaryLine()).append("\n");
-                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
@@ -168,7 +167,6 @@ public class BollingerBandTracker {
             sb.append("*Upper Band Touch* (overextended):\n");
             for (BollingerBandAnalysis analysis : overextended) {
                 sb.append(analysis.toSummaryLine()).append("\n");
-                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
@@ -177,7 +175,6 @@ public class BollingerBandTracker {
             sb.append("*Lower Band Touch* (underextended):\n");
             for (BollingerBandAnalysis analysis : underextended) {
                 sb.append(analysis.toSummaryLine()).append("\n");
-                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
