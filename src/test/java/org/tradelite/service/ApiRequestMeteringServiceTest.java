@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,6 +19,13 @@ class ApiRequestMeteringServiceTest {
 
     private ApiRequestMeteringService meteringService;
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
+
+    @AfterAll
+    static void cleanUp() throws IOException {
+        Path configDir = Paths.get("config");
+        Files.deleteIfExists(configDir.resolve("finnhub-monthly-requests.txt"));
+        Files.deleteIfExists(configDir.resolve("coingecko-monthly-requests.txt"));
+    }
 
     @BeforeEach
     void setUp() {
