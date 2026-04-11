@@ -1,6 +1,6 @@
 package org.tradelite.config;
 
-import lombok.getter;
+import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

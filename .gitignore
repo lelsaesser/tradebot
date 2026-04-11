@@ -27,7 +27,7 @@ replay_pid*
 setup_env.sh
 deploy.sh
 .env
-.env-dev
+.env.dev
 .env.local
 config/dev-telegram-messages.log
 config/rs-data.json
