@@ -1,6 +1,7 @@
 package org.tradelite.quant;
 
 import java.util.List;
+import org.tradelite.service.model.DailyPrice;
 
 /**
  * Shared statistical utility methods used across quantitative analysis features.
@@ -135,5 +136,62 @@ public final class StatisticsUtil {
         }
         long countBelow = values.stream().filter(v -> v < currentValue).count();
         return (countBelow * 100.0) / values.size();
+    }
+
+    /**
+     * Calculates Exponential Moving Average (EMA) for chronological values.
+     *
+     * @param values List of values in chronological order
+     * @param period The EMA period
+     * @return The EMA value, or 0 if there is insufficient data
+     */
+    public static double calculateEma(List<Double> values, int period) {
+        if (values == null || values.size() < period || period <= 0) {
+            return 0;
+        }
+
+        double multiplier = 2.0 / (period + 1);
+        double ema =
+                values.subList(0, period).stream()
+                        .mapToDouble(Double::doubleValue)
+                        .average()
+                        .orElse(0.0);
+
+        for (int index = period; index < values.size(); index++) {
+            ema = (values.get(index) - ema) * multiplier + ema;
+        }
+
+        return ema;
+    }
+
+    /**
+     * Calculates Rate of Change (ROC) for a price series.
+     *
+     * @param prices List of daily prices sorted by date ascending
+     * @param period The ROC period in days
+     * @return The ROC percentage, or 0 if there is insufficient data
+     */
+    public static double calculateRocValue(List<DailyPrice> prices, int period) {
+        if (prices == null || prices.size() <= period) {
+            return 0;
+        }
+
+        double currentPrice = prices.getLast().getPrice();
+        double pastPrice = prices.get(prices.size() - 1 - period).getPrice();
+        if (pastPrice == 0) {
+            return 0;
+        }
+
+        return ((currentPrice - pastPrice) / pastPrice) * 100;
+    }
+
+    /**
+     * Rounds a double value to two decimal places.
+     *
+     * @param value The value to round
+     * @return Rounded value with two decimal places
+     */
+    public static double roundTo2Decimals(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 }

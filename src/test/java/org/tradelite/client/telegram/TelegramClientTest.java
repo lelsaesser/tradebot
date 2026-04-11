@@ -20,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.telegram.dto.TelegramMessage;
 import org.tradelite.client.telegram.dto.TelegramSendMessageResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
+import org.tradelite.config.TradebotTelegramProperties;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramClientTest {
@@ -30,7 +31,10 @@ class TelegramClientTest {
 
     @BeforeEach
     void setUp() {
-        telegramClient = new TelegramClient(restTemplate, "testToken", "testChatId");
+        TradebotTelegramProperties properties = new TradebotTelegramProperties();
+        properties.setBotToken("testToken");
+        properties.setGroupChatId("testChatId");
+        telegramClient = new TelegramClient(restTemplate, properties);
     }
 
     @Test

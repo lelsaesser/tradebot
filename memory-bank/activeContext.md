@@ -21,6 +21,21 @@ Fixed market holiday detection that was broken due to timing gap between last pr
 - `RsiPriceFetcher.fetchCryptoClosingPrices()` — passes `0.0` for `previousClose` (crypto has no holiday detection)
 - All tests updated for new signatures; 739 total tests pass
 
+### PR #161 Review Follow-Up (April 3, 2026) ✅ COMPLETE
+Aligned the dev-environment branch with the remaining PR review feedback.
+
+**Key outcomes:**
+- Default Spring behavior is now production-like via `application.yaml`; `application-prod.yaml` was removed
+- `dev` is the only opt-in local profile and owns local Telegram mocking, scheduler disablement, dev DB isolation, and analytics seeding
+- `LocalTelegramGateway` is active only in `dev`; the real `TelegramClient` is the default gateway outside `dev`
+- `DevDataSeeder` constructor wiring is explicit, avoiding Spring constructor ambiguity
+- Shared EMA / ROC / rounding helpers now live in `StatisticsUtil`
+- Dev manual job endpoints now return real HTTP success/failure based on job execution status
+
+**Verification:**
+- `mvn -q -DskipTests test-compile` passes
+- full `mvn -q test` pending after final doc updates in this pass
+
 ### Sector ROC Dead Zone Filter (April 2, 2026) ✅ COMPLETE
 Fixed false alerts in sector momentum ROC analysis. ROC₁₀ values oscillating near zero (e.g., ±0.0%–0.1%) caused rapid positive/negative crossover alerts — sometimes 4+ per day for the same ETF (e.g., XLV).
 
@@ -92,7 +107,8 @@ Enhanced RSI analysis to use current price from cache during `analyzeAllSymbols(
 - **Delete-before-send pattern**: Hourly report messages are treated as updates — previous message is deleted before sending the new one
 - **In-memory message ID tracking**: `lastTelegramReportMessageId` stored as instance field; resets on app restart
 - **Display name registry**: `symbolDisplayNames` map populated during `addPrice()`, used by `analyzeAllSymbols()` for human-readable report names
-- **Shared `StatisticsUtil`**: Eliminates statistical code duplication across services
+- **Shared `StatisticsUtil`**: Eliminates statistical code duplication across services and now owns EMA / ROC / round-to-2-decimals helpers used by RS, momentum ROC, and dev seeding
+- **Default profile = production**: production settings live in `application.yaml`; `dev` is opt-in and only used for local overrides / tooling
 - **`quant` package**: All quantitative analysis components live in `org.tradelite.quant`
 
 ## Next Steps

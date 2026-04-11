@@ -26,6 +26,13 @@ replay_pid*
 /target/
 setup_env.sh
 deploy.sh
+.env
+.env.dev
+.env.local
+config/dev-telegram-messages.log
+config/rs-data.json
+config/coingecko-monthly-requests.txt
+config/finnhub-monthly-requests.txt
 
 # SQLite database
 /data/

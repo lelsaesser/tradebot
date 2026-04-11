@@ -4,3 +4,9 @@ server:
 tradebot:
   database:
     path: data/tradebot.db
+  api:
+    finnhub-key: ${FINNHUB_API_KEY:}
+    coingecko-key: ${COINGECKO_API_KEY:}
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    group-chat-id: ${TELEGRAM_BOT_GROUP_CHAT_ID:}

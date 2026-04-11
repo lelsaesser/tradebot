@@ -13,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.config.TradebotApiProperties;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.utils.DateUtil;
 
@@ -21,22 +22,33 @@ import org.tradelite.utils.DateUtil;
 public class FinnhubClient {
 
     private static final String API_URL = "https://finnhub.io/api/v1";
-    private static final String API_KEY = System.getenv("FINNHUB_API_KEY");
 
     private final RestTemplate restTemplate;
     private final ApiRequestMeteringService meteringService;
+    private final TradebotApiProperties apiProperties;
 
     @Autowired
-    public FinnhubClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
+    public FinnhubClient(
+            RestTemplate restTemplate,
+            ApiRequestMeteringService meteringService,
+            TradebotApiProperties apiProperties) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
+        this.apiProperties = apiProperties;
     }
 
     private String getApiUrl(String baseUrl, StockSymbol ticker) {
-        return API_URL + String.format(baseUrl, ticker.getTicker()) + "&token=" + API_KEY;
+        return API_URL
+                + String.format(baseUrl, ticker.getTicker())
+                + "&token="
+                + apiProperties.getFinnhubKey();
     }
 
     public PriceQuoteResponse getPriceQuote(StockSymbol ticker) {
+        if (apiProperties.getFinnhubKey() == null || apiProperties.getFinnhubKey().isBlank()) {
+            throw quoteFailure(ticker, new IllegalStateException("FINNHUB key not configured"));
+        }
+
         String baseUrl = "/quote?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
 
@@ -44,28 +56,35 @@ public class FinnhubClient {
         HttpHeaders headers = new HttpHeaders();
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
+        ResponseEntity<PriceQuoteResponse> response;
         try {
             meteringService.incrementFinnhubRequests();
-            ResponseEntity<PriceQuoteResponse> response =
+            response =
                     restTemplate.exchange(
                             url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
-            PriceQuoteResponse quote = response.getBody();
-            if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
-                throw new IllegalStateException(
-                        "Failed to fetch price quote for "
-                                + ticker.getTicker()
-                                + ": "
-                                + response.getStatusCode());
-            }
-            quote.setStockSymbol(ticker);
-            return quote;
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            throw e;
+            throw quoteFailure(ticker, e);
         }
+
+        PriceQuoteResponse quote = response.getBody();
+        if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
+            throw quoteFailure(
+                    ticker,
+                    new IllegalStateException(
+                            "Failed to fetch price quote for "
+                                    + ticker.getTicker()
+                                    + ": "
+                                    + response.getStatusCode()));
+        }
+        quote.setStockSymbol(ticker);
+        return quote;
     }
 
     public InsiderTransactionResponse getInsiderTransactions(StockSymbol ticker) {
+        if (apiProperties.getFinnhubKey() == null || apiProperties.getFinnhubKey().isBlank()) {
+            throw insiderFailure(ticker, new IllegalStateException("FINNHUB key not configured"));
+        }
+
         String fromDate = DateUtil.getDateTwoMonthsAgo(null);
         String baseUrl = "/stock/insider-transactions?symbol=%s";
         String url = getApiUrl(baseUrl, ticker);
@@ -75,15 +94,43 @@ public class FinnhubClient {
         HttpHeaders headers = new HttpHeaders();
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
+        ResponseEntity<InsiderTransactionResponse> response;
         try {
             meteringService.incrementFinnhubRequests();
-            ResponseEntity<InsiderTransactionResponse> response =
+            response =
                     restTemplate.exchange(
                             url, HttpMethod.GET, requestEntity, InsiderTransactionResponse.class);
-            return response.getBody();
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            throw e;
+            throw insiderFailure(ticker, e);
         }
+
+        InsiderTransactionResponse responseBody = response.getBody();
+        if (responseBody == null || !response.getStatusCode().is2xxSuccessful()) {
+            throw insiderFailure(
+                    ticker,
+                    new IllegalStateException(
+                            "Failed to fetch insider transactions for "
+                                    + ticker.getTicker()
+                                    + ": "
+                                    + response.getStatusCode()));
+        }
+        return responseBody;
+    }
+
+    private RuntimeException quoteFailure(StockSymbol ticker, Exception cause) {
+        log.error("Failed to fetch Finnhub quote for {}", ticker.getTicker(), cause);
+        return toRuntime(cause);
+    }
+
+    private RuntimeException insiderFailure(StockSymbol ticker, Exception cause) {
+        log.error("Failed to fetch Finnhub insider transactions for {}", ticker.getTicker(), cause);
+        return toRuntime(cause);
+    }
+
+    private RuntimeException toRuntime(Exception exception) {
+        if (exception instanceof RuntimeException runtimeException) {
+            return runtimeException;
+        }
+        return new IllegalStateException(exception.getMessage(), exception);
     }
 }

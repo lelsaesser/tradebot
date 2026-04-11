@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.core.RelativeStrengthSignal;
+import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RelativeStrengthData;
@@ -132,7 +133,7 @@ public class RelativeStrengthService {
 
         // Calculate current RS and EMA
         double currentRs = rsValues.getLast();
-        double currentEma = calculateEma(rsValues, EMA_PERIOD);
+        double currentEma = StatisticsUtil.calculateEma(rsValues, EMA_PERIOD);
 
         // Detect crossover
         Optional<RelativeStrengthSignal> signal =
@@ -216,41 +217,6 @@ public class RelativeStrengthService {
     }
 
     /**
-     * Calculates Exponential Moving Average (EMA).
-     *
-     * <p>Formula: EMA = (Current - Previous EMA) * multiplier + Previous EMA Where multiplier = 2 /
-     * (period + 1)
-     *
-     * <p>For the first EMA calculation, uses SMA (Simple Moving Average) as the seed.
-     *
-     * @param values List of values in chronological order
-     * @param period The EMA period (e.g., 50)
-     * @return The calculated EMA value
-     */
-    protected double calculateEma(List<Double> values, int period) {
-        if (values.size() < period) {
-            return 0;
-        }
-
-        double multiplier = 2.0 / (period + 1);
-
-        // Calculate initial SMA for the first 'period' values
-        double sma = 0;
-        for (int i = 0; i < period; i++) {
-            sma += values.get(i);
-        }
-        sma /= period;
-
-        // Apply EMA formula starting from the period-th value
-        double ema = sma;
-        for (int i = period; i < values.size(); i++) {
-            ema = (values.get(i) - ema) * multiplier + ema;
-        }
-
-        return ema;
-    }
-
-    /**
      * Gets the current RS and EMA values for a symbol.
      *
      * <p>This method fetches fresh price data from SQLite to ensure up-to-date values even if the
@@ -320,7 +286,7 @@ public class RelativeStrengthService {
         double currentRs = rsValues.getLast();
         // Use available data for EMA, even if less than full period
         int emaPeriod = Math.min(rsValues.size(), EMA_PERIOD);
-        double currentEma = calculateEma(rsValues, emaPeriod);
+        double currentEma = StatisticsUtil.calculateEma(rsValues, emaPeriod);
         boolean isComplete = rsValues.size() >= EMA_PERIOD;
 
         return Optional.of(new RsResult(currentRs, currentEma, rsValues.size(), isComplete));

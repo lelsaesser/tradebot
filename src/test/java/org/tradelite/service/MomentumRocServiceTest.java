@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.core.MomentumRocSignal;
 import org.tradelite.core.MomentumRocSignal.SignalType;
+import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
@@ -69,7 +70,7 @@ class MomentumRocServiceTest {
             prices.add(new DailyPrice(startDate.plusDays(i), price));
         }
 
-        double roc10 = service.calculateRocValue(prices, 10);
+        double roc10 = StatisticsUtil.calculateRocValue(prices, 10);
 
         // (109.6 - 105.6) / 105.6 * 100 = 3.79%
         assertTrue(roc10 > 0);
@@ -85,7 +86,7 @@ class MomentumRocServiceTest {
             prices.add(new DailyPrice(startDate.plusDays(i), price));
         }
 
-        double roc10 = service.calculateRocValue(prices, 10);
+        double roc10 = StatisticsUtil.calculateRocValue(prices, 10);
 
         assertTrue(roc10 < 0);
     }
@@ -99,7 +100,7 @@ class MomentumRocServiceTest {
             prices.add(new DailyPrice(startDate.plusDays(i), i == 14 ? 0.0 : 100.0));
         }
 
-        double roc10 = service.calculateRocValue(prices, 10);
+        double roc10 = StatisticsUtil.calculateRocValue(prices, 10);
 
         assertEquals(0.0, roc10);
     }
@@ -108,7 +109,7 @@ class MomentumRocServiceTest {
     void calculateRocValue_insufficientDataReturnsZero() {
         List<DailyPrice> prices = List.of(new DailyPrice(LocalDate.now(), 100.0));
 
-        double roc10 = service.calculateRocValue(prices, 10);
+        double roc10 = StatisticsUtil.calculateRocValue(prices, 10);
 
         assertEquals(0.0, roc10);
     }
@@ -244,7 +245,7 @@ class MomentumRocServiceTest {
             prices.add(new DailyPrice(startDate.plusDays(i), 100.0 + i));
         }
 
-        double roc10 = service.calculateRocValue(prices, 10);
+        double roc10 = StatisticsUtil.calculateRocValue(prices, 10);
 
         assertEquals(10.0, roc10, 0.01);
     }

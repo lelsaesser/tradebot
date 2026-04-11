@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.common.CoinId;
+import org.tradelite.config.TradebotApiProperties;
 import org.tradelite.service.ApiRequestMeteringService;
 
 @Slf4j
@@ -18,18 +19,26 @@ import org.tradelite.service.ApiRequestMeteringService;
 public class CoinGeckoClient {
 
     private static final String BASE_URL = "https://api.coingecko.com/api/v3";
-    private static final String API_KEY = System.getenv("COINGECKO_API_KEY");
 
     private final RestTemplate restTemplate;
     private final ApiRequestMeteringService meteringService;
+    private final TradebotApiProperties apiProperties;
 
     @Autowired
-    public CoinGeckoClient(RestTemplate restTemplate, ApiRequestMeteringService meteringService) {
+    public CoinGeckoClient(
+            RestTemplate restTemplate,
+            ApiRequestMeteringService meteringService,
+            TradebotApiProperties apiProperties) {
         this.restTemplate = restTemplate;
         this.meteringService = meteringService;
+        this.apiProperties = apiProperties;
     }
 
     public CoinGeckoPriceResponse.CoinData getCoinPriceData(CoinId coinId) {
+        if (apiProperties.getCoingeckoKey() == null || apiProperties.getCoingeckoKey().isBlank()) {
+            throw priceFailure(coinId, new IllegalStateException("COINGECKO key not configured"));
+        }
+
         String endpointUrl = "/simple/price";
         String url =
                 BASE_URL
@@ -40,32 +49,48 @@ public class CoinGeckoClient {
                         + "&include_24hr_change=true";
 
         HttpHeaders headers = new HttpHeaders();
-        headers.add("x-cg-demo-api-key", API_KEY);
+        headers.add("x-cg-demo-api-key", apiProperties.getCoingeckoKey());
         headers.set("Accept", "application/json");
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
+        ResponseEntity<CoinGeckoPriceResponse> response;
         try {
             meteringService.incrementCoingeckoRequests();
-            ResponseEntity<CoinGeckoPriceResponse> response =
+            response =
                     restTemplate.exchange(
                             url, HttpMethod.GET, entity, CoinGeckoPriceResponse.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                CoinGeckoPriceResponse.CoinData data =
-                        response.getBody().getCoinData().get(coinId.getId());
-                data.setCoinId(coinId);
-                return data;
-            } else {
-                log.error(
-                        "Failed to fetch coin price data for {}: {}",
-                        coinId.getId(),
-                        response.getStatusCode());
-                throw new IllegalStateException(
-                        "Failed to fetch coin price data: " + response.getStatusCode());
-            }
         } catch (RestClientException e) {
-            log.error("Error fetching coin price data for {}: {}", coinId.getId(), e.getMessage());
-            throw e;
+            throw priceFailure(coinId, e);
         }
+
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw priceFailure(
+                    coinId,
+                    new IllegalStateException(
+                            "Failed to fetch coin price data: " + response.getStatusCode()));
+        }
+
+        CoinGeckoPriceResponse.CoinData data = response.getBody().getCoinData().get(coinId.getId());
+        if (data == null) {
+            throw priceFailure(
+                    coinId,
+                    new IllegalStateException(
+                            "CoinGecko response missing payload for " + coinId.getId()));
+        }
+        data.setCoinId(coinId);
+        return data;
+    }
+
+    private RuntimeException priceFailure(CoinId coinId, Exception cause) {
+        log.error("Failed to fetch CoinGecko price data for {}", coinId.getId(), cause);
+        return toRuntime(cause);
+    }
+
+    private RuntimeException toRuntime(Exception exception) {
+        if (exception instanceof RuntimeException runtimeException) {
+            return runtimeException;
+        }
+        return new IllegalStateException(exception.getMessage(), exception);
     }
 }

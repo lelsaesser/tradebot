@@ -42,6 +42,7 @@ This document covers the technologies used, development setup, technical constra
 - **Scheduled Tasks:** Spring's `@Scheduled` annotation with cron expressions and timezone support
 - **JSON Persistence:** Uses Jackson ObjectMapper to persist data structures to JSON files in the `config/` directory
 - **SQLite Persistence:** **NEW** - Uses JDBC with DataSource for SQLite database operations
+- **Profile Model:** Default runtime is production-like via `application.yaml`; `dev` is opt-in and used only for local overrides, mocked Telegram output, scheduler disablement, and analytics seeding
 
 ## External Data Sources
 
@@ -74,9 +75,28 @@ This document covers the technologies used, development setup, technical constra
 | `config/insider-transactions.json` | JSON | Insider trading data |
 | `config/finnhub-monthly-requests.txt` | Text | API metering |
 | `config/coingecko-monthly-requests.txt` | Text | API metering |
+| `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `config/tg-last-processed-message-id.txt` | Text | Telegram message tracking |
 | `config/feature-toggles.json` | JSON | **NEW** Runtime feature flags |
 | `data/tradebot.db` | SQLite | Historical price data |
+
+## Runtime Profiles
+
+### Default Runtime
+- Uses `FINNHUB_API_KEY`
+- Uses `COINGECKO_API_KEY`
+- Uses `TELEGRAM_BOT_TOKEN`
+- Uses `TELEGRAM_BOT_GROUP_CHAT_ID`
+- Active when `SPRING_PROFILES_ACTIVE` is unset
+
+### Dev Runtime
+- Activated with `SPRING_PROFILES_ACTIVE=dev`
+- Uses `FINNHUB_DEV_API_KEY`
+- Uses `COINGECKO_DEV_API_KEY`
+- Disables schedulers
+- Redirects Telegram output to a local sink file
+- Uses a separate local SQLite database path and seeded analytics state
+- Exposes manual `/dev/jobs/*` endpoints that return HTTP 200/500 based on execution success
 
 ## Project Structure
 

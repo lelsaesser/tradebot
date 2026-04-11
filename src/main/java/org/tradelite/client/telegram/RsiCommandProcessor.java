@@ -9,7 +9,7 @@ import org.tradelite.service.RsiService;
 public class RsiCommandProcessor implements TelegramCommandProcessor<RsiCommand> {
 
     private final RsiService rsiService;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
 
     @Override
     public void processCommand(RsiCommand command) {

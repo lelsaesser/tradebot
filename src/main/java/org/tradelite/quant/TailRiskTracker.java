@@ -7,7 +7,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.telegram.TelegramClient;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SectorEtfRegistry;
 
 /**
@@ -26,7 +26,7 @@ import org.tradelite.common.SectorEtfRegistry;
 public class TailRiskTracker {
 
     private final TailRiskService tailRiskService;
-    private final TelegramClient telegramClient;
+    private final TelegramGateway telegramClient;
 
     /** Analyzes tail risk for all tracked sector ETFs and returns the results. */
     public List<TailRiskAnalysis> analyzeAllSectors() {
