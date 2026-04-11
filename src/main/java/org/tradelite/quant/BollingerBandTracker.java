@@ -159,7 +159,6 @@ public class BollingerBandTracker {
             sb.append("*Volatility Squeeze* (breakout expected):\n");
             for (BollingerBandAnalysis analysis : squeezes) {
                 sb.append(analysis.toSummaryLine()).append("\n");
-                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
@@ -168,7 +167,6 @@ public class BollingerBandTracker {
             sb.append("*Upper Band Touch* (overextended):\n");
             for (BollingerBandAnalysis analysis : overextended) {
                 sb.append(analysis.toSummaryLine()).append("\n");
-                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
@@ -177,7 +175,6 @@ public class BollingerBandTracker {
             sb.append("*Lower Band Touch* (underextended):\n");
             for (BollingerBandAnalysis analysis : underextended) {
                 sb.append(analysis.toSummaryLine()).append("\n");
-                sb.append("   _").append(analysis.getInterpretation()).append("_\n");
             }
             sb.append("\n");
         }
