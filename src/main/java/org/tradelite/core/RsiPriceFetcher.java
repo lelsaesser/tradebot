@@ -37,7 +37,11 @@ public class RsiPriceFetcher {
                         stockSymbolRegistry.fromString(targetPrice.getSymbol());
                 if (stockSymbol.isPresent()) {
                     PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(stockSymbol.get());
-                    rsiService.addPrice(stockSymbol.get(), priceQuote.getCurrentPrice(), today);
+                    rsiService.addPrice(
+                            stockSymbol.get(),
+                            priceQuote.getCurrentPrice(),
+                            priceQuote.getPreviousClose(),
+                            today);
                 }
                 // prevent 60 requests/minute Finnhub API limit by sleeping for 1 second between
                 // requests
@@ -58,7 +62,9 @@ public class RsiPriceFetcher {
                 if (coinId.isPresent()) {
                     CoinGeckoPriceResponse.CoinData coinData =
                             coinGeckoClient.getCoinPriceData(coinId.get());
-                    rsiService.addPrice(coinId.get(), coinData.getUsd(), today);
+                    // previousClose is 0.0 for crypto: crypto markets trade 24/7 without official
+                    // closing prices, so market holiday detection does not apply
+                    rsiService.addPrice(coinId.get(), coinData.getUsd(), 0.0, today);
                 }
             } catch (Exception e) {
                 log.error("Error fetching crypto price for RSI", e);

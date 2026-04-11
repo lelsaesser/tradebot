@@ -58,7 +58,7 @@ class RsiServiceTest {
     @Test
     void testAddPrice_onlyStoresData_doesNotCalculateRsi() throws IOException {
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         // addPrice should NOT send any messages or calculate RSI
@@ -71,7 +71,7 @@ class RsiServiceTest {
 
     @Test
     void testAddPrice_storesDisplayName_forStock() throws IOException {
-        rsiService.addPrice(symbol, 100, LocalDate.now());
+        rsiService.addPrice(symbol, 100, 0.0, LocalDate.now());
 
         assertEquals("Apple (AAPL)", rsiService.getSymbolDisplayNames().get("AAPL"));
     }
@@ -79,7 +79,7 @@ class RsiServiceTest {
     @Test
     void testAddPrice_storesDisplayName_forCrypto() throws IOException {
         CoinId cryptoSymbol = CoinId.BITCOIN;
-        rsiService.addPrice(cryptoSymbol, 50000, LocalDate.now());
+        rsiService.addPrice(cryptoSymbol, 50000, 0.0, LocalDate.now());
 
         assertEquals(
                 cryptoSymbol.getName(),
@@ -89,7 +89,7 @@ class RsiServiceTest {
     @Test
     void testAnalyzeAllSymbols_detectsOverbought() throws IOException {
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
@@ -103,7 +103,7 @@ class RsiServiceTest {
     @Test
     void testAnalyzeAllSymbols_detectsOversold() throws IOException {
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 200 - (i * 5), 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
@@ -115,7 +115,7 @@ class RsiServiceTest {
     @Test
     void testAnalyzeAllSymbols_insufficientData_noSignals() throws IOException {
         for (int i = 0; i < 10; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(9 - i));
         }
 
         List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
@@ -130,7 +130,7 @@ class RsiServiceTest {
             100, 105, 102, 108, 104, 110, 106, 112, 108, 114, 110, 116, 112, 118, 114
         };
         for (int i = 0; i < mixedPrices.length; i++) {
-            rsiService.addPrice(symbol, mixedPrices[i], LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, mixedPrices[i], 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
@@ -141,7 +141,7 @@ class RsiServiceTest {
     @Test
     void testAnalyzeAllSymbols_usesDisplayNameFromMap() throws IOException {
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
@@ -171,7 +171,7 @@ class RsiServiceTest {
         when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(123L));
 
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         rsiService.sendRsiReport();
@@ -195,7 +195,7 @@ class RsiServiceTest {
 
         // First report
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
         rsiService.sendRsiReport();
 
@@ -204,6 +204,7 @@ class RsiServiceTest {
             rsiService.addPrice(
                     new StockSymbol("MSFT", "Microsoft"),
                     100 + i,
+                    0.0,
                     LocalDate.now().minusDays(14 - i));
         }
         rsiService.sendRsiReport();
@@ -216,7 +217,7 @@ class RsiServiceTest {
         when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(100L));
 
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
         rsiService.sendRsiReport();
 
@@ -419,39 +420,66 @@ class RsiServiceTest {
 
     @Test
     void testHolidayDetection_skipsWhenMarketHolidayDetected() throws IOException {
-        when(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.50)).thenReturn(true);
+        // Holiday scenario: currentPrice == previousClose (Finnhub returns last close as current)
+        when(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.50, 150.50))
+                .thenReturn(true);
 
-        rsiService.addPrice(symbol, 150.50, LocalDate.now());
+        rsiService.addPrice(symbol, 150.50, 150.50, LocalDate.now());
 
         assertThat(rsiService.getPriceHistory().containsKey(symbol.getName()), is(false));
     }
 
     @Test
     void testHolidayDetection_addsWhenNotMarketHoliday() throws IOException {
-        when(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.50)).thenReturn(false);
+        // Normal trading day: currentPrice != previousClose
+        when(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 152.30, 150.50))
+                .thenReturn(false);
 
-        rsiService.addPrice(symbol, 150.50, LocalDate.now());
+        rsiService.addPrice(symbol, 152.30, 150.50, LocalDate.now());
 
         assertEquals(1, rsiService.getPriceHistory().get(symbol.getName()).getPrices().size());
     }
 
     @Test
     void testHolidayDetection_delegatesToFinnhubPriceEvaluator() throws IOException {
-        rsiService.addPrice(symbol, 150.50, LocalDate.now());
+        rsiService.addPrice(symbol, 152.30, 150.50, LocalDate.now());
 
-        verify(finnhubPriceEvaluator).isPotentialMarketHoliday("AAPL", 150.50);
+        verify(finnhubPriceEvaluator).isPotentialMarketHoliday("AAPL", 152.30, 150.50);
+    }
+
+    @Test
+    void testHolidayDetection_previousClosePassedCorrectly() throws IOException {
+        // Verify that previousClose is forwarded to the evaluator, not hardcoded to 0.0
+        double currentPrice = 175.25;
+        double previousClose = 173.80;
+        rsiService.addPrice(symbol, currentPrice, previousClose, LocalDate.now());
+
+        verify(finnhubPriceEvaluator).isPotentialMarketHoliday("AAPL", currentPrice, previousClose);
+    }
+
+    @Test
+    void testHolidayDetection_cryptoSkipsHolidayCheck() throws IOException {
+        // Crypto uses 0.0 for previousClose; holiday detection should not trigger
+        CoinId cryptoSymbol = CoinId.BITCOIN;
+        when(finnhubPriceEvaluator.isPotentialMarketHoliday(anyString(), anyDouble(), anyDouble()))
+                .thenReturn(false);
+
+        rsiService.addPrice(cryptoSymbol, 50000.0, 0.0, LocalDate.now());
+
+        assertEquals(
+                1, rsiService.getPriceHistory().get(cryptoSymbol.getName()).getPrices().size());
     }
 
     @Test
     void testAnalyzeAllSymbols_rsiDiffCalculation() throws IOException {
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 200 - (i * 5), LocalDate.now().minusDays(15 - i));
+            rsiService.addPrice(symbol, 200 - (i * 5), 0.0, LocalDate.now().minusDays(15 - i));
         }
         // Set a known previousRsi so the diff is meaningful
         rsiService.getPriceHistory().get(symbol.getName()).setPreviousRsi(10);
 
         // Add one more price to keep it in oversold territory
-        rsiService.addPrice(symbol, 120, LocalDate.now());
+        rsiService.addPrice(symbol, 120, 0.0, LocalDate.now());
 
         List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
 
@@ -464,7 +492,7 @@ class RsiServiceTest {
     @Test
     void testGetCurrentRsi_withSufficientData() throws IOException {
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         var rsi = rsiService.getCurrentRsi(symbol);
@@ -476,7 +504,7 @@ class RsiServiceTest {
     @Test
     void testGetCurrentRsi_withInsufficientData() throws IOException {
         for (int i = 0; i < 10; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(9 - i));
         }
 
         var rsi = rsiService.getCurrentRsi(symbol);
@@ -496,7 +524,7 @@ class RsiServiceTest {
         CoinId cryptoSymbol = CoinId.BITCOIN;
 
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(cryptoSymbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(cryptoSymbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
@@ -523,7 +551,7 @@ class RsiServiceTest {
 
         assertThrows(
                 IOException.class,
-                () -> serviceWithFailingMapper.addPrice(symbol, 100.0, LocalDate.now()));
+                () -> serviceWithFailingMapper.addPrice(symbol, 100.0, 0.0, LocalDate.now()));
     }
 
     @Test
@@ -572,7 +600,7 @@ class RsiServiceTest {
     @Test
     void testGetCurrentRsi_withCurrentPriceFromCache() throws IOException {
         for (int i = 0; i < 14; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(13 - i));
         }
 
         when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 125.0));
@@ -589,7 +617,7 @@ class RsiServiceTest {
 
         for (int i = 0; i < 14; i++) {
             rsiService.addPrice(
-                    cryptoSymbol, 40000 + (i * 1000), LocalDate.now().minusDays(13 - i));
+                    cryptoSymbol, 40000 + (i * 1000), 0.0, LocalDate.now().minusDays(13 - i));
         }
 
         when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(Map.of(cryptoSymbol, 55000.0));
@@ -603,7 +631,7 @@ class RsiServiceTest {
     @Test
     void testGetCurrentRsi_insufficientDataEvenWithCache() throws IOException {
         for (int i = 0; i < 10; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(9 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(9 - i));
         }
 
         when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(Map.of("AAPL", 125.0));
@@ -616,7 +644,7 @@ class RsiServiceTest {
     @Test
     void testAnalyzeAllSymbols_updatesPreviousRsi() throws IOException {
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         double previousRsiBefore =
@@ -663,7 +691,7 @@ class RsiServiceTest {
     void testAnalyzeAllSymbols_usesCurrentPriceFromCache() throws IOException {
         // Add only 14 historical prices (not enough alone for RSI)
         for (int i = 0; i < 14; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(13 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(13 - i));
         }
 
         // Provide a current price via the cache to make 15 total
@@ -681,12 +709,12 @@ class RsiServiceTest {
 
         // Add overbought data
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol, 100 + i, LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol, 100 + i, 0.0, LocalDate.now().minusDays(14 - i));
         }
         // Add oversold data for another symbol
         StockSymbol symbol2 = new StockSymbol("TSLA", "Tesla");
         for (int i = 0; i < 15; i++) {
-            rsiService.addPrice(symbol2, 200 - (i * 5), LocalDate.now().minusDays(14 - i));
+            rsiService.addPrice(symbol2, 200 - (i * 5), 0.0, LocalDate.now().minusDays(14 - i));
         }
 
         rsiService.sendRsiReport();

@@ -2,6 +2,25 @@
 
 ## Current Work Focus
 
+### Market Holiday Detection Fix (April 3, 2026) ✅ COMPLETE
+Fixed market holiday detection that was broken due to timing gap between last price fetch and actual market close.
+
+**Root Cause:** The scheduler runs on a `fixedRate` interval (every 5 min), not aligned to clock boundaries. `MARKET_CLOSE = LocalTime.of(16, 0)` NY time meant the last fetch before close was typically at ~15:57, and the next fetch at ~16:02 was already skipped (market closed). This meant our last recorded price for the day was the 15:57 quote — NOT the actual closing price. The holiday detection compared this last recorded price against the next day's current price (Finnhub returns `previousClose` as current price when market is closed). Since the 15:57 price ≠ actual close price, the comparison almost never matched, so holidays were never detected.
+
+**Solution:** Changed `isPotentialMarketHoliday()` to use Finnhub's `previousClose` field (`pc`) from the `PriceQuoteResponse` instead of comparing against our last SQLite-stored price from the previous day.
+
+- `previousClose` is the official closing price from the exchange, always accurate
+- When market is closed (holiday), Finnhub returns `currentPrice == previousClose`
+- Comparing `currentPrice == previousClose` reliably detects holidays regardless of fetch timing
+
+**Changes:**
+- `FinnhubPriceEvaluator.isPotentialMarketHoliday(String, double, double)` — now takes `previousClose` as 3rd param; compares `currentPrice == previousClose` directly instead of looking up last stored price from SQLite
+- `FinnhubPriceEvaluator.evaluatePrice()` — passes `previousClose` from `PriceQuoteResponse` to `isPotentialMarketHoliday()`
+- `RsiService.addPrice(TickerSymbol, double, double, LocalDate)` — new `previousClose` param, forwarded to `isPotentialMarketHoliday()`
+- `RsiPriceFetcher.fetchStockClosingPrices()` — passes `quote.getPreviousClose()` to `rsiService.addPrice()`
+- `RsiPriceFetcher.fetchCryptoClosingPrices()` — passes `0.0` for `previousClose` (crypto has no holiday detection)
+- All tests updated for new signatures; 739 total tests pass
+
 ### PR #161 Review Follow-Up (April 3, 2026) ✅ COMPLETE
 Aligned the dev-environment branch with the remaining PR review feedback.
 

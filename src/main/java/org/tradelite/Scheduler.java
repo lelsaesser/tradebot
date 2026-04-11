@@ -118,7 +118,7 @@ public class Scheduler {
         log.info("Relative strength vs SPY analysis completed.");
     }
 
-    @Scheduled(cron = "0 0 16 * * MON-FRI", zone = "CET")
+    @Scheduled(cron = "0 0 16,21 * * MON-FRI", zone = "CET")
     protected void dailySectorRelativeStrengthReport() {
         rootErrorHandler.run(sectorRelativeStrengthTracker::sendDailySectorRsSummary);
         log.info("Daily sector relative strength report completed.");

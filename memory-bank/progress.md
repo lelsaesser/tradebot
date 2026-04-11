@@ -21,7 +21,49 @@
 
 ---
 
-## Latest Milestone: Sector ROC Dead Zone Filter ✅ COMPLETE
+## Latest Milestone: PR #161 Review Feedback Addressed ✅ COMPLETE
+
+**Status**: ✅ **READY FOR RE-REVIEW**
+
+### Implementation Complete (April 3, 2026)
+
+#### Review Requests Addressed
+- Default Spring profile now behaves as production; `application-prod.yaml` removed
+- `dev` is the only opt-in local profile
+- `LocalTelegramGateway` is restricted to `dev`; the real Telegram client is the default gateway outside `dev`
+- `DevDataSeeder` constructor wiring was made unambiguous for Spring
+- Shared EMA / ROC / rounding helpers were consolidated into `StatisticsUtil`
+- Dev manual job endpoints now return real success/failure responses
+- README, `.env.example`, and Memory Bank updated to reflect the final profile model
+
+#### Verification
+- `mvn -q -DskipTests test-compile` passes
+- full `mvn -q test` is the final verification step for this change set
+
+---
+
+## Latest Milestone: Market Holiday Detection Fix ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation Complete (April 3, 2026)
+
+#### Problem
+Market holiday detection was broken due to timing gap between last price fetch and actual market close. The scheduler runs on `fixedRate` (every 5 min), not aligned to clock boundaries. Last fetch before 16:00 NY close was typically ~15:57, with the next fetch at ~16:02 already skipped. Our last recorded price for the day (15:57 quote) ≠ actual closing price, so the holiday check (`lastStoredPrice == currentPrice`) almost never matched.
+
+#### Solution
+Changed `isPotentialMarketHoliday()` to use Finnhub's `previousClose` field (`pc`) instead of comparing against the last SQLite-stored price. When market is closed (holiday), Finnhub returns `currentPrice == previousClose`, making this comparison reliable regardless of fetch timing.
+
+#### Changes
+- `FinnhubPriceEvaluator.isPotentialMarketHoliday(String, double, double)` — takes `previousClose` as 3rd param; compares `currentPrice == previousClose` directly
+- `FinnhubPriceEvaluator.evaluatePrice()` — passes `previousClose` from `PriceQuoteResponse`
+- `RsiService.addPrice(TickerSymbol, double, double, LocalDate)` — new `previousClose` param
+- `RsiPriceFetcher` — passes `quote.getPreviousClose()` for stocks, `0.0` for crypto
+- All tests updated; 739 total tests pass
+
+---
+
+## Previous Milestone: Sector ROC Dead Zone Filter ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
