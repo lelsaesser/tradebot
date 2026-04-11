@@ -175,41 +175,40 @@ public class Scheduler {
 
     @Scheduled(cron = "0 0 0 1 * *", zone = "UTC")
     public void monthlyApiUsageReport() {
-        rootErrorHandler.run(
-                () -> {
-                    int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
-                    int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
-
-                    if (finnhubCount > 0 || coingeckoCount > 0) {
-                        String previousMonth = apiRequestMeteringService.getPreviousMonth();
-
-                        String message =
-                                String.format(
-                                        """
-                        *Monthly API Usage Report - %s*
-                        🔹 *Finnhub API*: %,d requests
-                        🔹 *CoinGecko API*: %,d requests
-                        🔹 *Total*: %,d requests""",
-                                        previousMonth,
-                                        finnhubCount,
-                                        coingeckoCount,
-                                        finnhubCount + coingeckoCount);
-
-                        telegramClient.sendMessage(message);
-                        log.info(
-                                "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}",
-                                previousMonth,
-                                finnhubCount,
-                                coingeckoCount);
-                    } else {
-                        log.info(
-                                "No API requests recorded for the previous month, skipping report");
-                    }
-
-                    apiRequestMeteringService.resetCounters();
-                });
-
+        rootErrorHandler.run(this::doMonthlyApiUsageReport);
         log.info("Monthly API usage report completed.");
+    }
+
+    private void doMonthlyApiUsageReport() throws Exception {
+        int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
+        int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
+
+        if (finnhubCount > 0 || coingeckoCount > 0) {
+            String previousMonth = apiRequestMeteringService.getPreviousMonth();
+
+            String message =
+                    String.format(
+                            """
+                            *Monthly API Usage Report - %s*
+                            🔹 *Finnhub API*: %,d requests
+                            🔹 *CoinGecko API*: %,d requests
+                            🔹 *Total*: %,d requests""",
+                            previousMonth,
+                            finnhubCount,
+                            coingeckoCount,
+                            finnhubCount + coingeckoCount);
+
+            telegramClient.sendMessage(message);
+            log.info(
+                    "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}",
+                    previousMonth,
+                    finnhubCount,
+                    coingeckoCount);
+        } else {
+            log.info("No API requests recorded for the previous month, skipping report");
+        }
+
+        apiRequestMeteringService.resetCounters();
     }
 
     public boolean manualStockMarketMonitoring() {
@@ -287,41 +286,7 @@ public class Scheduler {
     }
 
     public boolean manualMonthlyApiUsageReport() {
-        boolean success =
-                rootErrorHandler.runWithStatus(
-                        () -> {
-                            int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
-                            int coingeckoCount =
-                                    apiRequestMeteringService.getCoingeckoRequestCount();
-
-                            if (finnhubCount > 0 || coingeckoCount > 0) {
-                                String previousMonth = apiRequestMeteringService.getPreviousMonth();
-
-                                String message =
-                                        String.format(
-                                                """
-                                *Monthly API Usage Report - %s*
-                                🔹 *Finnhub API*: %,d requests
-                                🔹 *CoinGecko API*: %,d requests
-                                🔹 *Total*: %,d requests""",
-                                                previousMonth,
-                                                finnhubCount,
-                                                coingeckoCount,
-                                                finnhubCount + coingeckoCount);
-
-                                telegramClient.sendMessage(message);
-                                log.info(
-                                        "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}",
-                                        previousMonth,
-                                        finnhubCount,
-                                        coingeckoCount);
-                            } else {
-                                log.info(
-                                        "No API requests recorded for the previous month, skipping report");
-                            }
-
-                            apiRequestMeteringService.resetCounters();
-                        });
+        boolean success = rootErrorHandler.runWithStatus(this::doMonthlyApiUsageReport);
         log.info("Manual monthly API usage report completed.");
         return success;
     }

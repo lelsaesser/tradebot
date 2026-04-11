@@ -730,7 +730,7 @@ class RsiServiceTest {
 
     @Test
     void testRemoveSymbolRsiData_success() throws IOException {
-        rsiService.addPrice(symbol, 100.0, LocalDate.now());
+        rsiService.addPrice(symbol, 100.0, 0.0, LocalDate.now());
 
         boolean removed = rsiService.removeSymbolRsiData("AAPL");
 
@@ -753,7 +753,7 @@ class RsiServiceTest {
 
     @Test
     void testRemoveSymbolRsiData_returnsFalseWhenSaveFails() throws Exception {
-        rsiService.addPrice(symbol, 100.0, LocalDate.now());
+        rsiService.addPrice(symbol, 100.0, 0.0, LocalDate.now());
         doThrow(new IOException("save failed")).when(rsiService).savePriceHistory();
 
         boolean removed = rsiService.removeSymbolRsiData("AAPL");
