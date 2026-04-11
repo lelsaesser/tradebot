@@ -1,0 +1,15 @@
+info:
+  name: rsiStock
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: http://localhost:9090/dev/jobs/rsi-stock
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

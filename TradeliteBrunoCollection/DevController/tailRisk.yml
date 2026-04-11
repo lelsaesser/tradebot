@@ -1,0 +1,15 @@
+info:
+  name: tailRisk
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: http://localhost:9090/dev/jobs/tail-risk
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,4 +1,4 @@
-# Cline Rules
+# claude.md
 
 You always must start by reading `AGENTS.md` for instructions.
 
