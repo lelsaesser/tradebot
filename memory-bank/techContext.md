@@ -52,6 +52,7 @@ This document covers the technologies used, development setup, technical constra
 | Finnhub | `FinnhubClient` | Stock prices, insider transactions | API Key |
 | CoinGecko | `CoinGeckoClient` | Cryptocurrency prices | No auth |
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
+| Yahoo Finance | `YahooFinanceClient` | Daily OHLCV data (volume + adj close) | No auth |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |
@@ -63,6 +64,7 @@ This document covers the technologies used, development setup, technical constra
 |----------|------------|---------|----------|
 | SQLite | `SqlitePriceQuoteRepository` | Historical Finnhub price quotes | `data/tradebot.db` |
 | SQLite | `SqliteMomentumRocRepository` | Momentum ROC state | `data/tradebot.db` |
+| SQLite | `SqliteYahooOhlcvRepository` | Yahoo Finance daily OHLCV | `data/tradebot.db` |
 
 ## Configuration Files
 
@@ -78,7 +80,8 @@ This document covers the technologies used, development setup, technical constra
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `config/tg-last-processed-message-id.txt` | Text | Telegram message tracking |
 | `config/feature-toggles.json` | JSON | **NEW** Runtime feature flags |
-| `data/tradebot.db` | SQLite | Historical price data |
+| `config/yahoo-monthly-requests.txt` | Text | Yahoo API metering |
+| `data/tradebot.db` | SQLite | Historical price data + OHLCV |
 
 ## Runtime Profiles
 
@@ -110,7 +113,8 @@ src/main/java/org/tradelite/
 │   ├── coingecko/               # CoinGecko API client
 │   ├── finnhub/                 # Finnhub API client
 │   ├── finviz/                  # FinViz web scraper
-│   └── telegram/                # Telegram Bot API
+│   ├── telegram/                # Telegram Bot API
+│   └── yahoo/                   # Yahoo Finance OHLCV client
 ├── common/                      # Shared DTOs and utilities
 │   ├── SectorEtfRegistry.java  # Central ETF symbol/name registry (20 ETFs)
 ├── config/                      # Spring configuration
@@ -137,7 +141,9 @@ src/main/java/org/tradelite/
 │   ├── PriceQuoteRepository.java # Interface (includes findDailyChangePercents)
 │   ├── SqlitePriceQuoteRepository.java # SQLite price implementation
 │   ├── MomentumRocRepository.java # Interface
-│   └── SqliteMomentumRocRepository.java # SQLite ROC implementation
+│   ├── SqliteMomentumRocRepository.java # SQLite ROC implementation
+│   ├── YahooOhlcvRepository.java # Interface for Yahoo OHLCV
+│   └── SqliteYahooOhlcvRepository.java # SQLite Yahoo OHLCV implementation
 ├── service/                     # Application services
 ├── utils/                       # Utility classes
 └── web/                         # Web endpoints (if any)
@@ -148,7 +154,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** 813
+- **Total Tests:** 852
 
 ### Testing Libraries
 ```xml

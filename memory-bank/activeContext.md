@@ -2,6 +2,30 @@
 
 ## Current Work Focus
 
+### Yahoo Finance Client + SQLite OHLCV Storage (April 12, 2026) ✅ COMPLETE
+Implemented issue #245 — the foundational data layer for the VFI (Volume Flow Indicator) feature (#244). Introduces Yahoo Finance as a new data source for daily OHLCV data (open, high, low, close, adjusted close, volume), stored in a dedicated SQLite table.
+
+**New Files:**
+- `client/yahoo/dto/YahooOhlcvRecord.java` — Java record DTO: symbol, date, open, high, low, close, adjClose, volume
+- `client/yahoo/YahooFinanceClient.java` — HTTP client using RestTemplate + Jackson `JsonNode` tree parsing for Yahoo Finance chart API (`/v8/finance/chart/{SYMBOL}?range=6mo&interval=1d`). User-Agent header, graceful HTTP 429 handling (log + return empty), metered via `ApiRequestMeteringService`
+- `repository/YahooOhlcvRepository.java` — Interface: `saveAll(List<YahooOhlcvRecord>)`, `findBySymbol(String symbol, int days)`
+- `repository/SqliteYahooOhlcvRepository.java` — SQLite implementation with auto-schema init, batch upsert (`INSERT OR REPLACE`) on `UNIQUE(symbol, date)`, date-based range queries
+- `client/yahoo/YahooFinanceClientTest.java` — 12 tests: parsing, 429 handling, null body, malformed JSON, network errors, adjclose fallback
+- `repository/SqliteYahooOhlcvRepositoryTest.java` — 15 tests: CRUD, upsert, date filtering, case sensitivity, large volumes, error paths
+
+**Modified Files:**
+- `service/ApiRequestMeteringService.java` — Added Yahoo counter (`incrementYahooRequests()`, `getYahooRequestCount()`, file persistence at `config/yahoo-monthly-requests.txt`, reset, summary)
+- `service/ApiRequestMeteringServiceTest.java` — Updated all existing tests for 3-counter model, added Yahoo-specific test
+- `.gitignore` — Added `config/yahoo-monthly-requests.txt`
+
+**Design Decisions:**
+- Date stored as `TEXT` (`YYYY-MM-DD`) not epoch seconds — simplifies queries for daily OHLCV data
+- Yahoo response parsed with Jackson `JsonNode` tree walking (not DTOs) — Yahoo's nested JSON structure doesn't map cleanly to flat DTOs
+- Volume stored as `INTEGER` / `long` — can exceed int max
+- Adj close falls back to close if Yahoo doesn't provide it
+- Timestamps converted to `America/New_York` timezone for date extraction
+- No API key needed — Yahoo Finance chart API is public
+
 ### Partial EMA Calculation (April 11, 2026) ✅ COMPLETE
 Changed `EmaService` to calculate every EMA for which enough data exists, instead of requiring all 200 data points. With fewer than 200 data points, shorter EMAs are still computed (e.g., 53 data points → EMA 9, 21, 50; EMA 100/200 = NaN).
 
@@ -65,8 +89,9 @@ Added Exponential Moving Average (EMA) analysis with a once-per-day scheduled re
 - **`TelegramGateway` interface**: All Telegram-sending components inject the `TelegramGateway` interface, allowing profile-based switching between `TelegramClient` (production) and `LocalTelegramGateway` (dev)
 
 ## Next Steps
+- **VFI feature (PRD #244)**: Yahoo OHLCV data layer is complete. Remaining slices: VfiService calculation engine, CombinedSignalType enum, VfiTracker (combined RS+VFI hourly report), feature toggle, scheduler integration, DevDataSeeder extension, DevJobController endpoint
 - Consider extending delete-before-send pattern to other recurring reports (tail risk, sector rotation)
 - RSI + BB batched reporting pattern can be templated for future indicators
 - Consider MACD indicator as next quant feature (uses same EMA concepts from StatisticsUtil)
 - Consider combining Bollinger + RS + ROC + EMA signals for multi-signal confirmation alerts
-- Monitor API rate limits with tracked stocks + 20 ETFs across all tracking systems
+- Monitor API rate limits with tracked stocks + 20 ETFs across all tracking systems + Yahoo Finance calls

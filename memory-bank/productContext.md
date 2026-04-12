@@ -70,6 +70,7 @@ The bot runs continuously in the background, requiring no manual intervention wh
 | **Sector ETF Tracking** | Real-time + Daily | Finnhub | Telegram alerts + daily summary |
 | **Bollinger Band Analysis** | Hourly + Daily | Finnhub (SQLite) | Telegram alerts + daily report |
 | **EMA Classification** | Daily | Finnhub (SQLite) | Telegram report (green/yellow/red) |
+| **Yahoo OHLCV Storage** | On demand | Yahoo Finance | SQLite (foundation for VFI) |
 
 ## Tracked Sector & Thematic ETFs
 

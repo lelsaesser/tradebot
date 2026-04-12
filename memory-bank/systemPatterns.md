@@ -41,6 +41,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`FinnhubClient`:** Interacts with Finnhub API for stock prices and insider transactions.
 -   **`CoinGeckoClient`:** Interacts with CoinGecko API for cryptocurrency prices.
 -   **`FinvizClient`:** Web scraper using JSoup to fetch industry performance data from FinViz. No API key required.
+-   **`YahooFinanceClient`:** Fetches daily OHLCV data from Yahoo Finance chart API (`/v8/finance/chart/{SYMBOL}?range=6mo&interval=1d`). No API key required. Uses RestTemplate with User-Agent header. Parses nested JSON response with Jackson `JsonNode` tree walking. Handles HTTP 429 gracefully (log + return empty list). Metered via `ApiRequestMeteringService`.
 
 ## Data Persistence Components
 
@@ -51,6 +52,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`TelegramMessageTracker`:** Tracks last processed message ID to avoid duplicates.
 -   **`SqlitePriceQuoteRepository`:** SQLite-based storage for historical Finnhub price quotes.
 -   **`SqliteMomentumRocRepository`:** SQLite-based storage for momentum ROC state (previous ROC values for crossover detection).
+-   **`YahooOhlcvRepository` / `SqliteYahooOhlcvRepository`:** SQLite-based storage for Yahoo Finance daily OHLCV data in `yahoo_daily_ohlcv` table. Auto-schema init, batch upsert on `UNIQUE(symbol, date)`, date-range queries sorted by date ASC. Foundation for VFI indicator.
 -   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence and caching.
 
 ## Design Patterns
@@ -105,6 +107,8 @@ Scheduler
 │   └── PriceQuoteRepository.findBySymbol()
 ├── EmaTracker → EmaService + StockSymbolRegistry
 │   └── PriceQuoteRepository.findDailyClosingPrices()
+├── YahooFinanceClient → Yahoo Finance API (no auth, User-Agent header)
+│   └── SqliteYahooOhlcvRepository → SQLite DB (yahoo_daily_ohlcv)
 ├── StatisticsUtil (shared by SectorRotationAnalyzer, TailRiskService, BollingerBandService, EmaService)
 ├── InsiderTracker → InsiderPersistence → JSON file
 ├── SectorRotationTracker → FinvizClient → FinViz website

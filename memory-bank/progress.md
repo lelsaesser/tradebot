@@ -1,6 +1,40 @@
 # Progress Tracking
 
-## Latest Milestone: Partial EMA Calculation ✅ COMPLETE
+## Latest Milestone: Yahoo Finance Client + SQLite OHLCV Storage ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation Complete (April 12, 2026)
+
+#### Purpose
+Foundational data layer for VFI (Volume Flow Indicator) feature — issue #245 from parent PRD #244. Introduces Yahoo Finance as a new data source for daily OHLCV data (open, high, low, close, adjusted close, volume) stored in a dedicated SQLite table.
+
+#### New Components
+- `YahooOhlcvRecord` — Java record DTO for OHLCV data
+- `YahooFinanceClient` — HTTP client for Yahoo Finance chart API, RestTemplate + Jackson `JsonNode` tree parsing, graceful HTTP 429 handling, metered via `ApiRequestMeteringService`
+- `YahooOhlcvRepository` — Interface: `saveAll()`, `findBySymbol(symbol, days)`
+- `SqliteYahooOhlcvRepository` — SQLite implementation: auto-schema init, batch upsert on `UNIQUE(symbol, date)`, date-range queries
+
+#### Modified Components
+- `ApiRequestMeteringService` — Added Yahoo counter (`incrementYahooRequests()`, `getYahooRequestCount()`, file persistence, reset, summary)
+- `.gitignore` — Added `config/yahoo-monthly-requests.txt`
+
+#### Design Decisions
+- Date stored as `TEXT` (YYYY-MM-DD) not epoch — simplifies daily OHLCV queries
+- Yahoo JSON parsed with `JsonNode` tree walking — nested structure doesn't map to flat DTOs
+- Volume as `INTEGER`/`long` — can exceed int max
+- Adj close falls back to close when Yahoo doesn't provide it
+- Timestamps converted to `America/New_York` for date extraction
+
+#### Tests
+- `YahooFinanceClientTest` — 12 tests
+- `SqliteYahooOhlcvRepositoryTest` — 15 tests
+- `ApiRequestMeteringServiceTest` — updated for 3-counter model
+- All 852 tests pass, 97% coverage maintained
+
+---
+
+## Previous Milestone: Partial EMA Calculation ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -289,10 +323,11 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 ### Data Persistence ✅
 - JSON-based storage for target prices and configuration
 - SQLite database for historical price data
+- SQLite Yahoo Finance daily OHLCV data
 - SQLite momentum ROC state
 - Sector performance history (JSON)
 - Insider transaction history (JSON)
-- API request metering
+- API request metering (Finnhub, CoinGecko, Yahoo)
 - Feature toggles (JSON)
 - RS streak persistence (JSON)
 
@@ -327,7 +362,8 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 
 ## Future Enhancements
 
-### Statistical Enhancements (Future)
+### Statistical Enhancements (Future / In Progress)
+- **VFI (Volume Flow Indicator)** — next slices from PRD #244: VfiService calculation, combined RS+VFI hourly report, feature toggle, scheduler integration (Yahoo OHLCV data layer is complete)
 - MACD indicator (uses same EMA concepts)
 - Multi-signal confirmation alerts (Bollinger + RS + ROC)
 - Historical kurtosis/skewness tracking for trend detection
@@ -342,8 +378,8 @@ Statistical measure of fat tails in price distributions using excess kurtosis. N
 ## Deployment Status
 
 ### Ready for Deployment ✅
-- Date: April 11, 2026
+- Date: April 12, 2026
 - Version: 1.0-SNAPSHOT
 - Environment: Ready for production
 - Code coverage: 97%
-- Total tests: 813
+- Total tests: 852
