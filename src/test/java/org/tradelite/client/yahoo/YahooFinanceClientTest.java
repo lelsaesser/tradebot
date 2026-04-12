@@ -15,6 +15,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpEntity;
@@ -254,6 +255,46 @@ class YahooFinanceClientTest {
         List<YahooOhlcvRecord> records = client.parseResponse("AAPL", json);
 
         assertThat(records, is(empty()));
+    }
+
+    @Test
+    void fetchDailyOhlcv_withCustomRange_shouldUseCorrectUrl() {
+        String json = buildValidResponse();
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(json));
+
+        client.fetchDailyOhlcv("AAPL", "5d");
+
+        ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(restTemplate)
+                .exchange(
+                        urlCaptor.capture(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(String.class));
+        assertThat(urlCaptor.getValue(), containsString("range=5d"));
+        assertThat(urlCaptor.getValue(), containsString("AAPL"));
+    }
+
+    @Test
+    void fetchDailyOhlcv_defaultRange_shouldUse6mo() {
+        String json = buildValidResponse();
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(json));
+
+        client.fetchDailyOhlcv("MSFT");
+
+        ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(restTemplate)
+                .exchange(
+                        urlCaptor.capture(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(String.class));
+        assertThat(urlCaptor.getValue(), containsString("range=6mo"));
+        assertThat(urlCaptor.getValue(), containsString("MSFT"));
     }
 
     private String buildValidResponse() {

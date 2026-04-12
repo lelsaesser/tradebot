@@ -26,7 +26,7 @@ import org.tradelite.service.ApiRequestMeteringService;
 public class YahooFinanceClient {
 
     private static final String CHART_URL =
-            "https://query1.finance.yahoo.com/v8/finance/chart/%s?range=6mo&interval=1d";
+            "https://query1.finance.yahoo.com/v8/finance/chart/%s?range=%s&interval=1d";
 
     private static final String USER_AGENT =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
@@ -48,7 +48,23 @@ public class YahooFinanceClient {
     }
 
     public List<YahooOhlcvRecord> fetchDailyOhlcv(String symbol) {
-        String url = String.format(CHART_URL, symbol);
+        return fetchDailyOhlcv(symbol, "6mo");
+    }
+
+    /**
+     * Fetches daily OHLCV data from Yahoo Finance for the given symbol and time range.
+     *
+     * <p>Yahoo's chart API with {@code interval=1d} returns one bar per trading day. The {@code
+     * range} parameter controls how far back to look (e.g. "6mo" for 6 months of history, "5d" for
+     * the last 5 trading days).
+     *
+     * <p>Note on "5d" range: Yahoo's "1d" range returns intraday minute-level candles, not a single
+     * daily OHLCV bar. Using "5d" with {@code interval=1d} reliably returns the last ~5 daily bars
+     * including today's running bar. The extra 4 days are harmless — upsert ({@code INSERT OR
+     * REPLACE}) overwrites identical existing records.
+     */
+    public List<YahooOhlcvRecord> fetchDailyOhlcv(String symbol, String range) {
+        String url = String.format(CHART_URL, symbol, range);
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("User-Agent", USER_AGENT);

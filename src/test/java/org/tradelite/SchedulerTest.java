@@ -28,6 +28,7 @@ import org.tradelite.core.RsiPriceFetcher;
 import org.tradelite.core.SectorMomentumRocTracker;
 import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
+import org.tradelite.core.YahooOhlcvFetcher;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
 import org.tradelite.quant.TailRiskTracker;
@@ -54,6 +55,7 @@ class SchedulerTest {
     @Mock private BollingerBandTracker bollingerBandTracker;
     @Mock private RsiService rsiService;
     @Mock private EmaTracker emaTracker;
+    @Mock private YahooOhlcvFetcher yahooOhlcvFetcher;
 
     private Scheduler scheduler;
 
@@ -77,7 +79,8 @@ class SchedulerTest {
                         tailRiskTracker,
                         bollingerBandTracker,
                         rsiService,
-                        emaTracker);
+                        emaTracker,
+                        yahooOhlcvFetcher);
     }
 
     @Test
@@ -128,11 +131,11 @@ class SchedulerTest {
 
         scheduler.hourlySignalMonitoring();
 
-        // Called 2 times: bollingerBandTracker and rsiService
-        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
+        // Called 3 times: bollingerBandTracker, rsiService, yahooOhlcvFetcher
+        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).run(captor.capture());
+        verify(rootErrorHandler, times(3)).run(captor.capture());
 
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
@@ -140,10 +143,11 @@ class SchedulerTest {
 
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
         verify(rsiService, times(1)).sendRsiReport();
+        verify(yahooOhlcvFetcher, times(1)).fetchAndBackfillOhlcv();
     }
 
     @Test
-    void hourlySignalMonitoring_marketClosed_shouldNotRun() {
+    void hourlySignalMonitoring_marketClosed_shouldNotRun() throws Exception {
         // Saturday 11:00 AM NY time = market closed (weekend)
         scheduler.marketDateTime =
                 ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, ZoneId.of("America/New_York"));
@@ -153,6 +157,7 @@ class SchedulerTest {
         verify(rootErrorHandler, never()).run(any(ThrowingRunnable.class));
         verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
         verify(rsiService, never()).sendRsiReport();
+        verify(yahooOhlcvFetcher, never()).fetchAndBackfillOhlcv();
     }
 
     @Test
@@ -412,10 +417,10 @@ class SchedulerTest {
 
         boolean success = scheduler.manualHourlySignalMonitoring();
 
-        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(3)).runWithStatus(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).runWithStatus(captor.capture());
+        verify(rootErrorHandler, times(3)).runWithStatus(captor.capture());
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
         }
@@ -423,6 +428,7 @@ class SchedulerTest {
         assertTrue(success);
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
         verify(rsiService, times(1)).sendRsiReport();
+        verify(yahooOhlcvFetcher, times(1)).fetchAndBackfillOhlcv();
     }
 
     @Test
@@ -472,7 +478,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualWeeklyInsiderTradingReport_shouldRunAndReturnTrue() throws Exception {
+    void manualWeeklyInsiderTradingReport_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualWeeklyInsiderTradingReport();
@@ -483,7 +489,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailySectorRotationTracking_shouldRunAndReturnTrue() throws Exception {
+    void manualDailySectorRotationTracking_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualDailySectorRotationTracking();
@@ -494,7 +500,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailySectorRelativeStrengthReport_shouldRunAndReturnTrue() throws Exception {
+    void manualDailySectorRelativeStrengthReport_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualDailySectorRelativeStrengthReport();
@@ -505,7 +511,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailyTailRiskMonitoring_shouldRunAndReturnTrue() throws Exception {
+    void manualDailyTailRiskMonitoring_shouldRunAndReturnTrue() {
         stubRunWithStatus(true, true);
 
         boolean success = scheduler.manualDailyTailRiskMonitoring();
@@ -517,7 +523,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailyBollingerBandReport_shouldRunAndReturnTrue() throws Exception {
+    void manualDailyBollingerBandReport_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualDailyBollingerBandReport();
@@ -528,7 +534,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualMonthlyApiUsageReport_withRequestsShouldSendReportAndReset() throws Exception {
+    void manualMonthlyApiUsageReport_withRequestsShouldSendReportAndReset() {
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(10);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(5);
         when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2026-03");
@@ -543,7 +549,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualMonthlyApiUsageReport_withNoRequestsShouldStillResetCounters() throws Exception {
+    void manualMonthlyApiUsageReport_withNoRequestsShouldStillResetCounters() {
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
         stubRunWithStatus(true);
@@ -555,6 +561,27 @@ class SchedulerTest {
         verify(telegramClient, never()).sendMessage(anyString());
         verify(apiRequestMeteringService).resetCounters();
         verify(apiRequestMeteringService, never()).getPreviousMonth();
+    }
+
+    @Test
+    void manualYahooOhlcvFetch_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualYahooOhlcvFetch();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(yahooOhlcvFetcher).fetchAndBackfillOhlcv();
+    }
+
+    @Test
+    void manualYahooOhlcvFetch_failure_shouldReturnFalse() {
+        stubRunWithStatus(false);
+
+        boolean success = scheduler.manualYahooOhlcvFetch();
+
+        assertFalse(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
     }
 
     @Test
@@ -611,7 +638,7 @@ class SchedulerTest {
                         invocation -> {
                             ThrowingRunnable runnable = invocation.getArgument(0);
                             runnable.run();
-                            return remaining.isEmpty() ? true : remaining.remove();
+                            return remaining.isEmpty() || remaining.remove();
                         });
     }
 }

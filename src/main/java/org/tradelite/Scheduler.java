@@ -13,6 +13,7 @@ import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
+import org.tradelite.core.YahooOhlcvFetcher;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
 import org.tradelite.quant.TailRiskTracker;
@@ -41,6 +42,7 @@ public class Scheduler {
     private final BollingerBandTracker bollingerBandTracker;
     private final RsiService rsiService;
     private final EmaTracker emaTracker;
+    private final YahooOhlcvFetcher yahooOhlcvFetcher;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -62,7 +64,8 @@ public class Scheduler {
             TailRiskTracker tailRiskTracker,
             BollingerBandTracker bollingerBandTracker,
             RsiService rsiService,
-            EmaTracker emaTracker) {
+            EmaTracker emaTracker,
+            YahooOhlcvFetcher yahooOhlcvFetcher) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -80,6 +83,7 @@ public class Scheduler {
         this.bollingerBandTracker = bollingerBandTracker;
         this.rsiService = rsiService;
         this.emaTracker = emaTracker;
+        this.yahooOhlcvFetcher = yahooOhlcvFetcher;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -100,6 +104,7 @@ public class Scheduler {
         if (DateUtil.isStockMarketOpen(marketDateTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(rsiService::sendRsiReport);
+            rootErrorHandler.run(yahooOhlcvFetcher::fetchAndBackfillOhlcv);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping hourly signal monitoring.");
         }
@@ -235,6 +240,7 @@ public class Scheduler {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(bollingerBandTracker::analyzeAndSendAlerts);
         success &= rootErrorHandler.runWithStatus(rsiService::sendRsiReport);
+        success &= rootErrorHandler.runWithStatus(yahooOhlcvFetcher::fetchAndBackfillOhlcv);
         log.info("Manual hourly signal monitoring completed.");
         return success;
     }
@@ -292,6 +298,12 @@ public class Scheduler {
     public boolean manualDailyBollingerBandReport() {
         boolean success = rootErrorHandler.runWithStatus(bollingerBandTracker::sendDailyReport);
         log.info("Manual Bollinger Band report completed.");
+        return success;
+    }
+
+    public boolean manualYahooOhlcvFetch() {
+        boolean success = rootErrorHandler.runWithStatus(yahooOhlcvFetcher::fetchAndBackfillOhlcv);
+        log.info("Manual Yahoo OHLCV fetch completed.");
         return success;
     }
 

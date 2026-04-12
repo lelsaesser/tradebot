@@ -79,6 +79,11 @@ public class DevJobController {
         return runJob("monthly-api-usage", scheduler::manualMonthlyApiUsageReport);
     }
 
+    @PostMapping("/yahoo-ohlcv-fetch")
+    public ResponseEntity<Map<String, String>> yahooOhlcvFetch() {
+        return runJob("yahoo-ohlcv-fetch", scheduler::manualYahooOhlcvFetch);
+    }
+
     @PostMapping("/seed-analytics")
     public ResponseEntity<Map<String, String>> seedAnalytics() {
         return runJob(
