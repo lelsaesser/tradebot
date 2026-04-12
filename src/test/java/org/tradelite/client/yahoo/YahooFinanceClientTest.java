@@ -53,11 +53,11 @@ class YahooFinanceClientTest {
         List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL");
 
         assertThat(records, hasSize(2));
-        assertThat(records.get(0).symbol(), is("AAPL"));
-        assertThat(records.get(0).open(), is(closeTo(170.0, 0.01)));
-        assertThat(records.get(0).high(), is(closeTo(175.0, 0.01)));
-        assertThat(records.get(0).low(), is(closeTo(168.0, 0.01)));
-        assertThat(records.get(0).close(), is(closeTo(174.0, 0.01)));
+        assertThat(records.getFirst().symbol(), is("AAPL"));
+        assertThat(records.getFirst().open(), is(closeTo(170.0, 0.01)));
+        assertThat(records.getFirst().high(), is(closeTo(175.0, 0.01)));
+        assertThat(records.getFirst().low(), is(closeTo(168.0, 0.01)));
+        assertThat(records.getFirst().close(), is(closeTo(174.0, 0.01)));
         assertThat(records.get(0).adjClose(), is(closeTo(173.5, 0.01)));
         assertThat(records.get(0).volume(), is(50000000L));
 
