@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -282,5 +283,39 @@ class StockSymbolRegistryTest {
         assertTrue(stockSymbolRegistry.isEtf("smh"));
         assertTrue(stockSymbolRegistry.isEtf("Smh"));
         assertTrue(stockSymbolRegistry.isEtf("ura"));
+    }
+
+    @Test
+    void getAllTrackedSymbols_containsEtfsAndStocks() {
+        Set<String> symbols = stockSymbolRegistry.getAllTrackedSymbols();
+
+        // Should contain ETFs from SectorEtfRegistry
+        assertTrue(symbols.contains("XLK"));
+        assertTrue(symbols.contains("SMH"));
+        // Should contain individual stocks
+        assertTrue(symbols.contains("AAPL"));
+        assertTrue(symbols.contains("MSFT"));
+        // SPY is not in SectorEtfRegistry.allEtfs()
+        assertFalse(symbols.contains("SPY"));
+    }
+
+    @Test
+    void getAllTrackedSymbols_deduplicatesOverlappingSymbols() {
+        // If a stock symbol matches an ETF symbol, it should appear only once
+        Set<String> symbols = stockSymbolRegistry.getAllTrackedSymbols();
+
+        long xlkCount = symbols.stream().filter("XLK"::equals).count();
+        assertThat(xlkCount, is(1L));
+    }
+
+    @Test
+    void getAllTrackedSymbols_includesNewlyAddedSymbols() {
+        stockSymbolRegistry.addSymbol("ZZZTEST", "Test Company");
+
+        Set<String> symbols = stockSymbolRegistry.getAllTrackedSymbols();
+        assertTrue(symbols.contains("ZZZTEST"));
+
+        // Cleanup
+        stockSymbolRegistry.removeSymbol("ZZZTEST");
     }
 }

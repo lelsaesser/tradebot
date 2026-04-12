@@ -1,6 +1,5 @@
 package org.tradelite.core;
 
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -8,8 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.client.yahoo.dto.YahooOhlcvRecord;
-import org.tradelite.common.SectorEtfRegistry;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.YahooOhlcvRepository;
 import org.tradelite.service.StockSymbolRegistry;
 
@@ -61,7 +58,7 @@ public class YahooOhlcvFetcher {
      * only the last 5 days to update the current trading day's bar.
      */
     public void fetchAndBackfillOhlcv() throws InterruptedException {
-        Set<String> symbols = collectAllSymbols();
+        Set<String> symbols = stockSymbolRegistry.getAllTrackedSymbols();
         int backfilledCount = 0;
         int updatedCount = 0;
 
@@ -96,11 +93,5 @@ public class YahooOhlcvFetcher {
                 symbols.size(),
                 backfilledCount,
                 updatedCount);
-    }
-
-    Set<String> collectAllSymbols() {
-        Set<String> symbols = new LinkedHashSet<>(SectorEtfRegistry.allEtfs().keySet());
-        stockSymbolRegistry.getAll().stream().map(StockSymbol::getTicker).forEach(symbols::add);
-        return symbols;
     }
 }

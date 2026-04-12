@@ -1,7 +1,5 @@
 package org.tradelite.core;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.IntStream;
@@ -19,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.client.yahoo.dto.YahooOhlcvRecord;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.YahooOhlcvRepository;
 import org.tradelite.service.StockSymbolRegistry;
 
@@ -41,11 +39,8 @@ class YahooOhlcvFetcherTest {
 
     @Test
     void fetchAndBackfillOhlcv_emptyTable_shouldBackfillAllSymbols() throws Exception {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(
-                        List.of(
-                                new StockSymbol("AAPL", "Apple"),
-                                new StockSymbol("MSFT", "Microsoft")));
+        when(stockSymbolRegistry.getAllTrackedSymbols())
+                .thenReturn(new LinkedHashSet<>(Set.of("AAPL", "MSFT")));
         when(yahooOhlcvRepository.findBySymbol(anyString(), anyInt()))
                 .thenReturn(Collections.emptyList());
 
@@ -56,15 +51,15 @@ class YahooOhlcvFetcherTest {
 
         fetcher.fetchAndBackfillOhlcv();
 
-        // Both stocks + all ETFs should use 6mo range (backfill)
         verify(yahooFinanceClient, never()).fetchDailyOhlcv(anyString(), eq("5d"));
-        verify(yahooFinanceClient, atLeastOnce()).fetchDailyOhlcv(anyString(), eq("6mo"));
-        verify(yahooOhlcvRepository, atLeastOnce()).saveAll(backfillRecords);
+        verify(yahooFinanceClient, times(2)).fetchDailyOhlcv(anyString(), eq("6mo"));
+        verify(yahooOhlcvRepository, times(2)).saveAll(backfillRecords);
     }
 
     @Test
     void fetchAndBackfillOhlcv_sufficientData_shouldFetchRecentOnly() throws Exception {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
+        when(stockSymbolRegistry.getAllTrackedSymbols())
+                .thenReturn(new LinkedHashSet<>(Set.of("AAPL")));
 
         List<YahooOhlcvRecord> existingRecords = buildRecordList("AAPL", 135);
         when(yahooOhlcvRepository.findBySymbol(anyString(), anyInt())).thenReturn(existingRecords);
@@ -75,30 +70,21 @@ class YahooOhlcvFetcherTest {
         fetcher.fetchAndBackfillOhlcv();
 
         verify(yahooFinanceClient, never()).fetchDailyOhlcv(anyString(), eq("6mo"));
-        verify(yahooFinanceClient, atLeastOnce()).fetchDailyOhlcv(anyString(), eq("5d"));
-        verify(yahooOhlcvRepository, atLeastOnce()).saveAll(recentRecords);
+        verify(yahooFinanceClient, times(1)).fetchDailyOhlcv(anyString(), eq("5d"));
+        verify(yahooOhlcvRepository, times(1)).saveAll(recentRecords);
     }
 
     @Test
     void fetchAndBackfillOhlcv_mixedData_shouldBackfillOnlyInsufficient() throws Exception {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(
-                        List.of(
-                                new StockSymbol("AAPL", "Apple"),
-                                new StockSymbol("MSFT", "Microsoft")));
+        when(stockSymbolRegistry.getAllTrackedSymbols())
+                .thenReturn(new LinkedHashSet<>(List.of("AAPL", "MSFT")));
 
         List<YahooOhlcvRecord> sufficientRecords = buildRecordList("AAPL", 135);
         List<YahooOhlcvRecord> insufficientRecords = buildRecordList("MSFT", 50);
 
-        // AAPL has enough, MSFT doesn't — other ETFs will also need backfill
-        // We match by symbol to return the right list
         when(yahooOhlcvRepository.findBySymbol(eq("AAPL"), anyInt())).thenReturn(sufficientRecords);
         when(yahooOhlcvRepository.findBySymbol(eq("MSFT"), anyInt()))
                 .thenReturn(insufficientRecords);
-        // All ETFs return empty (need backfill)
-        when(yahooOhlcvRepository.findBySymbol(
-                        argThat(s -> !"AAPL".equals(s) && !"MSFT".equals(s)), anyInt()))
-                .thenReturn(Collections.emptyList());
 
         List<YahooOhlcvRecord> fetchedRecords = List.of(buildRecord("X", 1));
         when(yahooFinanceClient.fetchDailyOhlcv(anyString(), anyString()))
@@ -106,30 +92,14 @@ class YahooOhlcvFetcherTest {
 
         fetcher.fetchAndBackfillOhlcv();
 
-        // AAPL should use 5d range (sufficient data)
         verify(yahooFinanceClient).fetchDailyOhlcv("AAPL", "5d");
-        // MSFT should use 6mo range (insufficient data)
         verify(yahooFinanceClient).fetchDailyOhlcv("MSFT", "6mo");
     }
 
     @Test
-    void fetchAndBackfillOhlcv_deduplicatesEtfsFromStocks() throws Exception {
-        // XLK is both an ETF (in SectorEtfRegistry) and might appear in stock list
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("XLK", "Tech ETF")));
-        when(yahooOhlcvRepository.findBySymbol(anyString(), anyInt()))
-                .thenReturn(Collections.emptyList());
-        when(yahooFinanceClient.fetchDailyOhlcv(anyString(), anyString()))
-                .thenReturn(List.of(buildRecord("X", 1)));
-
-        fetcher.fetchAndBackfillOhlcv();
-
-        // XLK should only be fetched once, not twice
-        verify(yahooFinanceClient, times(1)).fetchDailyOhlcv(eq("XLK"), anyString());
-    }
-
-    @Test
     void fetchAndBackfillOhlcv_emptyYahooResponse_shouldSkipSave() throws Exception {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
+        when(stockSymbolRegistry.getAllTrackedSymbols())
+                .thenReturn(new LinkedHashSet<>(Set.of("AAPL")));
         when(yahooOhlcvRepository.findBySymbol(anyString(), anyInt()))
                 .thenReturn(Collections.emptyList());
         when(yahooFinanceClient.fetchDailyOhlcv(anyString(), anyString()))
@@ -142,7 +112,8 @@ class YahooOhlcvFetcherTest {
 
     @Test
     void fetchAndBackfillOhlcv_shouldSaveResults() throws Exception {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
+        when(stockSymbolRegistry.getAllTrackedSymbols())
+                .thenReturn(new LinkedHashSet<>(Set.of("AAPL")));
         when(yahooOhlcvRepository.findBySymbol(anyString(), anyInt()))
                 .thenReturn(Collections.emptyList());
 
@@ -152,35 +123,7 @@ class YahooOhlcvFetcherTest {
 
         fetcher.fetchAndBackfillOhlcv();
 
-        verify(yahooOhlcvRepository, atLeastOnce()).saveAll(records);
-    }
-
-    @Test
-    void collectAllSymbols_combinesEtfsAndStocks() {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(
-                        List.of(
-                                new StockSymbol("AAPL", "Apple"),
-                                new StockSymbol("MSFT", "Microsoft")));
-
-        Set<String> symbols = fetcher.collectAllSymbols();
-
-        // Should contain all ETFs from SectorEtfRegistry + AAPL + MSFT
-        assertThat(symbols.contains("AAPL"), is(true));
-        assertThat(symbols.contains("MSFT"), is(true));
-        assertThat(symbols.contains("XLK"), is(true)); // from SectorEtfRegistry
-        assertThat(symbols.contains("SPY"), is(false)); // SPY not in allEtfs()
-    }
-
-    @Test
-    void collectAllSymbols_deduplicatesOverlapping() {
-        // XLK is in SectorEtfRegistry.allEtfs() already
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("XLK", "Tech ETF")));
-
-        Set<String> symbols = fetcher.collectAllSymbols();
-
-        long xlkCount = symbols.stream().filter("XLK"::equals).count();
-        assertThat(xlkCount, is(1L));
+        verify(yahooOhlcvRepository).saveAll(records);
     }
 
     private YahooOhlcvRecord buildRecord(String symbol, int dayOffset) {

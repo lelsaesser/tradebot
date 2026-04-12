@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -16,6 +17,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 
 @Slf4j
@@ -72,6 +74,13 @@ public class StockSymbolRegistry {
             return false;
         }
         return ETF_SYMBOLS.contains(ticker.toUpperCase());
+    }
+
+    /** Returns all tracked symbols: sector/thematic ETFs + individual stocks, deduplicated. */
+    public Set<String> getAllTrackedSymbols() {
+        Set<String> symbols = new LinkedHashSet<>(SectorEtfRegistry.allEtfs().keySet());
+        stockSymbols.stream().map(StockSymbolEntry::getTicker).forEach(symbols::add);
+        return symbols;
     }
 
     public synchronized boolean addSymbol(String ticker, String displayName) {
