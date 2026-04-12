@@ -194,7 +194,7 @@ public class Scheduler {
         log.info("Monthly API usage report completed.");
     }
 
-    private void doMonthlyApiUsageReport() throws Exception {
+    private void doMonthlyApiUsageReport() {
         int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
         int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
 
