@@ -47,10 +47,6 @@ public class YahooFinanceClient {
         this.meteringService = meteringService;
     }
 
-    public List<YahooOhlcvRecord> fetchDailyOhlcv(String symbol) {
-        return fetchDailyOhlcv(symbol, "6mo");
-    }
-
     /**
      * Fetches daily OHLCV data from Yahoo Finance for the given symbol and time range.
      *

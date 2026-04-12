@@ -51,7 +51,7 @@ class YahooFinanceClientTest {
                         anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(json));
 
-        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL");
+        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL", "6mo");
 
         assertThat(records, hasSize(2));
         assertThat(records.getFirst().symbol(), is("AAPL"));
@@ -79,7 +79,7 @@ class YahooFinanceClientTest {
                                 new byte[0],
                                 null));
 
-        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL");
+        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL", "6mo");
 
         assertThat(records, is(empty()));
         verify(meteringService).incrementYahooRequests();
@@ -91,7 +91,7 @@ class YahooFinanceClientTest {
                         anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenThrow(new RestClientException("Connection refused"));
 
-        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL");
+        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL", "6mo");
 
         assertThat(records, is(empty()));
         verify(meteringService).incrementYahooRequests();
@@ -103,7 +103,7 @@ class YahooFinanceClientTest {
                         anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(null));
 
-        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL");
+        List<YahooOhlcvRecord> records = client.fetchDailyOhlcv("AAPL", "6mo");
 
         assertThat(records, is(empty()));
     }
@@ -275,26 +275,6 @@ class YahooFinanceClientTest {
                         eq(String.class));
         assertThat(urlCaptor.getValue(), containsString("range=5d"));
         assertThat(urlCaptor.getValue(), containsString("AAPL"));
-    }
-
-    @Test
-    void fetchDailyOhlcv_defaultRange_shouldUse6mo() {
-        String json = buildValidResponse();
-        when(restTemplate.exchange(
-                        anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
-                .thenReturn(ResponseEntity.ok(json));
-
-        client.fetchDailyOhlcv("MSFT");
-
-        ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(restTemplate)
-                .exchange(
-                        urlCaptor.capture(),
-                        eq(HttpMethod.GET),
-                        any(HttpEntity.class),
-                        eq(String.class));
-        assertThat(urlCaptor.getValue(), containsString("range=6mo"));
-        assertThat(urlCaptor.getValue(), containsString("MSFT"));
     }
 
     private String buildValidResponse() {
