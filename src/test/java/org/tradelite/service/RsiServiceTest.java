@@ -27,7 +27,7 @@ import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
-@SpringBootTest
+@SpringBootTest(properties = "metering.counter-dir=${java.io.tmpdir}/tradebot-test-counters")
 class RsiServiceTest {
 
     @MockitoBean private TelegramGateway telegramClient;

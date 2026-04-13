@@ -25,7 +25,7 @@ class ApiRequestMeteringServiceTest {
         Path configDir = Paths.get("config");
         Files.deleteIfExists(configDir.resolve("finnhub-monthly-requests.txt"));
         Files.deleteIfExists(configDir.resolve("coingecko-monthly-requests.txt"));
-        Files.deleteIfExists(configDir.resolve("yahoo-monthly-requests.txt"));
+        Files.deleteIfExists(configDir.resolve("twelvedata-monthly-requests.txt"));
     }
 
     @BeforeEach
@@ -62,14 +62,14 @@ class ApiRequestMeteringServiceTest {
     }
 
     @Test
-    void testIncrementYahooRequests() {
-        assertEquals(0, meteringService.getYahooRequestCount());
+    void testIncrementTwelveDataRequests() {
+        assertEquals(0, meteringService.getTwelveDataRequestCount());
 
-        meteringService.incrementYahooRequests();
-        assertEquals(1, meteringService.getYahooRequestCount());
+        meteringService.incrementTwelveDataRequests();
+        assertEquals(1, meteringService.getTwelveDataRequestCount());
 
-        meteringService.incrementYahooRequests();
-        assertEquals(2, meteringService.getYahooRequestCount());
+        meteringService.incrementTwelveDataRequests();
+        assertEquals(2, meteringService.getTwelveDataRequestCount());
     }
 
     @Test
@@ -81,15 +81,15 @@ class ApiRequestMeteringServiceTest {
         // Increment CoinGecko
         meteringService.incrementCoingeckoRequests();
 
-        // Increment Yahoo
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
+        // Increment TwelveData
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
 
         // Verify they are independent
         assertEquals(2, meteringService.getFinnhubRequestCount());
         assertEquals(1, meteringService.getCoingeckoRequestCount());
-        assertEquals(3, meteringService.getYahooRequestCount());
+        assertEquals(3, meteringService.getTwelveDataRequestCount());
     }
 
     @Test
@@ -101,31 +101,31 @@ class ApiRequestMeteringServiceTest {
         meteringService.incrementFinnhubRequests();
         meteringService.incrementCoingeckoRequests();
         meteringService.incrementCoingeckoRequests();
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
 
         // Check that files are created
         Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
         Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-        Path yahooFile = configDir.resolve("yahoo-monthly-requests.txt");
+        Path twelvedataFile = configDir.resolve("twelvedata-monthly-requests.txt");
 
         assertTrue(Files.exists(finnhubFile));
         assertTrue(Files.exists(coingeckoFile));
-        assertTrue(Files.exists(yahooFile));
+        assertTrue(Files.exists(twelvedataFile));
 
         // Check file contents
         String finnhubContent = Files.readString(finnhubFile);
         String coingeckoContent = Files.readString(coingeckoFile);
-        String yahooContent = Files.readString(yahooFile);
+        String twelvedataContent = Files.readString(twelvedataFile);
 
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
         assertTrue(finnhubContent.contains("Month: " + currentMonth));
         assertTrue(finnhubContent.contains("Count: 1"));
         assertTrue(coingeckoContent.contains("Month: " + currentMonth));
         assertTrue(coingeckoContent.contains("Count: 2"));
-        assertTrue(yahooContent.contains("Month: " + currentMonth));
-        assertTrue(yahooContent.contains("Count: 3"));
+        assertTrue(twelvedataContent.contains("Month: " + currentMonth));
+        assertTrue(twelvedataContent.contains("Count: 3"));
     }
 
     @Test
@@ -133,9 +133,9 @@ class ApiRequestMeteringServiceTest {
         meteringService.incrementFinnhubRequests();
         meteringService.incrementFinnhubRequests();
         meteringService.incrementCoingeckoRequests();
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
 
         String summary = meteringService.getRequestCountSummary();
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
@@ -143,7 +143,7 @@ class ApiRequestMeteringServiceTest {
         assertTrue(summary.contains(currentMonth));
         assertTrue(summary.contains("Finnhub: 2"));
         assertTrue(summary.contains("CoinGecko: 1"));
-        assertTrue(summary.contains("Yahoo: 3"));
+        assertTrue(summary.contains("TwelveData: 3"));
     }
 
     @Test
@@ -156,7 +156,7 @@ class ApiRequestMeteringServiceTest {
         // Create existing files with some counts
         Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
         Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-        Path yahooFile = configDir.resolve("yahoo-monthly-requests.txt");
+        Path twelvedataFile = configDir.resolve("twelvedata-monthly-requests.txt");
 
         String finnhubContent =
                 String.format(
@@ -166,14 +166,14 @@ class ApiRequestMeteringServiceTest {
                 String.format(
                         "Month: %s%nCount: 3%nLast Updated: %s%n",
                         currentMonth, LocalDateTime.now());
-        String yahooContent =
+        String twelvedataContent =
                 String.format(
                         "Month: %s%nCount: 7%nLast Updated: %s%n",
                         currentMonth, LocalDateTime.now());
 
         Files.writeString(finnhubFile, finnhubContent);
         Files.writeString(coingeckoFile, coingeckoContent);
-        Files.writeString(yahooFile, yahooContent);
+        Files.writeString(twelvedataFile, twelvedataContent);
 
         // Create new service instance (should read from files)
         ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
@@ -181,7 +181,7 @@ class ApiRequestMeteringServiceTest {
         // Verify it loaded the counts from files
         assertEquals(5, newService.getFinnhubRequestCount());
         assertEquals(3, newService.getCoingeckoRequestCount());
-        assertEquals(7, newService.getYahooRequestCount());
+        assertEquals(7, newService.getTwelveDataRequestCount());
     }
 
     @Test
@@ -254,10 +254,10 @@ class ApiRequestMeteringServiceTest {
         if (Files.exists(configDir)) {
             Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
             Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-            Path yahooFile = configDir.resolve("yahoo-monthly-requests.txt");
+            Path twelvedataFile = configDir.resolve("twelvedata-monthly-requests.txt");
             Files.deleteIfExists(finnhubFile);
             Files.deleteIfExists(coingeckoFile);
-            Files.deleteIfExists(yahooFile);
+            Files.deleteIfExists(twelvedataFile);
         }
 
         // Test with the default counter directory
@@ -266,21 +266,21 @@ class ApiRequestMeteringServiceTest {
         // Should start with 0 counts
         assertEquals(0, defaultService.getFinnhubRequestCount());
         assertEquals(0, defaultService.getCoingeckoRequestCount());
-        assertEquals(0, defaultService.getYahooRequestCount());
+        assertEquals(0, defaultService.getTwelveDataRequestCount());
 
         // Should be able to increment
         defaultService.incrementFinnhubRequests();
         defaultService.incrementCoingeckoRequests();
-        defaultService.incrementYahooRequests();
+        defaultService.incrementTwelveDataRequests();
 
         assertEquals(1, defaultService.getFinnhubRequestCount());
         assertEquals(1, defaultService.getCoingeckoRequestCount());
-        assertEquals(1, defaultService.getYahooRequestCount());
+        assertEquals(1, defaultService.getTwelveDataRequestCount());
 
         // Clean up after test
         Files.deleteIfExists(configDir.resolve("finnhub-monthly-requests.txt"));
         Files.deleteIfExists(configDir.resolve("coingecko-monthly-requests.txt"));
-        Files.deleteIfExists(configDir.resolve("yahoo-monthly-requests.txt"));
+        Files.deleteIfExists(configDir.resolve("twelvedata-monthly-requests.txt"));
     }
 
     @Test
@@ -301,7 +301,7 @@ class ApiRequestMeteringServiceTest {
                                     } else if (threadIndex % 3 == 1) {
                                         meteringService.incrementCoingeckoRequests();
                                     } else {
-                                        meteringService.incrementYahooRequests();
+                                        meteringService.incrementTwelveDataRequests();
                                     }
                                 }
                             });
@@ -320,11 +320,11 @@ class ApiRequestMeteringServiceTest {
         // Verify final counts
         int expectedFinnhubCount = (numThreads / 3) * incrementsPerThread;
         int expectedCoingeckoCount = (numThreads / 3) * incrementsPerThread;
-        int expectedYahooCount = (numThreads / 3) * incrementsPerThread;
+        int expectedTwelveDataCount = (numThreads / 3) * incrementsPerThread;
 
         assertEquals(expectedFinnhubCount, meteringService.getFinnhubRequestCount());
         assertEquals(expectedCoingeckoCount, meteringService.getCoingeckoRequestCount());
-        assertEquals(expectedYahooCount, meteringService.getYahooRequestCount());
+        assertEquals(expectedTwelveDataCount, meteringService.getTwelveDataRequestCount());
     }
 
     @Test
@@ -390,13 +390,13 @@ class ApiRequestMeteringServiceTest {
         meteringService.incrementFinnhubRequests();
         meteringService.incrementFinnhubRequests();
         meteringService.incrementCoingeckoRequests();
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
-        meteringService.incrementYahooRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementTwelveDataRequests();
 
         assertEquals(2, meteringService.getFinnhubRequestCount());
         assertEquals(1, meteringService.getCoingeckoRequestCount());
-        assertEquals(3, meteringService.getYahooRequestCount());
+        assertEquals(3, meteringService.getTwelveDataRequestCount());
 
         // Reset counters
         meteringService.resetCounters();
@@ -404,7 +404,7 @@ class ApiRequestMeteringServiceTest {
         // Verify counters are reset
         assertEquals(0, meteringService.getFinnhubRequestCount());
         assertEquals(0, meteringService.getCoingeckoRequestCount());
-        assertEquals(0, meteringService.getYahooRequestCount());
+        assertEquals(0, meteringService.getTwelveDataRequestCount());
     }
 
     @Test

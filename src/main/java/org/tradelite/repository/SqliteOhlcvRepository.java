@@ -12,16 +12,16 @@ import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
-import org.tradelite.client.yahoo.dto.YahooOhlcvRecord;
+import org.tradelite.common.OhlcvRecord;
 
 @Slf4j
 @Repository
-public class SqliteYahooOhlcvRepository implements YahooOhlcvRepository {
+public class SqliteOhlcvRepository implements OhlcvRepository {
 
     private final DataSource dataSource;
 
     @Autowired
-    public SqliteYahooOhlcvRepository(DataSource dataSource) {
+    public SqliteOhlcvRepository(DataSource dataSource) {
         this.dataSource = dataSource;
         initializeSchema();
     }
@@ -29,80 +29,78 @@ public class SqliteYahooOhlcvRepository implements YahooOhlcvRepository {
     private void initializeSchema() {
         String createTableSql =
                 """
-                CREATE TABLE IF NOT EXISTS yahoo_daily_ohlcv (
+                CREATE TABLE IF NOT EXISTS twelvedata_daily_ohlcv (
                     symbol TEXT NOT NULL,
                     date TEXT NOT NULL,
                     open REAL NOT NULL,
                     high REAL NOT NULL,
                     low REAL NOT NULL,
                     close REAL NOT NULL,
-                    adj_close REAL NOT NULL,
                     volume INTEGER NOT NULL,
                     UNIQUE(symbol, date)
                 )
                 """;
 
         String createSymbolIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_yahoo_daily_ohlcv_symbol"
-                        + " ON yahoo_daily_ohlcv(symbol)";
+                "CREATE INDEX IF NOT EXISTS idx_twelvedata_daily_ohlcv_symbol"
+                        + " ON twelvedata_daily_ohlcv(symbol)";
 
         String createCompositeIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_yahoo_daily_ohlcv_symbol_date"
-                        + " ON yahoo_daily_ohlcv(symbol, date)";
+                "CREATE INDEX IF NOT EXISTS idx_twelvedata_daily_ohlcv_symbol_date"
+                        + " ON twelvedata_daily_ohlcv(symbol, date)";
 
         try (Connection conn = dataSource.getConnection();
                 Statement stmt = conn.createStatement()) {
             stmt.execute(createTableSql);
             stmt.execute(createSymbolIndexSql);
             stmt.execute(createCompositeIndexSql);
-            log.info("SQLite yahoo_daily_ohlcv table and indexes initialized successfully");
+            log.info("SQLite twelvedata_daily_ohlcv table and indexes initialized successfully");
         } catch (SQLException e) {
-            log.error("Failed to initialize SQLite yahoo_daily_ohlcv schema", e);
+            log.error("Failed to initialize SQLite twelvedata_daily_ohlcv schema", e);
             throw new IllegalStateException("Failed to initialize SQLite schema", e);
         }
     }
 
     @Override
-    public void saveAll(List<YahooOhlcvRecord> records) {
+    public void saveAll(List<OhlcvRecord> records) {
         String sql =
                 """
-                INSERT OR REPLACE INTO yahoo_daily_ohlcv
-                (symbol, date, open, high, low, close, adj_close, volume)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO twelvedata_daily_ohlcv
+                (symbol, date, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """;
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            for (YahooOhlcvRecord ohlcv : records) {
+            for (OhlcvRecord ohlcv : records) {
                 pstmt.setString(1, ohlcv.symbol());
                 pstmt.setString(2, ohlcv.date().toString());
                 pstmt.setDouble(3, ohlcv.open());
                 pstmt.setDouble(4, ohlcv.high());
                 pstmt.setDouble(5, ohlcv.low());
                 pstmt.setDouble(6, ohlcv.close());
-                pstmt.setDouble(7, ohlcv.adjClose());
-                pstmt.setLong(8, ohlcv.volume());
+                pstmt.setLong(7, ohlcv.volume());
                 pstmt.addBatch();
             }
             pstmt.executeBatch();
-            log.debug("Saved {} Yahoo OHLCV records", records.size());
+            log.debug("Saved {} OHLCV records", records.size());
         } catch (SQLException e) {
-            log.error("Failed to save Yahoo OHLCV records", e);
-            throw new IllegalStateException("Failed to save Yahoo OHLCV records", e);
+            log.error("Failed to save OHLCV records", e);
+            throw new IllegalStateException("Failed to save OHLCV records", e);
         }
     }
 
     @Override
-    public List<YahooOhlcvRecord> findBySymbol(String symbol, int days) {
+    public List<OhlcvRecord> findBySymbol(String symbol, int days) {
         String sql =
                 """
-                SELECT symbol, date, open, high, low, close, adj_close, volume
-                FROM yahoo_daily_ohlcv
+                SELECT symbol, date, open, high, low, close, volume
+                FROM twelvedata_daily_ohlcv
                 WHERE symbol = ? AND date >= date('now', ?)
                 ORDER BY date ASC
                 """;
 
-        List<YahooOhlcvRecord> results = new ArrayList<>();
+        List<OhlcvRecord> results = new ArrayList<>();
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, symbol);
@@ -113,25 +111,20 @@ public class SqliteYahooOhlcvRepository implements YahooOhlcvRepository {
                 }
             }
         } catch (SQLException e) {
-            log.error(
-                    "Failed to find Yahoo OHLCV records for symbol {} over {} days",
-                    symbol,
-                    days,
-                    e);
-            throw new IllegalStateException("Failed to find Yahoo OHLCV records", e);
+            log.error("Failed to find OHLCV records for symbol {} over {} days", symbol, days, e);
+            throw new IllegalStateException("Failed to find OHLCV records", e);
         }
         return results;
     }
 
-    private YahooOhlcvRecord mapResultSetToRecord(ResultSet rs) throws SQLException {
-        return new YahooOhlcvRecord(
+    private OhlcvRecord mapResultSetToRecord(ResultSet rs) throws SQLException {
+        return new OhlcvRecord(
                 rs.getString("symbol"),
                 LocalDate.parse(rs.getString("date")),
                 rs.getDouble("open"),
                 rs.getDouble("high"),
                 rs.getDouble("low"),
                 rs.getDouble("close"),
-                rs.getDouble("adj_close"),
                 rs.getLong("volume"));
     }
 }

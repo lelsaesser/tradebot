@@ -29,7 +29,7 @@ import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
-@SpringBootTest
+@SpringBootTest(properties = "metering.counter-dir=${java.io.tmpdir}/tradebot-test-counters")
 class RelativeStrengthServiceTest {
 
     @MockitoBean private TelegramGateway telegramClient;
