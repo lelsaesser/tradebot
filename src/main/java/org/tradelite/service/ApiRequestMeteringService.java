@@ -18,12 +18,12 @@ public class ApiRequestMeteringService {
     private static final String DEFAULT_COUNTER_DIR = "config";
     private static final String FINNHUB_COUNTER_FILE = "finnhub-monthly-requests.txt";
     private static final String COINGECKO_COUNTER_FILE = "coingecko-monthly-requests.txt";
-    private static final String YAHOO_COUNTER_FILE = "yahoo-monthly-requests.txt";
+    private static final String TWELVEDATA_COUNTER_FILE = "twelvedata-monthly-requests.txt";
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final AtomicInteger finnhubCounter = new AtomicInteger(0);
     private final AtomicInteger coingeckoCounter = new AtomicInteger(0);
-    private final AtomicInteger yahooCounter = new AtomicInteger(0);
+    private final AtomicInteger twelveDataCounter = new AtomicInteger(0);
     private final String currentMonth;
     private final String counterDir;
 
@@ -46,10 +46,10 @@ public class ApiRequestMeteringService {
         persistCounter(COINGECKO_COUNTER_FILE, newCount);
     }
 
-    public void incrementYahooRequests() {
-        int newCount = yahooCounter.incrementAndGet();
-        log.info("Yahoo API request count for {}: {}", currentMonth, newCount);
-        persistCounter(YAHOO_COUNTER_FILE, newCount);
+    public void incrementTwelveDataRequests() {
+        int newCount = twelveDataCounter.incrementAndGet();
+        log.info("TwelveData API request count for {}: {}", currentMonth, newCount);
+        persistCounter(TWELVEDATA_COUNTER_FILE, newCount);
     }
 
     public int getFinnhubRequestCount() {
@@ -60,8 +60,8 @@ public class ApiRequestMeteringService {
         return coingeckoCounter.get();
     }
 
-    public int getYahooRequestCount() {
-        return yahooCounter.get();
+    public int getTwelveDataRequestCount() {
+        return twelveDataCounter.get();
     }
 
     /** Get the current month in YYYY-MM format */
@@ -76,18 +76,21 @@ public class ApiRequestMeteringService {
 
     public String getRequestCountSummary() {
         return String.format(
-                "API Request Counts for %s - Finnhub: %d, CoinGecko: %d, Yahoo: %d",
-                currentMonth, finnhubCounter.get(), coingeckoCounter.get(), yahooCounter.get());
+                "API Request Counts for %s - Finnhub: %d, CoinGecko: %d, TwelveData: %d",
+                currentMonth,
+                finnhubCounter.get(),
+                coingeckoCounter.get(),
+                twelveDataCounter.get());
     }
 
     public void resetCounters() {
         log.info("Resetting counters for month: {}", currentMonth);
         finnhubCounter.set(0);
         coingeckoCounter.set(0);
-        yahooCounter.set(0);
+        twelveDataCounter.set(0);
         persistCounter(FINNHUB_COUNTER_FILE, 0);
         persistCounter(COINGECKO_COUNTER_FILE, 0);
-        persistCounter(YAHOO_COUNTER_FILE, 0);
+        persistCounter(TWELVEDATA_COUNTER_FILE, 0);
         log.info("Counters reset successfully");
     }
 
@@ -107,9 +110,9 @@ public class ApiRequestMeteringService {
             coingeckoCounter.set(coingeckoCount);
             log.info("Initialized CoinGecko counter for {}: {}", currentMonth, coingeckoCount);
 
-            int yahooCount = readCounterFromFile(YAHOO_COUNTER_FILE);
-            yahooCounter.set(yahooCount);
-            log.info("Initialized Yahoo counter for {}: {}", currentMonth, yahooCount);
+            int twelveDataCount = readCounterFromFile(TWELVEDATA_COUNTER_FILE);
+            twelveDataCounter.set(twelveDataCount);
+            log.info("Initialized TwelveData counter for {}: {}", currentMonth, twelveDataCount);
 
         } catch (IOException e) {
             log.error("Failed to initialize counters", e);

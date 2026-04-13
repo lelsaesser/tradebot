@@ -1,13 +1,12 @@
-package org.tradelite.client.yahoo.dto;
+package org.tradelite.common;
 
 import java.time.LocalDate;
 
-public record YahooOhlcvRecord(
+public record OhlcvRecord(
         String symbol,
         LocalDate date,
         double open,
         double high,
         double low,
         double close,
-        double adjClose,
         long volume) {}
