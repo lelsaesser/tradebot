@@ -27,7 +27,7 @@ public class VfiService {
         List<OhlcvRecord> records = ohlcvRepository.findBySymbol(symbol, LOOKBACK_CALENDAR_DAYS);
 
         if (records.size() < VfiAnalysis.MIN_DATA_POINTS) {
-            log.debug(
+            log.info(
                     "Insufficient OHLCV data for VFI calculation for {}: {} records (need {})",
                     symbol,
                     records.size(),
