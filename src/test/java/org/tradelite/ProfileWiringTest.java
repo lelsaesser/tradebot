@@ -19,6 +19,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.config.TradebotTelegramProperties;
 import org.tradelite.repository.MomentumRocRepository;
+import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 import org.tradelite.service.StockSymbolRegistry;
@@ -121,6 +122,11 @@ class ProfileWiringTest {
         @Bean
         StockSymbolRegistry stockSymbolRegistry() {
             return mock(StockSymbolRegistry.class);
+        }
+
+        @Bean
+        OhlcvRepository ohlcvRepository() {
+            return mock(OhlcvRepository.class);
         }
     }
 }

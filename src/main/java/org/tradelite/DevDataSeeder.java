@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,12 +22,14 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
+import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 import org.tradelite.service.StockSymbolRegistry;
@@ -41,9 +44,11 @@ import org.tradelite.service.model.RsiDailyClosePrice;
 public class DevDataSeeder implements ApplicationRunner {
 
     private static final int LOOKBACK_DAYS = 90;
+    private static final int OHLCV_LOOKBACK_DAYS = 200;
     private static final int SAMPLE_STOCK_LIMIT = 5;
     private static final String QUOTES_TABLE = "finnhub_price_quotes";
     private static final String MOMENTUM_TABLE = "momentum_roc_state";
+    private static final String OHLCV_TABLE = "twelvedata_daily_ohlcv";
     private static final LocalTime SEEDED_CLOSE_TIME = LocalTime.of(20, 0);
 
     private final DataSource dataSource;
@@ -53,6 +58,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final RelativeStrengthService relativeStrengthService;
     private final TargetPriceProvider targetPriceProvider;
     private final StockSymbolRegistry stockSymbolRegistry;
+    private final OhlcvRepository ohlcvRepository;
     private final Path rsiDataFilePath;
     private final Path rsDataFilePath;
 
@@ -64,7 +70,8 @@ public class DevDataSeeder implements ApplicationRunner {
             RsiService rsiService,
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
-            StockSymbolRegistry stockSymbolRegistry) {
+            StockSymbolRegistry stockSymbolRegistry,
+            OhlcvRepository ohlcvRepository) {
         this(
                 dataSource,
                 objectMapper,
@@ -73,6 +80,7 @@ public class DevDataSeeder implements ApplicationRunner {
                 relativeStrengthService,
                 targetPriceProvider,
                 stockSymbolRegistry,
+                ohlcvRepository,
                 Path.of("config/rsi-data.json"),
                 Path.of("config/rs-data.json"));
     }
@@ -85,6 +93,7 @@ public class DevDataSeeder implements ApplicationRunner {
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
             StockSymbolRegistry stockSymbolRegistry,
+            OhlcvRepository ohlcvRepository,
             Path rsiDataFilePath,
             Path rsDataFilePath) {
         this.dataSource = dataSource;
@@ -94,6 +103,7 @@ public class DevDataSeeder implements ApplicationRunner {
         this.relativeStrengthService = relativeStrengthService;
         this.targetPriceProvider = targetPriceProvider;
         this.stockSymbolRegistry = stockSymbolRegistry;
+        this.ohlcvRepository = ohlcvRepository;
         this.rsiDataFilePath = rsiDataFilePath;
         this.rsDataFilePath = rsDataFilePath;
     }
@@ -123,6 +133,7 @@ public class DevDataSeeder implements ApplicationRunner {
             seedRsiHistory(bundle);
             seedRelativeStrengthHistory(bundle);
             seedMomentumState(bundle);
+            seedOhlcvData(bundle);
             log.info(
                     "Seeded dev analytics data for {} symbols",
                     bundle.priceSeriesBySymbol().size());
@@ -146,7 +157,7 @@ public class DevDataSeeder implements ApplicationRunner {
             try (var resultSet = statement.executeQuery()) {
                 return resultSet.next() && resultSet.getInt(1) > 0;
             }
-        } catch (SQLException e) {
+        } catch (SQLException _) {
             return false;
         }
     }
@@ -180,6 +191,19 @@ public class DevDataSeeder implements ApplicationRunner {
                         updated_at INTEGER NOT NULL
                     )
                     """);
+            statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS twelvedata_daily_ohlcv (
+                        symbol TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        open REAL,
+                        high REAL,
+                        low REAL,
+                        close REAL,
+                        volume INTEGER,
+                        UNIQUE(symbol, date)
+                    )
+                    """);
         }
     }
 
@@ -188,6 +212,7 @@ public class DevDataSeeder implements ApplicationRunner {
                 Statement statement = connection.createStatement()) {
             statement.executeUpdate("DELETE FROM " + QUOTES_TABLE);
             statement.executeUpdate("DELETE FROM " + MOMENTUM_TABLE);
+            statement.executeUpdate("DELETE FROM " + OHLCV_TABLE);
         }
 
         Files.deleteIfExists(rsiDataFilePath);
@@ -405,6 +430,54 @@ public class DevDataSeeder implements ApplicationRunner {
             momentumRocData.setInitialized(true);
             momentumRocRepository.save(symbol, momentumRocData);
         }
+    }
+
+    private void seedOhlcvData(SeedBundle bundle) {
+        for (Map.Entry<String, String> entry : bundle.displayNamesBySymbol().entrySet()) {
+            String symbol = entry.getKey();
+            List<OhlcvRecord> records = buildOhlcvSeries(symbol);
+            ohlcvRepository.saveAll(records);
+        }
+        log.info(
+                "Seeded OHLCV data for {} symbols ({} days each)",
+                bundle.displayNamesBySymbol().size(),
+                OHLCV_LOOKBACK_DAYS);
+    }
+
+    private List<OhlcvRecord> buildOhlcvSeries(String symbol) {
+        int hash = Math.abs(symbol.hashCode());
+        double basePrice = 80.0 + (hash % 120);
+        double dailySlope = ((hash % 11) - 5) * 0.18;
+        double amplitude = 3.0 + (hash % 7);
+        double phase = (hash % 13) / 3.0;
+        long baseVolume = 1_000_000L + (hash % 49_000_000);
+
+        List<OhlcvRecord> records = new ArrayList<>(OHLCV_LOOKBACK_DAYS);
+        double previousClose = 0;
+
+        for (int i = 0; i < OHLCV_LOOKBACK_DAYS; i++) {
+            LocalDate date = LocalDate.now().minusDays(OHLCV_LOOKBACK_DAYS - 1L - i);
+            double seasonal =
+                    Math.sin((i + phase) / 5.0) * amplitude
+                            + Math.cos((i + phase) / 11.0) * (amplitude / 2.0);
+            double close =
+                    StatisticsUtil.roundTo2Decimals(
+                            Math.max(15.0, basePrice + (i * dailySlope) + seasonal));
+
+            double open =
+                    i == 0
+                            ? StatisticsUtil.roundTo2Decimals(close * 0.995)
+                            : StatisticsUtil.roundTo2Decimals((close + previousClose) / 2.0);
+            double high = StatisticsUtil.roundTo2Decimals(Math.max(open, close) * 1.01);
+            double low = StatisticsUtil.roundTo2Decimals(Math.min(open, close) * 0.99);
+            double volumeVariation = 1.0 + 0.3 * Math.sin(i * 0.7 + phase);
+            long volume = (long) (baseVolume * volumeVariation);
+
+            records.add(new OhlcvRecord(symbol, date, open, high, low, close, volume));
+            previousClose = close;
+        }
+
+        return records;
     }
 
     private void ensureParentDirectories(Path path) throws IOException {

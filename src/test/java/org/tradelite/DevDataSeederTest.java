@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -30,6 +31,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.MomentumRocRepository;
+import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 import org.tradelite.service.StockSymbolRegistry;
@@ -59,6 +61,7 @@ class DevDataSeederTest {
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         var rsiHistory = new java.util.HashMap<String, RsiDailyClosePrice>();
         var symbolDisplayNames = new java.util.HashMap<String, String>();
@@ -82,6 +85,7 @@ class DevDataSeederTest {
                         relativeStrengthService,
                         targetPriceProvider,
                         stockSymbolRegistry,
+                        ohlcvRepository,
                         tempDir.resolve("rsi-data.json"),
                         tempDir.resolve("rs-data.json"));
 
@@ -95,6 +99,7 @@ class DevDataSeederTest {
         assertThat(rsHistory, hasKey("AAPL"));
 
         verify(momentumRocRepository, atLeastOnce()).save(any(), any());
+        verify(ohlcvRepository, atLeastOnce()).saveAll(anyList());
 
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement();
@@ -118,6 +123,7 @@ class DevDataSeederTest {
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
         when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
@@ -134,6 +140,7 @@ class DevDataSeederTest {
                         relativeStrengthService,
                         targetPriceProvider,
                         stockSymbolRegistry,
+                        ohlcvRepository,
                         tempDir.resolve("rsi-data.json"),
                         tempDir.resolve("rs-data.json"));
 
@@ -174,6 +181,7 @@ class DevDataSeederTest {
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         var rsiHistory = new java.util.HashMap<String, RsiDailyClosePrice>();
         var symbolDisplayNames = new java.util.HashMap<String, String>();
@@ -210,6 +218,7 @@ class DevDataSeederTest {
                         relativeStrengthService,
                         targetPriceProvider,
                         stockSymbolRegistry,
+                        ohlcvRepository,
                         tempDir.resolve("rsi-fallback.json"),
                         tempDir.resolve("rs-fallback.json"));
 
@@ -234,6 +243,7 @@ class DevDataSeederTest {
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
         when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
@@ -250,6 +260,7 @@ class DevDataSeederTest {
                         relativeStrengthService,
                         targetPriceProvider,
                         stockSymbolRegistry,
+                        ohlcvRepository,
                         tempDir.resolve("rsi-error.json"),
                         tempDir.resolve("rs-error.json"));
 
@@ -275,6 +286,7 @@ class DevDataSeederTest {
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
         when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
@@ -290,6 +302,7 @@ class DevDataSeederTest {
                 relativeStrengthService,
                 targetPriceProvider,
                 stockSymbolRegistry,
+                ohlcvRepository,
                 rsiPath,
                 rsPath);
     }
