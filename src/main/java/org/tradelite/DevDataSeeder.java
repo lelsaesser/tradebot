@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -109,7 +110,7 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         seedIfMissing();
     }
 
@@ -405,7 +406,7 @@ public class DevDataSeeder implements ApplicationRunner {
             }
 
             int emaPeriod = Math.min(50, rsValues.size());
-            rsData.setPreviousRs(rsValues.get(rsValues.size() - 1));
+            rsData.setPreviousRs(rsValues.getLast());
             rsData.setPreviousEma(StatisticsUtil.calculateEma(rsValues, emaPeriod));
             rsData.setInitialized(true);
             rsHistory.put(entry.getKey(), rsData);

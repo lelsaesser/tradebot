@@ -152,7 +152,7 @@ class DevDataSeederTest {
         DevDataSeeder seeder = spy(createSeederWithEmptySources());
         doReturn(false).when(seeder).seedIfMissing();
 
-        seeder.run(new DefaultApplicationArguments(new String[0]));
+        seeder.run(new DefaultApplicationArguments());
 
         verify(seeder).seedIfMissing();
     }
