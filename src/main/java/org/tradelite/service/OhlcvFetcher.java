@@ -16,8 +16,8 @@ import org.tradelite.repository.OhlcvRepository;
 public class OhlcvFetcher {
 
     static final int LOOKBACK_CALENDAR_DAYS = 200;
-    static final int MIN_RECORDS_FOR_VFI = 130;
-    static final int BACKFILL_OUTPUT_SIZE = 130;
+    static final int MIN_RECORDS_FOR_VFI = 136;
+    static final int BACKFILL_OUTPUT_SIZE = 136;
     static final int REFRESH_OUTPUT_SIZE = 5;
     static final long REQUEST_DELAY_MS = 8000;
 

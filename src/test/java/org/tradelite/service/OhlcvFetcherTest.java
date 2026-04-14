@@ -73,7 +73,7 @@ class OhlcvFetcherTest {
         when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("NVDA", "Nvidia")));
         when(stockSymbolRegistry.isEtf("NVDA")).thenReturn(false);
 
-        List<OhlcvRecord> sufficientRecords = generateRecords("NVDA", 135);
+        List<OhlcvRecord> sufficientRecords = generateRecords("NVDA", 140);
         when(ohlcvRepository.findBySymbol("NVDA", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(sufficientRecords);
         when(twelveDataClient.fetchDailyOhlcv("NVDA", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
