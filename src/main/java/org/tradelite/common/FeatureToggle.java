@@ -16,7 +16,10 @@ public enum FeatureToggle {
     FINNHUB_PRICE_COLLECTION("finnhubPriceCollection"),
 
     /** Controls whether the daily EMA report is sent via Telegram */
-    EMA_REPORT("emaReport");
+    EMA_REPORT("emaReport"),
+
+    /** Controls whether the daily combined RS+VFI report is sent via Telegram */
+    VFI_REPORT("vfiReport");
 
     private final String key;
 }
