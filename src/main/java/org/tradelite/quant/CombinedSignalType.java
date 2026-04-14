@@ -6,9 +6,9 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum CombinedSignalType {
-    GREEN("\uD83D\uDFE2", "RS\u2191 + VFI\u2191"),
+    GREEN("\uD83D\uDFE2", "RS↑ + VFI↑"),
     YELLOW("\uD83D\uDFE1", "Mixed"),
-    RED("\uD83D\uDD34", "RS\u2193 + VFI\u2193");
+    RED("\uD83D\uDD34", "RS↓ + VFI↓");
 
     private final String emoji;
     private final String label;

@@ -39,14 +39,14 @@ public class VfiService {
     }
 
     VfiAnalysis calculateVfi(String symbol, String displayName, List<OhlcvRecord> records) {
-        int n = records.size();
+        int lastWindowEnd = records.size();
 
         // Extract price and volume arrays
-        double[] highs = new double[n];
-        double[] lows = new double[n];
-        double[] closes = new double[n];
-        double[] volumes = new double[n];
-        for (int i = 0; i < n; i++) {
+        double[] highs = new double[lastWindowEnd];
+        double[] lows = new double[lastWindowEnd];
+        double[] closes = new double[lastWindowEnd];
+        double[] volumes = new double[lastWindowEnd];
+        for (int i = 0; i < lastWindowEnd; i++) {
             OhlcvRecord r = records.get(i);
             highs[i] = r.high();
             lows[i] = r.low();
@@ -55,20 +55,20 @@ public class VfiService {
         }
 
         // Precompute typical prices
-        double[] typical = new double[n];
-        for (int i = 0; i < n; i++) {
+        double[] typical = new double[lastWindowEnd];
+        for (int i = 0; i < lastWindowEnd; i++) {
             typical[i] = (highs[i] + lows[i] + closes[i]) / 3.0;
         }
 
         // Precompute log returns (inter)
-        double[] inter = new double[n];
-        for (int i = 1; i < n; i++) {
+        double[] inter = new double[lastWindowEnd];
+        for (int i = 1; i < lastWindowEnd; i++) {
             inter[i] = Math.log(typical[i]) - Math.log(typical[i - 1]);
         }
 
         // Precompute rolling stdev of log returns (vinter) and cutoff
-        double[] cutoff = new double[n];
-        for (int i = VOLATILITY_PERIOD; i < n; i++) {
+        double[] cutoff = new double[lastWindowEnd];
+        for (int i = VOLATILITY_PERIOD; i < lastWindowEnd; i++) {
             List<Double> interWindow = new ArrayList<>(VOLATILITY_PERIOD);
             for (int j = i - VOLATILITY_PERIOD + 1; j <= i; j++) {
                 interWindow.add(inter[j]);
@@ -81,7 +81,7 @@ public class VfiService {
         // Compute rolling VFI values for signal line
         // We need SIGNAL_LENGTH + 1 VFI values for a proper EMA(SIGNAL_LENGTH)
         int numWindows = SIGNAL_LENGTH + 1;
-        int lastWindowEnd = n; // exclusive
+        // exclusive
         int firstWindowStart = lastWindowEnd - LENGTH - (numWindows - 1);
 
         List<Double> vfiSeries = new ArrayList<>(numWindows);
