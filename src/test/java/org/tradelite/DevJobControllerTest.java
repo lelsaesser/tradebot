@@ -202,4 +202,27 @@ class DevJobControllerTest {
         assertThat(response.getBody().get("status"), is("error"));
         assertThat(response.getBody().get("job"), is("ohlcv-fetch"));
     }
+
+    @Test
+    void vfiReport_callsManualVfiJob() {
+        when(scheduler.manualVfiReport()).thenReturn(true);
+
+        ResponseEntity<Map<String, String>> response = controller.vfiReport();
+
+        verify(scheduler, times(1)).manualVfiReport();
+        assertThat(response.getStatusCode(), is(HttpStatus.OK));
+        assertThat(response.getBody().get("status"), is("ok"));
+        assertThat(response.getBody().get("job"), is("vfi-report"));
+    }
+
+    @Test
+    void vfiReport_returnsServerErrorWhenJobFails() {
+        when(scheduler.manualVfiReport()).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = controller.vfiReport();
+
+        assertThat(response.getStatusCode(), is(HttpStatus.INTERNAL_SERVER_ERROR));
+        assertThat(response.getBody().get("status"), is("error"));
+        assertThat(response.getBody().get("job"), is("vfi-report"));
+    }
 }

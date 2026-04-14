@@ -31,6 +31,7 @@ import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
 import org.tradelite.quant.TailRiskTracker;
+import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.service.OhlcvFetcher;
 import org.tradelite.service.RsiService;
@@ -56,6 +57,7 @@ class SchedulerTest {
     @Mock private RsiService rsiService;
     @Mock private EmaTracker emaTracker;
     @Mock private OhlcvFetcher ohlcvFetcher;
+    @Mock private VfiTracker vfiTracker;
 
     private Scheduler scheduler;
 
@@ -80,7 +82,8 @@ class SchedulerTest {
                         bollingerBandTracker,
                         rsiService,
                         emaTracker,
-                        ohlcvFetcher);
+                        ohlcvFetcher,
+                        vfiTracker);
     }
 
     @Test
@@ -587,6 +590,19 @@ class SchedulerTest {
     }
 
     @Test
+    void dailyVfiReport_shouldSendReport() throws Exception {
+        scheduler.dailyVfiReport();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(vfiTracker, times(1)).sendDailyReport();
+    }
+
+    @Test
     void dailyOhlcvFetch_shouldDelegateToFetcher() throws Exception {
         scheduler.dailyOhlcvFetch();
 
@@ -608,6 +624,17 @@ class SchedulerTest {
         assertTrue(success);
         verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
         verify(ohlcvFetcher).fetchAndBackfillOhlcv();
+    }
+
+    @Test
+    void manualVfiReport_shouldRunAndReturnTrue() {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualVfiReport();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(vfiTracker).sendDailyReport();
     }
 
     @Test
