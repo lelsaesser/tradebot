@@ -29,7 +29,7 @@ public class VfiTracker {
 
     public void sendDailyReport() {
         if (!featureToggleService.isEnabled(FeatureToggle.VFI_REPORT)) {
-            log.debug("VFI report feature toggle is disabled, skipping");
+            log.info("VFI report feature toggle is disabled, skipping");
             return;
         }
 
@@ -65,13 +65,13 @@ public class VfiTracker {
     private Optional<SymbolResult> analyzeSymbol(String symbol, String displayName) {
         Optional<VfiAnalysis> vfiOpt = vfiService.analyze(symbol, displayName);
         if (vfiOpt.isEmpty()) {
-            log.debug("No VFI data for {}", symbol);
+            log.info("No VFI data for {}", symbol);
             return Optional.empty();
         }
 
         Optional<RsResult> rsOpt = relativeStrengthService.getCurrentRsResult(symbol);
         if (rsOpt.isEmpty()) {
-            log.debug("No RS data for {}", symbol);
+            log.info("No RS data for {}", symbol);
             return Optional.empty();
         }
 
