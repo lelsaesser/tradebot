@@ -138,7 +138,7 @@ public class VfiTracker {
 
     private String formatLine(SymbolResult r) {
         return String.format(
-                "\u2022 %s (%s) — RS %+.1f%% | VFI %+.1f / sig %+.1f",
+                "• %s (%s) — RS %+.1f%% | VFI %+.1f / sig %+.1f",
                 r.symbol, r.displayName, r.rsPercent, r.vfiValue, r.signalLineValue);
     }
 
