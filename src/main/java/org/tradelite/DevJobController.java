@@ -85,6 +85,16 @@ public class DevJobController {
                 "seed-analytics", () -> rootErrorHandler.runWithStatus(devDataSeeder::reseed));
     }
 
+    @PostMapping("/ohlcv-fetch")
+    public ResponseEntity<Map<String, String>> ohlcvFetch() {
+        return runJob("ohlcv-fetch", scheduler::manualOhlcvFetch);
+    }
+
+    @PostMapping("/vfi-report")
+    public ResponseEntity<Map<String, String>> vfiReport() {
+        return runJob("vfi-report", scheduler::manualVfiReport);
+    }
+
     private ResponseEntity<Map<String, String>> runJob(String job, BooleanSupplier jobRunner) {
         if (jobRunner.getAsBoolean()) {
             return ResponseEntity.ok(Map.of("status", "ok", "job", job));

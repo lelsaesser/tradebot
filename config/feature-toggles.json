@@ -1,4 +1,5 @@
 {
   "finnhubPriceCollection": true,
-  "emaReport": true
+  "emaReport": true,
+  "vfiReport": true
 }

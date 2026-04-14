@@ -31,7 +31,9 @@ import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
 import org.tradelite.quant.TailRiskTracker;
+import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.OhlcvFetcher;
 import org.tradelite.service.RsiService;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +56,8 @@ class SchedulerTest {
     @Mock private BollingerBandTracker bollingerBandTracker;
     @Mock private RsiService rsiService;
     @Mock private EmaTracker emaTracker;
+    @Mock private OhlcvFetcher ohlcvFetcher;
+    @Mock private VfiTracker vfiTracker;
 
     private Scheduler scheduler;
 
@@ -77,7 +81,9 @@ class SchedulerTest {
                         tailRiskTracker,
                         bollingerBandTracker,
                         rsiService,
-                        emaTracker);
+                        emaTracker,
+                        ohlcvFetcher,
+                        vfiTracker);
     }
 
     @Test
@@ -472,7 +478,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualWeeklyInsiderTradingReport_shouldRunAndReturnTrue() throws Exception {
+    void manualWeeklyInsiderTradingReport_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualWeeklyInsiderTradingReport();
@@ -483,7 +489,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailySectorRotationTracking_shouldRunAndReturnTrue() throws Exception {
+    void manualDailySectorRotationTracking_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualDailySectorRotationTracking();
@@ -494,7 +500,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailySectorRelativeStrengthReport_shouldRunAndReturnTrue() throws Exception {
+    void manualDailySectorRelativeStrengthReport_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualDailySectorRelativeStrengthReport();
@@ -505,7 +511,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailyTailRiskMonitoring_shouldRunAndReturnTrue() throws Exception {
+    void manualDailyTailRiskMonitoring_shouldRunAndReturnTrue() {
         stubRunWithStatus(true, true);
 
         boolean success = scheduler.manualDailyTailRiskMonitoring();
@@ -517,7 +523,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailyBollingerBandReport_shouldRunAndReturnTrue() throws Exception {
+    void manualDailyBollingerBandReport_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualDailyBollingerBandReport();
@@ -528,7 +534,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualMonthlyApiUsageReport_withRequestsShouldSendReportAndReset() throws Exception {
+    void manualMonthlyApiUsageReport_withRequestsShouldSendReportAndReset() {
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(10);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(5);
         when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2026-03");
@@ -543,7 +549,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualMonthlyApiUsageReport_withNoRequestsShouldStillResetCounters() throws Exception {
+    void manualMonthlyApiUsageReport_withNoRequestsShouldStillResetCounters() {
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
         stubRunWithStatus(true);
@@ -584,6 +590,54 @@ class SchedulerTest {
     }
 
     @Test
+    void dailyVfiReport_shouldSendReport() throws Exception {
+        scheduler.dailyVfiReport();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(vfiTracker, times(1)).sendDailyReport();
+    }
+
+    @Test
+    void dailyOhlcvFetch_shouldDelegateToFetcher() throws Exception {
+        scheduler.dailyOhlcvFetch();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(ohlcvFetcher, times(1)).fetchAndBackfillOhlcv();
+    }
+
+    @Test
+    void manualOhlcvFetch_shouldRunAndReturnTrue() throws Exception {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualOhlcvFetch();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(ohlcvFetcher).fetchAndBackfillOhlcv();
+    }
+
+    @Test
+    void manualVfiReport_shouldRunAndReturnTrue() {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualVfiReport();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(vfiTracker).sendDailyReport();
+    }
+
+    @Test
     void dailyTailRiskMonitoring_shouldSendReportAndAlerts() throws Exception {
         scheduler.dailyTailRiskMonitoring();
 
@@ -611,7 +665,7 @@ class SchedulerTest {
                         invocation -> {
                             ThrowingRunnable runnable = invocation.getArgument(0);
                             runnable.run();
-                            return remaining.isEmpty() ? true : remaining.remove();
+                            return remaining.isEmpty() || remaining.remove();
                         });
     }
 }

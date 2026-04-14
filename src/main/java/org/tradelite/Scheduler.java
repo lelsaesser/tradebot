@@ -16,7 +16,9 @@ import org.tradelite.core.*;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
 import org.tradelite.quant.TailRiskTracker;
+import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.OhlcvFetcher;
 import org.tradelite.service.RsiService;
 import org.tradelite.utils.DateUtil;
 
@@ -41,6 +43,8 @@ public class Scheduler {
     private final BollingerBandTracker bollingerBandTracker;
     private final RsiService rsiService;
     private final EmaTracker emaTracker;
+    private final OhlcvFetcher ohlcvFetcher;
+    private final VfiTracker vfiTracker;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -62,7 +66,9 @@ public class Scheduler {
             TailRiskTracker tailRiskTracker,
             BollingerBandTracker bollingerBandTracker,
             RsiService rsiService,
-            EmaTracker emaTracker) {
+            EmaTracker emaTracker,
+            OhlcvFetcher ohlcvFetcher,
+            VfiTracker vfiTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.rsiPriceFetcher = rsiPriceFetcher;
@@ -80,6 +86,8 @@ public class Scheduler {
         this.bollingerBandTracker = bollingerBandTracker;
         this.rsiService = rsiService;
         this.emaTracker = emaTracker;
+        this.ohlcvFetcher = ohlcvFetcher;
+        this.vfiTracker = vfiTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -147,6 +155,12 @@ public class Scheduler {
         log.info("Daily EMA report completed.");
     }
 
+    @Scheduled(cron = "0 0 9 * * MON-FRI", zone = "CET")
+    protected void dailyVfiReport() {
+        rootErrorHandler.run(vfiTracker::sendDailyReport);
+        log.info("Daily VFI report completed.");
+    }
+
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
     public void rsiCryptoMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchCryptoClosingPrices);
@@ -183,13 +197,19 @@ public class Scheduler {
         log.info("Daily sector rotation tracking completed.");
     }
 
+    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = "CET")
+    protected void dailyOhlcvFetch() {
+        rootErrorHandler.run(ohlcvFetcher::fetchAndBackfillOhlcv);
+        log.info("Daily OHLCV fetch completed.");
+    }
+
     @Scheduled(cron = "0 0 0 1 * *", zone = "UTC")
     public void monthlyApiUsageReport() {
         rootErrorHandler.run(this::doMonthlyApiUsageReport);
         log.info("Monthly API usage report completed.");
     }
 
-    private void doMonthlyApiUsageReport() throws Exception {
+    private void doMonthlyApiUsageReport() {
         int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
         int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
 
@@ -298,6 +318,18 @@ public class Scheduler {
     public boolean manualMonthlyApiUsageReport() {
         boolean success = rootErrorHandler.runWithStatus(this::doMonthlyApiUsageReport);
         log.info("Manual monthly API usage report completed.");
+        return success;
+    }
+
+    public boolean manualOhlcvFetch() {
+        boolean success = rootErrorHandler.runWithStatus(ohlcvFetcher::fetchAndBackfillOhlcv);
+        log.info("Manual OHLCV fetch completed.");
+        return success;
+    }
+
+    public boolean manualVfiReport() {
+        boolean success = rootErrorHandler.runWithStatus(vfiTracker::sendDailyReport);
+        log.info("Manual VFI report completed.");
         return success;
     }
 }
