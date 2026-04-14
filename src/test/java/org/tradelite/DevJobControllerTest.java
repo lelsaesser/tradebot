@@ -179,4 +179,27 @@ class DevJobControllerTest {
         assertThat(response.getBody().get("status"), is("error"));
         assertThat(response.getBody().get("message"), is("check logs"));
     }
+
+    @Test
+    void ohlcvFetch_callsManualOhlcvJob() {
+        when(scheduler.manualOhlcvFetch()).thenReturn(true);
+
+        ResponseEntity<Map<String, String>> response = controller.ohlcvFetch();
+
+        verify(scheduler, times(1)).manualOhlcvFetch();
+        assertThat(response.getStatusCode(), is(HttpStatus.OK));
+        assertThat(response.getBody().get("status"), is("ok"));
+        assertThat(response.getBody().get("job"), is("ohlcv-fetch"));
+    }
+
+    @Test
+    void ohlcvFetch_returnsServerErrorWhenJobFails() {
+        when(scheduler.manualOhlcvFetch()).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = controller.ohlcvFetch();
+
+        assertThat(response.getStatusCode(), is(HttpStatus.INTERNAL_SERVER_ERROR));
+        assertThat(response.getBody().get("status"), is("error"));
+        assertThat(response.getBody().get("job"), is("ohlcv-fetch"));
+    }
 }
