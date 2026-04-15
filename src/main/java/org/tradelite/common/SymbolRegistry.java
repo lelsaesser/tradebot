@@ -22,8 +22,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Central registry of all tracked symbols: ETFs (sector + thematic + benchmark) and individual
- * stocks. Replaces the former {@code SectorEtfRegistry} (static ETF maps) and {@code
- * StockSymbolRegistry} (JSON-loaded stocks).
+ * stocks.
  *
  * <p>ETF definitions are hardcoded constants. Stocks are loaded from {@code
  * config/stock-symbols.json} and can be added/removed at runtime via Telegram commands.
