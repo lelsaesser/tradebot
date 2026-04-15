@@ -13,25 +13,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.DailyPriceProvider;
 import org.tradelite.service.model.DailyPrice;
 
 @ExtendWith(MockitoExtension.class)
 class EmaServiceTest {
 
-    @Mock private PriceQuoteRepository priceQuoteRepository;
+    @Mock private DailyPriceProvider dailyPriceProvider;
 
     private EmaService service;
 
     @BeforeEach
     void setUp() {
-        service = new EmaService(priceQuoteRepository);
+        service = new EmaService(dailyPriceProvider);
     }
 
     @Test
     void analyze_returnsEmptyWhenInsufficientData() {
         List<DailyPrice> prices = generateDailyPrices(5, 150.0);
-        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
@@ -42,7 +42,7 @@ class EmaServiceTest {
     @Test
     void analyze_returnsAnalysisWithFullData() {
         List<DailyPrice> prices = generateDailyPrices(250, 150.0);
-        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
@@ -63,7 +63,7 @@ class EmaServiceTest {
     @Test
     void analyze_partialEmas_53DataPoints() {
         List<DailyPrice> prices = generateDailyPrices(53, 150.0);
-        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
@@ -81,7 +81,7 @@ class EmaServiceTest {
     @Test
     void analyze_partialEmas_25DataPoints() {
         List<DailyPrice> prices = generateDailyPrices(25, 150.0);
-        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
@@ -99,7 +99,7 @@ class EmaServiceTest {
     @Test
     void analyze_partialEmas_10DataPoints() {
         List<DailyPrice> prices = generateDailyPrices(10, 150.0);
-        when(priceQuoteRepository.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("AAPL", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("AAPL", "Apple");
@@ -117,7 +117,7 @@ class EmaServiceTest {
     @Test
     void analyze_greenSignalWhenPriceAboveAllEmas() {
         List<DailyPrice> prices = generateRisingPrices(250, 100.0, 1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("MSFT", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("MSFT", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("MSFT", "Microsoft");
@@ -132,7 +132,7 @@ class EmaServiceTest {
     @Test
     void analyze_redSignalWhenPriceBelowAllEmas() {
         List<DailyPrice> prices = generateFallingPrices(250, 300.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("TSLA", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("TSLA", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("TSLA", "Tesla");
@@ -148,7 +148,7 @@ class EmaServiceTest {
     void analyze_redSignalWithPartialEmas() {
         // Falling prices with only 25 data points — 2 EMAs available, below both = RED
         List<DailyPrice> prices = generateFallingPrices(25, 300.0, 5.0);
-        when(priceQuoteRepository.findDailyClosingPrices("TSLA", EmaService.LOOKBACK_CALENDAR_DAYS))
+        when(dailyPriceProvider.findDailyClosingPrices("TSLA", EmaService.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(prices);
 
         Optional<EmaAnalysis> result = service.analyze("TSLA", "Tesla");

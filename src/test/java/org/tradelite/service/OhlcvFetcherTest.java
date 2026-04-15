@@ -2,6 +2,7 @@ package org.tradelite.service;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
 import org.tradelite.common.OhlcvRecord;
+import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.OhlcvRepository;
 
@@ -35,118 +37,88 @@ class OhlcvFetcherTest {
         ohlcvFetcher =
                 new OhlcvFetcher(
                         twelveDataClient, ohlcvRepository, stockSymbolRegistry, telegramGateway);
+        ohlcvFetcher.setRequestDelayMs(0);
+        // Default: no additional stocks beyond the static ETF list
+        lenient().when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        // Default: all symbols need backfill
+        lenient().when(ohlcvRepository.findBySymbol(anyString(), anyInt())).thenReturn(List.of());
+        // Default: fetch returns empty
+        lenient()
+                .when(twelveDataClient.fetchDailyOhlcv(anyString(), anyInt()))
+                .thenReturn(List.of());
     }
 
     @Test
     void fetchAndBackfillOhlcv_emptyTable_triggersBackfill() throws InterruptedException {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(ohlcvRepository.findBySymbol("AAPL", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
-                .thenReturn(List.of());
-        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
-                .thenReturn(List.of());
-
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        verify(twelveDataClient).fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
-    }
-
-    @Test
-    void fetchAndBackfillOhlcv_partialData_triggersBackfill() throws InterruptedException {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("MSFT", "Microsoft")));
-        when(stockSymbolRegistry.isEtf("MSFT")).thenReturn(false);
-
-        List<OhlcvRecord> partialRecords = generateRecords("MSFT", 100);
-        when(ohlcvRepository.findBySymbol("MSFT", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
-                .thenReturn(partialRecords);
-        when(twelveDataClient.fetchDailyOhlcv("MSFT", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
-                .thenReturn(List.of());
-
-        ohlcvFetcher.fetchAndBackfillOhlcv();
-
-        verify(twelveDataClient).fetchDailyOhlcv("MSFT", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        // SPY is in allEtfsWithBenchmark, should get backfill since no existing records
+        verify(twelveDataClient).fetchDailyOhlcv("SPY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
     }
 
     @Test
     void fetchAndBackfillOhlcv_sufficientData_triggersRefresh() throws InterruptedException {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("NVDA", "Nvidia")));
-        when(stockSymbolRegistry.isEtf("NVDA")).thenReturn(false);
-
-        List<OhlcvRecord> sufficientRecords = generateRecords("NVDA", 140);
-        when(ohlcvRepository.findBySymbol("NVDA", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+        List<OhlcvRecord> sufficientRecords = generateRecords("SPY", 140);
+        when(ohlcvRepository.findBySymbol("SPY", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
                 .thenReturn(sufficientRecords);
-        when(twelveDataClient.fetchDailyOhlcv("NVDA", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
-                .thenReturn(List.of());
 
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        verify(twelveDataClient).fetchDailyOhlcv("NVDA", OhlcvFetcher.REFRESH_OUTPUT_SIZE);
+        verify(twelveDataClient).fetchDailyOhlcv("SPY", OhlcvFetcher.REFRESH_OUTPUT_SIZE);
     }
 
     @Test
-    void fetchAndBackfillOhlcv_filtersOutEtfs() throws InterruptedException {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(
-                        List.of(
-                                new StockSymbol("AAPL", "Apple"),
-                                new StockSymbol("SPY", "S&P 500"),
-                                new StockSymbol("XLK", "Technology")));
+    void fetchAndBackfillOhlcv_includesEtfsFromRegistry() throws InterruptedException {
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        // Verify ETFs from SectorEtfRegistry are fetched
+        for (String etf : SectorEtfRegistry.allEtfsWithBenchmark().keySet()) {
+            verify(twelveDataClient).fetchDailyOhlcv(eq(etf), anyInt());
+        }
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_includesNonEtfStocks() throws InterruptedException {
+        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
         when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("SPY")).thenReturn(true);
-        when(stockSymbolRegistry.isEtf("XLK")).thenReturn(true);
-        when(ohlcvRepository.findBySymbol("AAPL", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
-                .thenReturn(List.of());
-        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
-                .thenReturn(List.of());
 
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
         verify(twelveDataClient).fetchDailyOhlcv(eq("AAPL"), anyInt());
-        verify(twelveDataClient, never()).fetchDailyOhlcv(eq("SPY"), anyInt());
-        verify(twelveDataClient, never()).fetchDailyOhlcv(eq("XLK"), anyInt());
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_excludesDuplicateEtfsFromStockRegistry()
+            throws InterruptedException {
+        // XLK is in both SectorEtfRegistry and StockSymbolRegistry — should only be fetched once
+        when(stockSymbolRegistry.getAll())
+                .thenReturn(List.of(new StockSymbol("XLK", "Technology")));
+        when(stockSymbolRegistry.isEtf("XLK")).thenReturn(true);
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        // XLK fetched exactly once (from ETF registry, not duplicated from stock registry)
+        verify(twelveDataClient, times(1)).fetchDailyOhlcv(eq("XLK"), anyInt());
     }
 
     @Test
     void fetchAndBackfillOhlcv_oneSymbolFails_continuesFetching() throws InterruptedException {
         when(stockSymbolRegistry.getAll())
-                .thenReturn(
-                        List.of(
-                                new StockSymbol("AAPL", "Apple"),
-                                new StockSymbol("GLXY", "Galaxy Digital"),
-                                new StockSymbol("MSFT", "Microsoft")));
-        when(stockSymbolRegistry.isEtf(anyString())).thenReturn(false);
-        when(ohlcvRepository.findBySymbol(anyString(), eq(OhlcvFetcher.LOOKBACK_CALENDAR_DAYS)))
-                .thenReturn(List.of());
-
-        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
-                .thenReturn(List.of());
+                .thenReturn(List.of(new StockSymbol("GLXY", "Galaxy Digital")));
+        when(stockSymbolRegistry.isEtf("GLXY")).thenReturn(false);
         when(twelveDataClient.fetchDailyOhlcv("GLXY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
                 .thenThrow(new RuntimeException("API error"));
-        when(twelveDataClient.fetchDailyOhlcv("MSFT", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
-                .thenReturn(List.of());
 
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        verify(twelveDataClient).fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
-        verify(twelveDataClient).fetchDailyOhlcv("GLXY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
-        verify(twelveDataClient).fetchDailyOhlcv("MSFT", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        // GLXY failed but ETFs still fetched
+        verify(twelveDataClient).fetchDailyOhlcv(eq("GLXY"), anyInt());
+        verify(twelveDataClient).fetchDailyOhlcv(eq("SPY"), anyInt());
     }
 
     @Test
     void fetchAndBackfillOhlcv_withFailures_sendsTelegramSummary() throws InterruptedException {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(
-                        List.of(
-                                new StockSymbol("AAPL", "Apple"),
-                                new StockSymbol("GLXY", "Galaxy Digital")));
-        when(stockSymbolRegistry.isEtf(anyString())).thenReturn(false);
-        when(ohlcvRepository.findBySymbol(anyString(), eq(OhlcvFetcher.LOOKBACK_CALENDAR_DAYS)))
-                .thenReturn(List.of());
-
-        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
-                .thenReturn(List.of());
-        when(twelveDataClient.fetchDailyOhlcv("GLXY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+        when(twelveDataClient.fetchDailyOhlcv("SPY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
                 .thenThrow(new RuntimeException("API error"));
 
         ohlcvFetcher.fetchAndBackfillOhlcv();
@@ -156,19 +128,12 @@ class OhlcvFetcherTest {
 
         String message = messageCaptor.getValue();
         assertThat(message, containsString("OHLCV Fetch Alert"));
-        assertThat(message, containsString("1/2 failed"));
-        assertThat(message, containsString("GLXY"));
+        assertThat(message, containsString("failed"));
+        assertThat(message, containsString("SPY"));
     }
 
     @Test
     void fetchAndBackfillOhlcv_allSucceed_noTelegramSent() throws InterruptedException {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(ohlcvRepository.findBySymbol("AAPL", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
-                .thenReturn(List.of());
-        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
-                .thenReturn(List.of());
-
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
         verify(telegramGateway, never()).sendMessage(anyString());

@@ -142,11 +142,12 @@ class SqliteOhlcvRepositoryTest {
 
     @Test
     void findBySymbol_respectsDaysLimit() {
+        LocalDate today = LocalDate.now();
         repository.saveAll(
                 List.of(
-                        createRecord("AAPL", LocalDate.of(2026, 4, 10), 174.0, 178.0),
-                        createRecord("AAPL", LocalDate.of(2026, 4, 9), 170.0, 174.0),
-                        createRecord("AAPL", LocalDate.of(2025, 1, 1), 140.0, 142.0)));
+                        createRecord("AAPL", today.minusDays(1), 174.0, 178.0),
+                        createRecord("AAPL", today.minusDays(3), 170.0, 174.0),
+                        createRecord("AAPL", today.minusDays(400), 140.0, 142.0)));
 
         List<OhlcvRecord> results = repository.findBySymbol("AAPL", 5);
         assertThat(results, hasSize(2));

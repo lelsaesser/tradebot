@@ -7,7 +7,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.DailyPriceProvider;
 import org.tradelite.service.model.DailyPrice;
 
 /**
@@ -41,7 +41,7 @@ public class BollingerBandService {
      */
     static final int LOOKBACK_CALENDAR_DAYS = 90;
 
-    private final PriceQuoteRepository priceQuoteRepository;
+    private final DailyPriceProvider dailyPriceProvider;
 
     /**
      * Analyzes Bollinger Bands for a symbol and returns the result with detected signals.
@@ -52,7 +52,7 @@ public class BollingerBandService {
      */
     public Optional<BollingerBandAnalysis> analyze(String symbol, String displayName) {
         List<DailyPrice> dailyPrices =
-                priceQuoteRepository.findDailyClosingPrices(symbol, LOOKBACK_CALENDAR_DAYS);
+                dailyPriceProvider.findDailyClosingPrices(symbol, LOOKBACK_CALENDAR_DAYS);
 
         if (dailyPrices.size() < BollingerBandAnalysis.MIN_DATA_POINTS) {
             log.debug(

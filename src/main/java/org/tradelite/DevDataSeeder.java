@@ -45,7 +45,7 @@ import org.tradelite.service.model.RsiDailyClosePrice;
 public class DevDataSeeder implements ApplicationRunner {
 
     private static final int LOOKBACK_DAYS = 90;
-    private static final int OHLCV_LOOKBACK_DAYS = 200;
+    private static final int OHLCV_LOOKBACK_DAYS = 400;
     private static final int SAMPLE_STOCK_LIMIT = 5;
     private static final String QUOTES_TABLE = "finnhub_price_quotes";
     private static final String MOMENTUM_TABLE = "momentum_roc_state";

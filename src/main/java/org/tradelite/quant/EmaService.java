@@ -5,7 +5,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.DailyPriceProvider;
 import org.tradelite.service.model.DailyPrice;
 
 /**
@@ -29,7 +29,7 @@ public class EmaService {
      */
     static final int LOOKBACK_CALENDAR_DAYS = 400;
 
-    private final PriceQuoteRepository priceQuoteRepository;
+    private final DailyPriceProvider dailyPriceProvider;
 
     /**
      * Analyzes EMA positions for a symbol, calculating every EMA for which enough data exists.
@@ -43,7 +43,7 @@ public class EmaService {
      */
     public Optional<EmaAnalysis> analyze(String symbol, String displayName) {
         List<DailyPrice> dailyPrices =
-                priceQuoteRepository.findDailyClosingPrices(symbol, LOOKBACK_CALENDAR_DAYS);
+                dailyPriceProvider.findDailyClosingPrices(symbol, LOOKBACK_CALENDAR_DAYS);
 
         if (dailyPrices.size() < MIN_DATA_POINTS) {
             log.debug(

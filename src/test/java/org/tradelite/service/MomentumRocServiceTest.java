@@ -19,26 +19,25 @@ import org.tradelite.core.MomentumRocSignal;
 import org.tradelite.core.MomentumRocSignal.SignalType;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
-import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
 
 @ExtendWith(MockitoExtension.class)
 class MomentumRocServiceTest {
 
-    @Mock private PriceQuoteRepository priceQuoteRepository;
+    @Mock private DailyPriceProvider dailyPriceProvider;
     @Mock private MomentumRocRepository momentumRocRepository;
 
     private MomentumRocService service;
 
     @BeforeEach
     void setUp() {
-        service = new MomentumRocService(priceQuoteRepository, momentumRocRepository);
+        service = new MomentumRocService(dailyPriceProvider, momentumRocRepository);
     }
 
     @Test
     void calculateRoc_insufficientData_returnsEmpty() {
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35))
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35))
                 .thenReturn(List.of(new DailyPrice(LocalDate.now(), 100.0)));
 
         Optional<MomentumRocService.RocResult> result = service.calculateRoc("XLK");
@@ -49,7 +48,7 @@ class MomentumRocServiceTest {
     @Test
     void calculateRoc_sufficientData_returnsRocValues() {
         List<DailyPrice> prices = createPriceHistory(25, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocService.RocResult> result = service.calculateRoc("XLK");
 
@@ -117,7 +116,7 @@ class MomentumRocServiceTest {
     @Test
     void detectMomentumShift_firstCalculation_noSignal() {
         List<DailyPrice> prices = createPriceHistory(25, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.empty());
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
@@ -141,7 +140,7 @@ class MomentumRocServiceTest {
 
         // Current prices show positive ROC
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 1.0); // Uptrend
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 
@@ -162,7 +161,7 @@ class MomentumRocServiceTest {
 
         // Current prices show negative ROC
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 120.0, -1.0); // Downtrend
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 
@@ -181,7 +180,7 @@ class MomentumRocServiceTest {
 
         // Current ROC still positive (no crossover)
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 
@@ -190,7 +189,7 @@ class MomentumRocServiceTest {
 
     @Test
     void detectMomentumShift_insufficientData_returnsEmpty() {
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35))
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35))
                 .thenReturn(List.of(new DailyPrice(LocalDate.now(), 100.0)));
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
@@ -202,7 +201,7 @@ class MomentumRocServiceTest {
     @Test
     void detectMomentumShift_savesPreviousState() {
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.empty());
 
         service.detectMomentumShift("XLK", "Technology");
@@ -225,7 +224,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         service.detectMomentumShift("XLK", "Technology");
 
@@ -253,7 +252,7 @@ class MomentumRocServiceTest {
     @Test
     void calculateRoc_exactMinimumDataPoints_returnsResult() {
         List<DailyPrice> prices = createPriceHistory(21, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocService.RocResult> result = service.calculateRoc("XLK");
 
@@ -265,7 +264,7 @@ class MomentumRocServiceTest {
     @Test
     void calculateRoc_belowMinimumDataPoints_returnsEmpty() {
         List<DailyPrice> prices = createPriceHistory(20, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocService.RocResult> result = service.calculateRoc("XLK");
 
@@ -298,7 +297,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 120.0, -0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 
@@ -314,7 +313,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 
@@ -330,7 +329,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 
@@ -347,7 +346,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 120.0, -1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 
@@ -367,7 +366,7 @@ class MomentumRocServiceTest {
 
         // Create prices that produce a small positive ROC10 (within dead zone)
         List<DailyPrice> prices = createPriceHistory(25, 100.0, 0.01);
-        when(priceQuoteRepository.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLV", "Health Care");
 
@@ -387,7 +386,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLV")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 120.0, -1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLV", "Health Care");
 
@@ -405,7 +404,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLV")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLV", "Health Care");
 
@@ -421,7 +420,7 @@ class MomentumRocServiceTest {
         when(momentumRocRepository.findBySymbol("XLK")).thenReturn(Optional.of(previousData));
 
         List<DailyPrice> prices = createPriceHistoryWithTrend(25, 100.0, 1.0);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
 
         Optional<MomentumRocSignal> result = service.detectMomentumShift("XLK", "Technology");
 

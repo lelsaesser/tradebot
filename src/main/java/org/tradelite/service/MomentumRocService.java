@@ -9,7 +9,6 @@ import org.tradelite.core.MomentumRocSignal;
 import org.tradelite.core.MomentumRocSignal.SignalType;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
-import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
 
@@ -45,14 +44,13 @@ public class MomentumRocService {
      */
     static final double ROC_DEAD_ZONE = 0.25;
 
-    private final PriceQuoteRepository priceQuoteRepository;
+    private final DailyPriceProvider dailyPriceProvider;
     private final MomentumRocRepository momentumRocRepository;
 
     @Autowired
     public MomentumRocService(
-            PriceQuoteRepository priceQuoteRepository,
-            MomentumRocRepository momentumRocRepository) {
-        this.priceQuoteRepository = priceQuoteRepository;
+            DailyPriceProvider dailyPriceProvider, MomentumRocRepository momentumRocRepository) {
+        this.dailyPriceProvider = dailyPriceProvider;
         this.momentumRocRepository = momentumRocRepository;
     }
 
@@ -105,7 +103,7 @@ public class MomentumRocService {
      */
     public Optional<RocResult> calculateRoc(String symbol) {
         List<DailyPrice> prices =
-                priceQuoteRepository.findDailyClosingPrices(symbol, ROC_LOOKBACK_DAYS);
+                dailyPriceProvider.findDailyClosingPrices(symbol, ROC_LOOKBACK_DAYS);
 
         if (prices.size() < MIN_DATA_POINTS) {
             log.debug(

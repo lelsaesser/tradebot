@@ -1,13 +1,16 @@
 package org.tradelite.service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
 import org.tradelite.common.OhlcvRecord;
+import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.OhlcvRepository;
 
@@ -15,16 +18,17 @@ import org.tradelite.repository.OhlcvRepository;
 @Service
 public class OhlcvFetcher {
 
-    static final int LOOKBACK_CALENDAR_DAYS = 200;
-    static final int MIN_RECORDS_FOR_VFI = 136;
-    static final int BACKFILL_OUTPUT_SIZE = 136;
+    static final int LOOKBACK_CALENDAR_DAYS = 600;
+    static final int MIN_RECORDS_FOR_BACKFILL = 136;
+    static final int BACKFILL_OUTPUT_SIZE = 400;
     static final int REFRESH_OUTPUT_SIZE = 5;
-    static final long REQUEST_DELAY_MS = 8000;
+    static final long DEFAULT_REQUEST_DELAY_MS = 8000;
 
     private final TwelveDataClient twelveDataClient;
     private final OhlcvRepository ohlcvRepository;
     private final StockSymbolRegistry stockSymbolRegistry;
     private final TelegramGateway telegramGateway;
+    private long requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
 
     @Autowired
     public OhlcvFetcher(
@@ -38,30 +42,31 @@ public class OhlcvFetcher {
         this.telegramGateway = telegramGateway;
     }
 
-    public void fetchAndBackfillOhlcv() throws InterruptedException {
-        List<StockSymbol> stocks =
-                stockSymbolRegistry.getAll().stream()
-                        .filter(s -> !stockSymbolRegistry.isEtf(s.getTicker()))
-                        .toList();
+    void setRequestDelayMs(long requestDelayMs) {
+        this.requestDelayMs = requestDelayMs;
+    }
 
-        log.info("Starting OHLCV fetch for {} symbols", stocks.size());
+    public void fetchAndBackfillOhlcv() throws InterruptedException {
+        List<String> symbols = buildSymbolList();
+
+        log.info("Starting OHLCV fetch for {} symbols", symbols.size());
 
         List<String> failedSymbols = new ArrayList<>();
         int succeeded = 0;
 
-        for (int i = 0; i < stocks.size(); i++) {
+        for (int i = 0; i < symbols.size(); i++) {
             if (i > 0) {
-                Thread.sleep(REQUEST_DELAY_MS);
+                Thread.sleep(requestDelayMs);
             }
 
-            String ticker = stocks.get(i).getTicker();
+            String ticker = symbols.get(i);
             int existingRecords =
                     ohlcvRepository.findBySymbol(ticker, LOOKBACK_CALENDAR_DAYS).size();
-            boolean needsBackfill = existingRecords < MIN_RECORDS_FOR_VFI;
+            boolean needsBackfill = existingRecords < MIN_RECORDS_FOR_BACKFILL;
             int outputSize = needsBackfill ? BACKFILL_OUTPUT_SIZE : REFRESH_OUTPUT_SIZE;
             String mode = needsBackfill ? "backfill" : "refresh";
 
-            log.info("Fetching OHLCV for {} ({}/{}, {})", ticker, i + 1, stocks.size(), mode);
+            log.info("Fetching OHLCV for {} ({}/{}, {})", ticker, i + 1, symbols.size(), mode);
 
             try {
                 List<OhlcvRecord> records = twelveDataClient.fetchDailyOhlcv(ticker, outputSize);
@@ -83,7 +88,20 @@ public class OhlcvFetcher {
             telegramGateway.sendMessage(
                     String.format(
                             "*OHLCV Fetch Alert*%n%d/%d failed %s",
-                            failedSymbols.size(), stocks.size(), failedSymbols));
+                            failedSymbols.size(), symbols.size(), failedSymbols));
         }
+    }
+
+    private List<String> buildSymbolList() {
+        Set<String> symbols =
+                new LinkedHashSet<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet());
+
+        for (StockSymbol stock : stockSymbolRegistry.getAll()) {
+            if (!stockSymbolRegistry.isEtf(stock.getTicker())) {
+                symbols.add(stock.getTicker());
+            }
+        }
+
+        return new ArrayList<>(symbols);
     }
 }
