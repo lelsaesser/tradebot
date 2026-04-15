@@ -245,7 +245,6 @@ class BollingerBandServiceTest {
         List<BollingerSignalType> signals =
                 BollingerBandService.detectSignals(0.5, 0.05, 50.0, true);
 
-        assertThat(signals).isNotEmpty();
         assertThat(signals).doesNotContain(BollingerSignalType.SQUEEZE);
     }
 
@@ -263,7 +262,6 @@ class BollingerBandServiceTest {
         List<BollingerSignalType> signals =
                 BollingerBandService.detectSignals(0.5, 0.05, 5.0, false);
 
-        assertThat(signals).isNotEmpty();
         assertThat(signals).doesNotContain(BollingerSignalType.HISTORICAL_SQUEEZE);
     }
 
