@@ -73,8 +73,7 @@ public class SymbolRegistry {
     private static final Set<String> ETF_SYMBOLS;
 
     static {
-        Set<String> sectorSet = new LinkedHashSet<>();
-        sectorSet.addAll(BROAD_SECTOR_ETFS.keySet());
+        Set<String> sectorSet = new LinkedHashSet<>(BROAD_SECTOR_ETFS.keySet());
         sectorSet.add(BENCHMARK_SYMBOL);
         SECTOR_ETF_SYMBOLS = Set.copyOf(sectorSet);
 
@@ -119,16 +118,6 @@ public class SymbolRegistry {
         all.putAll(BROAD_SECTOR_ETFS);
         all.putAll(THEMATIC_ETFS);
         return all;
-    }
-
-    /** Returns the 11 broad SPDR sector ETFs. */
-    public Map<String, String> getBroadSectorEtfs() {
-        return BROAD_SECTOR_ETFS;
-    }
-
-    /** Returns the thematic / industry-specific ETFs. */
-    public Map<String, String> getThematicEtfs() {
-        return THEMATIC_ETFS;
     }
 
     /** Returns the set of thematic ETF symbols for report section splitting. */

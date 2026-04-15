@@ -19,6 +19,7 @@ class SymbolRegistryTest {
 
     private SymbolRegistry symbolRegistry;
 
+    @SuppressWarnings("unused")
     @TempDir File tempDir;
 
     @BeforeEach
@@ -203,6 +204,7 @@ class SymbolRegistryTest {
         assertThat(entry.getDisplayName(), is("Microsoft"));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     void loadStockSymbols_invalidFile_throwsIOException() throws Exception {
         ObjectMapper mockMapper = mock(ObjectMapper.class);

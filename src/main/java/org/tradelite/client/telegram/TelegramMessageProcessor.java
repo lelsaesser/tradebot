@@ -166,6 +166,7 @@ public class TelegramMessageProcessor {
             return Optional.empty();
         }
         Optional<CoinId> coinId = CoinId.fromString(symbol);
+        //noinspection OptionalIsPresent
         if (coinId.isPresent()) {
             return Optional.of(coinId.get());
         }
