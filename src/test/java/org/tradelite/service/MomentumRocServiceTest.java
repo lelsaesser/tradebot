@@ -22,6 +22,7 @@ import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
 
+@SuppressWarnings("SameParameterValue")
 @ExtendWith(MockitoExtension.class)
 class MomentumRocServiceTest {
 

@@ -22,6 +22,7 @@ import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.OhlcvRepository;
 
+@SuppressWarnings("SameParameterValue")
 @ExtendWith(MockitoExtension.class)
 class OhlcvFetcherTest {
 

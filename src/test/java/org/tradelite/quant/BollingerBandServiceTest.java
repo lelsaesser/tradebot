@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.service.DailyPriceProvider;
 import org.tradelite.service.model.DailyPrice;
 
+@SuppressWarnings("SameParameterValue")
 @ExtendWith(MockitoExtension.class)
 class BollingerBandServiceTest {
 
