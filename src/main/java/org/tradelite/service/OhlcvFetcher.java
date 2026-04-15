@@ -44,7 +44,7 @@ public class OhlcvFetcher {
     }
 
     public void fetchAndBackfillOhlcv() throws InterruptedException {
-        List<String> symbols = buildSymbolList();
+        List<String> symbols = stockSymbolRegistry.getAllTrackedSymbols();
 
         log.info("Starting OHLCV fetch for {} symbols", symbols.size());
 
@@ -88,9 +88,5 @@ public class OhlcvFetcher {
                             "*OHLCV Fetch Alert*%n%d/%d failed %s",
                             failedSymbols.size(), symbols.size(), failedSymbols));
         }
-    }
-
-    private List<String> buildSymbolList() {
-        return stockSymbolRegistry.getAllTrackedSymbols();
     }
 }
