@@ -6,7 +6,9 @@ import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -27,13 +30,22 @@ class SectorRelativeStrengthTrackerTest {
 
     @Mock private SectorRsStreakPersistence streakPersistence;
 
+    @Mock private SymbolRegistry symbolRegistry;
+
     private SectorRelativeStrengthTracker tracker;
 
     @BeforeEach
     void setUp() {
         tracker =
                 new SectorRelativeStrengthTracker(
-                        relativeStrengthService, telegramClient, streakPersistence);
+                        relativeStrengthService, telegramClient, streakPersistence, symbolRegistry);
+
+        Map<String, String> etfs = new LinkedHashMap<>(SymbolRegistry.BROAD_SECTOR_ETFS);
+        etfs.putAll(SymbolRegistry.THEMATIC_ETFS);
+        lenient().when(symbolRegistry.getAllEtfs()).thenReturn(etfs);
+        lenient()
+                .when(symbolRegistry.getThematicSymbols())
+                .thenReturn(SymbolRegistry.THEMATIC_ETFS.keySet());
 
         // Default stubs so un-mocked ETFs (including thematic) return empty instead of null
         lenient()

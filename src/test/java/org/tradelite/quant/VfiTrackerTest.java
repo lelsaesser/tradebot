@@ -16,10 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
-import org.tradelite.service.StockSymbolRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class VfiTrackerTest {
@@ -27,7 +27,7 @@ class VfiTrackerTest {
     @Mock private VfiService vfiService;
     @Mock private RelativeStrengthService relativeStrengthService;
     @Mock private TelegramGateway telegramClient;
-    @Mock private StockSymbolRegistry stockSymbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
     @Mock private FeatureToggleService featureToggleService;
 
     private VfiTracker tracker;
@@ -39,10 +39,10 @@ class VfiTrackerTest {
                         vfiService,
                         relativeStrengthService,
                         telegramClient,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         featureToggleService);
         lenient().when(featureToggleService.isEnabled(FeatureToggle.VFI_REPORT)).thenReturn(true);
-        lenient().when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        lenient().when(symbolRegistry.getAll()).thenReturn(List.of());
     }
 
     @Test
@@ -57,6 +57,13 @@ class VfiTrackerTest {
 
     @Test
     void sendDailyReport_sendsReportWithAllThreeSignalColors() {
+        when(symbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("XLK", "Technology"),
+                                new StockSymbol("XLF", "Financials"),
+                                new StockSymbol("XLU", "Utilities")));
+
         // XLK: GREEN (RS positive + VFI positive)
         mockVfi("XLK", "Technology", 3.4, 2.1);
         mockRs("XLK", 1.05, 1.04); // rs > ema → positive
@@ -87,7 +94,7 @@ class VfiTrackerTest {
     @Test
     void sendDailyReport_emptyData_noTelegramSend() {
         // allEtfs() returns real ETFs but none have VFI/RS data
-        // Default: stockSymbolRegistry.getAll() returns empty list (from setUp)
+        // Default: symbolRegistry.getAll() returns empty list (from setUp)
         // VfiService/RS not stubbed → return default null which Mockito makes Optional.empty()
         lenient().when(vfiService.analyze(anyString(), anyString())).thenReturn(Optional.empty());
         lenient()
@@ -101,6 +108,12 @@ class VfiTrackerTest {
 
     @Test
     void sendDailyReport_skipsSymbolsWithInsufficientVfiData() {
+        when(symbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("XLK", "Technology"),
+                                new StockSymbol("XLF", "Financials")));
+
         // XLK has VFI, XLF does not
         mockVfi("XLK", "Technology", 3.4, 2.1);
         mockRs("XLK", 1.05, 1.04);
@@ -118,6 +131,12 @@ class VfiTrackerTest {
 
     @Test
     void sendDailyReport_skipsSymbolsWithInsufficientRsData() {
+        when(symbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("XLK", "Technology"),
+                                new StockSymbol("XLF", "Financials")));
+
         mockVfi("XLK", "Technology", 3.4, 2.1);
         mockRs("XLK", 1.05, 1.04);
         mockVfi("XLF", "Financials", 0.8, 0.5);
@@ -138,13 +157,14 @@ class VfiTrackerTest {
     void sendDailyReport_includesStocksExcludingEtfs() {
         StockSymbol aapl = new StockSymbol("AAPL", "Apple Inc");
         StockSymbol xlk = new StockSymbol("XLK", "Technology");
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(aapl, xlk));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("XLK")).thenReturn(true);
+        when(symbolRegistry.getAll()).thenReturn(List.of(aapl, xlk));
 
         // AAPL gets VFI + RS data
         mockVfi("AAPL", "Apple Inc", 2.0, 1.5);
         mockRs("AAPL", 1.03, 1.01);
+
+        // XLK has no VFI data
+        lenient().when(vfiService.analyze(eq("XLK"), anyString())).thenReturn(Optional.empty());
 
         tracker.sendDailyReport();
 
@@ -152,14 +172,17 @@ class VfiTrackerTest {
         verify(telegramClient).sendMessage(captor.capture());
         String report = captor.getValue();
         assertThat(report).contains("AAPL (Apple Inc)");
-        // XLK appears from SectorEtfRegistry.allEtfs(), not from stockSymbolRegistry
-        // Verify isEtf was checked for the stock registry entries
-        verify(stockSymbolRegistry).isEtf("XLK");
-        verify(stockSymbolRegistry).isEtf("AAPL");
     }
 
     @Test
     void sendDailyReport_summaryFooterShowsCorrectCounts() {
+        when(symbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("XLK", "Technology"),
+                                new StockSymbol("XLF", "Financials"),
+                                new StockSymbol("XLU", "Utilities")));
+
         // 2 GREEN, 1 YELLOW, 0 RED
         mockVfi("XLK", "Technology", 3.4, 2.1);
         mockRs("XLK", 1.05, 1.04);
@@ -178,6 +201,8 @@ class VfiTrackerTest {
 
     @Test
     void sendDailyReport_rsPercentageCalculation() {
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("XLK", "Technology")));
+
         // rs=1.05, ema=1.04 → (1.05/1.04 - 1) * 100 = 0.96...% → +1.0%
         mockVfi("XLK", "Technology", 3.4, 2.1);
         mockRs("XLK", 1.05, 1.04);
@@ -192,6 +217,12 @@ class VfiTrackerTest {
 
     @Test
     void sendDailyReport_singleColorReport_onlyRendersNonEmptySections() {
+        when(symbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("XLK", "Technology"),
+                                new StockSymbol("XLF", "Financials")));
+
         // All GREEN — no YELLOW or RED sections
         mockVfi("XLK", "Technology", 3.4, 2.1);
         mockRs("XLK", 1.05, 1.04);

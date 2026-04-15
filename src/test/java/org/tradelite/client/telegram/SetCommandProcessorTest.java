@@ -13,22 +13,22 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.service.StockSymbolRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class SetCommandProcessorTest {
 
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private TelegramGateway telegramClient;
-    @Mock private StockSymbolRegistry stockSymbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
 
     private SetCommandProcessor setCommandProcessor;
 
     @BeforeEach
     void setUp() {
         setCommandProcessor =
-                new SetCommandProcessor(targetPriceProvider, telegramClient, stockSymbolRegistry);
+                new SetCommandProcessor(targetPriceProvider, telegramClient, symbolRegistry);
     }
 
     @Test
@@ -67,7 +67,7 @@ class SetCommandProcessorTest {
     void processCommand_updatesTargetPrice_forValidStock() {
         SetCommand command = new SetCommand("sell", "AAPL", 150.0);
         StockSymbol aaplSymbol = new StockSymbol("AAPL", "Apple");
-        when(stockSymbolRegistry.fromString("AAPL")).thenReturn(Optional.of(aaplSymbol));
+        when(symbolRegistry.fromString("AAPL")).thenReturn(Optional.of(aaplSymbol));
 
         setCommandProcessor.processCommand(command);
 
@@ -80,7 +80,7 @@ class SetCommandProcessorTest {
     @Test
     void processCommand_throwsException_forInvalidSymbol() {
         SetCommand command = new SetCommand("buy", "INVALID_SYMBOL", 100.0);
-        when(stockSymbolRegistry.fromString("INVALID_SYMBOL")).thenReturn(Optional.empty());
+        when(symbolRegistry.fromString("INVALID_SYMBOL")).thenReturn(Optional.empty());
 
         assertThrows(
                 IllegalArgumentException.class, () -> setCommandProcessor.processCommand(command));

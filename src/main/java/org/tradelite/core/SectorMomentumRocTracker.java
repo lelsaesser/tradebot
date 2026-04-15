@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
-import org.tradelite.common.SectorEtfRegistry;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.service.MomentumRocService;
 
 /**
@@ -28,6 +28,7 @@ public class SectorMomentumRocTracker {
 
     private final MomentumRocService momentumRocService;
     private final TelegramGateway telegramClient;
+    private final SymbolRegistry symbolRegistry;
 
     /**
      * Analyzes all sector ETFs for momentum crossovers and sends alerts.
@@ -41,7 +42,7 @@ public class SectorMomentumRocTracker {
 
         List<MomentumRocSignal> signals = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : SectorEtfRegistry.allEtfs().entrySet()) {
+        for (Map.Entry<String, String> entry : symbolRegistry.getAllEtfs().entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 

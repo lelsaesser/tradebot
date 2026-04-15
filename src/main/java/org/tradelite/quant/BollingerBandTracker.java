@@ -9,9 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
-import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
-import org.tradelite.service.StockSymbolRegistry;
+import org.tradelite.common.SymbolRegistry;
 
 /**
  * Tracks Bollinger Band signals across sector ETFs, SPY, and all tracked stocks to detect
@@ -32,7 +31,7 @@ public class BollingerBandTracker {
 
     private final BollingerBandService bollingerBandService;
     private final TelegramGateway telegramClient;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
 
     /**
      * Stores the Telegram message ID of the last sent hourly alert so it can be deleted before
@@ -44,8 +43,7 @@ public class BollingerBandTracker {
     public List<BollingerBandAnalysis> analyzeAllSectors() {
         List<BollingerBandAnalysis> results = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry :
-                SectorEtfRegistry.allEtfsWithBenchmark().entrySet()) {
+        for (Map.Entry<String, String> entry : symbolRegistry.getAllEtfs().entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 
@@ -61,11 +59,7 @@ public class BollingerBandTracker {
     public List<BollingerBandAnalysis> analyzeAllStocks() {
         List<BollingerBandAnalysis> results = new ArrayList<>();
 
-        for (StockSymbol stock : stockSymbolRegistry.getAll()) {
-            if (stockSymbolRegistry.isSectorEtf(stock.getTicker())) {
-                continue;
-            }
-
+        for (StockSymbol stock : symbolRegistry.getStocks()) {
             Optional<BollingerBandAnalysis> analysis =
                     bollingerBandService.analyze(stock.getTicker(), stock.getCompanyName());
             analysis.ifPresent(results::add);

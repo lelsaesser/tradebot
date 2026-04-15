@@ -2,19 +2,17 @@ package org.tradelite.quant;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.FeatureToggle;
-import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
-import org.tradelite.service.StockSymbolRegistry;
 
 @Slf4j
 @Component
@@ -24,7 +22,7 @@ public class VfiTracker {
     private final VfiService vfiService;
     private final RelativeStrengthService relativeStrengthService;
     private final TelegramGateway telegramClient;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
     private final FeatureToggleService featureToggleService;
 
     public void sendDailyReport() {
@@ -48,14 +46,7 @@ public class VfiTracker {
     List<SymbolResult> analyzeAllSymbols() {
         List<SymbolResult> results = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : SectorEtfRegistry.allEtfs().entrySet()) {
-            analyzeSymbol(entry.getKey(), entry.getValue()).ifPresent(results::add);
-        }
-
-        for (StockSymbol stock : stockSymbolRegistry.getAll()) {
-            if (stockSymbolRegistry.isEtf(stock.getTicker())) {
-                continue;
-            }
+        for (StockSymbol stock : symbolRegistry.getAll()) {
             analyzeSymbol(stock.getTicker(), stock.getCompanyName()).ifPresent(results::add);
         }
 

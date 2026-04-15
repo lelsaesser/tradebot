@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
-import org.tradelite.common.SectorEtfRegistry;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -35,6 +35,7 @@ public class SectorRelativeStrengthTracker {
     private final RelativeStrengthService relativeStrengthService;
     private final TelegramGateway telegramClient;
     private final SectorRsStreakPersistence streakPersistence;
+    private final SymbolRegistry symbolRegistry;
 
     /**
      * Analyzes sector ETFs for RS crossovers and sends alerts.
@@ -50,7 +51,7 @@ public class SectorRelativeStrengthTracker {
         List<RelativeStrengthSignal> outperformingSignals = new ArrayList<>();
         List<RelativeStrengthSignal> underperformingSignals = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : SectorEtfRegistry.allEtfs().entrySet()) {
+        for (Map.Entry<String, String> entry : symbolRegistry.getAllEtfs().entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 
@@ -163,7 +164,7 @@ public class SectorRelativeStrengthTracker {
      * @return List of sector RS data, sorted by percentage difference (descending)
      */
     protected List<SectorRsData> collectSectorRsData() {
-        return collectRsDataForEtfs(SectorEtfRegistry.allEtfs());
+        return collectRsDataForEtfs(symbolRegistry.getAllEtfs());
     }
 
     /**
@@ -225,7 +226,7 @@ public class SectorRelativeStrengthTracker {
      */
     protected String formatSummaryMessage(List<SectorRsData> sectorData) {
         // Split into broad sector and thematic ETFs
-        Set<String> thematicSymbols = SectorEtfRegistry.thematicSymbols();
+        Set<String> thematicSymbols = symbolRegistry.getThematicSymbols();
         List<SectorRsData> broadData =
                 sectorData.stream().filter(s -> !thematicSymbols.contains(s.symbol())).toList();
         List<SectorRsData> thematicData =

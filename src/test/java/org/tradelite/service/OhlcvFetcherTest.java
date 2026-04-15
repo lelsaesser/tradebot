@@ -18,7 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
 import org.tradelite.common.OhlcvRecord;
-import org.tradelite.common.SectorEtfRegistry;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.repository.OhlcvRepository;
 
 @SuppressWarnings("SameParameterValue")
@@ -27,7 +28,7 @@ class OhlcvFetcherTest {
 
     @Mock private TwelveDataClient twelveDataClient;
     @Mock private OhlcvRepository ohlcvRepository;
-    @Mock private StockSymbolRegistry stockSymbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
     @Mock private TelegramGateway telegramGateway;
 
     private OhlcvFetcher ohlcvFetcher;
@@ -36,12 +37,10 @@ class OhlcvFetcherTest {
     void setUp() {
         ohlcvFetcher =
                 new OhlcvFetcher(
-                        twelveDataClient, ohlcvRepository, stockSymbolRegistry, telegramGateway);
+                        twelveDataClient, ohlcvRepository, symbolRegistry, telegramGateway);
         ohlcvFetcher.setRequestDelayMs(0);
         // Default: return all ETFs + benchmark (no extra stocks)
-        lenient()
-                .when(stockSymbolRegistry.getAllTrackedSymbols())
-                .thenReturn(new ArrayList<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet()));
+        lenient().when(symbolRegistry.getAll()).thenReturn(defaultEtfSymbols());
         // Default: all symbols need backfill
         lenient().when(ohlcvRepository.findBySymbol(anyString(), anyInt())).thenReturn(List.of());
         // Default: fetch returns empty
@@ -72,16 +71,17 @@ class OhlcvFetcherTest {
     void fetchAndBackfillOhlcv_includesEtfsFromRegistry() throws InterruptedException {
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        for (String etf : SectorEtfRegistry.allEtfsWithBenchmark().keySet()) {
+        for (String etf : SymbolRegistry.BROAD_SECTOR_ETFS.keySet()) {
             verify(twelveDataClient).fetchDailyOhlcv(eq(etf), anyInt());
         }
+        verify(twelveDataClient).fetchDailyOhlcv(eq(SymbolRegistry.BENCHMARK_SYMBOL), anyInt());
     }
 
     @Test
     void fetchAndBackfillOhlcv_includesNonEtfStocks() throws InterruptedException {
-        List<String> symbols = new ArrayList<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet());
-        symbols.add("AAPL");
-        when(stockSymbolRegistry.getAllTrackedSymbols()).thenReturn(symbols);
+        List<StockSymbol> symbols = new ArrayList<>(defaultEtfSymbols());
+        symbols.add(new StockSymbol("AAPL", "Apple Inc"));
+        when(symbolRegistry.getAll()).thenReturn(symbols);
 
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
@@ -90,7 +90,7 @@ class OhlcvFetcherTest {
 
     @Test
     void fetchAndBackfillOhlcv_noDuplicatesInSymbolList() throws InterruptedException {
-        // getAllTrackedSymbols already deduplicates — verify XLK fetched exactly once
+        // getAll() already deduplicates — verify XLK fetched exactly once
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
         verify(twelveDataClient, times(1)).fetchDailyOhlcv(eq("XLK"), anyInt());
@@ -98,9 +98,9 @@ class OhlcvFetcherTest {
 
     @Test
     void fetchAndBackfillOhlcv_oneSymbolFails_continuesFetching() throws InterruptedException {
-        List<String> symbols = new ArrayList<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet());
-        symbols.add("GLXY");
-        when(stockSymbolRegistry.getAllTrackedSymbols()).thenReturn(symbols);
+        List<StockSymbol> symbols = new ArrayList<>(defaultEtfSymbols());
+        symbols.add(new StockSymbol("GLXY", "Galaxy Digital"));
+        when(symbolRegistry.getAll()).thenReturn(symbols);
         when(twelveDataClient.fetchDailyOhlcv("GLXY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
                 .thenThrow(new RuntimeException("API error"));
 
@@ -147,5 +147,17 @@ class OhlcvFetcherTest {
                             1000000L));
         }
         return records;
+    }
+
+    /** Builds the default list of ETF StockSymbols matching SymbolRegistry.getAllEtfs(). */
+    private static List<StockSymbol> defaultEtfSymbols() {
+        List<StockSymbol> symbols = new ArrayList<>();
+        symbols.add(
+                new StockSymbol(SymbolRegistry.BENCHMARK_SYMBOL, SymbolRegistry.BENCHMARK_NAME));
+        SymbolRegistry.BROAD_SECTOR_ETFS.forEach(
+                (ticker, name) -> symbols.add(new StockSymbol(ticker, name)));
+        SymbolRegistry.THEMATIC_ETFS.forEach(
+                (ticker, name) -> symbols.add(new StockSymbol(ticker, name)));
+        return symbols;
     }
 }

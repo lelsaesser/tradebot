@@ -13,26 +13,26 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
-import org.tradelite.service.StockSymbolRegistry;
+import org.tradelite.common.SymbolRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class EmaTrackerTest {
 
     @Mock private EmaService emaService;
     @Mock private TelegramGateway telegramClient;
-    @Mock private StockSymbolRegistry stockSymbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
 
     private EmaTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new EmaTracker(emaService, telegramClient, stockSymbolRegistry);
+        tracker = new EmaTracker(emaService, telegramClient, symbolRegistry);
     }
 
     @Test
     void sendDailyReport_sendsMessageWhenAnalysesExist() {
         StockSymbol aapl = new StockSymbol("AAPL", "Apple");
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(aapl));
+        when(symbolRegistry.getAll()).thenReturn(List.of(aapl));
         when(emaService.analyze("AAPL", "Apple"))
                 .thenReturn(
                         Optional.of(
@@ -57,7 +57,7 @@ class EmaTrackerTest {
     @Test
     void sendDailyReport_doesNotSendWhenNoAnalyses() {
         StockSymbol aapl = new StockSymbol("AAPL", "Apple");
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(aapl));
+        when(symbolRegistry.getAll()).thenReturn(List.of(aapl));
         when(emaService.analyze("AAPL", "Apple")).thenReturn(Optional.empty());
 
         tracker.sendDailyReport();
@@ -202,7 +202,7 @@ class EmaTrackerTest {
     void analyzeAllStocks_collectsAnalysesForAllStocks() {
         StockSymbol aapl = new StockSymbol("AAPL", "Apple");
         StockSymbol msft = new StockSymbol("MSFT", "Microsoft");
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(aapl, msft));
+        when(symbolRegistry.getAll()).thenReturn(List.of(aapl, msft));
         when(emaService.analyze("AAPL", "Apple"))
                 .thenReturn(
                         Optional.of(

@@ -29,7 +29,7 @@ class FinnhubPriceEvaluatorTest {
     @Mock private FinnhubClient finnhubClient;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private TelegramGateway telegramClient;
-    @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
+    @Mock private org.tradelite.common.SymbolRegistry symbolRegistry;
     @Mock private PriceQuoteRepository priceQuoteRepository;
     @Mock private FeatureToggleService featureToggleService;
 
@@ -42,7 +42,7 @@ class FinnhubPriceEvaluatorTest {
                         finnhubClient,
                         targetPriceProvider,
                         telegramClient,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         priceQuoteRepository,
                         featureToggleService);
     }
@@ -55,9 +55,9 @@ class FinnhubPriceEvaluatorTest {
                                 new StockSymbol("AVGO", "Broadcom").getTicker(), 150.0, 160.0),
                         new TargetPrice(new StockSymbol("GOOG", "Google").getTicker(), 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(stockSymbolRegistry.fromString("AVGO"))
+        when(symbolRegistry.fromString("AVGO"))
                 .thenReturn(java.util.Optional.of(new StockSymbol("AVGO", "Broadcom")));
-        when(stockSymbolRegistry.fromString("GOOG"))
+        when(symbolRegistry.fromString("GOOG"))
                 .thenReturn(java.util.Optional.of(new StockSymbol("GOOG", "Google")));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
@@ -188,7 +188,7 @@ class FinnhubPriceEvaluatorTest {
         List<TargetPrice> targetPrices =
                 List.of(new TargetPrice("TEST", lastPrice - 1000, lastPrice + 1000));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(stockSymbolRegistry.fromString("TEST")).thenReturn(java.util.Optional.of(testSymbol));
+        when(symbolRegistry.fromString("TEST")).thenReturn(java.util.Optional.of(testSymbol));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
         priceQuoteResponse.setCurrentPrice(lastPrice);
@@ -213,8 +213,8 @@ class FinnhubPriceEvaluatorTest {
                         new TargetPrice("INVALID", 150.0, 160.0),
                         new TargetPrice(new StockSymbol("GOOG", "Google").getTicker(), 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(stockSymbolRegistry.fromString("INVALID")).thenReturn(java.util.Optional.empty());
-        when(stockSymbolRegistry.fromString("GOOG"))
+        when(symbolRegistry.fromString("INVALID")).thenReturn(java.util.Optional.empty());
+        when(symbolRegistry.fromString("GOOG"))
                 .thenReturn(java.util.Optional.of(new StockSymbol("GOOG", "Google")));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
@@ -238,9 +238,9 @@ class FinnhubPriceEvaluatorTest {
                                 new StockSymbol("AVGO", "Broadcom").getTicker(), 150.0, 160.0),
                         new TargetPrice(new StockSymbol("GOOG", "Google").getTicker(), 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(stockSymbolRegistry.fromString("AVGO"))
+        when(symbolRegistry.fromString("AVGO"))
                 .thenReturn(java.util.Optional.of(new StockSymbol("AVGO", "Broadcom")));
-        when(stockSymbolRegistry.fromString("GOOG"))
+        when(symbolRegistry.fromString("GOOG"))
                 .thenReturn(java.util.Optional.of(new StockSymbol("GOOG", "Google")));
 
         when(finnhubClient.getPriceQuote(new StockSymbol("AVGO", "Broadcom"))).thenReturn(null);
@@ -297,7 +297,7 @@ class FinnhubPriceEvaluatorTest {
         StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(stockSymbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
+        when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
         when(featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION))
                 .thenReturn(true);
 
@@ -317,7 +317,7 @@ class FinnhubPriceEvaluatorTest {
         StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(stockSymbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
+        when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
         when(featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION))
                 .thenReturn(false);
 
@@ -339,7 +339,7 @@ class FinnhubPriceEvaluatorTest {
 
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(stockSymbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
+        when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
         priceQuoteResponse.setStockSymbol(testSymbol);

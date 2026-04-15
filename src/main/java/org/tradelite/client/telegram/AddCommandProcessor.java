@@ -11,9 +11,9 @@ import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.service.StockSymbolRegistry;
 
 @Slf4j
 @Component
@@ -21,7 +21,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
 
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramGateway telegramClient;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
     private final FinnhubClient finnhubClient;
     private final CoinGeckoClient coinGeckoClient;
 
@@ -29,12 +29,12 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     public AddCommandProcessor(
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
-            StockSymbolRegistry stockSymbolRegistry,
+            SymbolRegistry symbolRegistry,
             FinnhubClient finnhubClient,
             CoinGeckoClient coinGeckoClient) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
         this.finnhubClient = finnhubClient;
         this.coinGeckoClient = coinGeckoClient;
     }
@@ -57,7 +57,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
 
         // Add to stock symbol registry
         boolean symbolAdded =
-                stockSymbolRegistry.addSymbol(command.getTicker(), command.getDisplayName());
+                symbolRegistry.addSymbol(command.getTicker(), command.getDisplayName());
         if (!symbolAdded) {
             telegramClient.sendMessage(
                     "Failed to add symbol: "
@@ -70,7 +70,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
         boolean priceAdded = addToTargetPrices(command);
         if (!priceAdded) {
             // Rollback symbol addition if price addition fails
-            stockSymbolRegistry.removeSymbol(command.getTicker());
+            symbolRegistry.removeSymbol(command.getTicker());
             telegramClient.sendMessage(
                     "Failed to add symbol to target prices: " + command.getTicker());
             return;

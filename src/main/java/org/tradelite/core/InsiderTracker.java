@@ -8,9 +8,9 @@ import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.service.StockSymbolRegistry;
 
 @Component
 public class InsiderTracker {
@@ -19,7 +19,7 @@ public class InsiderTracker {
     private final TelegramGateway telegramClient;
     private final TargetPriceProvider targetPriceProvider;
     private final InsiderPersistence insiderPersistence;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
 
     @Autowired
     public InsiderTracker(
@@ -27,25 +27,25 @@ public class InsiderTracker {
             TelegramGateway telegramClient,
             TargetPriceProvider targetPriceProvider,
             InsiderPersistence insiderPersistence,
-            StockSymbolRegistry stockSymbolRegistry) {
+            SymbolRegistry symbolRegistry) {
         this.finnhubClient = finnhubClient;
         this.telegramClient = telegramClient;
         this.targetPriceProvider = targetPriceProvider;
         this.insiderPersistence = insiderPersistence;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
     }
 
     public void trackInsiderTransactions() {
         List<String> monitoredSymbols =
                 targetPriceProvider.getStockTargetPrices().stream()
                         .map(TargetPrice::getSymbol)
-                        .filter(symbol -> !stockSymbolRegistry.isEtf(symbol))
+                        .filter(symbol -> !symbolRegistry.isEtf(symbol))
                         .toList();
 
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
 
         for (String symbolString : monitoredSymbols) {
-            Optional<StockSymbol> stockSymbolOpt = stockSymbolRegistry.fromString(symbolString);
+            Optional<StockSymbol> stockSymbolOpt = symbolRegistry.fromString(symbolString);
             if (stockSymbolOpt.isEmpty()) {
                 continue;
             }

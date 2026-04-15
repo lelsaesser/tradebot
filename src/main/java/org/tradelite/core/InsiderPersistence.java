@@ -10,7 +10,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.common.StockSymbol;
-import org.tradelite.service.StockSymbolRegistry;
+import org.tradelite.common.SymbolRegistry;
 
 @Component
 public class InsiderPersistence {
@@ -18,12 +18,12 @@ public class InsiderPersistence {
     public static final String PERSISTENCE_FILE_PATH = "config/insider-transactions.json";
 
     private final ObjectMapper objectMapper;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
 
     @Autowired
-    public InsiderPersistence(ObjectMapper objectMapper, StockSymbolRegistry stockSymbolRegistry) {
+    public InsiderPersistence(ObjectMapper objectMapper, SymbolRegistry symbolRegistry) {
         this.objectMapper = objectMapper;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
     }
 
     public void persistToFile(
@@ -48,7 +48,7 @@ public class InsiderPersistence {
             return map.entrySet().stream()
                     .map(
                             e ->
-                                    stockSymbolRegistry
+                                    symbolRegistry
                                             .fromString(e.getKey())
                                             .map(
                                                     symbol ->

@@ -24,8 +24,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.tradelite.common.OhlcvRecord;
-import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.quant.StatisticsUtil;
@@ -33,7 +33,6 @@ import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
-import org.tradelite.service.StockSymbolRegistry;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
 import org.tradelite.service.model.RelativeStrengthData;
@@ -59,7 +58,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final RsiService rsiService;
     private final RelativeStrengthService relativeStrengthService;
     private final TargetPriceProvider targetPriceProvider;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
     private final OhlcvRepository ohlcvRepository;
     private final Path rsiDataFilePath;
     private final Path rsDataFilePath;
@@ -72,7 +71,7 @@ public class DevDataSeeder implements ApplicationRunner {
             RsiService rsiService,
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
-            StockSymbolRegistry stockSymbolRegistry,
+            SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository) {
         this(
                 dataSource,
@@ -81,7 +80,7 @@ public class DevDataSeeder implements ApplicationRunner {
                 rsiService,
                 relativeStrengthService,
                 targetPriceProvider,
-                stockSymbolRegistry,
+                symbolRegistry,
                 ohlcvRepository,
                 Path.of("config/rsi-data.json"),
                 Path.of("config/rs-data.json"));
@@ -94,7 +93,7 @@ public class DevDataSeeder implements ApplicationRunner {
             RsiService rsiService,
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
-            StockSymbolRegistry stockSymbolRegistry,
+            SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
             Path rsiDataFilePath,
             Path rsDataFilePath) {
@@ -104,7 +103,7 @@ public class DevDataSeeder implements ApplicationRunner {
         this.rsiService = rsiService;
         this.relativeStrengthService = relativeStrengthService;
         this.targetPriceProvider = targetPriceProvider;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
         this.ohlcvRepository = ohlcvRepository;
         this.rsiDataFilePath = rsiDataFilePath;
         this.rsDataFilePath = rsDataFilePath;
@@ -147,7 +146,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private boolean hasSeedData() {
         return Files.exists(rsiDataFilePath)
                 && Files.exists(rsDataFilePath)
-                && hasPersistedQuotes(SectorEtfRegistry.BENCHMARK_SYMBOL);
+                && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
     }
 
     private boolean hasPersistedQuotes(String symbol) {
@@ -225,8 +224,7 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private SeedBundle buildSeedBundle() {
-        Map<String, String> displayNames =
-                new LinkedHashMap<>(SectorEtfRegistry.allEtfsWithBenchmark());
+        Map<String, String> displayNames = new LinkedHashMap<>(symbolRegistry.getAllEtfs());
 
         int stockCount = 0;
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
@@ -234,9 +232,9 @@ public class DevDataSeeder implements ApplicationRunner {
                 break;
             }
 
-            stockSymbolRegistry
+            symbolRegistry
                     .fromString(targetPrice.getSymbol())
-                    .filter(symbol -> !stockSymbolRegistry.isEtf(symbol.getTicker()))
+                    .filter(symbol -> !symbolRegistry.isEtf(symbol.getTicker()))
                     .ifPresent(
                             stockSymbol -> {
                                 if (!displayNames.containsKey(stockSymbol.getTicker())) {
@@ -250,12 +248,9 @@ public class DevDataSeeder implements ApplicationRunner {
         }
 
         if (stockCount == 0) {
-            for (StockSymbol stockSymbol : stockSymbolRegistry.getAll()) {
+            for (StockSymbol stockSymbol : symbolRegistry.getStocks()) {
                 if (stockCount >= SAMPLE_STOCK_LIMIT) {
                     break;
-                }
-                if (stockSymbolRegistry.isEtf(stockSymbol.getTicker())) {
-                    continue;
                 }
                 displayNames.putIfAbsent(stockSymbol.getTicker(), stockSymbol.getCompanyName());
                 stockCount++;
@@ -381,14 +376,14 @@ public class DevDataSeeder implements ApplicationRunner {
         rsHistory.clear();
 
         List<DailyPrice> spySeries =
-                bundle.priceSeriesBySymbol().get(SectorEtfRegistry.BENCHMARK_SYMBOL);
+                bundle.priceSeriesBySymbol().get(SymbolRegistry.BENCHMARK_SYMBOL);
         Map<LocalDate, Double> spyByDate = new LinkedHashMap<>();
         for (DailyPrice dailyPrice : spySeries) {
             spyByDate.put(dailyPrice.getDate(), dailyPrice.getPrice());
         }
 
         for (Map.Entry<String, List<DailyPrice>> entry : bundle.priceSeriesBySymbol().entrySet()) {
-            if (SectorEtfRegistry.BENCHMARK_SYMBOL.equals(entry.getKey())) {
+            if (SymbolRegistry.BENCHMARK_SYMBOL.equals(entry.getKey())) {
                 continue;
             }
 
@@ -420,7 +415,7 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private void seedMomentumState(SeedBundle bundle) {
-        for (String symbol : SectorEtfRegistry.allEtfs().keySet()) {
+        for (String symbol : symbolRegistry.getAllEtfs().keySet()) {
             List<DailyPrice> series = bundle.priceSeriesBySymbol().get(symbol);
             if (series == null || series.size() <= 20) {
                 continue;

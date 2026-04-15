@@ -8,24 +8,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.service.StockSymbolRegistry;
 
 @Component
 public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand> {
 
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramGateway telegramClient;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
 
     @Autowired
     public SetCommandProcessor(
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
-            StockSymbolRegistry stockSymbolRegistry) {
+            SymbolRegistry symbolRegistry) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
     }
 
     @Override
@@ -48,7 +48,7 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
 
         String symbol = command.getSymbol();
         Optional<CoinId> coinId = CoinId.fromString(symbol);
-        Optional<StockSymbol> stockSymbol = stockSymbolRegistry.fromString(symbol);
+        Optional<StockSymbol> stockSymbol = symbolRegistry.fromString(symbol);
         String displayName;
 
         if (coinId.isPresent()) {

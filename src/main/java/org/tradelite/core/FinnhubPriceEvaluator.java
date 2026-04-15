@@ -11,11 +11,11 @@ import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
-import org.tradelite.service.StockSymbolRegistry;
 
 @Slf4j
 @Component
@@ -24,7 +24,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final FinnhubClient finnhubClient;
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramGateway telegramClient;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
     private final PriceQuoteRepository priceQuoteRepository;
     private final FeatureToggleService featureToggleService;
 
@@ -35,14 +35,14 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             FinnhubClient finnhubClient,
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
-            StockSymbolRegistry stockSymbolRegistry,
+            SymbolRegistry symbolRegistry,
             PriceQuoteRepository priceQuoteRepository,
             FeatureToggleService featureToggleService) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
         this.priceQuoteRepository = priceQuoteRepository;
         this.featureToggleService = featureToggleService;
     }
@@ -53,7 +53,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
 
         for (TargetPrice targetPrice : targetPrices) {
-            Optional<StockSymbol> ticker = stockSymbolRegistry.fromString(targetPrice.getSymbol());
+            Optional<StockSymbol> ticker = symbolRegistry.fromString(targetPrice.getSymbol());
             if (ticker.isEmpty()) {
                 log.warn(
                         "Target price symbol {} not found in stock symbol registry",

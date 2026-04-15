@@ -12,16 +12,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
-import org.tradelite.service.StockSymbolRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class RemoveCommandProcessorTest {
 
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private TelegramGateway telegramClient;
-    @Mock private StockSymbolRegistry stockSymbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
     @Mock private RsiService rsiService;
 
     private RemoveCommandProcessor removeCommandProcessor;
@@ -30,7 +30,7 @@ class RemoveCommandProcessorTest {
     void setUp() {
         removeCommandProcessor =
                 new RemoveCommandProcessor(
-                        targetPriceProvider, telegramClient, stockSymbolRegistry, rsiService);
+                        targetPriceProvider, telegramClient, symbolRegistry, rsiService);
     }
 
     @Test
@@ -52,14 +52,14 @@ class RemoveCommandProcessorTest {
     @Test
     void processCommand_validRemoveCommand_removesSymbol() {
         RemoveCommand command = new RemoveCommand("PLTR");
-        when(stockSymbolRegistry.removeSymbol("PLTR")).thenReturn(true);
+        when(symbolRegistry.removeSymbol("PLTR")).thenReturn(true);
         when(targetPriceProvider.removeSymbolFromTargetPrices(eq("PLTR"), anyString()))
                 .thenReturn(true);
         when(rsiService.removeSymbolRsiData("PLTR")).thenReturn(true);
 
         removeCommandProcessor.processCommand(command);
 
-        verify(stockSymbolRegistry).removeSymbol("PLTR");
+        verify(symbolRegistry).removeSymbol("PLTR");
         verify(targetPriceProvider).removeSymbolFromTargetPrices(eq("PLTR"), anyString());
         verify(rsiService).removeSymbolRsiData("PLTR");
         verify(telegramClient)
@@ -69,7 +69,7 @@ class RemoveCommandProcessorTest {
     @Test
     void processCommand_symbolNotFound_sendsErrorMessage() {
         RemoveCommand command = new RemoveCommand("NONEXISTENT");
-        when(stockSymbolRegistry.removeSymbol("NONEXISTENT")).thenReturn(false);
+        when(symbolRegistry.removeSymbol("NONEXISTENT")).thenReturn(false);
         when(targetPriceProvider.removeSymbolFromTargetPrices(eq("NONEXISTENT"), anyString()))
                 .thenReturn(false);
         when(rsiService.removeSymbolRsiData("NONEXISTENT")).thenReturn(false);
@@ -82,7 +82,7 @@ class RemoveCommandProcessorTest {
     @Test
     void processCommand_onlyTargetPriceRemoved_sendsSuccessMessage() {
         RemoveCommand command = new RemoveCommand("TEST");
-        when(stockSymbolRegistry.removeSymbol("TEST")).thenReturn(false);
+        when(symbolRegistry.removeSymbol("TEST")).thenReturn(false);
         when(targetPriceProvider.removeSymbolFromTargetPrices(eq("TEST"), anyString()))
                 .thenReturn(true);
         when(rsiService.removeSymbolRsiData("TEST")).thenReturn(false);
@@ -95,7 +95,7 @@ class RemoveCommandProcessorTest {
     @Test
     void processCommand_noRsiDataToRemove_sendsMessageWithoutRsiNote() {
         RemoveCommand command = new RemoveCommand("PLTR");
-        when(stockSymbolRegistry.removeSymbol("PLTR")).thenReturn(true);
+        when(symbolRegistry.removeSymbol("PLTR")).thenReturn(true);
         when(targetPriceProvider.removeSymbolFromTargetPrices(eq("PLTR"), anyString()))
                 .thenReturn(true);
         when(rsiService.removeSymbolRsiData("PLTR")).thenReturn(false);

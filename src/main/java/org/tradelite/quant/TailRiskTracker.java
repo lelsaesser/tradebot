@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
-import org.tradelite.common.SectorEtfRegistry;
+import org.tradelite.common.SymbolRegistry;
 
 /**
  * Tracks tail risk across sector ETFs and SPY to provide early warning of market instability.
@@ -27,13 +27,13 @@ public class TailRiskTracker {
 
     private final TailRiskService tailRiskService;
     private final TelegramGateway telegramClient;
+    private final SymbolRegistry symbolRegistry;
 
     /** Analyzes tail risk for all tracked sector ETFs and returns the results. */
     public List<TailRiskAnalysis> analyzeAllSectors() {
         List<TailRiskAnalysis> results = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry :
-                SectorEtfRegistry.allEtfsWithBenchmark().entrySet()) {
+        for (Map.Entry<String, String> entry : symbolRegistry.getAllEtfs().entrySet()) {
             String symbol = entry.getKey();
             String displayName = entry.getValue();
 

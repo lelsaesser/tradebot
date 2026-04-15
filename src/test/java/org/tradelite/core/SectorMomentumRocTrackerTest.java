@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.core.MomentumRocSignal.SignalType;
 import org.tradelite.service.MomentumRocService;
 
@@ -20,12 +23,17 @@ class SectorMomentumRocTrackerTest {
 
     @Mock private MomentumRocService momentumRocService;
     @Mock private TelegramGateway telegramClient;
+    @Mock private SymbolRegistry symbolRegistry;
 
     private SectorMomentumRocTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new SectorMomentumRocTracker(momentumRocService, telegramClient);
+        tracker = new SectorMomentumRocTracker(momentumRocService, telegramClient, symbolRegistry);
+
+        Map<String, String> etfs = new LinkedHashMap<>(SymbolRegistry.BROAD_SECTOR_ETFS);
+        etfs.putAll(SymbolRegistry.THEMATIC_ETFS);
+        lenient().when(symbolRegistry.getAllEtfs()).thenReturn(etfs);
 
         // Default stub so un-mocked ETFs return empty instead of null
         lenient()

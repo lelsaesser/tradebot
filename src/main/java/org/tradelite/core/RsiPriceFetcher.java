@@ -12,10 +12,10 @@ import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
-import org.tradelite.service.StockSymbolRegistry;
 
 @Component
 @RequiredArgsConstructor
@@ -26,7 +26,7 @@ public class RsiPriceFetcher {
     private final CoinGeckoClient coinGeckoClient;
     private final TargetPriceProvider targetPriceProvider;
     private final RsiService rsiService;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
 
     public void fetchStockClosingPrices() throws IOException, InterruptedException {
         LocalDate today = LocalDate.now();
@@ -34,7 +34,7 @@ public class RsiPriceFetcher {
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
             try {
                 Optional<StockSymbol> stockSymbol =
-                        stockSymbolRegistry.fromString(targetPrice.getSymbol());
+                        symbolRegistry.fromString(targetPrice.getSymbol());
                 if (stockSymbol.isPresent()) {
                     PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(stockSymbol.get());
                     rsiService.addPrice(

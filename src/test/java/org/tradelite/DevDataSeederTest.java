@@ -28,13 +28,13 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
-import org.tradelite.service.StockSymbolRegistry;
 import org.tradelite.service.model.RelativeStrengthData;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
@@ -60,7 +60,7 @@ class DevDataSeederTest {
         RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
-        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         var rsiHistory = new java.util.HashMap<String, RsiDailyClosePrice>();
@@ -72,9 +72,15 @@ class DevDataSeederTest {
         when(relativeStrengthService.getRsHistory()).thenReturn(rsHistory);
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 150.0, 200.0)));
-        when(stockSymbolRegistry.fromString("AAPL"))
+        when(symbolRegistry.fromString("AAPL"))
                 .thenReturn(java.util.Optional.of(new StockSymbol("AAPL", "Apple Inc")));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
+        when(symbolRegistry.isEtf("AAPL")).thenReturn(false);
+        when(symbolRegistry.getAllEtfs())
+                .thenReturn(
+                        java.util.Map.of(
+                                "SPY", "S&P 500",
+                                "XLK", "Technology"));
+        when(symbolRegistry.getStocks()).thenReturn(List.of());
 
         DevDataSeeder seeder =
                 new DevDataSeeder(
@@ -84,7 +90,7 @@ class DevDataSeederTest {
                         rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         ohlcvRepository,
                         tempDir.resolve("rsi-data.json"),
                         tempDir.resolve("rs-data.json"));
@@ -122,14 +128,15 @@ class DevDataSeederTest {
         RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
-        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
         when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
+        when(symbolRegistry.getStocks()).thenReturn(List.of());
 
         DevDataSeeder seeder =
                 new DevDataSeeder(
@@ -139,7 +146,7 @@ class DevDataSeederTest {
                         rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         ohlcvRepository,
                         tempDir.resolve("rsi-data.json"),
                         tempDir.resolve("rs-data.json"));
@@ -180,7 +187,7 @@ class DevDataSeederTest {
         RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
-        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         var rsiHistory = new java.util.HashMap<String, RsiDailyClosePrice>();
@@ -191,23 +198,16 @@ class DevDataSeederTest {
         when(rsiService.getSymbolDisplayNames()).thenReturn(symbolDisplayNames);
         when(relativeStrengthService.getRsHistory()).thenReturn(rsHistory);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
-        when(stockSymbolRegistry.getAll())
+        when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
+        when(symbolRegistry.getStocks())
                 .thenReturn(
                         List.of(
-                                new StockSymbol("ETF1", "ETF One"),
                                 new StockSymbol("AAPL", "Apple Inc"),
                                 new StockSymbol("MSFT", "Microsoft Corp"),
                                 new StockSymbol("NVDA", "NVIDIA Corp"),
                                 new StockSymbol("AMZN", "Amazon.com"),
                                 new StockSymbol("META", "Meta Platforms"),
                                 new StockSymbol("GOOG", "Alphabet Inc")));
-        when(stockSymbolRegistry.isEtf("ETF1")).thenReturn(true);
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("MSFT")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("NVDA")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("AMZN")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("META")).thenReturn(false);
-        when(stockSymbolRegistry.isEtf("GOOG")).thenReturn(false);
 
         DevDataSeeder seeder =
                 new DevDataSeeder(
@@ -217,7 +217,7 @@ class DevDataSeederTest {
                         rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         ohlcvRepository,
                         tempDir.resolve("rsi-fallback.json"),
                         tempDir.resolve("rs-fallback.json"));
@@ -242,14 +242,15 @@ class DevDataSeederTest {
         RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
-        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
         when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
+        when(symbolRegistry.getStocks()).thenReturn(List.of());
 
         DevDataSeeder seeder =
                 new DevDataSeeder(
@@ -259,7 +260,7 @@ class DevDataSeederTest {
                         rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         ohlcvRepository,
                         tempDir.resolve("rsi-error.json"),
                         tempDir.resolve("rs-error.json"));
@@ -285,14 +286,15 @@ class DevDataSeederTest {
         RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
-        StockSymbolRegistry stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
         when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
         when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
+        when(symbolRegistry.getStocks()).thenReturn(List.of());
 
         return new DevDataSeeder(
                 dataSource,
@@ -301,7 +303,7 @@ class DevDataSeederTest {
                 rsiService,
                 relativeStrengthService,
                 targetPriceProvider,
-                stockSymbolRegistry,
+                symbolRegistry,
                 ohlcvRepository,
                 rsiPath,
                 rsPath);

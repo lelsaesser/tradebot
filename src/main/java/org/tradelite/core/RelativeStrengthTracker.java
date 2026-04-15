@@ -9,10 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RelativeStrengthService;
-import org.tradelite.service.StockSymbolRegistry;
 
 /**
  * Orchestrates relative strength calculation and alert generation for all tracked stocks.
@@ -28,7 +28,7 @@ public class RelativeStrengthTracker {
 
     private final RelativeStrengthService relativeStrengthService;
     private final TargetPriceProvider targetPriceProvider;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
     private final TelegramGateway telegramClient;
 
     /**
@@ -51,7 +51,7 @@ public class RelativeStrengthTracker {
                 continue;
             }
 
-            Optional<StockSymbol> stockSymbol = stockSymbolRegistry.fromString(symbol);
+            Optional<StockSymbol> stockSymbol = symbolRegistry.fromString(symbol);
             String displayName = stockSymbol.map(StockSymbol::getDisplayName).orElse(symbol);
 
             try {

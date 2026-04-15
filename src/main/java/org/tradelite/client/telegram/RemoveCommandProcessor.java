@@ -4,27 +4,27 @@ import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RsiService;
-import org.tradelite.service.StockSymbolRegistry;
 
 @Component
 public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCommand> {
 
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramGateway telegramClient;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
     private final RsiService rsiService;
 
     @Autowired
     public RemoveCommandProcessor(
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
-            StockSymbolRegistry stockSymbolRegistry,
+            SymbolRegistry symbolRegistry,
             RsiService rsiService) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
         this.rsiService = rsiService;
     }
 
@@ -38,7 +38,7 @@ public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCo
         String ticker = command.getTicker();
 
         // Remove from stock symbol registry
-        boolean symbolRemoved = stockSymbolRegistry.removeSymbol(ticker);
+        boolean symbolRemoved = symbolRegistry.removeSymbol(ticker);
 
         // Remove from target prices
         boolean priceRemoved = removeFromTargetPrices(ticker);
