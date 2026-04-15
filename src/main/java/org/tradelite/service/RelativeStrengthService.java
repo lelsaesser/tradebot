@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
-import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RelativeStrengthData;
 import org.tradelite.service.model.RsiDailyClosePrice;
@@ -52,19 +51,17 @@ public class RelativeStrengthService {
 
     private final ObjectMapper objectMapper;
     private final RsiService rsiService;
-    private final PriceQuoteRepository priceQuoteRepository;
+    private final DailyPriceProvider dailyPriceProvider;
 
     @Getter private Map<String, RelativeStrengthData> rsHistory = new HashMap<>();
 
     @Autowired
     public RelativeStrengthService(
-            ObjectMapper objectMapper,
-            RsiService rsiService,
-            PriceQuoteRepository priceQuoteRepository)
+            ObjectMapper objectMapper, RsiService rsiService, DailyPriceProvider dailyPriceProvider)
             throws IOException {
         this.objectMapper = objectMapper;
         this.rsiService = rsiService;
-        this.priceQuoteRepository = priceQuoteRepository;
+        this.dailyPriceProvider = dailyPriceProvider;
         loadRsHistory();
     }
 
@@ -246,9 +243,9 @@ public class RelativeStrengthService {
 
         // Fetch fresh daily prices from SQLite (only last 80 days)
         List<DailyPrice> stockPrices =
-                priceQuoteRepository.findDailyClosingPrices(symbol, RS_LOOKBACK_DAYS);
+                dailyPriceProvider.findDailyClosingPrices(symbol, RS_LOOKBACK_DAYS);
         List<DailyPrice> spyPrices =
-                priceQuoteRepository.findDailyClosingPrices(BENCHMARK_SYMBOL, RS_LOOKBACK_DAYS);
+                dailyPriceProvider.findDailyClosingPrices(BENCHMARK_SYMBOL, RS_LOOKBACK_DAYS);
 
         if (stockPrices.isEmpty() || spyPrices.isEmpty()) {
             log.debug(

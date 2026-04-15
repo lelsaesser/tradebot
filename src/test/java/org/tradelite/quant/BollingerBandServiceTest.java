@@ -14,19 +14,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.DailyPriceProvider;
 import org.tradelite.service.model.DailyPrice;
 
+@SuppressWarnings("SameParameterValue")
 @ExtendWith(MockitoExtension.class)
 class BollingerBandServiceTest {
 
-    @Mock private PriceQuoteRepository priceQuoteRepository;
+    @Mock private DailyPriceProvider dailyPriceProvider;
 
     private BollingerBandService service;
 
     @BeforeEach
     void setUp() {
-        service = new BollingerBandService(priceQuoteRepository);
+        service = new BollingerBandService(dailyPriceProvider);
     }
 
     // ========== analyze() integration tests ==========
@@ -34,7 +35,7 @@ class BollingerBandServiceTest {
     @Test
     void analyze_returnsEmptyWhenInsufficientData() {
         List<DailyPrice> prices = generateDailyPrices(10, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 90)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 90)).thenReturn(prices);
 
         Optional<BollingerBandAnalysis> result = service.analyze("SPY", "S&P 500");
 
@@ -44,7 +45,7 @@ class BollingerBandServiceTest {
     @Test
     void analyze_returnsAnalysisWithExactly20DataPoints() {
         List<DailyPrice> prices = generateDailyPrices(20, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 90)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 90)).thenReturn(prices);
 
         Optional<BollingerBandAnalysis> result = service.analyze("XLK", "Technology");
 
@@ -60,7 +61,7 @@ class BollingerBandServiceTest {
     @Test
     void analyze_returnsAnalysisWithBandwidthHistoryWhen40PlusPoints() {
         List<DailyPrice> prices = generateDailyPrices(50, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 90)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 90)).thenReturn(prices);
 
         Optional<BollingerBandAnalysis> result = service.analyze("XLK", "Technology");
 
@@ -74,7 +75,7 @@ class BollingerBandServiceTest {
     @Test
     void analyze_returnsEmptyWhenLessThan20Points() {
         List<DailyPrice> prices = generateDailyPrices(19, 100.0, 0.5);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 90)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 90)).thenReturn(prices);
 
         Optional<BollingerBandAnalysis> result = service.analyze("SPY", "S&P 500");
 
@@ -206,6 +207,7 @@ class BollingerBandServiceTest {
 
         BollingerBandAnalysis result = service.calculateBollingerBands("SPY", "S&P 500", prices);
 
+        assertThat(result.signals()).isNotEmpty();
         assertThat(result.signals()).doesNotContain(BollingerSignalType.HISTORICAL_SQUEEZE);
     }
 
@@ -329,6 +331,7 @@ class BollingerBandServiceTest {
 
         List<Double> history = service.calculateBandwidthHistory(prices);
 
+        assertThat(history).isNotEmpty();
         assertThat(history).allMatch(bw -> bw > 0);
     }
 
@@ -341,6 +344,7 @@ class BollingerBandServiceTest {
 
         List<Double> history = service.calculateBandwidthHistory(prices);
 
+        assertThat(history).isNotEmpty();
         assertThat(history).allMatch(bw -> bw == 0.0);
     }
 

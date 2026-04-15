@@ -25,17 +25,17 @@ import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
-import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
+@SuppressWarnings({"ResultOfMethodCallIgnored", "SpringBootApplicationProperties"})
 @SpringBootTest(properties = "metering.counter-dir=${java.io.tmpdir}/tradebot-test-counters")
 class RelativeStrengthServiceTest {
 
     @MockitoBean private TelegramGateway telegramClient;
     @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
     @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
-    @MockitoBean private PriceQuoteRepository priceQuoteRepository;
+    @MockitoBean private DailyPriceProvider dailyPriceProvider;
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -56,7 +56,7 @@ class RelativeStrengthServiceTest {
                         finnhubPriceEvaluator,
                         coinGeckoPriceEvaluator);
         relativeStrengthService =
-                new RelativeStrengthService(objectMapper, rsiService, priceQuoteRepository);
+                new RelativeStrengthService(objectMapper, rsiService, dailyPriceProvider);
     }
 
     @Test
@@ -299,8 +299,8 @@ class RelativeStrengthServiceTest {
             spyPrice.setPrice(500.0);
             spyPrices.add(spyPrice);
         }
-        when(priceQuoteRepository.findDailyClosingPrices("NVDA", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("NVDA", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("NVDA");
 
@@ -312,7 +312,7 @@ class RelativeStrengthServiceTest {
     @Test
     void testGetCurrentRsAndEma_noData() {
         // Mock repository to return empty data
-        when(priceQuoteRepository.findDailyClosingPrices("UNKNOWN", 80))
+        when(dailyPriceProvider.findDailyClosingPrices("UNKNOWN", 80))
                 .thenReturn(new ArrayList<>());
 
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("UNKNOWN");
@@ -348,7 +348,7 @@ class RelativeStrengthServiceTest {
 
         // Create a new service that should load from the file
         RelativeStrengthService newService =
-                new RelativeStrengthService(objectMapper, rsiService, priceQuoteRepository);
+                new RelativeStrengthService(objectMapper, rsiService, dailyPriceProvider);
 
         // Verify data was loaded
         assertThat(newService.getRsHistory().containsKey("NVDA"), is(true));
@@ -384,7 +384,7 @@ class RelativeStrengthServiceTest {
                                 IOException.class,
                                 () ->
                                         new RelativeStrengthService(
-                                                failingMapper, rsiService, priceQuoteRepository))
+                                                failingMapper, rsiService, dailyPriceProvider))
                         .getClass());
 
         rsFile.delete();
@@ -398,7 +398,7 @@ class RelativeStrengthServiceTest {
                 .writeValue(any(File.class), any());
 
         RelativeStrengthService service =
-                new RelativeStrengthService(failingMapper, rsiService, priceQuoteRepository);
+                new RelativeStrengthService(failingMapper, rsiService, dailyPriceProvider);
 
         assertEquals(
                 IOException.class,
@@ -422,8 +422,8 @@ class RelativeStrengthServiceTest {
             spyPrice.setPrice(500.0);
             spyPrices.add(spyPrice);
         }
-        when(priceQuoteRepository.findDailyClosingPrices("MSFT", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("MSFT", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         // Should return empty because insufficient history (less than 10 minimum)
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("MSFT");
@@ -505,8 +505,8 @@ class RelativeStrengthServiceTest {
             spyPrice.setPrice(500.0);
             spyPrices.add(spyPrice);
         }
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -534,8 +534,8 @@ class RelativeStrengthServiceTest {
             spyPrice.setPrice(500.0);
             spyPrices.add(spyPrice);
         }
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -556,8 +556,8 @@ class RelativeStrengthServiceTest {
             stockPrice.setPrice(600.0);
             stockPrices.add(stockPrice);
         }
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(new ArrayList<>());
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(new ArrayList<>());
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -589,8 +589,8 @@ class RelativeStrengthServiceTest {
             spyPrices.add(spyPrice);
         }
 
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -624,8 +624,8 @@ class RelativeStrengthServiceTest {
             spyPrice.setPrice(500.0);
             spyPrices.add(spyPrice);
         }
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -652,8 +652,8 @@ class RelativeStrengthServiceTest {
             spyPrice.setPrice(500.0);
             spyPrices.add(spyPrice);
         }
-        when(priceQuoteRepository.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(priceQuoteRepository.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
