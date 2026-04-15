@@ -20,7 +20,8 @@ class SymbolRegistryTest {
     private SymbolRegistry symbolRegistry;
 
     @SuppressWarnings("unused")
-    @TempDir File tempDir;
+    @TempDir
+    File tempDir;
 
     @BeforeEach
     void setUp() throws IOException {
