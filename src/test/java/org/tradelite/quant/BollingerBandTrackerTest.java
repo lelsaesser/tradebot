@@ -5,7 +5,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,23 +18,25 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
-import org.tradelite.service.StockSymbolRegistry;
+import org.tradelite.common.SymbolRegistry;
 
+@SuppressWarnings("SameParameterValue")
 @ExtendWith(MockitoExtension.class)
 class BollingerBandTrackerTest {
 
     @Mock private BollingerBandService bollingerBandService;
     @Mock private TelegramGateway telegramClient;
-    @Mock private StockSymbolRegistry stockSymbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
 
     private BollingerBandTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker =
-                new BollingerBandTracker(bollingerBandService, telegramClient, stockSymbolRegistry);
+        tracker = new BollingerBandTracker(bollingerBandService, telegramClient, symbolRegistry);
         // Default: no tracked stocks (tests that need stocks will override)
-        lenient().when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        lenient().when(symbolRegistry.getStocks()).thenReturn(List.of());
+        // Default: return all ETFs via getAllEtfs()
+        lenient().when(symbolRegistry.getAllEtfs()).thenReturn(defaultEtfMap());
     }
 
     @Test
@@ -55,13 +59,11 @@ class BollingerBandTrackerTest {
 
     @Test
     void analyzeAllStocks_returnsResultsForTrackedStocks() {
-        when(stockSymbolRegistry.getAll())
+        when(symbolRegistry.getStocks())
                 .thenReturn(
                         List.of(
                                 new StockSymbol("AAPL", "Apple Inc"),
                                 new StockSymbol("MSFT", "Microsoft Corp")));
-        when(stockSymbolRegistry.isSectorEtf("AAPL")).thenReturn(false);
-        when(stockSymbolRegistry.isSectorEtf("MSFT")).thenReturn(false);
 
         when(bollingerBandService.analyze("AAPL", "Apple Inc"))
                 .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
@@ -76,13 +78,8 @@ class BollingerBandTrackerTest {
 
     @Test
     void analyzeAllStocks_excludesEtfSymbols() {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(
-                        List.of(
-                                new StockSymbol("AAPL", "Apple Inc"),
-                                new StockSymbol("SPY", "S&P 500 ETF")));
-        when(stockSymbolRegistry.isSectorEtf("AAPL")).thenReturn(false);
-        when(stockSymbolRegistry.isSectorEtf("SPY")).thenReturn(true);
+        // getStocks() already filters out ETFs, so only AAPL should appear
+        when(symbolRegistry.getStocks()).thenReturn(List.of(new StockSymbol("AAPL", "Apple Inc")));
 
         when(bollingerBandService.analyze("AAPL", "Apple Inc"))
                 .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
@@ -96,7 +93,7 @@ class BollingerBandTrackerTest {
 
     @Test
     void analyzeAllStocks_returnsEmptyWhenNoTrackedStocks() {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        when(symbolRegistry.getStocks()).thenReturn(List.of());
 
         List<BollingerBandAnalysis> results = tracker.analyzeAllStocks();
 
@@ -180,9 +177,7 @@ class BollingerBandTrackerTest {
                 .thenReturn(Optional.of(normalAnalysis("OTHER", "Other")));
 
         // Stock with signal
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("TSLA", "Tesla Inc")));
-        when(stockSymbolRegistry.isSectorEtf("TSLA")).thenReturn(false);
+        when(symbolRegistry.getStocks()).thenReturn(List.of(new StockSymbol("TSLA", "Tesla Inc")));
         when(bollingerBandService.analyze("TSLA", "Tesla Inc"))
                 .thenReturn(Optional.of(upperBandAnalysis("TSLA", "Tesla Inc")));
 
@@ -287,9 +282,7 @@ class BollingerBandTrackerTest {
                 .thenReturn(Optional.empty());
 
         // Stock data
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("AAPL", "Apple Inc")));
-        when(stockSymbolRegistry.isSectorEtf("AAPL")).thenReturn(false);
+        when(symbolRegistry.getStocks()).thenReturn(List.of(new StockSymbol("AAPL", "Apple Inc")));
         when(bollingerBandService.analyze("AAPL", "Apple Inc"))
                 .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
 
@@ -364,5 +357,13 @@ class BollingerBandTrackerTest {
                 5.0,
                 List.of(BollingerSignalType.SQUEEZE),
                 50);
+    }
+
+    private static Map<String, String> defaultEtfMap() {
+        Map<String, String> etfs = new LinkedHashMap<>();
+        etfs.put(SymbolRegistry.BENCHMARK_SYMBOL, SymbolRegistry.BENCHMARK_NAME);
+        etfs.putAll(SymbolRegistry.BROAD_SECTOR_ETFS);
+        etfs.putAll(SymbolRegistry.THEMATIC_ETFS);
+        return etfs;
     }
 }

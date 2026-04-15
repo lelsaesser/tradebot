@@ -12,16 +12,16 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.service.RelativeStrengthService;
-import org.tradelite.service.StockSymbolRegistry;
 
 class RelativeStrengthTrackerTest {
 
     private RelativeStrengthService relativeStrengthService;
     private TargetPriceProvider targetPriceProvider;
-    private StockSymbolRegistry stockSymbolRegistry;
+    private SymbolRegistry symbolRegistry;
     private TelegramGateway telegramClient;
 
     private RelativeStrengthTracker tracker;
@@ -30,14 +30,14 @@ class RelativeStrengthTrackerTest {
     void setUp() {
         relativeStrengthService = mock(RelativeStrengthService.class);
         targetPriceProvider = mock(TargetPriceProvider.class);
-        stockSymbolRegistry = mock(StockSymbolRegistry.class);
+        symbolRegistry = mock(SymbolRegistry.class);
         telegramClient = mock(TelegramGateway.class);
 
         tracker =
                 new RelativeStrengthTracker(
                         relativeStrengthService,
                         targetPriceProvider,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         telegramClient);
     }
 
@@ -45,7 +45,7 @@ class RelativeStrengthTrackerTest {
     void testAnalyzeAndSendAlerts_noSignals() throws IOException {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 150.0, 200.0)));
-        when(stockSymbolRegistry.fromString("AAPL"))
+        when(symbolRegistry.fromString("AAPL"))
                 .thenReturn(Optional.of(new StockSymbol("AAPL", "Apple")));
         when(relativeStrengthService.calculateRelativeStrength(eq("AAPL"), anyString()))
                 .thenReturn(Optional.empty());
@@ -61,7 +61,7 @@ class RelativeStrengthTrackerTest {
     void testAnalyzeAndSendAlerts_withOutperformingSignal() throws IOException {
         TargetPrice targetPrice = new TargetPrice("NVDA", 100.0, 150.0);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(targetPrice));
-        when(stockSymbolRegistry.fromString("NVDA"))
+        when(symbolRegistry.fromString("NVDA"))
                 .thenReturn(Optional.of(new StockSymbol("NVDA", "Nvidia")));
 
         RelativeStrengthSignal signal =
@@ -93,7 +93,7 @@ class RelativeStrengthTrackerTest {
     void testAnalyzeAndSendAlerts_withUnderperformingSignal() throws IOException {
         TargetPrice targetPrice = new TargetPrice("INTC", 30.0, 50.0);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(targetPrice));
-        when(stockSymbolRegistry.fromString("INTC"))
+        when(symbolRegistry.fromString("INTC"))
                 .thenReturn(Optional.of(new StockSymbol("INTC", "Intel")));
 
         RelativeStrengthSignal signal =
@@ -125,9 +125,9 @@ class RelativeStrengthTrackerTest {
                         List.of(
                                 new TargetPrice("NVDA", 100.0, 150.0),
                                 new TargetPrice("INTC", 30.0, 50.0)));
-        when(stockSymbolRegistry.fromString("NVDA"))
+        when(symbolRegistry.fromString("NVDA"))
                 .thenReturn(Optional.of(new StockSymbol("NVDA", "Nvidia")));
-        when(stockSymbolRegistry.fromString("INTC"))
+        when(symbolRegistry.fromString("INTC"))
                 .thenReturn(Optional.of(new StockSymbol("INTC", "Intel")));
 
         RelativeStrengthSignal outperforming =
@@ -180,7 +180,7 @@ class RelativeStrengthTrackerTest {
     void testAnalyzeAndSendAlerts_usesSymbolAsDisplayNameWhenNotFound() throws IOException {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("UNKNOWN", 100.0, 150.0)));
-        when(stockSymbolRegistry.fromString("UNKNOWN")).thenReturn(Optional.empty());
+        when(symbolRegistry.fromString("UNKNOWN")).thenReturn(Optional.empty());
         when(relativeStrengthService.calculateRelativeStrength("UNKNOWN", "UNKNOWN"))
                 .thenReturn(Optional.empty());
 
@@ -197,9 +197,9 @@ class RelativeStrengthTrackerTest {
                         List.of(
                                 new TargetPrice("AAPL", 150.0, 200.0),
                                 new TargetPrice("NVDA", 100.0, 150.0)));
-        when(stockSymbolRegistry.fromString("AAPL"))
+        when(symbolRegistry.fromString("AAPL"))
                 .thenReturn(Optional.of(new StockSymbol("AAPL", "Apple")));
-        when(stockSymbolRegistry.fromString("NVDA"))
+        when(symbolRegistry.fromString("NVDA"))
                 .thenReturn(Optional.of(new StockSymbol("NVDA", "Nvidia")));
 
         // First stock throws exception

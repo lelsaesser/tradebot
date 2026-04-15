@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.SymbolRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class TailRiskTrackerTest {
@@ -21,11 +24,18 @@ class TailRiskTrackerTest {
 
     @Mock private TelegramGateway telegramClient;
 
+    @Mock private SymbolRegistry symbolRegistry;
+
     private TailRiskTracker tailRiskTracker;
 
     @BeforeEach
     void setUp() {
-        tailRiskTracker = new TailRiskTracker(tailRiskService, telegramClient);
+        tailRiskTracker = new TailRiskTracker(tailRiskService, telegramClient, symbolRegistry);
+        Map<String, String> etfs = new LinkedHashMap<>();
+        etfs.put(SymbolRegistry.BENCHMARK_SYMBOL, SymbolRegistry.BENCHMARK_NAME);
+        etfs.putAll(SymbolRegistry.BROAD_SECTOR_ETFS);
+        etfs.putAll(SymbolRegistry.THEMATIC_ETFS);
+        lenient().when(symbolRegistry.getAllEtfs()).thenReturn(etfs);
     }
 
     @Test

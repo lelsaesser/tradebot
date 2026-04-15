@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
-import org.tradelite.service.StockSymbolRegistry;
+import org.tradelite.common.SymbolRegistry;
 
 /**
  * Tracks EMA (Exponential Moving Average) positions across all tracked stocks and sends a daily
@@ -28,7 +28,7 @@ public class EmaTracker {
 
     private final EmaService emaService;
     private final TelegramGateway telegramClient;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
 
     /** Analyzes all tracked stocks and sends a daily EMA report via Telegram. */
     public void sendDailyReport() {
@@ -48,7 +48,7 @@ public class EmaTracker {
     List<EmaAnalysis> analyzeAllStocks() {
         List<EmaAnalysis> results = new ArrayList<>();
 
-        for (StockSymbol stock : stockSymbolRegistry.getAll()) {
+        for (StockSymbol stock : symbolRegistry.getAll()) {
             Optional<EmaAnalysis> analysis =
                     emaService.analyze(stock.getTicker(), stock.getCompanyName());
             analysis.ifPresent(results::add);

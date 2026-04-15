@@ -29,7 +29,7 @@ class TelegramMessageProcessorTest {
     @Mock private TelegramGateway telegramClient;
     @Mock private TelegramCommandDispatcher commandDispatcher;
     @Mock private TelegramMessageTracker messageTracker;
-    @Mock private org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
+    @Mock private org.tradelite.common.SymbolRegistry symbolRegistry;
 
     private TelegramMessageProcessor messageProcessor;
 
@@ -37,25 +37,25 @@ class TelegramMessageProcessorTest {
     void setUp() {
         messageProcessor =
                 new TelegramMessageProcessor(
-                        telegramClient, commandDispatcher, messageTracker, stockSymbolRegistry);
+                        telegramClient, commandDispatcher, messageTracker, symbolRegistry);
 
         // Setup lenient mock responses for common stock symbols
         lenient()
-                .when(stockSymbolRegistry.fromString("pltr"))
+                .when(symbolRegistry.fromString("pltr"))
                 .thenReturn(
                         java.util.Optional.of(
                                 new org.tradelite.common.StockSymbol("PLTR", "Palantir")));
         lenient()
-                .when(stockSymbolRegistry.fromString("aapl"))
+                .when(symbolRegistry.fromString("aapl"))
                 .thenReturn(
                         java.util.Optional.of(
                                 new org.tradelite.common.StockSymbol("AAPL", "Apple")));
         lenient()
-                .when(stockSymbolRegistry.fromString("invalid_symbol"))
+                .when(symbolRegistry.fromString("invalid_symbol"))
                 .thenReturn(java.util.Optional.empty());
         lenient()
                 .when(
-                        stockSymbolRegistry.fromString(
+                        symbolRegistry.fromString(
                                 argThat(
                                         s ->
                                                 s != null

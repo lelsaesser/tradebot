@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.CoinId;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TickerSymbol;
 
 @Slf4j
@@ -19,18 +20,18 @@ public class TelegramMessageProcessor {
     private final TelegramGateway telegramClient;
     private final TelegramCommandDispatcher telegramCommandDispatcher;
     private final TelegramMessageTracker telegramMessageTracker;
-    private final org.tradelite.service.StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
 
     @Autowired
     public TelegramMessageProcessor(
             TelegramGateway telegramClient,
             TelegramCommandDispatcher telegramCommandDispatcher,
             TelegramMessageTracker telegramMessageTracker,
-            org.tradelite.service.StockSymbolRegistry stockSymbolRegistry) {
+            SymbolRegistry symbolRegistry) {
         this.telegramClient = telegramClient;
         this.telegramCommandDispatcher = telegramCommandDispatcher;
         this.telegramMessageTracker = telegramMessageTracker;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
     }
 
     public void processUpdates(List<TelegramUpdateResponse> chatUpdates) {
@@ -165,10 +166,11 @@ public class TelegramMessageProcessor {
             return Optional.empty();
         }
         Optional<CoinId> coinId = CoinId.fromString(symbol);
+        //noinspection OptionalIsPresent
         if (coinId.isPresent()) {
             return Optional.of(coinId.get());
         }
-        return stockSymbolRegistry.fromString(symbol).map(s -> s);
+        return symbolRegistry.fromString(symbol).map(s -> s);
     }
 
     protected Optional<RsiCommand> parseRsiCommand(String commandText) {

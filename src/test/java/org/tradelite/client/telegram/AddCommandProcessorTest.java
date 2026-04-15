@@ -18,16 +18,16 @@ import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.service.StockSymbolRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class AddCommandProcessorTest {
 
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private TelegramGateway telegramClient;
-    @Mock private StockSymbolRegistry stockSymbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
     @Mock private FinnhubClient finnhubClient;
     @Mock private CoinGeckoClient coinGeckoClient;
 
@@ -39,7 +39,7 @@ class AddCommandProcessorTest {
                 new AddCommandProcessor(
                         targetPriceProvider,
                         telegramClient,
-                        stockSymbolRegistry,
+                        symbolRegistry,
                         finnhubClient,
                         coinGeckoClient);
     }
@@ -70,14 +70,14 @@ class AddCommandProcessorTest {
         mockQuote.setCurrentPrice(100.0);
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
 
-        when(stockSymbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
+        when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
                 .thenReturn(true);
 
         addCommandProcessor.processCommand(command);
 
         verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
-        verify(stockSymbolRegistry).addSymbol("COHR", "Coherent Corp");
+        verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
         verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), anyString());
         verify(telegramClient)
                 .sendMessage(
@@ -97,7 +97,7 @@ class AddCommandProcessorTest {
         verify(telegramClient)
                 .sendMessage(
                         "Invalid ticker symbol: INVALID. Could not fetch price data from Finnhub or CoinGecko.");
-        verify(stockSymbolRegistry, never()).addSymbol(anyString(), anyString());
+        verify(symbolRegistry, never()).addSymbol(anyString(), anyString());
     }
 
     @Test
@@ -110,7 +110,7 @@ class AddCommandProcessorTest {
         mockQuote.setCurrentPrice(150.0);
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
 
-        when(stockSymbolRegistry.addSymbol("AAPL", "Apple")).thenReturn(false);
+        when(symbolRegistry.addSymbol("AAPL", "Apple")).thenReturn(false);
 
         addCommandProcessor.processCommand(command);
 
@@ -129,14 +129,14 @@ class AddCommandProcessorTest {
         mockQuote.setCurrentPrice(100.0);
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
 
-        when(stockSymbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
+        when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
                 .thenReturn(false);
 
         addCommandProcessor.processCommand(command);
 
-        verify(stockSymbolRegistry).addSymbol("COHR", "Coherent Corp");
-        verify(stockSymbolRegistry).removeSymbol("COHR");
+        verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
+        verify(symbolRegistry).removeSymbol("COHR");
         verify(telegramClient).sendMessage("Failed to add symbol to target prices: COHR");
     }
 
@@ -153,7 +153,7 @@ class AddCommandProcessorTest {
         mockCoinData.setUsd(50000.0);
         when(coinGeckoClient.getCoinPriceData(any())).thenReturn(mockCoinData);
 
-        when(stockSymbolRegistry.addSymbol("bitcoin", "Bitcoin")).thenReturn(true);
+        when(symbolRegistry.addSymbol("bitcoin", "Bitcoin")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
                 .thenReturn(true);
 
@@ -161,7 +161,7 @@ class AddCommandProcessorTest {
 
         verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
         verify(coinGeckoClient).getCoinPriceData(any());
-        verify(stockSymbolRegistry).addSymbol("bitcoin", "Bitcoin");
+        verify(symbolRegistry).addSymbol("bitcoin", "Bitcoin");
         verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), anyString());
         verify(telegramClient)
                 .sendMessage(

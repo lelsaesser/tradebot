@@ -11,8 +11,8 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.config.BeanConfig;
-import org.tradelite.service.StockSymbolRegistry;
 
 class InsiderPersistenceTest {
 
@@ -25,7 +25,7 @@ class InsiderPersistenceTest {
         insiderPersistence =
                 new InsiderPersistence(
                         new BeanConfig().objectMapper(),
-                        new StockSymbolRegistry(new BeanConfig().objectMapper()));
+                        new SymbolRegistry(new BeanConfig().objectMapper()));
     }
 
     @Test

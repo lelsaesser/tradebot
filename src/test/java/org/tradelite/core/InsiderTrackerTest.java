@@ -38,7 +38,7 @@ class InsiderTrackerTest {
                         telegramClient,
                         targetPriceProvider,
                         insiderPersistence,
-                        new org.tradelite.service.StockSymbolRegistry(
+                        new org.tradelite.common.SymbolRegistry(
                                 new org.tradelite.config.BeanConfig().objectMapper()));
     }
 
@@ -506,7 +506,7 @@ class InsiderTrackerTest {
                         telegramClient,
                         targetPriceProvider,
                         insiderPersistence,
-                        new org.tradelite.service.StockSymbolRegistry(
+                        new org.tradelite.common.SymbolRegistry(
                                 new org.tradelite.config.BeanConfig().objectMapper())) {
                     @Override
                     public void trackInsiderTransactions() {

@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
 import org.tradelite.common.OhlcvRecord;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.repository.OhlcvRepository;
 
 @SuppressWarnings("SameParameterValue")
@@ -23,7 +25,7 @@ public class OhlcvFetcher {
 
     private final TwelveDataClient twelveDataClient;
     private final OhlcvRepository ohlcvRepository;
-    private final StockSymbolRegistry stockSymbolRegistry;
+    private final SymbolRegistry symbolRegistry;
     private final TelegramGateway telegramGateway;
     private long requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
 
@@ -31,11 +33,11 @@ public class OhlcvFetcher {
     public OhlcvFetcher(
             TwelveDataClient twelveDataClient,
             OhlcvRepository ohlcvRepository,
-            StockSymbolRegistry stockSymbolRegistry,
+            SymbolRegistry symbolRegistry,
             TelegramGateway telegramGateway) {
         this.twelveDataClient = twelveDataClient;
         this.ohlcvRepository = ohlcvRepository;
-        this.stockSymbolRegistry = stockSymbolRegistry;
+        this.symbolRegistry = symbolRegistry;
         this.telegramGateway = telegramGateway;
     }
 
@@ -44,7 +46,8 @@ public class OhlcvFetcher {
     }
 
     public void fetchAndBackfillOhlcv() throws InterruptedException {
-        List<String> symbols = stockSymbolRegistry.getAllTrackedSymbols();
+        List<String> symbols =
+                symbolRegistry.getAll().stream().map(StockSymbol::getTicker).toList();
 
         log.info("Starting OHLCV fetch for {} symbols", symbols.size());
 
