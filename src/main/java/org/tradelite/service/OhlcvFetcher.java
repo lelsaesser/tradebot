@@ -1,17 +1,13 @@
 package org.tradelite.service;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
 import org.tradelite.common.OhlcvRecord;
-import org.tradelite.common.SectorEtfRegistry;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.OhlcvRepository;
 
 @SuppressWarnings("SameParameterValue")
@@ -95,15 +91,6 @@ public class OhlcvFetcher {
     }
 
     private List<String> buildSymbolList() {
-        Set<String> symbols =
-                new LinkedHashSet<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet());
-
-        for (StockSymbol stock : stockSymbolRegistry.getAll()) {
-            if (!stockSymbolRegistry.isEtf(stock.getTicker())) {
-                symbols.add(stock.getTicker());
-            }
-        }
-
-        return new ArrayList<>(symbols);
+        return stockSymbolRegistry.getAllTrackedSymbols();
     }
 }

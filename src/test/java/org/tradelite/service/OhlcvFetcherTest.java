@@ -19,7 +19,6 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.SectorEtfRegistry;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.OhlcvRepository;
 
 @SuppressWarnings("SameParameterValue")
@@ -39,8 +38,10 @@ class OhlcvFetcherTest {
                 new OhlcvFetcher(
                         twelveDataClient, ohlcvRepository, stockSymbolRegistry, telegramGateway);
         ohlcvFetcher.setRequestDelayMs(0);
-        // Default: no additional stocks beyond the static ETF list
-        lenient().when(stockSymbolRegistry.getAll()).thenReturn(List.of());
+        // Default: return all ETFs + benchmark (no extra stocks)
+        lenient()
+                .when(stockSymbolRegistry.getAllTrackedSymbols())
+                .thenReturn(new ArrayList<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet()));
         // Default: all symbols need backfill
         lenient().when(ohlcvRepository.findBySymbol(anyString(), anyInt())).thenReturn(List.of());
         // Default: fetch returns empty
@@ -53,7 +54,6 @@ class OhlcvFetcherTest {
     void fetchAndBackfillOhlcv_emptyTable_triggersBackfill() throws InterruptedException {
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        // SPY is in allEtfsWithBenchmark, should get backfill since no existing records
         verify(twelveDataClient).fetchDailyOhlcv("SPY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
     }
 
@@ -72,7 +72,6 @@ class OhlcvFetcherTest {
     void fetchAndBackfillOhlcv_includesEtfsFromRegistry() throws InterruptedException {
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        // Verify ETFs from SectorEtfRegistry are fetched
         for (String etf : SectorEtfRegistry.allEtfsWithBenchmark().keySet()) {
             verify(twelveDataClient).fetchDailyOhlcv(eq(etf), anyInt());
         }
@@ -80,8 +79,9 @@ class OhlcvFetcherTest {
 
     @Test
     void fetchAndBackfillOhlcv_includesNonEtfStocks() throws InterruptedException {
-        when(stockSymbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
-        when(stockSymbolRegistry.isEtf("AAPL")).thenReturn(false);
+        List<String> symbols = new ArrayList<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet());
+        symbols.add("AAPL");
+        when(stockSymbolRegistry.getAllTrackedSymbols()).thenReturn(symbols);
 
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
@@ -89,30 +89,23 @@ class OhlcvFetcherTest {
     }
 
     @Test
-    void fetchAndBackfillOhlcv_excludesDuplicateEtfsFromStockRegistry()
-            throws InterruptedException {
-        // XLK is in both SectorEtfRegistry and StockSymbolRegistry — should only be fetched once
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("XLK", "Technology")));
-        when(stockSymbolRegistry.isEtf("XLK")).thenReturn(true);
-
+    void fetchAndBackfillOhlcv_noDuplicatesInSymbolList() throws InterruptedException {
+        // getAllTrackedSymbols already deduplicates — verify XLK fetched exactly once
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        // XLK fetched exactly once (from ETF registry, not duplicated from stock registry)
         verify(twelveDataClient, times(1)).fetchDailyOhlcv(eq("XLK"), anyInt());
     }
 
     @Test
     void fetchAndBackfillOhlcv_oneSymbolFails_continuesFetching() throws InterruptedException {
-        when(stockSymbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("GLXY", "Galaxy Digital")));
-        when(stockSymbolRegistry.isEtf("GLXY")).thenReturn(false);
+        List<String> symbols = new ArrayList<>(SectorEtfRegistry.allEtfsWithBenchmark().keySet());
+        symbols.add("GLXY");
+        when(stockSymbolRegistry.getAllTrackedSymbols()).thenReturn(symbols);
         when(twelveDataClient.fetchDailyOhlcv("GLXY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
                 .thenThrow(new RuntimeException("API error"));
 
         ohlcvFetcher.fetchAndBackfillOhlcv();
 
-        // GLXY failed but ETFs still fetched
         verify(twelveDataClient).fetchDailyOhlcv(eq("GLXY"), anyInt());
         verify(twelveDataClient).fetchDailyOhlcv(eq("SPY"), anyInt());
     }
