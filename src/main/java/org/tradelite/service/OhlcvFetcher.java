@@ -14,6 +14,7 @@ import org.tradelite.common.SectorEtfRegistry;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.repository.OhlcvRepository;
 
+@SuppressWarnings("SameParameterValue")
 @Slf4j
 @Service
 public class OhlcvFetcher {
@@ -56,6 +57,7 @@ public class OhlcvFetcher {
 
         for (int i = 0; i < symbols.size(); i++) {
             if (i > 0) {
+                //noinspection BusyWait
                 Thread.sleep(requestDelayMs);
             }
 

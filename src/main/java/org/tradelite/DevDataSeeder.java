@@ -39,6 +39,7 @@ import org.tradelite.service.model.MomentumRocData;
 import org.tradelite.service.model.RelativeStrengthData;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
+@SuppressWarnings("SameParameterValue")
 @Slf4j
 @Component
 @Profile("dev")

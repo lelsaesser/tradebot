@@ -194,7 +194,7 @@ class EmaServiceTest {
 
     @Test
     void computeEmaOrNaN_returnsValueWhenSufficientData() {
-        List<Double> prices = IntStream.range(0, 50).mapToDouble(i -> 100.0).boxed().toList();
+        List<Double> prices = IntStream.range(0, 50).mapToDouble(_ -> 100.0).boxed().toList();
         assertThat(EmaService.computeEmaOrNaN(prices, 50)).isGreaterThan(0);
     }
 

@@ -28,6 +28,7 @@ import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RsiDailyClosePrice;
 
+@SuppressWarnings("ResultOfMethodCallIgnored")
 @SpringBootTest(properties = "metering.counter-dir=${java.io.tmpdir}/tradebot-test-counters")
 class RelativeStrengthServiceTest {
 
