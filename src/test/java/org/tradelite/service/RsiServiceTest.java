@@ -61,8 +61,8 @@ class RsiServiceTest {
     void calculateRsi_allGains_returns100() {
         List<Double> prices =
                 List.of(
-                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
-                        110.0, 111.0, 112.0, 113.0, 114.0);
+                        100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0,
+                        111.0, 112.0, 113.0, 114.0);
 
         double rsi = rsiService.calculateRsi(prices);
 
@@ -85,8 +85,8 @@ class RsiServiceTest {
     void calculateRsi_mixedPrices_returnsBetween0And100() {
         List<Double> prices =
                 List.of(
-                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0,
-                        110.0, 116.0, 112.0, 118.0, 114.0);
+                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0, 110.0,
+                        116.0, 112.0, 118.0, 114.0);
 
         double rsi = rsiService.calculateRsi(prices);
 
@@ -164,8 +164,7 @@ class RsiServiceTest {
 
         assertThat(signals, is(not(empty())));
         assertThat(
-                signals.stream()
-                        .anyMatch(s -> s.zone() == RsiService.RsiSignal.Zone.OVERBOUGHT),
+                signals.stream().anyMatch(s -> s.zone() == RsiService.RsiSignal.Zone.OVERBOUGHT),
                 is(true));
         assertThat(
                 signals.stream().anyMatch(s -> "Apple (AAPL)".equals(s.displayName())), is(true));
@@ -180,8 +179,7 @@ class RsiServiceTest {
 
         assertThat(signals, is(not(empty())));
         assertThat(
-                signals.stream()
-                        .anyMatch(s -> s.zone() == RsiService.RsiSignal.Zone.OVERSOLD),
+                signals.stream().anyMatch(s -> s.zone() == RsiService.RsiSignal.Zone.OVERSOLD),
                 is(true));
     }
 
@@ -198,9 +196,10 @@ class RsiServiceTest {
     @Test
     void analyzeAllSymbols_neutralRsi_noSignals() {
         stubSymbolRegistry(appleSymbol);
-        List<DailyPrice> mixedPrices = toDailyPrices(
-                100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0,
-                110.0, 116.0, 112.0, 118.0, 114.0);
+        List<DailyPrice> mixedPrices =
+                toDailyPrices(
+                        100.0, 105.0, 102.0, 108.0, 104.0, 110.0, 106.0, 112.0, 108.0, 114.0, 110.0,
+                        116.0, 112.0, 118.0, 114.0);
         when(dailyPriceProvider.findDailyClosingPrices("AAPL", RsiService.RSI_LOOKBACK_DAYS))
                 .thenReturn(mixedPrices);
 
@@ -264,8 +263,7 @@ class RsiServiceTest {
 
     @Test
     void sendRsiReport_sendsConsolidatedReport() {
-        when(telegramClient.sendMessageAndReturnId(anyString()))
-                .thenReturn(OptionalLong.of(123L));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(123L));
         stubSymbolRegistry(appleSymbol);
         stubDailyPrices("AAPL", risingPrices(15));
 
@@ -304,8 +302,7 @@ class RsiServiceTest {
 
     @Test
     void sendRsiReport_noDeleteWhenNoPreviousMessage() {
-        when(telegramClient.sendMessageAndReturnId(anyString()))
-                .thenReturn(OptionalLong.of(100L));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(100L));
         stubSymbolRegistry(appleSymbol);
         stubDailyPrices("AAPL", risingPrices(15));
 
@@ -316,8 +313,7 @@ class RsiServiceTest {
 
     @Test
     void sendRsiReport_analyzesAndSendsInOneStep() {
-        when(telegramClient.sendMessageAndReturnId(anyString()))
-                .thenReturn(OptionalLong.of(123L));
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(123L));
         StockSymbol tsla = new StockSymbol("TSLA", "Tesla");
         stubSymbolRegistry(appleSymbol, tsla);
         stubDailyPrices("AAPL", risingPrices(15));
@@ -343,7 +339,10 @@ class RsiServiceTest {
                         new RsiService.RsiSignal(
                                 "Apple", 75.5, 72.0, 3.5, RsiService.RsiSignal.Zone.OVERBOUGHT),
                         new RsiService.RsiSignal(
-                                "Microsoft", 80.2, 78.0, 2.2,
+                                "Microsoft",
+                                80.2,
+                                78.0,
+                                2.2,
                                 RsiService.RsiSignal.Zone.OVERBOUGHT));
 
         String report = rsiService.buildRsiReport(signals);

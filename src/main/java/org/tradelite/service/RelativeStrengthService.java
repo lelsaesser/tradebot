@@ -54,8 +54,7 @@ public class RelativeStrengthService {
     @Getter private Map<String, RelativeStrengthData> rsHistory = new HashMap<>();
 
     @Autowired
-    public RelativeStrengthService(
-            ObjectMapper objectMapper, DailyPriceProvider dailyPriceProvider)
+    public RelativeStrengthService(ObjectMapper objectMapper, DailyPriceProvider dailyPriceProvider)
             throws IOException {
         this.objectMapper = objectMapper;
         this.dailyPriceProvider = dailyPriceProvider;

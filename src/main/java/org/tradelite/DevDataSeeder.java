@@ -132,8 +132,7 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private boolean hasSeedData() {
-        return Files.exists(rsDataFilePath)
-                && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
+        return Files.exists(rsDataFilePath) && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
     }
 
     private boolean hasPersistedQuotes(String symbol) {

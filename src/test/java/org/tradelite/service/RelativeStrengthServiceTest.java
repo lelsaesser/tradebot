@@ -31,7 +31,8 @@ class RelativeStrengthServiceTest {
 
     @Mock private DailyPriceProvider dailyPriceProvider;
 
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper =
+            new ObjectMapper().registerModule(new JavaTimeModule());
 
     private RelativeStrengthService relativeStrengthService;
 
@@ -42,8 +43,7 @@ class RelativeStrengthServiceTest {
     @BeforeEach
     void setUp() throws IOException {
         new File(rsDataFile).delete();
-        relativeStrengthService =
-                new RelativeStrengthService(objectMapper, dailyPriceProvider);
+        relativeStrengthService = new RelativeStrengthService(objectMapper, dailyPriceProvider);
     }
 
     @Test
@@ -458,7 +458,8 @@ class RelativeStrengthServiceTest {
         double step = (endPrice - startPrice) / (count - 1);
         for (int i = 0; i < count; i++) {
             prices.add(
-                    new DailyPrice(LocalDate.now().minusDays(count - 1 - i), startPrice + step * i));
+                    new DailyPrice(
+                            LocalDate.now().minusDays(count - 1 - i), startPrice + step * i));
         }
         return prices;
     }

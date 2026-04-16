@@ -125,8 +125,7 @@ public class RsiService {
     private List<Double> fetchPrices(String symbolKey) {
         List<DailyPrice> dailyPrices =
                 dailyPriceProvider.findDailyClosingPrices(symbolKey, RSI_LOOKBACK_DAYS);
-        return new ArrayList<>(
-                dailyPrices.stream().map(DailyPrice::getPrice).toList());
+        return new ArrayList<>(dailyPrices.stream().map(DailyPrice::getPrice).toList());
     }
 
     private void deletePreviousTelegramReport() {
@@ -145,13 +144,9 @@ public class RsiService {
         sb.append("*RSI Signal Report*\n\n");
 
         List<RsiSignal> overbought =
-                signals.stream()
-                        .filter(s -> s.zone() == RsiSignal.Zone.OVERBOUGHT)
-                        .toList();
+                signals.stream().filter(s -> s.zone() == RsiSignal.Zone.OVERBOUGHT).toList();
         List<RsiSignal> oversold =
-                signals.stream()
-                        .filter(s -> s.zone() == RsiSignal.Zone.OVERSOLD)
-                        .toList();
+                signals.stream().filter(s -> s.zone() == RsiSignal.Zone.OVERSOLD).toList();
 
         if (!overbought.isEmpty()) {
             sb.append("🔴 *Overbought (RSI ≥ 70):*\n");
