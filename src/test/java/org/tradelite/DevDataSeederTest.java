@@ -34,9 +34,7 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
-import org.tradelite.service.RsiService;
 import org.tradelite.service.model.RelativeStrengthData;
-import org.tradelite.service.model.RsiDailyClosePrice;
 
 class DevDataSeederTest {
 
@@ -57,18 +55,13 @@ class DevDataSeederTest {
         dataSource.setUrl("jdbc:sqlite:" + dbPath);
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
-        RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
-        var rsiHistory = new java.util.HashMap<String, RsiDailyClosePrice>();
-        var symbolDisplayNames = new java.util.HashMap<String, String>();
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
 
-        when(rsiService.getPriceHistory()).thenReturn(rsiHistory);
-        when(rsiService.getSymbolDisplayNames()).thenReturn(symbolDisplayNames);
         when(relativeStrengthService.getRsHistory()).thenReturn(rsHistory);
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 150.0, 200.0)));
@@ -87,21 +80,15 @@ class DevDataSeederTest {
                         dataSource,
                         objectMapper,
                         momentumRocRepository,
-                        rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
-                        tempDir.resolve("rsi-data.json"),
                         tempDir.resolve("rs-data.json"));
 
         seeder.reseed();
 
-        assertThat(Files.exists(tempDir.resolve("rsi-data.json")), is(true));
         assertThat(Files.exists(tempDir.resolve("rs-data.json")), is(true));
-        assertThat(rsiHistory, hasKey("SPY"));
-        assertThat(rsiHistory, hasKey("AAPL"));
-        assertThat(symbolDisplayNames.get("AAPL"), is("Apple Inc"));
         assertThat(rsHistory, hasKey("AAPL"));
 
         verify(momentumRocRepository, atLeastOnce()).save(any(), any());
@@ -121,18 +108,14 @@ class DevDataSeederTest {
     void seedIfMissing_skipsWhenFilesAndBenchmarkDataAlreadyExist() throws Exception {
         DataSource dataSource = createPreseededDataSource();
 
-        Files.writeString(tempDir.resolve("rsi-data.json"), "{}");
         Files.writeString(tempDir.resolve("rs-data.json"), "{}");
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
-        RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
-        when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
-        when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
         when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
@@ -143,12 +126,10 @@ class DevDataSeederTest {
                         dataSource,
                         objectMapper,
                         momentumRocRepository,
-                        rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
-                        tempDir.resolve("rsi-data.json"),
                         tempDir.resolve("rs-data.json"));
 
         assertThat(seeder.seedIfMissing(), is(false));
@@ -166,14 +147,12 @@ class DevDataSeederTest {
 
     @Test
     void seedIfMissing_reseedsWhenFilesAreAbsent() {
-        Path rsiPath = tempDir.resolve("seed-if-missing-rsi.json");
         Path rsPath = tempDir.resolve("seed-if-missing-rs.json");
-        DevDataSeeder seeder = createSeederWithEmptySources(rsiPath, rsPath);
+        DevDataSeeder seeder = createSeederWithEmptySources(rsPath);
 
         boolean seeded = seeder.seedIfMissing();
 
         assertThat(seeded, is(true));
-        assertThat(Files.exists(rsiPath), is(true));
         assertThat(Files.exists(rsPath), is(true));
     }
 
@@ -184,18 +163,13 @@ class DevDataSeederTest {
         dataSource.setUrl("jdbc:sqlite:" + dbPath);
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
-        RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
-        var rsiHistory = new java.util.HashMap<String, RsiDailyClosePrice>();
-        var symbolDisplayNames = new java.util.HashMap<String, String>();
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
 
-        when(rsiService.getPriceHistory()).thenReturn(rsiHistory);
-        when(rsiService.getSymbolDisplayNames()).thenReturn(symbolDisplayNames);
         when(relativeStrengthService.getRsHistory()).thenReturn(rsHistory);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
         when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
@@ -214,23 +188,17 @@ class DevDataSeederTest {
                         dataSource,
                         objectMapper,
                         momentumRocRepository,
-                        rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
-                        tempDir.resolve("rsi-fallback.json"),
                         tempDir.resolve("rs-fallback.json"));
 
         seeder.reseed();
 
-        assertThat(symbolDisplayNames, hasKey("AAPL"));
-        assertThat(symbolDisplayNames, hasKey("MSFT"));
-        assertThat(symbolDisplayNames, hasKey("NVDA"));
-        assertThat(symbolDisplayNames, hasKey("AMZN"));
-        assertThat(symbolDisplayNames, hasKey("META"));
-        assertThat(symbolDisplayNames.containsKey("GOOG"), is(false));
-        assertThat(symbolDisplayNames.containsKey("ETF1"), is(false));
+        // RS history should contain non-ETF stocks (limited to 5)
+        assertThat(rsHistory, hasKey("AAPL"));
+        assertThat(rsHistory.containsKey("GOOG"), is(false));
     }
 
     @Test
@@ -239,14 +207,11 @@ class DevDataSeederTest {
         when(dataSource.getConnection()).thenThrow(new java.sql.SQLException("db down"));
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
-        RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
-        when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
-        when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
         when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
@@ -257,12 +222,10 @@ class DevDataSeederTest {
                         dataSource,
                         objectMapper,
                         momentumRocRepository,
-                        rsiService,
                         relativeStrengthService,
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
-                        tempDir.resolve("rsi-error.json"),
                         tempDir.resolve("rs-error.json"));
 
         IllegalStateException exception =
@@ -273,24 +236,20 @@ class DevDataSeederTest {
     }
 
     private DevDataSeeder createSeederWithEmptySources() {
-        return createSeederWithEmptySources(
-                tempDir.resolve("generic-rsi.json"), tempDir.resolve("generic-rs.json"));
+        return createSeederWithEmptySources(tempDir.resolve("generic-rs.json"));
     }
 
-    private DevDataSeeder createSeederWithEmptySources(Path rsiPath, Path rsPath) {
+    private DevDataSeeder createSeederWithEmptySources(Path rsPath) {
         SQLiteDataSource dataSource = new SQLiteDataSource();
         Path dbPath = tempDir.resolve("generic.db");
         dataSource.setUrl("jdbc:sqlite:" + dbPath);
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
-        RsiService rsiService = mock(RsiService.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
 
-        when(rsiService.getPriceHistory()).thenReturn(new java.util.HashMap<>());
-        when(rsiService.getSymbolDisplayNames()).thenReturn(new java.util.HashMap<>());
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
         when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
@@ -300,12 +259,10 @@ class DevDataSeederTest {
                 dataSource,
                 objectMapper,
                 momentumRocRepository,
-                rsiService,
                 relativeStrengthService,
                 targetPriceProvider,
                 symbolRegistry,
                 ohlcvRepository,
-                rsiPath,
                 rsPath);
     }
 

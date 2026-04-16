@@ -1,21 +1,16 @@
 package org.tradelite.core;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.coingecko.CoinGeckoClient;
-import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
-import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.CoinId;
-import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.service.RsiService;
 
 @Component
 @RequiredArgsConstructor
@@ -25,51 +20,27 @@ public class RsiPriceFetcher {
     private final FinnhubClient finnhubClient;
     private final CoinGeckoClient coinGeckoClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final RsiService rsiService;
     private final SymbolRegistry symbolRegistry;
 
-    public void fetchStockClosingPrices() throws IOException, InterruptedException {
-        LocalDate today = LocalDate.now();
-
-        for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
-            try {
-                Optional<StockSymbol> stockSymbol =
-                        symbolRegistry.fromString(targetPrice.getSymbol());
-                if (stockSymbol.isPresent()) {
-                    PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(stockSymbol.get());
-                    rsiService.addPrice(
-                            stockSymbol.get(),
-                            priceQuote.getCurrentPrice(),
-                            priceQuote.getPreviousClose(),
-                            today);
-                }
-                // prevent 60 requests/minute Finnhub API limit by sleeping for 1 second between
-                // requests
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                log.error("Error fetching stock price for RSI", e);
-                throw e;
-            }
-        }
+    /**
+     * @deprecated RsiService no longer accumulates prices via addPrice(). Stock closing prices are
+     *     now sourced from OHLCV data via DailyPriceProvider. This method is retained temporarily
+     *     for scheduler compatibility and will be removed in a follow-up subtask.
+     */
+    @Deprecated
+    public void fetchStockClosingPrices() {
+        log.info(
+                "fetchStockClosingPrices() is a no-op: RsiService now reads from DailyPriceProvider");
     }
 
-    public void fetchCryptoClosingPrices() throws IOException {
-        LocalDate today = LocalDate.now();
-
-        for (TargetPrice targetPrice : targetPriceProvider.getCoinTargetPrices()) {
-            try {
-                Optional<CoinId> coinId = CoinId.fromString(targetPrice.getSymbol());
-                if (coinId.isPresent()) {
-                    CoinGeckoPriceResponse.CoinData coinData =
-                            coinGeckoClient.getCoinPriceData(coinId.get());
-                    // previousClose is 0.0 for crypto: crypto markets trade 24/7 without official
-                    // closing prices, so market holiday detection does not apply
-                    rsiService.addPrice(coinId.get(), coinData.getUsd(), 0.0, today);
-                }
-            } catch (Exception e) {
-                log.error("Error fetching crypto price for RSI", e);
-                throw e;
-            }
-        }
+    /**
+     * @deprecated RsiService no longer accumulates prices via addPrice(). Crypto OHLCV support is
+     *     deferred. This method is retained temporarily for scheduler compatibility and will be
+     *     removed in a follow-up subtask.
+     */
+    @Deprecated
+    public void fetchCryptoClosingPrices() {
+        log.info(
+                "fetchCryptoClosingPrices() is a no-op: crypto RSI is deferred pending crypto OHLCV provider");
     }
 }

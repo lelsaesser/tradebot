@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
@@ -17,54 +18,39 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.tradelite.client.telegram.TelegramGateway;
-import org.tradelite.core.CoinGeckoPriceEvaluator;
-import org.tradelite.core.FinnhubPriceEvaluator;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.service.model.DailyPrice;
-import org.tradelite.service.model.RsiDailyClosePrice;
 
-@SuppressWarnings({"ResultOfMethodCallIgnored", "SpringBootApplicationProperties"})
-@SpringBootTest(properties = "metering.counter-dir=${java.io.tmpdir}/tradebot-test-counters")
+@SuppressWarnings("SameParameterValue")
+@ExtendWith(MockitoExtension.class)
 class RelativeStrengthServiceTest {
 
-    @MockitoBean private TelegramGateway telegramClient;
-    @MockitoBean private FinnhubPriceEvaluator finnhubPriceEvaluator;
-    @MockitoBean private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
-    @MockitoBean private DailyPriceProvider dailyPriceProvider;
+    @Mock private DailyPriceProvider dailyPriceProvider;
 
-    @Autowired private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-    private RsiService rsiService;
     private RelativeStrengthService relativeStrengthService;
 
     private final String rsDataFile = "config/rs-data.json";
 
+    private static final int RS_LOOKBACK_DAYS = 80;
+
     @BeforeEach
     void setUp() throws IOException {
         new File(rsDataFile).delete();
-        String rsiDataFile = "config/rsi-data.json";
-        new File(rsiDataFile).delete();
-        rsiService =
-                new RsiService(
-                        telegramClient,
-                        objectMapper,
-                        finnhubPriceEvaluator,
-                        coinGeckoPriceEvaluator);
         relativeStrengthService =
-                new RelativeStrengthService(objectMapper, rsiService, dailyPriceProvider);
+                new RelativeStrengthService(objectMapper, dailyPriceProvider);
     }
 
     @Test
     void testCalculateEma_withSufficientData() {
-        // Test EMA calculation with 50+ values
         List<Double> values = new ArrayList<>();
         for (int i = 0; i < 60; i++) {
-            values.add(1.0 + (i * 0.01)); // Gradually increasing RS values
+            values.add(1.0 + (i * 0.01));
         }
 
         double ema = StatisticsUtil.calculateEma(values, 50);
@@ -75,15 +61,13 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateEma_withExactPeriodData() {
-        // Test EMA with exactly 50 values (should use SMA only)
         List<Double> values = new ArrayList<>();
         for (int i = 0; i < 50; i++) {
-            values.add(1.0); // Constant values
+            values.add(1.0);
         }
 
         double ema = StatisticsUtil.calculateEma(values, 50);
 
-        // EMA of constant values should equal the constant
         assertThat(ema, is(closeTo(1.0, 0.001)));
     }
 
@@ -101,7 +85,6 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateRelativeStrength_skipsBenchmark() {
-        // SPY should be skipped
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength(
                         RelativeStrengthService.BENCHMARK_SYMBOL, "SPDR S&P 500 ETF");
@@ -111,7 +94,11 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateRelativeStrength_insufficientStockData() {
-        // No price data added
+        when(dailyPriceProvider.findDailyClosingPrices("NVDA", RS_LOOKBACK_DAYS))
+                .thenReturn(List.of());
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", RS_LOOKBACK_DAYS))
+                .thenReturn(List.of());
+
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
@@ -120,13 +107,9 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateRelativeStrength_insufficientSpyData() {
-        // Add stock data but no SPY data
-        for (int i = 0; i < 60; i++) {
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(LocalDate.now().minusDays(59 - i), 500.0 + i);
-        }
+        stubDailyPrices("NVDA", constantPrices(60, 500.0));
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", RS_LOOKBACK_DAYS))
+                .thenReturn(List.of());
 
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
@@ -136,18 +119,9 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateRelativeStrength_insufficientHistory() {
-        // Add only 30 days of data (less than 50 required for EMA)
-        for (int i = 0; i < 30; i++) {
-            LocalDate date = LocalDate.now().minusDays(29 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 600.0);
-        }
+        // Only 5 days — less than 10 minimum
+        stubDailyPrices("SPY", constantPrices(5, 500.0));
+        stubDailyPrices("NVDA", constantPrices(5, 600.0));
 
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
@@ -157,58 +131,32 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateRelativeStrength_noSignalOnFirstCalculation() {
-        // Add 60 days of aligned price data
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 600.0);
-        }
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
 
-        // First calculation should not produce a signal (no previous state)
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
         assertThat(signal.isEmpty(), is(true));
-
-        // Verify RS data was stored
         assertThat(relativeStrengthService.getRsHistory().containsKey("NVDA"), is(true));
         assertThat(relativeStrengthService.getRsHistory().get("NVDA").isInitialized(), is(true));
     }
 
     @Test
     void testCalculateRelativeStrength_crossoverUp() {
-        // Set up initial state where RS is below EMA
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(60 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            // Stock starts weak relative to SPY
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 400.0 + (i < 55 ? 0 : i * 5));
-        }
-
         // First calculation to initialize
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 400.0));
         relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
         // Manually set previous state to simulate RS being below EMA
         var rsData = relativeStrengthService.getRsHistory().get("NVDA");
-        rsData.setPreviousRs(0.8); // Below EMA
-        rsData.setPreviousEma(0.85); // EMA higher than RS
+        rsData.setPreviousRs(0.8);
+        rsData.setPreviousEma(0.85);
 
-        // Add new data point where RS jumps above EMA
-        LocalDate today = LocalDate.now();
-        rsiService.getPriceHistory().get("SPY").addPrice(today, 500.0);
-        rsiService.getPriceHistory().get("NVDA").addPrice(today, 500.0); // RS = 1.0, above EMA
+        // Now RS jumps above EMA — use rising prices so latest RS > EMA
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", risingPrices(60, 500.0, 700.0));
 
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
@@ -221,31 +169,19 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateRelativeStrength_crossoverDown() {
-        // Set up initial state
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(60 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 600.0);
-        }
-
         // First calculation to initialize
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
         relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
         // Manually set previous state to simulate RS being above EMA
         var rsData = relativeStrengthService.getRsHistory().get("NVDA");
-        rsData.setPreviousRs(1.3); // Above EMA
-        rsData.setPreviousEma(1.2); // EMA lower than RS
+        rsData.setPreviousRs(1.3);
+        rsData.setPreviousEma(1.2);
 
-        // Add new data point where RS drops below EMA
-        LocalDate today = LocalDate.now();
-        rsiService.getPriceHistory().get("SPY").addPrice(today, 500.0);
-        rsiService.getPriceHistory().get("NVDA").addPrice(today, 500.0); // RS drops to 1.0
+        // Now RS drops below EMA — use declining prices so latest RS < EMA
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", risingPrices(60, 700.0, 400.0));
 
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
@@ -257,62 +193,32 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testSaveRsHistory() throws IOException {
-        // Add data and calculate RS
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 600.0);
-        }
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
         relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
-        // Save
         relativeStrengthService.saveRsHistory();
 
-        // Verify file exists
         File rsFile = new File(rsDataFile);
         assertThat(rsFile.exists(), is(true));
-
-        // Cleanup
         rsFile.delete();
     }
 
     @Test
     void testGetCurrentRsAndEma_withSufficientData() {
-        // Mock the repository to return 60 days of daily price data
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        List<DailyPrice> spyPrices = new ArrayList<>();
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(600.0);
-            stockPrices.add(stockPrice);
-
-            DailyPrice spyPrice = new DailyPrice();
-            spyPrice.setDate(date);
-            spyPrice.setPrice(500.0);
-            spyPrices.add(spyPrice);
-        }
-        when(dailyPriceProvider.findDailyClosingPrices("NVDA", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
 
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("NVDA");
 
         assertThat(rsAndEma.isPresent(), is(true));
-        assertThat(rsAndEma.get()[0], is(closeTo(1.2, 0.01))); // RS = 600/500 = 1.2
-        assertThat(rsAndEma.get()[1], is(closeTo(1.2, 0.01))); // EMA of constant RS
+        assertThat(rsAndEma.get()[0], is(closeTo(1.2, 0.01)));
+        assertThat(rsAndEma.get()[1], is(closeTo(1.2, 0.01)));
     }
 
     @Test
     void testGetCurrentRsAndEma_noData() {
-        // Mock repository to return empty data
-        when(dailyPriceProvider.findDailyClosingPrices("UNKNOWN", 80))
+        when(dailyPriceProvider.findDailyClosingPrices("UNKNOWN", RS_LOOKBACK_DAYS))
                 .thenReturn(new ArrayList<>());
 
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("UNKNOWN");
@@ -327,34 +233,19 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testLoadRsHistory_existingFile() throws IOException {
-        // First, create and save RS data
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 600.0);
-        }
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
         relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
         relativeStrengthService.saveRsHistory();
 
-        // Verify file exists
         File rsFile = new File(rsDataFile);
         assertThat(rsFile.exists(), is(true));
 
-        // Create a new service that should load from the file
         RelativeStrengthService newService =
-                new RelativeStrengthService(objectMapper, rsiService, dailyPriceProvider);
+                new RelativeStrengthService(objectMapper, dailyPriceProvider);
 
-        // Verify data was loaded
         assertThat(newService.getRsHistory().containsKey("NVDA"), is(true));
         assertThat(newService.getRsHistory().get("NVDA").isInitialized(), is(true));
-
-        // Cleanup
         rsFile.delete();
     }
 
@@ -378,14 +269,9 @@ class RelativeStrengthServiceTest {
                 .when(failingMapper)
                 .readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
 
-        assertEquals(
+        assertThrows(
                 IOException.class,
-                assertThrows(
-                                IOException.class,
-                                () ->
-                                        new RelativeStrengthService(
-                                                failingMapper, rsiService, dailyPriceProvider))
-                        .getClass());
+                () -> new RelativeStrengthService(failingMapper, dailyPriceProvider));
 
         rsFile.delete();
     }
@@ -398,34 +284,16 @@ class RelativeStrengthServiceTest {
                 .writeValue(any(File.class), any());
 
         RelativeStrengthService service =
-                new RelativeStrengthService(failingMapper, rsiService, dailyPriceProvider);
+                new RelativeStrengthService(failingMapper, dailyPriceProvider);
 
-        assertEquals(
-                IOException.class,
-                assertThrows(IOException.class, service::saveRsHistory).getClass());
+        assertThrows(IOException.class, service::saveRsHistory);
     }
 
     @Test
     void testGetCurrentRsAndEma_withInsufficientHistory() {
-        // Mock repository to return only 5 days of data (less than 10 minimum)
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        List<DailyPrice> spyPrices = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            LocalDate date = LocalDate.now().minusDays(4 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(300.0);
-            stockPrices.add(stockPrice);
+        stubDailyPrices("MSFT", constantPrices(5, 300.0));
+        stubDailyPrices("SPY", constantPrices(5, 500.0));
 
-            DailyPrice spyPrice = new DailyPrice();
-            spyPrice.setDate(date);
-            spyPrice.setPrice(500.0);
-            spyPrices.add(spyPrice);
-        }
-        when(dailyPriceProvider.findDailyClosingPrices("MSFT", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
-
-        // Should return empty because insufficient history (less than 10 minimum)
         Optional<double[]> rsAndEma = relativeStrengthService.getCurrentRsAndEma("MSFT");
 
         assertThat(rsAndEma.isEmpty(), is(true));
@@ -433,80 +301,41 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testCalculateRelativeStrength_noCrossover() {
-        // Set up initial state
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(60 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 500.0);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("NVDA", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 600.0);
-        }
-
         // First calculation to initialize
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
         relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
         // Manually set previous state where RS was above EMA and still is
         var rsData = relativeStrengthService.getRsHistory().get("NVDA");
-        rsData.setPreviousRs(1.25); // Above EMA
-        rsData.setPreviousEma(1.2); // EMA lower than RS
+        rsData.setPreviousRs(1.25);
+        rsData.setPreviousEma(1.2);
 
-        // Add new data point where RS is still above EMA (no crossover)
-        LocalDate today = LocalDate.now();
-        rsiService.getPriceHistory().get("SPY").addPrice(today, 500.0);
-        rsiService.getPriceHistory().get("NVDA").addPrice(today, 610.0); // RS = 1.22, still above
+        // RS is still above EMA (no crossover)
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 610.0));
 
         Optional<RelativeStrengthSignal> signal =
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
-        // No crossover because RS stayed above EMA
         assertThat(signal.isEmpty(), is(true));
     }
 
     @Test
     void testRsCalculation_correctRatio() {
-        // Add aligned price data
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("SPY", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 400.0); // SPY at 400
-            rsiService
-                    .getPriceHistory()
-                    .computeIfAbsent("AAPL", _ -> new RsiDailyClosePrice())
-                    .addPrice(date, 200.0); // AAPL at 200
-        }
+        stubDailyPrices("SPY", constantPrices(60, 400.0));
+        stubDailyPrices("AAPL", constantPrices(60, 200.0));
 
         relativeStrengthService.calculateRelativeStrength("AAPL", "Apple");
 
-        // RS should be 200/400 = 0.5
         var rsData = relativeStrengthService.getRsHistory().get("AAPL");
         assertThat(rsData.getLatestRs(), is(closeTo(0.5, 0.001)));
     }
 
     @Test
     void testGetCurrentRsResult_withCompleteData() {
-        // Mock repository to return 50+ days of data (complete)
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        List<DailyPrice> spyPrices = new ArrayList<>();
-        for (int i = 0; i < 55; i++) {
-            LocalDate date = LocalDate.now().minusDays(54 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(600.0);
-            stockPrices.add(stockPrice);
-
-            DailyPrice spyPrice = new DailyPrice();
-            spyPrice.setDate(date);
-            spyPrice.setPrice(500.0);
-            spyPrices.add(spyPrice);
-        }
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        stubDailyPrices("XLK", constantPrices(55, 600.0));
+        stubDailyPrices("SPY", constantPrices(55, 500.0));
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -519,45 +348,22 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsResult_withIncompleteData() {
-        // Mock repository to return 30 days of data (incomplete but above minimum)
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        List<DailyPrice> spyPrices = new ArrayList<>();
-        for (int i = 0; i < 30; i++) {
-            LocalDate date = LocalDate.now().minusDays(29 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(600.0);
-            stockPrices.add(stockPrice);
-
-            DailyPrice spyPrice = new DailyPrice();
-            spyPrice.setDate(date);
-            spyPrice.setPrice(500.0);
-            spyPrices.add(spyPrice);
-        }
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        stubDailyPrices("XLK", constantPrices(30, 600.0));
+        stubDailyPrices("SPY", constantPrices(30, 500.0));
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
 
         assertThat(result.isPresent(), is(true));
-        assertThat(result.get().isComplete(), is(false)); // Less than 50 data points
+        assertThat(result.get().isComplete(), is(false));
         assertThat(result.get().dataPoints(), is(30));
     }
 
     @Test
     void testGetCurrentRsResult_withNoSpyData() {
-        // Mock repository to return data for stock but not SPY
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(600.0);
-            stockPrices.add(stockPrice);
-        }
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(new ArrayList<>());
+        stubDailyPrices("XLK", constantPrices(60, 600.0));
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", RS_LOOKBACK_DAYS))
+                .thenReturn(new ArrayList<>());
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -567,30 +373,8 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsResult_withMismatchedDates() {
-        // Mock repository to return data with different dates for stock and SPY
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        List<DailyPrice> spyPrices = new ArrayList<>();
-
-        // Stock has data from last 60 days
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(600.0);
-            stockPrices.add(stockPrice);
-        }
-
-        // SPY has data from last 60 days (same dates)
-        for (int i = 0; i < 60; i++) {
-            LocalDate date = LocalDate.now().minusDays(59 - i);
-            DailyPrice spyPrice = new DailyPrice();
-            spyPrice.setDate(date);
-            spyPrice.setPrice(500.0);
-            spyPrices.add(spyPrice);
-        }
-
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        stubDailyPrices("XLK", constantPrices(60, 600.0));
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -600,7 +384,6 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsResult_returnsEmptyForBenchmark() {
-        // Requesting RS for SPY itself should return empty
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("SPY");
 
@@ -609,23 +392,8 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsResult_exactlyMinimumData() {
-        // Mock repository to return exactly 20 days (minimum required)
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        List<DailyPrice> spyPrices = new ArrayList<>();
-        for (int i = 0; i < 20; i++) {
-            LocalDate date = LocalDate.now().minusDays(19 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(600.0);
-            stockPrices.add(stockPrice);
-
-            DailyPrice spyPrice = new DailyPrice();
-            spyPrice.setDate(date);
-            spyPrice.setPrice(500.0);
-            spyPrices.add(spyPrice);
-        }
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        stubDailyPrices("XLK", constantPrices(20, 600.0));
+        stubDailyPrices("SPY", constantPrices(20, 500.0));
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -637,23 +405,8 @@ class RelativeStrengthServiceTest {
 
     @Test
     void testGetCurrentRsResult_exactlyFullData() {
-        // Mock repository to return exactly 50 days (full EMA period)
-        List<DailyPrice> stockPrices = new ArrayList<>();
-        List<DailyPrice> spyPrices = new ArrayList<>();
-        for (int i = 0; i < 50; i++) {
-            LocalDate date = LocalDate.now().minusDays(49 - i);
-            DailyPrice stockPrice = new DailyPrice();
-            stockPrice.setDate(date);
-            stockPrice.setPrice(600.0);
-            stockPrices.add(stockPrice);
-
-            DailyPrice spyPrice = new DailyPrice();
-            spyPrice.setDate(date);
-            spyPrice.setPrice(500.0);
-            spyPrices.add(spyPrice);
-        }
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 80)).thenReturn(stockPrices);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 80)).thenReturn(spyPrices);
+        stubDailyPrices("XLK", constantPrices(50, 600.0));
+        stubDailyPrices("SPY", constantPrices(50, 500.0));
 
         Optional<RelativeStrengthService.RsResult> result =
                 relativeStrengthService.getCurrentRsResult("XLK");
@@ -683,5 +436,30 @@ class RelativeStrengthServiceTest {
         assertThat(result.ema(), is(1.20));
         assertThat(result.dataPoints(), is(45));
         assertThat(result.isComplete(), is(false));
+    }
+
+    // --- helpers ---
+
+    private void stubDailyPrices(String symbol, List<DailyPrice> prices) {
+        when(dailyPriceProvider.findDailyClosingPrices(symbol, RS_LOOKBACK_DAYS))
+                .thenReturn(prices);
+    }
+
+    private List<DailyPrice> constantPrices(int count, double price) {
+        List<DailyPrice> prices = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            prices.add(new DailyPrice(LocalDate.now().minusDays(count - 1 - i), price));
+        }
+        return prices;
+    }
+
+    private List<DailyPrice> risingPrices(int count, double startPrice, double endPrice) {
+        List<DailyPrice> prices = new ArrayList<>();
+        double step = (endPrice - startPrice) / (count - 1);
+        for (int i = 0; i < count; i++) {
+            prices.add(
+                    new DailyPrice(LocalDate.now().minusDays(count - 1 - i), startPrice + step * i));
+        }
+        return prices;
     }
 }
