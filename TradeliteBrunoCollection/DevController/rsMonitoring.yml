@@ -1,11 +1,11 @@
 info:
-  name: rsiStock
+  name: rsMonitoring
   type: http
   seq: 8
 
 http:
   method: POST
-  url: http://localhost:9090/dev/jobs/rsi-stock
+  url: http://localhost:9090/dev/jobs/rs-monitoring
   auth: inherit
 
 settings:
