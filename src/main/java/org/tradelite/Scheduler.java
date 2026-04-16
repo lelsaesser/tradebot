@@ -120,7 +120,7 @@ public class Scheduler {
         log.info("Crypto market monitoring round completed.");
     }
 
-    @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
+    @Scheduled(cron = "0 0 22 * * MON-FRI", zone = "CET")
     public void rsiStockMonitoring() {
         rootErrorHandler.run(rsiPriceFetcher::fetchStockClosingPrices);
         log.info("RSI daily stock price data fetch completed.");
@@ -197,7 +197,7 @@ public class Scheduler {
         log.info("Daily sector rotation tracking completed.");
     }
 
-    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = "CET")
+    @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
     protected void dailyOhlcvFetch() {
         rootErrorHandler.run(ohlcvFetcher::fetchAndBackfillOhlcv);
         log.info("Daily OHLCV fetch completed.");
