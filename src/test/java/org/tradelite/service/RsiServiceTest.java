@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
-import org.tradelite.common.TickerSymbol;
 import org.tradelite.service.model.DailyPrice;
 
 @SuppressWarnings("SameParameterValue")
@@ -29,30 +28,13 @@ class RsiServiceTest {
     @Mock private DailyPriceProvider dailyPriceProvider;
     @Mock private SymbolRegistry symbolRegistry;
 
-    private final Map<String, Double> livePrices = new HashMap<>();
-
-    private final LivePriceSource livePriceSource =
-            new LivePriceSource() {
-                @Override
-                public Optional<Double> getPrice(TickerSymbol symbol) {
-                    return Optional.ofNullable(livePrices.get(symbol.getName()));
-                }
-
-                @Override
-                public Optional<Double> getPriceByKey(String symbolKey) {
-                    return Optional.ofNullable(livePrices.get(symbolKey));
-                }
-            };
-
     private RsiService rsiService;
 
     private final StockSymbol appleSymbol = new StockSymbol("AAPL", "Apple");
 
     @BeforeEach
     void setUp() {
-        livePrices.clear();
-        rsiService =
-                new RsiService(telegramClient, dailyPriceProvider, livePriceSource, symbolRegistry);
+        rsiService = new RsiService(telegramClient, dailyPriceProvider, symbolRegistry);
     }
 
     // --- calculateRsi tests ---
@@ -132,27 +114,6 @@ class RsiServiceTest {
         assertThat(rsi.isEmpty(), is(true));
     }
 
-    @Test
-    void getCurrentRsi_augmentsWithLivePrice() {
-        // 14 historical prices is not enough alone (needs RSI_PERIOD + 1 = 15)
-        stubDailyPrices("AAPL", risingPrices(14));
-        livePrices.put("AAPL", 125.0);
-
-        Optional<Double> rsi = rsiService.getCurrentRsi(appleSymbol);
-
-        assertThat(rsi.isPresent(), is(true));
-    }
-
-    @Test
-    void getCurrentRsi_insufficientEvenWithLivePrice_returnsEmpty() {
-        stubDailyPrices("AAPL", risingPrices(10));
-        livePrices.put("AAPL", 125.0);
-
-        Optional<Double> rsi = rsiService.getCurrentRsi(appleSymbol);
-
-        assertThat(rsi.isEmpty(), is(true));
-    }
-
     // --- analyzeAllSymbols tests ---
 
     @Test
@@ -217,18 +178,6 @@ class RsiServiceTest {
 
         assertThat(signals, is(not(empty())));
         assertThat(signals.getFirst().displayName(), is("Apple (AAPL)"));
-    }
-
-    @Test
-    void analyzeAllSymbols_augmentsWithLivePrice() {
-        stubSymbolRegistry(appleSymbol);
-        // 14 historical + 1 live = 15 total
-        stubDailyPrices("AAPL", risingPrices(14));
-        livePrices.put("AAPL", 120.0);
-
-        List<RsiService.RsiSignal> signals = rsiService.analyzeAllSymbols();
-
-        assertThat(signals, is(not(empty())));
     }
 
     @Test

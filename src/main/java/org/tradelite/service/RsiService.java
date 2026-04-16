@@ -20,7 +20,6 @@ public class RsiService {
 
     private final TelegramGateway telegramClient;
     private final DailyPriceProvider dailyPriceProvider;
-    private final LivePriceSource livePriceSource;
     private final SymbolRegistry symbolRegistry;
 
     /**
@@ -64,16 +63,6 @@ public class RsiService {
             String displayName = stockSymbol.getDisplayName();
 
             List<Double> prices = fetchPrices(symbolKey);
-            livePriceSource
-                    .getPriceByKey(symbolKey)
-                    .ifPresent(
-                            currentPrice -> {
-                                prices.add(currentPrice);
-                                log.info(
-                                        "Using current price {} from cache for RSI report of {}",
-                                        currentPrice,
-                                        symbolKey);
-                            });
 
             if (prices.size() < RSI_PERIOD + 1) {
                 continue;
@@ -101,19 +90,7 @@ public class RsiService {
     }
 
     public Optional<Double> getCurrentRsi(TickerSymbol symbol) {
-        String symbolKey = symbol.getName();
-
-        List<Double> historicalPrices = fetchPrices(symbolKey);
-        livePriceSource
-                .getPrice(symbol)
-                .ifPresent(
-                        currentPrice -> {
-                            historicalPrices.add(currentPrice);
-                            log.info(
-                                    "Using current price {} from cache for RSI calculation of {}",
-                                    currentPrice,
-                                    symbol.getName());
-                        });
+        List<Double> historicalPrices = fetchPrices(symbol.getName());
 
         if (historicalPrices.size() < RSI_PERIOD + 1) {
             return Optional.empty();
