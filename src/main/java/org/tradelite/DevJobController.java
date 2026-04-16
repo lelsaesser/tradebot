@@ -39,14 +39,9 @@ public class DevJobController {
         return runJob("crypto-monitoring", scheduler::manualCryptoMarketMonitoring);
     }
 
-    @PostMapping("/rsi-stock")
-    public ResponseEntity<Map<String, String>> rsiStock() {
-        return runJob("rsi-stock", scheduler::manualRsiStockMonitoring);
-    }
-
-    @PostMapping("/rsi-crypto")
-    public ResponseEntity<Map<String, String>> rsiCrypto() {
-        return runJob("rsi-crypto", scheduler::manualRsiCryptoMonitoring);
+    @PostMapping("/rs-monitoring")
+    public ResponseEntity<Map<String, String>> rsMonitoring() {
+        return runJob("rs-monitoring", scheduler::manualRelativeStrengthMonitoring);
     }
 
     @PostMapping("/insider-report")

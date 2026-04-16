@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+@SuppressWarnings("DataFlowIssue")
 @ExtendWith(MockitoExtension.class)
 class DevJobControllerTest {
 
@@ -64,25 +65,14 @@ class DevJobControllerTest {
     }
 
     @Test
-    void rsiStock_callsJob() {
-        when(scheduler.manualRsiStockMonitoring()).thenReturn(true);
+    void rsMonitoring_callsJob() {
+        when(scheduler.manualRelativeStrengthMonitoring()).thenReturn(true);
 
-        ResponseEntity<Map<String, String>> response = controller.rsiStock();
+        ResponseEntity<Map<String, String>> response = controller.rsMonitoring();
 
-        verify(scheduler, times(1)).manualRsiStockMonitoring();
+        verify(scheduler, times(1)).manualRelativeStrengthMonitoring();
         assertThat(response.getStatusCode(), is(HttpStatus.OK));
-        assertThat(response.getBody().get("job"), is("rsi-stock"));
-    }
-
-    @Test
-    void rsiCrypto_callsJob() {
-        when(scheduler.manualRsiCryptoMonitoring()).thenReturn(true);
-
-        ResponseEntity<Map<String, String>> response = controller.rsiCrypto();
-
-        verify(scheduler, times(1)).manualRsiCryptoMonitoring();
-        assertThat(response.getStatusCode(), is(HttpStatus.OK));
-        assertThat(response.getBody().get("job"), is("rsi-crypto"));
+        assertThat(response.getBody().get("job"), is("rs-monitoring"));
     }
 
     @Test

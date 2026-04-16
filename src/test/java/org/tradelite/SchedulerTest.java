@@ -1,6 +1,5 @@
 package org.tradelite;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -24,7 +23,6 @@ import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
 import org.tradelite.core.RelativeStrengthTracker;
-import org.tradelite.core.RsiPriceFetcher;
 import org.tradelite.core.SectorMomentumRocTracker;
 import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
@@ -46,7 +44,6 @@ class SchedulerTest {
     @Mock private TelegramMessageProcessor telegramMessageProcessor;
     @Mock private RootErrorHandler rootErrorHandler;
     @Mock private InsiderTracker insiderTracker;
-    @Mock private RsiPriceFetcher rsiPriceFetcher;
     @Mock private ApiRequestMeteringService apiRequestMeteringService;
     @Mock private SectorRotationTracker sectorRotationTracker;
     @Mock private RelativeStrengthTracker relativeStrengthTracker;
@@ -72,7 +69,6 @@ class SchedulerTest {
                         telegramMessageProcessor,
                         rootErrorHandler,
                         insiderTracker,
-                        rsiPriceFetcher,
                         apiRequestMeteringService,
                         sectorRotationTracker,
                         relativeStrengthTracker,
@@ -134,11 +130,11 @@ class SchedulerTest {
 
         scheduler.hourlySignalMonitoring();
 
-        // Called 2 times: bollingerBandTracker and rsiService
-        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
+        // Called 3 times: bollingerBandTracker, rsiService, relativeStrengthTracker
+        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).run(captor.capture());
+        verify(rootErrorHandler, times(3)).run(captor.capture());
 
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
@@ -146,10 +142,11 @@ class SchedulerTest {
 
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
         verify(rsiService, times(1)).sendRsiReport();
+        verify(relativeStrengthTracker, times(1)).analyzeAndSendAlerts();
     }
 
     @Test
-    void hourlySignalMonitoring_marketClosed_shouldNotRun() {
+    void hourlySignalMonitoring_marketClosed_shouldNotRun() throws Exception {
         // Saturday 11:00 AM NY time = market closed (weekend)
         scheduler.marketDateTime =
                 ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, ZoneId.of("America/New_York"));
@@ -159,6 +156,7 @@ class SchedulerTest {
         verify(rootErrorHandler, never()).run(any(ThrowingRunnable.class));
         verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
         verify(rsiService, never()).sendRsiReport();
+        verify(relativeStrengthTracker, never()).analyzeAndSendAlerts();
     }
 
     @Test
@@ -216,38 +214,6 @@ class SchedulerTest {
         captor.getValue().run();
 
         verify(insiderTracker, times(1)).trackInsiderTransactions();
-    }
-
-    @Test
-    void rsiStockMonitoring_shouldFetchStockPricesAndAnalyzeRS() throws Exception {
-        scheduler.rsiStockMonitoring();
-
-        // Verify rootErrorHandler.run is called twice (once for RSI, once for RS)
-        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).run(captor.capture());
-
-        // Execute both captured runnables
-        for (ThrowingRunnable runnable : captor.getAllValues()) {
-            runnable.run();
-        }
-
-        verify(rsiPriceFetcher, times(1)).fetchStockClosingPrices();
-        verify(relativeStrengthTracker, times(1)).analyzeAndSendAlerts();
-    }
-
-    @Test
-    void rsiCryptoMonitoring_shouldFetchCryptoPrices() throws Exception {
-        scheduler.rsiCryptoMonitoring();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
-
-        verify(rsiPriceFetcher, times(1)).fetchCryptoClosingPrices();
     }
 
     @Test
@@ -418,10 +384,10 @@ class SchedulerTest {
 
         boolean success = scheduler.manualHourlySignalMonitoring();
 
-        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(3)).runWithStatus(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).runWithStatus(captor.capture());
+        verify(rootErrorHandler, times(3)).runWithStatus(captor.capture());
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
         }
@@ -429,6 +395,7 @@ class SchedulerTest {
         assertTrue(success);
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
         verify(rsiService, times(1)).sendRsiReport();
+        verify(relativeStrengthTracker, times(1)).analyzeAndSendAlerts();
     }
 
     @Test
@@ -443,38 +410,14 @@ class SchedulerTest {
     }
 
     @Test
-    void manualRsiStockMonitoring_shouldRunAndReturnTrue() throws Exception {
-        stubRunWithStatus(true, true);
-
-        boolean success = scheduler.manualRsiStockMonitoring();
-
-        assertTrue(success);
-        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
-        verify(rsiPriceFetcher).fetchStockClosingPrices();
-        verify(relativeStrengthTracker).analyzeAndSendAlerts();
-    }
-
-    @Test
-    void manualRsiStockMonitoring_returnsFalseWhenOneStepFailsButStillRunsBoth() throws Exception {
-        stubRunWithStatus(true, false);
-
-        boolean success = scheduler.manualRsiStockMonitoring();
-
-        assertFalse(success);
-        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
-        verify(rsiPriceFetcher).fetchStockClosingPrices();
-        verify(relativeStrengthTracker).analyzeAndSendAlerts();
-    }
-
-    @Test
-    void manualRsiCryptoMonitoring_shouldRunAndReturnTrue() throws Exception {
+    void manualRelativeStrengthMonitoring_shouldRunAndReturnTrue() throws Exception {
         stubRunWithStatus(true);
 
-        boolean success = scheduler.manualRsiCryptoMonitoring();
+        boolean success = scheduler.manualRelativeStrengthMonitoring();
 
         assertTrue(success);
         verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
-        verify(rsiPriceFetcher).fetchCryptoClosingPrices();
+        verify(relativeStrengthTracker).analyzeAndSendAlerts();
     }
 
     @Test

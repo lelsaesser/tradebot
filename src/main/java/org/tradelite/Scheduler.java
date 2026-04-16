@@ -33,7 +33,6 @@ public class Scheduler {
     private final TelegramMessageProcessor telegramMessageProcessor;
     private final RootErrorHandler rootErrorHandler;
     private final InsiderTracker insiderTracker;
-    private final RsiPriceFetcher rsiPriceFetcher;
     private final ApiRequestMeteringService apiRequestMeteringService;
     private final SectorRotationTracker sectorRotationTracker;
     private final RelativeStrengthTracker relativeStrengthTracker;
@@ -57,7 +56,6 @@ public class Scheduler {
             TelegramMessageProcessor telegramMessageProcessor,
             RootErrorHandler rootErrorHandler,
             InsiderTracker insiderTracker,
-            RsiPriceFetcher rsiPriceFetcher,
             ApiRequestMeteringService apiRequestMeteringService,
             SectorRotationTracker sectorRotationTracker,
             RelativeStrengthTracker relativeStrengthTracker,
@@ -71,7 +69,6 @@ public class Scheduler {
             VfiTracker vfiTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
-        this.rsiPriceFetcher = rsiPriceFetcher;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.telegramMessageProcessor = telegramMessageProcessor;
@@ -108,6 +105,7 @@ public class Scheduler {
         if (DateUtil.isStockMarketOpen(marketDateTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(rsiService::sendRsiReport);
+            rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping hourly signal monitoring.");
         }
@@ -118,16 +116,6 @@ public class Scheduler {
     public void cryptoMarketMonitoring() {
         rootErrorHandler.run(coinGeckoPriceEvaluator::evaluatePrice);
         log.info("Crypto market monitoring round completed.");
-    }
-
-    @Scheduled(cron = "0 0 22 * * MON-FRI", zone = "CET")
-    public void rsiStockMonitoring() {
-        rootErrorHandler.run(rsiPriceFetcher::fetchStockClosingPrices);
-        log.info("RSI daily stock price data fetch completed.");
-
-        // Run RS analysis after RSI data is fetched (both use same price data)
-        rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);
-        log.info("Relative strength vs SPY analysis completed.");
     }
 
     @Scheduled(cron = "0 0 16,21 * * MON-FRI", zone = "CET")
@@ -159,12 +147,6 @@ public class Scheduler {
     protected void dailyVfiReport() {
         rootErrorHandler.run(vfiTracker::sendDailyReport);
         log.info("Daily VFI report completed.");
-    }
-
-    @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
-    public void rsiCryptoMonitoring() {
-        rootErrorHandler.run(rsiPriceFetcher::fetchCryptoClosingPrices);
-        log.info("RSI daily crypto price data fetch completed.");
     }
 
     @Scheduled(fixedRate = 600000)
@@ -255,6 +237,7 @@ public class Scheduler {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(bollingerBandTracker::analyzeAndSendAlerts);
         success &= rootErrorHandler.runWithStatus(rsiService::sendRsiReport);
+        success &= rootErrorHandler.runWithStatus(relativeStrengthTracker::analyzeAndSendAlerts);
         log.info("Manual hourly signal monitoring completed.");
         return success;
     }
@@ -265,17 +248,10 @@ public class Scheduler {
         return success;
     }
 
-    public boolean manualRsiStockMonitoring() {
-        boolean success = true;
-        success &= rootErrorHandler.runWithStatus(rsiPriceFetcher::fetchStockClosingPrices);
-        success &= rootErrorHandler.runWithStatus(relativeStrengthTracker::analyzeAndSendAlerts);
-        log.info("Manual RSI stock monitoring completed.");
-        return success;
-    }
-
-    public boolean manualRsiCryptoMonitoring() {
-        boolean success = rootErrorHandler.runWithStatus(rsiPriceFetcher::fetchCryptoClosingPrices);
-        log.info("Manual RSI crypto monitoring completed.");
+    public boolean manualRelativeStrengthMonitoring() {
+        boolean success =
+                rootErrorHandler.runWithStatus(relativeStrengthTracker::analyzeAndSendAlerts);
+        log.info("Manual relative strength monitoring completed.");
         return success;
     }
 
