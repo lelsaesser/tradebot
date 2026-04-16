@@ -23,8 +23,7 @@ public class EvaluatorLivePriceSource implements LivePriceSource {
                     finnhubPriceEvaluator.getLastPriceCache().get(symbol.getName()));
         } else if (symbol.getSymbolType() == SymbolType.CRYPTO) {
             CoinId coinId = (CoinId) symbol;
-            return Optional.ofNullable(
-                    coinGeckoPriceEvaluator.getLastPriceCache().get(coinId));
+            return Optional.ofNullable(coinGeckoPriceEvaluator.getLastPriceCache().get(coinId));
         }
         return Optional.empty();
     }

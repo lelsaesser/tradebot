@@ -34,7 +34,8 @@ class EvaluatorLivePriceSourceTest {
         coinGeckoCache.clear();
         lenient().when(finnhubPriceEvaluator.getLastPriceCache()).thenReturn(finnhubCache);
         lenient().when(coinGeckoPriceEvaluator.getLastPriceCache()).thenReturn(coinGeckoCache);
-        livePriceSource = new EvaluatorLivePriceSource(finnhubPriceEvaluator, coinGeckoPriceEvaluator);
+        livePriceSource =
+                new EvaluatorLivePriceSource(finnhubPriceEvaluator, coinGeckoPriceEvaluator);
     }
 
     @Test
