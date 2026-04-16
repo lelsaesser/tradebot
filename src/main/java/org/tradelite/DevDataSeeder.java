@@ -32,11 +32,9 @@ import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
-import org.tradelite.service.RsiService;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
 import org.tradelite.service.model.RelativeStrengthData;
-import org.tradelite.service.model.RsiDailyClosePrice;
 
 @SuppressWarnings("SameParameterValue")
 @Slf4j
@@ -55,12 +53,10 @@ public class DevDataSeeder implements ApplicationRunner {
     private final DataSource dataSource;
     private final ObjectMapper objectMapper;
     private final MomentumRocRepository momentumRocRepository;
-    private final RsiService rsiService;
     private final RelativeStrengthService relativeStrengthService;
     private final TargetPriceProvider targetPriceProvider;
     private final SymbolRegistry symbolRegistry;
     private final OhlcvRepository ohlcvRepository;
-    private final Path rsiDataFilePath;
     private final Path rsDataFilePath;
 
     @Autowired
@@ -68,7 +64,6 @@ public class DevDataSeeder implements ApplicationRunner {
             DataSource dataSource,
             ObjectMapper objectMapper,
             MomentumRocRepository momentumRocRepository,
-            RsiService rsiService,
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
@@ -77,12 +72,10 @@ public class DevDataSeeder implements ApplicationRunner {
                 dataSource,
                 objectMapper,
                 momentumRocRepository,
-                rsiService,
                 relativeStrengthService,
                 targetPriceProvider,
                 symbolRegistry,
                 ohlcvRepository,
-                Path.of("config/rsi-data.json"),
                 Path.of("config/rs-data.json"));
     }
 
@@ -90,22 +83,18 @@ public class DevDataSeeder implements ApplicationRunner {
             DataSource dataSource,
             ObjectMapper objectMapper,
             MomentumRocRepository momentumRocRepository,
-            RsiService rsiService,
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
-            Path rsiDataFilePath,
             Path rsDataFilePath) {
         this.dataSource = dataSource;
         this.objectMapper = objectMapper;
         this.momentumRocRepository = momentumRocRepository;
-        this.rsiService = rsiService;
         this.relativeStrengthService = relativeStrengthService;
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;
         this.ohlcvRepository = ohlcvRepository;
-        this.rsiDataFilePath = rsiDataFilePath;
         this.rsDataFilePath = rsDataFilePath;
     }
 
@@ -131,7 +120,6 @@ public class DevDataSeeder implements ApplicationRunner {
             initializeSchema();
             clearExistingData();
             insertPriceHistory(bundle.priceSeriesBySymbol());
-            seedRsiHistory(bundle);
             seedRelativeStrengthHistory(bundle);
             seedMomentumState(bundle);
             seedOhlcvData(bundle);
@@ -144,9 +132,7 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private boolean hasSeedData() {
-        return Files.exists(rsiDataFilePath)
-                && Files.exists(rsDataFilePath)
-                && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
+        return Files.exists(rsDataFilePath) && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
     }
 
     private boolean hasPersistedQuotes(String symbol) {
@@ -216,10 +202,7 @@ public class DevDataSeeder implements ApplicationRunner {
             statement.executeUpdate("DELETE FROM " + OHLCV_TABLE);
         }
 
-        Files.deleteIfExists(rsiDataFilePath);
         Files.deleteIfExists(rsDataFilePath);
-        rsiService.getPriceHistory().clear();
-        rsiService.getSymbolDisplayNames().clear();
         relativeStrengthService.getRsHistory().clear();
     }
 
@@ -347,28 +330,6 @@ public class DevDataSeeder implements ApplicationRunner {
             }
             statement.executeBatch();
         }
-    }
-
-    private void seedRsiHistory(SeedBundle bundle) throws IOException {
-        Map<String, RsiDailyClosePrice> history = rsiService.getPriceHistory();
-        Map<String, String> displayNames = rsiService.getSymbolDisplayNames();
-
-        history.clear();
-        displayNames.clear();
-
-        for (Map.Entry<String, List<DailyPrice>> entry : bundle.priceSeriesBySymbol().entrySet()) {
-            RsiDailyClosePrice closePrice = new RsiDailyClosePrice();
-            for (DailyPrice dailyPrice : entry.getValue()) {
-                closePrice.addPrice(dailyPrice.getDate(), dailyPrice.getPrice());
-            }
-            history.put(entry.getKey(), closePrice);
-            displayNames.put(
-                    entry.getKey(),
-                    bundle.displayNamesBySymbol().getOrDefault(entry.getKey(), entry.getKey()));
-        }
-
-        ensureParentDirectories(rsiDataFilePath);
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(rsiDataFilePath.toFile(), history);
     }
 
     private void seedRelativeStrengthHistory(SeedBundle bundle) throws IOException {

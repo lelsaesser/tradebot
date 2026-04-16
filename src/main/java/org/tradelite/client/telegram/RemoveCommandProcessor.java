@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.service.RsiService;
 
 @Component
 public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCommand> {
@@ -14,18 +13,15 @@ public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCo
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
-    private final RsiService rsiService;
 
     @Autowired
     public RemoveCommandProcessor(
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
-            SymbolRegistry symbolRegistry,
-            RsiService rsiService) {
+            SymbolRegistry symbolRegistry) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.symbolRegistry = symbolRegistry;
-        this.rsiService = rsiService;
     }
 
     @Override
@@ -43,15 +39,8 @@ public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCo
         // Remove from target prices
         boolean priceRemoved = removeFromTargetPrices(ticker);
 
-        // Remove RSI data
-        boolean rsiRemoved = rsiService.removeSymbolRsiData(ticker);
-
-        if (symbolRemoved || priceRemoved || rsiRemoved) {
-            telegramClient.sendMessage(
-                    "Removed "
-                            + ticker
-                            + " from monitoring."
-                            + (rsiRemoved ? " Deleted RSI historical data." : ""));
+        if (symbolRemoved || priceRemoved) {
+            telegramClient.sendMessage("Removed " + ticker + " from monitoring.");
         } else {
             telegramClient.sendMessage("Symbol " + ticker + " not found or already removed.");
         }

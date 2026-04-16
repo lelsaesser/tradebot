@@ -1,37 +1,26 @@
 package org.tradelite.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
-import java.io.IOException;
-import java.time.LocalDate;
 import java.util.*;
-import java.util.OptionalLong;
-import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramGateway;
-import org.tradelite.common.CoinId;
-import org.tradelite.common.SymbolType;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TickerSymbol;
-import org.tradelite.core.CoinGeckoPriceEvaluator;
-import org.tradelite.core.FinnhubPriceEvaluator;
-import org.tradelite.service.model.RsiDailyClosePrice;
+import org.tradelite.service.model.DailyPrice;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class RsiService {
 
-    private static final int RSI_PERIOD = 14;
-    private static final String RSI_DATA_FILE = "config/rsi-data.json";
+    static final int RSI_PERIOD = 14;
+    static final int RSI_LOOKBACK_DAYS = 30;
 
     private final TelegramGateway telegramClient;
-    private final ObjectMapper objectMapper;
-
-    @Getter private Map<String, RsiDailyClosePrice> priceHistory = new HashMap<>();
-
-    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
-    private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+    private final DailyPriceProvider dailyPriceProvider;
+    private final SymbolRegistry symbolRegistry;
 
     /**
      * Stores the Telegram message ID of the last sent RSI report so it can be deleted before
@@ -39,52 +28,13 @@ public class RsiService {
      */
     private Long lastTelegramReportMessageId;
 
-    /** Maps symbol keys to their display names for use when building RSI reports. */
-    @Getter private final Map<String, String> symbolDisplayNames = new HashMap<>();
-
-    @Autowired
-    public RsiService(
-            TelegramGateway telegramClient,
-            ObjectMapper objectMapper,
-            FinnhubPriceEvaluator finnhubPriceEvaluator,
-            CoinGeckoPriceEvaluator coinGeckoPriceEvaluator)
-            throws IOException {
-        this.telegramClient = telegramClient;
-        this.objectMapper = objectMapper;
-        this.finnhubPriceEvaluator = finnhubPriceEvaluator;
-        this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
-        loadPriceHistory();
-    }
-
-    public void addPrice(TickerSymbol symbol, double price, double previousClose, LocalDate date)
-            throws IOException {
-        String symbolKey = symbol.getName();
-        RsiDailyClosePrice rsiDailyClosePrice =
-                priceHistory.getOrDefault(symbolKey, new RsiDailyClosePrice());
-
-        if (finnhubPriceEvaluator.isPotentialMarketHoliday(symbolKey, price, previousClose)) {
-            log.info(
-                    "Potential market holiday detected for {}: price {} on {} is identical to previous trading day. Skipping price update.",
-                    symbol,
-                    price,
-                    date);
-            return;
-        }
-
-        rsiDailyClosePrice.addPrice(date, price);
-        priceHistory.put(symbolKey, rsiDailyClosePrice);
-        savePriceHistory();
-
-        String displayName =
-                symbol.getSymbolType() == SymbolType.STOCK
-                        ? symbol.getDisplayName()
-                        : symbol.getName();
-        symbolDisplayNames.put(symbolKey, displayName);
-    }
+    /** Tracks the previous RSI value per symbol for delta display in reports. */
+    private final Map<String, Double> previousRsiMap = new HashMap<>();
 
     /**
-     * Analyzes all symbols in priceHistory, calculates RSI, detects overbought/oversold signals,
-     * builds a consolidated report, and sends it via Telegram. Deletes the previous report message.
+     * Analyzes all symbols from SymbolRegistry, calculates RSI, detects overbought/oversold
+     * signals, builds a consolidated report, and sends it via Telegram. Deletes the previous report
+     * message.
      */
     public void sendRsiReport() {
         List<RsiSignal> signals = analyzeAllSymbols();
@@ -102,50 +52,57 @@ public class RsiService {
     }
 
     /**
-     * Iterates over all symbols in priceHistory, calculates RSI for each, and returns signals for
-     * those in overbought or oversold territory.
+     * Iterates over all symbols from SymbolRegistry, calculates RSI for each, and returns signals
+     * for those in overbought or oversold territory.
      */
     protected List<RsiSignal> analyzeAllSymbols() {
         List<RsiSignal> signals = new ArrayList<>();
 
-        for (Map.Entry<String, RsiDailyClosePrice> entry : priceHistory.entrySet()) {
-            String symbolKey = entry.getKey();
-            RsiDailyClosePrice rsiDailyClosePrice = entry.getValue();
+        for (StockSymbol stockSymbol : symbolRegistry.getAll()) {
+            String symbolKey = stockSymbol.getName();
+            String displayName = stockSymbol.getDisplayName();
 
-            if (rsiDailyClosePrice.getPrices().size() < RSI_PERIOD) {
-                continue;
-            }
-
-            List<Double> prices = new ArrayList<>(rsiDailyClosePrice.getPriceValues());
-            Double currentPrice = getCurrentPriceFromCacheByKey(symbolKey);
-            if (currentPrice != null) {
-                prices.add(currentPrice);
-                log.info(
-                        "Using current price {} from cache for RSI report of {}",
-                        currentPrice,
-                        symbolKey);
-            }
+            List<Double> prices = fetchPrices(symbolKey);
 
             if (prices.size() < RSI_PERIOD + 1) {
                 continue;
             }
 
             double rsi = calculateRsi(prices);
-            String displayName = symbolDisplayNames.getOrDefault(symbolKey, symbolKey);
-            double previousRsi = rsiDailyClosePrice.getPreviousRsi();
+            double previousRsi = previousRsiMap.getOrDefault(symbolKey, 0.0);
             double rsiDiff = rsi - previousRsi;
 
             if (rsi >= 70) {
                 log.info("RSI for {} is in overbought zone: {}", displayName, rsi);
-                signals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERBOUGHT"));
+                signals.add(
+                        new RsiSignal(
+                                displayName, rsi, previousRsi, rsiDiff, RsiSignal.Zone.OVERBOUGHT));
             } else if (rsi <= 30) {
                 log.info("RSI for {} is in oversold zone: {}", displayName, rsi);
-                signals.add(new RsiSignal(displayName, rsi, previousRsi, rsiDiff, "OVERSOLD"));
+                signals.add(
+                        new RsiSignal(
+                                displayName, rsi, previousRsi, rsiDiff, RsiSignal.Zone.OVERSOLD));
             }
-            rsiDailyClosePrice.setPreviousRsi(rsi);
+            previousRsiMap.put(symbolKey, rsi);
         }
 
         return signals;
+    }
+
+    public Optional<Double> getCurrentRsi(TickerSymbol symbol) {
+        List<Double> historicalPrices = fetchPrices(symbol.getName());
+
+        if (historicalPrices.size() < RSI_PERIOD + 1) {
+            return Optional.empty();
+        }
+
+        return Optional.of(calculateRsi(historicalPrices));
+    }
+
+    private List<Double> fetchPrices(String symbolKey) {
+        List<DailyPrice> dailyPrices =
+                dailyPriceProvider.findDailyClosingPrices(symbolKey, RSI_LOOKBACK_DAYS);
+        return new ArrayList<>(dailyPrices.stream().map(DailyPrice::getPrice).toList());
     }
 
     private void deletePreviousTelegramReport() {
@@ -164,9 +121,9 @@ public class RsiService {
         sb.append("*RSI Signal Report*\n\n");
 
         List<RsiSignal> overbought =
-                signals.stream().filter(s -> "OVERBOUGHT".equals(s.zone())).toList();
+                signals.stream().filter(s -> s.zone() == RsiSignal.Zone.OVERBOUGHT).toList();
         List<RsiSignal> oversold =
-                signals.stream().filter(s -> "OVERSOLD".equals(s.zone())).toList();
+                signals.stream().filter(s -> s.zone() == RsiSignal.Zone.OVERSOLD).toList();
 
         if (!overbought.isEmpty()) {
             sb.append("🔴 *Overbought (RSI ≥ 70):*\n");
@@ -202,75 +159,12 @@ public class RsiService {
 
     /** Represents an RSI signal for a single symbol. */
     public record RsiSignal(
-            String displayName, double rsi, double previousRsi, double rsiDiff, String zone) {}
+            String displayName, double rsi, double previousRsi, double rsiDiff, Zone zone) {
 
-    public Optional<Double> getCurrentRsi(TickerSymbol symbol) {
-        String symbolKey = symbol.getName();
-        RsiDailyClosePrice rsiDailyClosePrice = priceHistory.get(symbolKey);
-
-        if (rsiDailyClosePrice == null || rsiDailyClosePrice.getPrices().size() < RSI_PERIOD) {
-            return Optional.empty();
+        public enum Zone {
+            OVERBOUGHT,
+            OVERSOLD
         }
-
-        List<Double> historicalPrices = new ArrayList<>(rsiDailyClosePrice.getPriceValues());
-        Double currentPrice = getCurrentPriceFromCache(symbol);
-        if (currentPrice != null) {
-            // Add the current price to get the most up-to-date RSI calculation
-            historicalPrices.add(currentPrice);
-            log.info(
-                    "Using current price {} from cache for RSI calculation of {}",
-                    currentPrice,
-                    symbol.getName());
-        }
-
-        if (historicalPrices.size() < RSI_PERIOD + 1) {
-            return Optional.empty();
-        }
-
-        return Optional.of(calculateRsi(historicalPrices));
-    }
-
-    protected Double getCurrentPriceFromCache(TickerSymbol symbol) {
-        if (symbol.getSymbolType() == SymbolType.STOCK) {
-            return finnhubPriceEvaluator.getLastPriceCache().get(symbol.getName());
-        } else if (symbol.getSymbolType() == SymbolType.CRYPTO) {
-            CoinId coinId = (CoinId) symbol;
-            return coinGeckoPriceEvaluator.getLastPriceCache().get(coinId);
-        }
-        return null;
-    }
-
-    /**
-     * Looks up the current price from the Finnhub or CoinGecko cache using only the symbol key
-     * string. Tries the stock cache first, then checks if it matches a known CoinId.
-     */
-    protected Double getCurrentPriceFromCacheByKey(String symbolKey) {
-        Double stockPrice = finnhubPriceEvaluator.getLastPriceCache().get(symbolKey);
-        if (stockPrice != null) {
-            return stockPrice;
-        }
-        Optional<CoinId> coinId = CoinId.fromString(symbolKey);
-        return coinId.map(id -> coinGeckoPriceEvaluator.getLastPriceCache().get(id)).orElse(null);
-    }
-
-    public synchronized boolean removeSymbolRsiData(String symbolKey) {
-        if (symbolKey == null || symbolKey.isEmpty()) {
-            return false;
-        }
-
-        boolean removed = priceHistory.remove(symbolKey) != null;
-        if (removed) {
-            try {
-                savePriceHistory();
-                log.info("Removed RSI data for symbol: {}", symbolKey);
-                return true;
-            } catch (IOException e) {
-                log.error("Failed to save RSI data after removing symbol: {}", symbolKey, e);
-                return false;
-            }
-        }
-
-        return false;
     }
 
     protected double calculateRsi(List<Double> prices) {
@@ -317,34 +211,5 @@ public class RsiService {
 
         double rs = avgGain / avgLoss;
         return 100 - (100 / (1 + rs));
-    }
-
-    protected void loadPriceHistory() throws IOException {
-        try {
-            File file = new File(RSI_DATA_FILE);
-            if (file.exists()) {
-                priceHistory =
-                        objectMapper.readValue(
-                                file,
-                                objectMapper
-                                        .getTypeFactory()
-                                        .constructMapType(
-                                                HashMap.class,
-                                                String.class,
-                                                RsiDailyClosePrice.class));
-            }
-        } catch (IOException e) {
-            log.error("Error loading RSI data", e);
-            throw e;
-        }
-    }
-
-    protected void savePriceHistory() throws IOException {
-        try {
-            objectMapper.writeValue(new File(RSI_DATA_FILE), priceHistory);
-        } catch (IOException e) {
-            log.error("Error saving RSI data", e);
-            throw e;
-        }
     }
 }

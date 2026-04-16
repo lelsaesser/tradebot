@@ -13,7 +13,6 @@ import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RelativeStrengthData;
-import org.tradelite.service.model.RsiDailyClosePrice;
 
 /**
  * Service for calculating Relative Strength (RS) vs SPY benchmark and detecting crossovers.
@@ -50,17 +49,14 @@ public class RelativeStrengthService {
     private static final String RS_DATA_FILE = "config/rs-data.json";
 
     private final ObjectMapper objectMapper;
-    private final RsiService rsiService;
     private final DailyPriceProvider dailyPriceProvider;
 
     @Getter private Map<String, RelativeStrengthData> rsHistory = new HashMap<>();
 
     @Autowired
-    public RelativeStrengthService(
-            ObjectMapper objectMapper, RsiService rsiService, DailyPriceProvider dailyPriceProvider)
+    public RelativeStrengthService(ObjectMapper objectMapper, DailyPriceProvider dailyPriceProvider)
             throws IOException {
         this.objectMapper = objectMapper;
-        this.rsiService = rsiService;
         this.dailyPriceProvider = dailyPriceProvider;
         loadRsHistory();
     }
@@ -80,22 +76,19 @@ public class RelativeStrengthService {
             return Optional.empty();
         }
 
-        // Get price history for stock and SPY
-        Map<String, RsiDailyClosePrice> priceHistory = rsiService.getPriceHistory();
-        RsiDailyClosePrice stockPriceData = priceHistory.get(symbol);
-        RsiDailyClosePrice spyPriceData = priceHistory.get(BENCHMARK_SYMBOL);
+        // Get price history for stock and SPY from DailyPriceProvider
+        List<DailyPrice> stockPrices =
+                dailyPriceProvider.findDailyClosingPrices(symbol, RS_LOOKBACK_DAYS);
+        List<DailyPrice> spyPrices =
+                dailyPriceProvider.findDailyClosingPrices(BENCHMARK_SYMBOL, RS_LOOKBACK_DAYS);
 
-        if (stockPriceData == null || spyPriceData == null) {
+        if (stockPrices.isEmpty() || spyPrices.isEmpty()) {
             log.info(
                     "Insufficient price data for RS calculation. Stock={}, SPY={}",
-                    stockPriceData != null,
-                    spyPriceData != null);
+                    !stockPrices.isEmpty(),
+                    !spyPrices.isEmpty());
             return Optional.empty();
         }
-
-        // Calculate RS values for matching dates
-        List<DailyPrice> stockPrices = stockPriceData.getPrices();
-        List<DailyPrice> spyPrices = spyPriceData.getPrices();
 
         // Build a map of SPY prices by date for efficient lookup
         Map<LocalDate, Double> spyPriceMap = new HashMap<>();
