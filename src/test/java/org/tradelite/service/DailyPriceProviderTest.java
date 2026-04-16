@@ -115,13 +115,7 @@ class DailyPriceProviderTest {
                 .thenReturn(
                         List.of(
                                 new OhlcvRecord(
-                                        "AAPL",
-                                        wednesday,
-                                        150.0,
-                                        155.0,
-                                        149.0,
-                                        153.0,
-                                        1000000)));
+                                        "AAPL", wednesday, 150.0, 155.0, 149.0, 153.0, 1000000)));
         when(priceQuoteRepository.findLatestBySymbol("AAPL"))
                 .thenReturn(
                         Optional.of(
@@ -192,6 +186,29 @@ class DailyPriceProviderTest {
         List<DailyPrice> result = provider.findDailyClosingPrices("UNKNOWN", 90);
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findDailyClosingPrices_ohlcvPresent_alwaysQueriesFinnhubForIntradayPrice() {
+        // Regression guard: DailyPriceProvider MUST always query Finnhub for the latest
+        // intraday price when OHLCV data exists. Removing this call would silently break
+        // all intraday indicator signals (see issue #276).
+        when(ohlcvRepository.findBySymbol("AAPL", 90))
+                .thenReturn(
+                        List.of(
+                                new OhlcvRecord(
+                                        "AAPL",
+                                        LocalDate.of(2026, 4, 15),
+                                        150.0,
+                                        155.0,
+                                        149.0,
+                                        153.0,
+                                        1000000)));
+        when(priceQuoteRepository.findLatestBySymbol("AAPL")).thenReturn(Optional.empty());
+
+        provider.findDailyClosingPrices("AAPL", 90);
+
+        verify(priceQuoteRepository).findLatestBySymbol("AAPL");
     }
 
     private long toEpochSecond(LocalDate date, int hour, int minute) {
