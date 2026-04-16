@@ -15,11 +15,11 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
+import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.service.OhlcvFetcher;
-import org.tradelite.service.RsiService;
 import org.tradelite.utils.DateUtil;
 
 @Slf4j
@@ -40,7 +40,7 @@ public class Scheduler {
     private final SectorMomentumRocTracker sectorMomentumRocTracker;
     private final TailRiskTracker tailRiskTracker;
     private final BollingerBandTracker bollingerBandTracker;
-    private final RsiService rsiService;
+    private final RsiTracker rsiTracker;
     private final EmaTracker emaTracker;
     private final OhlcvFetcher ohlcvFetcher;
     private final VfiTracker vfiTracker;
@@ -63,7 +63,7 @@ public class Scheduler {
             SectorMomentumRocTracker sectorMomentumRocTracker,
             TailRiskTracker tailRiskTracker,
             BollingerBandTracker bollingerBandTracker,
-            RsiService rsiService,
+            RsiTracker rsiTracker,
             EmaTracker emaTracker,
             OhlcvFetcher ohlcvFetcher,
             VfiTracker vfiTracker) {
@@ -81,7 +81,7 @@ public class Scheduler {
         this.sectorMomentumRocTracker = sectorMomentumRocTracker;
         this.tailRiskTracker = tailRiskTracker;
         this.bollingerBandTracker = bollingerBandTracker;
-        this.rsiService = rsiService;
+        this.rsiTracker = rsiTracker;
         this.emaTracker = emaTracker;
         this.ohlcvFetcher = ohlcvFetcher;
         this.vfiTracker = vfiTracker;
@@ -104,7 +104,7 @@ public class Scheduler {
     protected void hourlySignalMonitoring() {
         if (DateUtil.isStockMarketOpen(marketDateTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
-            rootErrorHandler.run(rsiService::sendRsiReport);
+            rootErrorHandler.run(rsiTracker::analyzeAndSendReport);
             rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping hourly signal monitoring.");
@@ -236,7 +236,7 @@ public class Scheduler {
     public boolean manualHourlySignalMonitoring() {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(bollingerBandTracker::analyzeAndSendAlerts);
-        success &= rootErrorHandler.runWithStatus(rsiService::sendRsiReport);
+        success &= rootErrorHandler.runWithStatus(rsiTracker::analyzeAndSendReport);
         success &= rootErrorHandler.runWithStatus(relativeStrengthTracker::analyzeAndSendAlerts);
         log.info("Manual hourly signal monitoring completed.");
         return success;

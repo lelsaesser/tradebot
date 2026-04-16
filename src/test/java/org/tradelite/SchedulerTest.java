@@ -28,11 +28,11 @@ import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
+import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.service.OhlcvFetcher;
-import org.tradelite.service.RsiService;
 
 @ExtendWith(MockitoExtension.class)
 class SchedulerTest {
@@ -51,7 +51,7 @@ class SchedulerTest {
     @Mock private SectorMomentumRocTracker sectorMomentumRocTracker;
     @Mock private TailRiskTracker tailRiskTracker;
     @Mock private BollingerBandTracker bollingerBandTracker;
-    @Mock private RsiService rsiService;
+    @Mock private RsiTracker rsiTracker;
     @Mock private EmaTracker emaTracker;
     @Mock private OhlcvFetcher ohlcvFetcher;
     @Mock private VfiTracker vfiTracker;
@@ -76,7 +76,7 @@ class SchedulerTest {
                         sectorMomentumRocTracker,
                         tailRiskTracker,
                         bollingerBandTracker,
-                        rsiService,
+                        rsiTracker,
                         emaTracker,
                         ohlcvFetcher,
                         vfiTracker);
@@ -141,7 +141,7 @@ class SchedulerTest {
         }
 
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
-        verify(rsiService, times(1)).sendRsiReport();
+        verify(rsiTracker, times(1)).analyzeAndSendReport();
         verify(relativeStrengthTracker, times(1)).analyzeAndSendAlerts();
     }
 
@@ -155,7 +155,7 @@ class SchedulerTest {
 
         verify(rootErrorHandler, never()).run(any(ThrowingRunnable.class));
         verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
-        verify(rsiService, never()).sendRsiReport();
+        verify(rsiTracker, never()).analyzeAndSendReport();
         verify(relativeStrengthTracker, never()).analyzeAndSendAlerts();
     }
 
@@ -394,7 +394,7 @@ class SchedulerTest {
 
         assertTrue(success);
         verify(bollingerBandTracker, times(1)).analyzeAndSendAlerts();
-        verify(rsiService, times(1)).sendRsiReport();
+        verify(rsiTracker, times(1)).analyzeAndSendReport();
         verify(relativeStrengthTracker, times(1)).analyzeAndSendAlerts();
     }
 
