@@ -103,6 +103,12 @@ public class TelegramMessageProcessor {
                 log.info("Received rsi command: {}", rsiCommand.get());
                 return Optional.of(rsiCommand.get());
             }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/data")) {
+            Optional<DataResetCommand> dataResetCommand = parseDataResetCommand(messageText);
+            if (dataResetCommand.isPresent()) {
+                log.info("Received data reset command: {}", dataResetCommand.get());
+                return Optional.of(dataResetCommand.get());
+            }
         }
         return Optional.empty();
     }
@@ -188,5 +194,15 @@ public class TelegramMessageProcessor {
         }
 
         return Optional.of(new RsiCommand(tickerSymbol.get()));
+    }
+
+    protected Optional<DataResetCommand> parseDataResetCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 3 || !parts[1].equalsIgnoreCase("reset")) {
+            telegramClient.sendMessage("Invalid command format. Use /data reset <SYMBOL>");
+            return Optional.empty();
+        }
+        String ticker = parts[2].toUpperCase();
+        return Optional.of(new DataResetCommand(ticker));
     }
 }
