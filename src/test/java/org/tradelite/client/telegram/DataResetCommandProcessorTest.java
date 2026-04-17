@@ -55,8 +55,7 @@ class DataResetCommandProcessorTest {
     @Test
     void processCommand_backfillFails_sendsErrorMessage() {
         when(ohlcvRepository.deleteBySymbol("NFLX")).thenReturn(245);
-        when(ohlcvFetcher.backfillSymbol("NFLX"))
-                .thenThrow(new RuntimeException("API error"));
+        when(ohlcvFetcher.backfillSymbol("NFLX")).thenThrow(new RuntimeException("API error"));
 
         processor.processCommand(new DataResetCommand("NFLX"));
 
