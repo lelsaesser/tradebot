@@ -120,9 +120,7 @@ public class OhlcvFetcher {
     }
 
     private void checkForStockSplit(
-            String ticker,
-            List<OhlcvRecord> existingRecords,
-            List<OhlcvRecord> fetchedRecords) {
+            String ticker, List<OhlcvRecord> existingRecords, List<OhlcvRecord> fetchedRecords) {
         double lastStoredClose = existingRecords.getLast().close();
         double oldestFetchedClose = fetchedRecords.getLast().close();
 

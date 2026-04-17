@@ -142,8 +142,7 @@ class OhlcvFetcherTest {
     @Test
     void fetchAndBackfillOhlcv_splitDetectedDuringRefresh_sendsTelegramAlert()
             throws InterruptedException {
-        when(symbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
 
         List<OhlcvRecord> storedRecords = generateRecords("NFLX", 140, 900.0);
         when(ohlcvRepository.findBySymbol("NFLX", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
@@ -169,8 +168,7 @@ class OhlcvFetcherTest {
 
     @Test
     void fetchAndBackfillOhlcv_noSplitDuringRefresh_noSplitAlert() throws InterruptedException {
-        when(symbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
 
         List<OhlcvRecord> storedRecords = generateRecords("AAPL", 140, 180.0);
         when(ohlcvRepository.findBySymbol("AAPL", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
@@ -201,8 +199,7 @@ class OhlcvFetcherTest {
                         throwingDetector);
         fetcherWithThrowingDetector.setRequestDelayMs(0);
 
-        when(symbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
 
         List<OhlcvRecord> storedRecords = generateRecords("NFLX", 140, 900.0);
         when(ohlcvRepository.findBySymbol("NFLX", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
@@ -219,8 +216,7 @@ class OhlcvFetcherTest {
 
     @Test
     void fetchAndBackfillOhlcv_backfillMode_skipsSplitDetection() throws InterruptedException {
-        when(symbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
 
         // Empty DB triggers backfill mode
         when(ohlcvRepository.findBySymbol("NFLX", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
