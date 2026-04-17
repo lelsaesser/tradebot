@@ -27,6 +27,7 @@ public class OhlcvFetcher {
     private final OhlcvRepository ohlcvRepository;
     private final SymbolRegistry symbolRegistry;
     private final TelegramGateway telegramGateway;
+    private final StockSplitDetector stockSplitDetector;
     private long requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
 
     @Autowired
@@ -34,11 +35,13 @@ public class OhlcvFetcher {
             TwelveDataClient twelveDataClient,
             OhlcvRepository ohlcvRepository,
             SymbolRegistry symbolRegistry,
-            TelegramGateway telegramGateway) {
+            TelegramGateway telegramGateway,
+            StockSplitDetector stockSplitDetector) {
         this.twelveDataClient = twelveDataClient;
         this.ohlcvRepository = ohlcvRepository;
         this.symbolRegistry = symbolRegistry;
         this.telegramGateway = telegramGateway;
+        this.stockSplitDetector = stockSplitDetector;
     }
 
     void setRequestDelayMs(long requestDelayMs) {
@@ -61,9 +64,9 @@ public class OhlcvFetcher {
             }
 
             String ticker = symbols.get(i);
-            int existingRecords =
-                    ohlcvRepository.findBySymbol(ticker, LOOKBACK_CALENDAR_DAYS).size();
-            boolean needsBackfill = existingRecords < MIN_RECORDS_FOR_BACKFILL;
+            List<OhlcvRecord> existingRecords =
+                    ohlcvRepository.findBySymbol(ticker, LOOKBACK_CALENDAR_DAYS);
+            boolean needsBackfill = existingRecords.size() < MIN_RECORDS_FOR_BACKFILL;
             int outputSize = needsBackfill ? BACKFILL_OUTPUT_SIZE : REFRESH_OUTPUT_SIZE;
             String mode = needsBackfill ? "backfill" : "refresh";
 
@@ -71,6 +74,15 @@ public class OhlcvFetcher {
 
             try {
                 List<OhlcvRecord> records = twelveDataClient.fetchDailyOhlcv(ticker, outputSize);
+
+                if (!needsBackfill && !records.isEmpty() && !existingRecords.isEmpty()) {
+                    try {
+                        checkForStockSplit(ticker, existingRecords, records);
+                    } catch (Exception e) {
+                        log.warn("Split detection failed for {}: {}", ticker, e.getMessage());
+                    }
+                }
+
                 ohlcvRepository.saveAll(records);
                 succeeded++;
             } catch (Exception e) {
@@ -91,5 +103,46 @@ public class OhlcvFetcher {
                             "*OHLCV Fetch Alert*%n%d/%d failed %s",
                             failedSymbols.size(), symbols.size(), failedSymbols));
         }
+    }
+
+    /**
+     * Fetches a full backfill (400 records) for a single symbol and saves to the repository. Used
+     * by the /data reset command after deleting existing data.
+     *
+     * @return number of records fetched and saved
+     */
+    public int backfillSymbol(String ticker) {
+        log.info("Backfilling OHLCV for {}", ticker);
+        List<OhlcvRecord> records = twelveDataClient.fetchDailyOhlcv(ticker, BACKFILL_OUTPUT_SIZE);
+        ohlcvRepository.saveAll(records);
+        log.info("Backfill complete for {}: {} records saved", ticker, records.size());
+        return records.size();
+    }
+
+    private void checkForStockSplit(
+            String ticker,
+            List<OhlcvRecord> existingRecords,
+            List<OhlcvRecord> fetchedRecords) {
+        double lastStoredClose = existingRecords.getLast().close();
+        double oldestFetchedClose = fetchedRecords.getLast().close();
+
+        stockSplitDetector
+                .detectSplit(lastStoredClose, oldestFetchedClose)
+                .ifPresent(
+                        result ->
+                                telegramGateway.sendMessage(
+                                        String.format(
+                                                "*Stock Split Alert*%n"
+                                                        + "%s: possible %d:1 %s split detected%n"
+                                                        + "Stored close: %.2f → Fetched close:"
+                                                        + " %.2f%n"
+                                                        + "Run `/data reset %s` to fix historical"
+                                                        + " data",
+                                                ticker,
+                                                result.factor(),
+                                                result.direction().name().toLowerCase(),
+                                                lastStoredClose,
+                                                oldestFetchedClose,
+                                                ticker)));
     }
 }

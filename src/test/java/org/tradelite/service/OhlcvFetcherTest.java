@@ -2,6 +2,7 @@ package org.tradelite.service;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -31,13 +32,19 @@ class OhlcvFetcherTest {
     @Mock private SymbolRegistry symbolRegistry;
     @Mock private TelegramGateway telegramGateway;
 
+    private StockSplitDetector stockSplitDetector;
     private OhlcvFetcher ohlcvFetcher;
 
     @BeforeEach
     void setUp() {
+        stockSplitDetector = new StockSplitDetector();
         ohlcvFetcher =
                 new OhlcvFetcher(
-                        twelveDataClient, ohlcvRepository, symbolRegistry, telegramGateway);
+                        twelveDataClient,
+                        ohlcvRepository,
+                        symbolRegistry,
+                        telegramGateway,
+                        stockSplitDetector);
         ohlcvFetcher.setRequestDelayMs(0);
         // Default: return all ETFs + benchmark (no extra stocks)
         lenient().when(symbolRegistry.getAll()).thenReturn(defaultEtfSymbols());
@@ -133,17 +140,131 @@ class OhlcvFetcherTest {
         verify(telegramGateway, never()).sendMessage(anyString());
     }
 
+    @Test
+    void fetchAndBackfillOhlcv_splitDetectedDuringRefresh_sendsTelegramAlert()
+            throws InterruptedException {
+        when(symbolRegistry.getAll())
+                .thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
+
+        List<OhlcvRecord> storedRecords = generateRecords("NFLX", 140, 900.0);
+        when(ohlcvRepository.findBySymbol("NFLX", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(storedRecords);
+
+        // API returns split-adjusted prices (10:1 split), descending order
+        List<OhlcvRecord> fetchedRecords = generateRecords("NFLX", 5, 90.0);
+        when(twelveDataClient.fetchDailyOhlcv("NFLX", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
+                .thenReturn(fetchedRecords);
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramGateway).sendMessage(messageCaptor.capture());
+
+        String message = messageCaptor.getValue();
+        assertThat(message, containsString("Stock Split Alert"));
+        assertThat(message, containsString("NFLX"));
+        assertThat(message, containsString("10:1"));
+        assertThat(message, containsString("forward"));
+        assertThat(message, containsString("/data reset NFLX"));
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_noSplitDuringRefresh_noSplitAlert() throws InterruptedException {
+        when(symbolRegistry.getAll())
+                .thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
+
+        List<OhlcvRecord> storedRecords = generateRecords("AAPL", 140, 180.0);
+        when(ohlcvRepository.findBySymbol("AAPL", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(storedRecords);
+
+        List<OhlcvRecord> fetchedRecords = generateRecords("AAPL", 5, 182.0);
+        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
+                .thenReturn(fetchedRecords);
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        verify(telegramGateway, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_splitDetectionThrows_stillSavesRecords()
+            throws InterruptedException {
+        StockSplitDetector throwingDetector = mock(StockSplitDetector.class);
+        when(throwingDetector.detectSplit(anyDouble(), anyDouble()))
+                .thenThrow(new RuntimeException("unexpected error"));
+
+        OhlcvFetcher fetcherWithThrowingDetector =
+                new OhlcvFetcher(
+                        twelveDataClient,
+                        ohlcvRepository,
+                        symbolRegistry,
+                        telegramGateway,
+                        throwingDetector);
+        fetcherWithThrowingDetector.setRequestDelayMs(0);
+
+        when(symbolRegistry.getAll())
+                .thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
+
+        List<OhlcvRecord> storedRecords = generateRecords("NFLX", 140, 900.0);
+        when(ohlcvRepository.findBySymbol("NFLX", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(storedRecords);
+
+        List<OhlcvRecord> fetchedRecords = generateRecords("NFLX", 5, 90.0);
+        when(twelveDataClient.fetchDailyOhlcv("NFLX", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
+                .thenReturn(fetchedRecords);
+
+        fetcherWithThrowingDetector.fetchAndBackfillOhlcv();
+
+        verify(ohlcvRepository).saveAll(fetchedRecords);
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_backfillMode_skipsSplitDetection() throws InterruptedException {
+        when(symbolRegistry.getAll())
+                .thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
+
+        // Empty DB triggers backfill mode
+        when(ohlcvRepository.findBySymbol("NFLX", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(List.of());
+
+        List<OhlcvRecord> fetchedRecords = generateRecords("NFLX", 400, 90.0);
+        when(twelveDataClient.fetchDailyOhlcv("NFLX", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(fetchedRecords);
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        // No split alert — backfill mode skips detection
+        verify(telegramGateway, never()).sendMessage(anyString());
+        verify(ohlcvRepository).saveAll(fetchedRecords);
+    }
+
+    @Test
+    void backfillSymbol_fetchesAndSavesRecords() {
+        List<OhlcvRecord> records = generateRecords("NFLX", 400, 90.0);
+        when(twelveDataClient.fetchDailyOhlcv("NFLX", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(records);
+
+        int count = ohlcvFetcher.backfillSymbol("NFLX");
+
+        assertThat(count, is(400));
+        verify(ohlcvRepository).saveAll(records);
+    }
+
     private List<OhlcvRecord> generateRecords(String symbol, int count) {
+        return generateRecords(symbol, count, 102.0);
+    }
+
+    private List<OhlcvRecord> generateRecords(String symbol, int count, double closePrice) {
         List<OhlcvRecord> records = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             records.add(
                     new OhlcvRecord(
                             symbol,
                             java.time.LocalDate.now().minusDays(count - i),
-                            100.0,
-                            105.0,
-                            95.0,
-                            102.0,
+                            closePrice - 2.0,
+                            closePrice + 3.0,
+                            closePrice - 7.0,
+                            closePrice,
                             1000000L));
         }
         return records;
