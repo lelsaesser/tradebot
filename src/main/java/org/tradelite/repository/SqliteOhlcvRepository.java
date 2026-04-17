@@ -127,4 +127,19 @@ public class SqliteOhlcvRepository implements OhlcvRepository {
                 rs.getDouble("close"),
                 rs.getLong("volume"));
     }
+
+    @Override
+    public int deleteBySymbol(String symbol) {
+        String sql = "DELETE FROM twelvedata_daily_ohlcv WHERE symbol = ?";
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, symbol);
+            int deleted = pstmt.executeUpdate();
+            log.info("Deleted {} OHLCV records for symbol {}", deleted, symbol);
+            return deleted;
+        } catch (SQLException e) {
+            log.error("Failed to delete OHLCV records for symbol {}", symbol, e);
+            throw new IllegalStateException("Failed to delete OHLCV records", e);
+        }
+    }
 }

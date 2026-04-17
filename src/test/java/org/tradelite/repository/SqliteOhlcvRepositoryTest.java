@@ -239,6 +239,44 @@ class SqliteOhlcvRepositoryTest {
         assertThrows(IllegalStateException.class, () -> repoWithMock.findBySymbol("AAPL", 365));
     }
 
+    @Test
+    void deleteBySymbol_deletesOnlyTargetSymbol() {
+        repository.saveAll(
+                List.of(
+                        createRecord("AAPL", LocalDate.of(2026, 4, 9), 170.0, 174.0),
+                        createRecord("AAPL", LocalDate.of(2026, 4, 10), 174.0, 178.0),
+                        createRecord("GOOG", LocalDate.of(2026, 4, 10), 150.0, 152.0)));
+
+        int deleted = repository.deleteBySymbol("AAPL");
+
+        assertThat(deleted, is(2));
+        assertThat(repository.findBySymbol("AAPL", 365), is(empty()));
+        assertThat(repository.findBySymbol("GOOG", 365), hasSize(1));
+    }
+
+    @Test
+    void deleteBySymbol_nonexistentSymbol_returnsZero() {
+        int deleted = repository.deleteBySymbol("UNKNOWN");
+
+        assertThat(deleted, is(0));
+    }
+
+    @Test
+    void deleteBySymbol_sqlException_throwsIllegalState() throws SQLException {
+        DataSource mockDataSource = mock(DataSource.class);
+        Connection mockConnection = mock(Connection.class);
+
+        when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.createStatement())
+                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
+
+        SqliteOhlcvRepository repoWithMock = new SqliteOhlcvRepository(mockDataSource);
+
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
+
+        assertThrows(IllegalStateException.class, () -> repoWithMock.deleteBySymbol("AAPL"));
+    }
+
     private OhlcvRecord createRecord(String symbol, LocalDate date, double open, double close) {
         return new OhlcvRecord(symbol, date, open, open + 5.0, open - 2.0, close, 1_000_000L);
     }
