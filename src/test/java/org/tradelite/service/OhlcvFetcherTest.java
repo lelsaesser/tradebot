@@ -32,12 +32,11 @@ class OhlcvFetcherTest {
     @Mock private SymbolRegistry symbolRegistry;
     @Mock private TelegramGateway telegramGateway;
 
-    private StockSplitDetector stockSplitDetector;
     private OhlcvFetcher ohlcvFetcher;
 
     @BeforeEach
     void setUp() {
-        stockSplitDetector = new StockSplitDetector();
+        StockSplitDetector stockSplitDetector = new StockSplitDetector();
         ohlcvFetcher =
                 new OhlcvFetcher(
                         twelveDataClient,
