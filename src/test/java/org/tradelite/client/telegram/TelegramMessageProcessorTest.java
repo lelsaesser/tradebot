@@ -405,4 +405,46 @@ class TelegramMessageProcessorTest {
 
         assertThat(result.isPresent(), is(false));
     }
+
+    @Test
+    void parseMessage_validDataResetCommand_returnsDataResetCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/data reset AAPL");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(DataResetCommand.class)));
+        assertThat(((DataResetCommand) command.get()).getTicker(), is("AAPL"));
+    }
+
+    @Test
+    void parseMessage_dataResetCommand_caseInsensitive() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/DATA Reset nflx");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(DataResetCommand.class)));
+        assertThat(((DataResetCommand) command.get()).getTicker(), is("NFLX"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "/data reset",
+        "/data delete AAPL",
+        "/data reset AAPL extra",
+        "/data",
+    })
+    void parseDataResetCommand_invalidFormats_returnsEmpty(String commandText) {
+        Optional<DataResetCommand> command = messageProcessor.parseDataResetCommand(commandText);
+
+        assertThat(command.isPresent(), is(false));
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
 }
