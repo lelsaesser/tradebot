@@ -26,8 +26,8 @@ import org.tradelite.repository.PriceQuoteRepository;
  *
  * <p><b>Stock split safety:</b> This service operates on daily change percents (via {@link
  * PriceQuoteRepository#findDailyChangePercents}), not absolute prices. Percentage changes are
- * invariant to stock splits — a 2% daily move is 2% regardless of pre- or post-split price
- * levels. Therefore, no data reset is needed for this service when a stock split occurs.
+ * invariant to stock splits — a 2% daily move is 2% regardless of pre- or post-split price levels.
+ * Therefore, no data reset is needed for this service when a stock split occurs.
  */
 @Slf4j
 @Service
