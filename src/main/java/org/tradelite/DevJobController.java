@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/dev/jobs")
 public class DevJobController {
 
+    private static final int SMOKE_TEST_OHLCV_SYMBOLS = 3;
+
     private final Scheduler scheduler;
     private final DevDataSeeder devDataSeeder;
     private final RootErrorHandler rootErrorHandler;
@@ -108,8 +110,12 @@ public class DevJobController {
                         "seed-analytics",
                         () -> rootErrorHandler.runWithStatus(devDataSeeder::reseed));
 
-        // Phase 2: fetch OHLCV (needed by VFI)
-        failures += runAndRecord(results, "ohlcv-fetch", scheduler::manualOhlcvFetch);
+        // Phase 2: fetch OHLCV for a small subset (needed by VFI)
+        failures +=
+                runAndRecord(
+                        results,
+                        "ohlcv-fetch",
+                        () -> scheduler.manualOhlcvFetchLimited(SMOKE_TEST_OHLCV_SYMBOLS));
 
         // Phase 3: all independent jobs
         failures +=

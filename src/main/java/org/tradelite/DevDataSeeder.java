@@ -45,6 +45,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private static final int LOOKBACK_DAYS = 90;
     private static final int OHLCV_LOOKBACK_DAYS = 400;
     private static final int SAMPLE_STOCK_LIMIT = 5;
+    private static final int OHLCV_SYMBOL_LIMIT = 10;
     private static final String QUOTES_TABLE = "finnhub_price_quotes";
     private static final String MOMENTUM_TABLE = "momentum_roc_state";
     private static final String OHLCV_TABLE = "twelvedata_daily_ohlcv";
@@ -391,15 +392,17 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private void seedOhlcvData(SeedBundle bundle) {
+        int count = 0;
         for (Map.Entry<String, String> entry : bundle.displayNamesBySymbol().entrySet()) {
+            if (count >= OHLCV_SYMBOL_LIMIT) {
+                break;
+            }
             String symbol = entry.getKey();
             List<OhlcvRecord> records = buildOhlcvSeries(symbol);
             ohlcvRepository.saveAll(records);
+            count++;
         }
-        log.info(
-                "Seeded OHLCV data for {} symbols ({} days each)",
-                bundle.displayNamesBySymbol().size(),
-                OHLCV_LOOKBACK_DAYS);
+        log.info("Seeded OHLCV data for {} symbols ({} days each)", count, OHLCV_LOOKBACK_DAYS);
     }
 
     private List<OhlcvRecord> buildOhlcvSeries(String symbol) {

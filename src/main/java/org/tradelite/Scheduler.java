@@ -309,6 +309,14 @@ public class Scheduler {
         return success;
     }
 
+    public boolean manualOhlcvFetchLimited(int maxSymbols) {
+        boolean success =
+                rootErrorHandler.runWithStatus(
+                        () -> ohlcvFetcher.fetchAndBackfillOhlcv(maxSymbols));
+        log.info("Manual OHLCV fetch (limited to {} symbols) completed.", maxSymbols);
+        return success;
+    }
+
     public boolean manualVfiReport() {
         boolean success = rootErrorHandler.runWithStatus(vfiTracker::sendDailyReport);
         log.info("Manual VFI report completed.");

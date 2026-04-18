@@ -49,8 +49,14 @@ public class OhlcvFetcher {
     }
 
     public void fetchAndBackfillOhlcv() throws InterruptedException {
-        List<String> symbols =
+        fetchAndBackfillOhlcv(Integer.MAX_VALUE);
+    }
+
+    public void fetchAndBackfillOhlcv(int maxSymbols) throws InterruptedException {
+        List<String> allSymbols =
                 symbolRegistry.getAll().stream().map(StockSymbol::getTicker).toList();
+        List<String> symbols =
+                maxSymbols < allSymbols.size() ? allSymbols.subList(0, maxSymbols) : allSymbols;
 
         log.info("Starting OHLCV fetch for {} symbols", symbols.size());
 

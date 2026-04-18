@@ -3,6 +3,7 @@ package org.tradelite;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -232,7 +233,7 @@ class DevJobControllerTest {
     @SuppressWarnings("unchecked")
     void runAll_allJobsPass_returnsOk() {
         when(rootErrorHandler.runWithStatus(any())).thenReturn(true);
-        when(scheduler.manualOhlcvFetch()).thenReturn(true);
+        when(scheduler.manualOhlcvFetchLimited(anyInt())).thenReturn(true);
         when(scheduler.manualStockMarketMonitoring()).thenReturn(true);
         when(scheduler.manualHourlySignalMonitoring()).thenReturn(true);
         when(scheduler.manualCryptoMarketMonitoring()).thenReturn(true);
@@ -262,7 +263,7 @@ class DevJobControllerTest {
     @SuppressWarnings("unchecked")
     void runAll_someJobsFail_returnsPartialWith207() {
         when(rootErrorHandler.runWithStatus(any())).thenReturn(true);
-        when(scheduler.manualOhlcvFetch()).thenReturn(true);
+        when(scheduler.manualOhlcvFetchLimited(anyInt())).thenReturn(true);
         when(scheduler.manualStockMarketMonitoring()).thenReturn(true);
         when(scheduler.manualHourlySignalMonitoring()).thenReturn(true);
         when(scheduler.manualCryptoMarketMonitoring()).thenReturn(false);
