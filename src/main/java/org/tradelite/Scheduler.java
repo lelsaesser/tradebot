@@ -291,6 +291,12 @@ public class Scheduler {
         return success;
     }
 
+    public boolean manualEmaReport() {
+        boolean success = rootErrorHandler.runWithStatus(emaTracker::sendDailyReport);
+        log.info("Manual EMA report completed.");
+        return success;
+    }
+
     public boolean manualMonthlyApiUsageReport() {
         boolean success = rootErrorHandler.runWithStatus(this::doMonthlyApiUsageReport);
         log.info("Manual monthly API usage report completed.");

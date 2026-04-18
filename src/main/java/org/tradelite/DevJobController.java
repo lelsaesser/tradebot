@@ -1,5 +1,6 @@
 package org.tradelite;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import org.springframework.context.annotation.Profile;
@@ -69,6 +70,11 @@ public class DevJobController {
         return runJob("bollinger-report", scheduler::manualDailyBollingerBandReport);
     }
 
+    @PostMapping("/ema-report")
+    public ResponseEntity<Map<String, String>> emaReport() {
+        return runJob("ema-report", scheduler::manualEmaReport);
+    }
+
     @PostMapping("/monthly-api-usage")
     public ResponseEntity<Map<String, String>> monthlyApiUsage() {
         return runJob("monthly-api-usage", scheduler::manualMonthlyApiUsageReport);
@@ -88,6 +94,81 @@ public class DevJobController {
     @PostMapping("/vfi-report")
     public ResponseEntity<Map<String, String>> vfiReport() {
         return runJob("vfi-report", scheduler::manualVfiReport);
+    }
+
+    @PostMapping("/run-all")
+    public ResponseEntity<Map<String, Object>> runAll() {
+        LinkedHashMap<String, String> results = new LinkedHashMap<>();
+        int failures = 0;
+
+        // Phase 1: seed data
+        failures +=
+                runAndRecord(
+                        results,
+                        "seed-analytics",
+                        () -> rootErrorHandler.runWithStatus(devDataSeeder::reseed));
+
+        // Phase 2: fetch OHLCV (needed by VFI)
+        failures += runAndRecord(results, "ohlcv-fetch", scheduler::manualOhlcvFetch);
+
+        // Phase 3: all independent jobs
+        failures +=
+                runAndRecord(results, "stock-monitoring", scheduler::manualStockMarketMonitoring);
+        failures +=
+                runAndRecord(results, "hourly-signals", scheduler::manualHourlySignalMonitoring);
+        failures +=
+                runAndRecord(results, "crypto-monitoring", scheduler::manualCryptoMarketMonitoring);
+        failures +=
+                runAndRecord(results, "rs-monitoring", scheduler::manualRelativeStrengthMonitoring);
+        failures +=
+                runAndRecord(
+                        results, "insider-report", scheduler::manualWeeklyInsiderTradingReport);
+        failures +=
+                runAndRecord(
+                        results, "sector-rotation", scheduler::manualDailySectorRotationTracking);
+        failures +=
+                runAndRecord(
+                        results,
+                        "sector-rs-summary",
+                        scheduler::manualDailySectorRelativeStrengthReport);
+        failures += runAndRecord(results, "tail-risk", scheduler::manualDailyTailRiskMonitoring);
+        failures +=
+                runAndRecord(
+                        results, "bollinger-report", scheduler::manualDailyBollingerBandReport);
+        failures += runAndRecord(results, "ema-report", scheduler::manualEmaReport);
+        failures +=
+                runAndRecord(results, "monthly-api-usage", scheduler::manualMonthlyApiUsageReport);
+
+        // Phase 4: VFI last (depends on OHLCV data)
+        failures += runAndRecord(results, "vfi-report", scheduler::manualVfiReport);
+
+        String status;
+        if (failures == 0) {
+            status = "ok";
+        } else if (failures == results.size()) {
+            status = "error";
+        } else {
+            status = "partial";
+        }
+
+        LinkedHashMap<String, Object> body = new LinkedHashMap<>();
+        body.put("status", status);
+        body.put("total", results.size());
+        body.put("passed", results.size() - failures);
+        body.put("failed", failures);
+        body.put("results", results);
+
+        if (failures == 0) {
+            return ResponseEntity.ok(body);
+        }
+        return ResponseEntity.status(207).body(body);
+    }
+
+    private int runAndRecord(
+            LinkedHashMap<String, String> results, String job, BooleanSupplier runner) {
+        boolean ok = runner.getAsBoolean();
+        results.put(job, ok ? "ok" : "error");
+        return ok ? 0 : 1;
     }
 
     private ResponseEntity<Map<String, String>> runJob(String job, BooleanSupplier jobRunner) {

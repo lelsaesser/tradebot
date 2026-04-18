@@ -1,0 +1,15 @@
+info:
+  name: runAll
+  type: http
+  seq: 16
+
+http:
+  method: POST
+  url: http://localhost:9090/dev/jobs/run-all
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

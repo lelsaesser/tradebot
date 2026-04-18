@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 
 @SuppressWarnings("DataFlowIssue")
@@ -214,5 +215,76 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatus.INTERNAL_SERVER_ERROR));
         assertThat(response.getBody().get("status"), is("error"));
         assertThat(response.getBody().get("job"), is("vfi-report"));
+    }
+
+    @Test
+    void emaReport_callsJob() {
+        when(scheduler.manualEmaReport()).thenReturn(true);
+
+        ResponseEntity<Map<String, String>> response = controller.emaReport();
+
+        verify(scheduler, times(1)).manualEmaReport();
+        assertThat(response.getStatusCode(), is(HttpStatus.OK));
+        assertThat(response.getBody().get("job"), is("ema-report"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void runAll_allJobsPass_returnsOk() {
+        when(rootErrorHandler.runWithStatus(any())).thenReturn(true);
+        when(scheduler.manualOhlcvFetch()).thenReturn(true);
+        when(scheduler.manualStockMarketMonitoring()).thenReturn(true);
+        when(scheduler.manualHourlySignalMonitoring()).thenReturn(true);
+        when(scheduler.manualCryptoMarketMonitoring()).thenReturn(true);
+        when(scheduler.manualRelativeStrengthMonitoring()).thenReturn(true);
+        when(scheduler.manualWeeklyInsiderTradingReport()).thenReturn(true);
+        when(scheduler.manualDailySectorRotationTracking()).thenReturn(true);
+        when(scheduler.manualDailySectorRelativeStrengthReport()).thenReturn(true);
+        when(scheduler.manualDailyTailRiskMonitoring()).thenReturn(true);
+        when(scheduler.manualDailyBollingerBandReport()).thenReturn(true);
+        when(scheduler.manualEmaReport()).thenReturn(true);
+        when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
+        when(scheduler.manualVfiReport()).thenReturn(true);
+
+        ResponseEntity<Map<String, Object>> response = controller.runAll();
+
+        assertThat(response.getStatusCode(), is(HttpStatus.OK));
+        assertThat(response.getBody().get("status"), is("ok"));
+        assertThat(response.getBody().get("failed"), is(0));
+        assertThat(response.getBody().get("total"), is(14));
+
+        Map<String, String> results = (Map<String, String>) response.getBody().get("results");
+        assertThat(results.get("vfi-report"), is("ok"));
+        assertThat(results.get("seed-analytics"), is("ok"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void runAll_someJobsFail_returnsPartialWith207() {
+        when(rootErrorHandler.runWithStatus(any())).thenReturn(true);
+        when(scheduler.manualOhlcvFetch()).thenReturn(true);
+        when(scheduler.manualStockMarketMonitoring()).thenReturn(true);
+        when(scheduler.manualHourlySignalMonitoring()).thenReturn(true);
+        when(scheduler.manualCryptoMarketMonitoring()).thenReturn(false);
+        when(scheduler.manualRelativeStrengthMonitoring()).thenReturn(true);
+        when(scheduler.manualWeeklyInsiderTradingReport()).thenReturn(true);
+        when(scheduler.manualDailySectorRotationTracking()).thenReturn(true);
+        when(scheduler.manualDailySectorRelativeStrengthReport()).thenReturn(true);
+        when(scheduler.manualDailyTailRiskMonitoring()).thenReturn(true);
+        when(scheduler.manualDailyBollingerBandReport()).thenReturn(true);
+        when(scheduler.manualEmaReport()).thenReturn(true);
+        when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
+        when(scheduler.manualVfiReport()).thenReturn(true);
+
+        ResponseEntity<Map<String, Object>> response = controller.runAll();
+
+        assertThat(response.getStatusCode(), is(HttpStatusCode.valueOf(207)));
+        assertThat(response.getBody().get("status"), is("partial"));
+        assertThat(response.getBody().get("failed"), is(1));
+        assertThat(response.getBody().get("passed"), is(13));
+
+        Map<String, String> results = (Map<String, String>) response.getBody().get("results");
+        assertThat(results.get("crypto-monitoring"), is("error"));
+        assertThat(results.get("stock-monitoring"), is("ok"));
     }
 }
