@@ -79,9 +79,69 @@ This document covers the technologies used, development setup, technical constra
 - Activated with `SPRING_PROFILES_ACTIVE=dev`
 - Uses `*_DEV_API_KEY` variants
 - Disables schedulers, redirects Telegram to local sink file
-- Exposes `/dev/jobs/*` manual trigger endpoints (vfi-report, ohlcv-fetch, hourly-signals, etc.)
+- Exposes `/dev/jobs/*` manual trigger endpoints (see Dev Endpoints below)
 - DevDataSeeder populates synthetic data (400 days OHLCV, RSI, RS, ROC)
-- Bruno API collection at `TradeliteBrunoCollection/DevController/`
+- Bruno API collection for manual testing (see Bruno Collection below)
+- Smoke test script for pre-deployment validation (see Smoke Test below)
+
+### Dev Endpoints (`DevJobController`)
+
+All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<name>"}` on success or `{"status":"error","job":"<name>","message":"check logs"}` on failure (HTTP 500).
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/dev/jobs/stock-monitoring` | Manual stock market monitoring |
+| `/dev/jobs/hourly-signals` | Hourly signal monitoring (BB + RSI) |
+| `/dev/jobs/crypto-monitoring` | Cryptocurrency market monitoring |
+| `/dev/jobs/rs-monitoring` | Relative strength monitoring |
+| `/dev/jobs/insider-report` | Weekly insider trading report |
+| `/dev/jobs/sector-rotation` | Daily sector rotation tracking |
+| `/dev/jobs/sector-rs-summary` | Daily sector RS report |
+| `/dev/jobs/tail-risk` | Daily tail risk monitoring |
+| `/dev/jobs/ema-report` | EMA classification report |
+| `/dev/jobs/monthly-api-usage` | Monthly API usage report |
+| `/dev/jobs/seed-analytics` | Reseed all dev data from scratch |
+| `/dev/jobs/ohlcv-fetch` | OHLCV data fetch from Twelve Data |
+| `/dev/jobs/vfi-report` | VFI + RS combined report |
+| `/dev/jobs/run-all` | Phased smoke test (runs all 13 jobs) |
+
+### Bruno API Collection
+
+Location: `TradeliteBrunoCollection/DevController/`
+
+Bruno (open-source API client) collection for manually triggering dev endpoints. All requests target `http://localhost:9090`. The collection contains 14 individual request files (one per endpoint above) plus `runAll.yml` for the phased smoke test. The collection can be opened in Bruno by pointing it at the `TradeliteBrunoCollection/` directory.
+
+### Pre-Deployment Smoke Test
+
+**Script:** `scripts/run-smoke-test.sh`
+
+Bash script that validates all system components work together before deployment:
+- Takes optional base URL argument (defaults to `http://localhost:9090`)
+- POSTs to `/dev/jobs/run-all` with 300-second timeout
+- Parses JSON response and checks `status` field
+- Exits 0 on `"ok"`, exits 1 on any other status or curl failure
+
+**`/dev/jobs/run-all` Execution Phases:**
+
+| Phase | Jobs | Purpose |
+|-------|------|---------|
+| 1 | `seed-analytics` | Reseed dev database (clean slate) |
+| 2 | `ohlcv-fetch` (3 symbols only) | Minimal OHLCV data for VFI dependency |
+| 3 | 10 jobs in parallel: stock-monitoring, hourly-signals, crypto-monitoring, rs-monitoring, insider-report, sector-rotation, sector-rs-summary, tail-risk, ema-report, monthly-api-usage | All independent jobs |
+| 4 | `vfi-report` | Depends on OHLCV data from Phase 2 |
+
+**Response format:**
+```json
+{
+  "status": "ok|partial|error",
+  "total": 13,
+  "passed": 13,
+  "failed": 0,
+  "results": { "seed-analytics": "ok", "ohlcv-fetch": "ok", ... }
+}
+```
+- HTTP 200 if all pass (`status: "ok"`)
+- HTTP 207 (Multi-Status) if any fail (`status: "partial"` or `"error"`)
 
 ## Project Structure
 

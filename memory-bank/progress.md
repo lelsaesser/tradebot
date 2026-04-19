@@ -124,6 +124,12 @@ Follow-up issues (open):
 - **DailyPriceProvider** (OHLCV-first, Finnhub-fallback)
 - **Unified SymbolRegistry** (single source of truth for all symbols)
 
+### Dev Tooling & Smoke Test ✅
+- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 14 endpoint requests
+- DevJobController with 14 individual endpoints + phased `run-all` composite endpoint
+- Pre-deployment smoke test script (`scripts/run-smoke-test.sh`) — validates all 13 jobs in 4 phases
+- DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
+
 ### Data Persistence ✅
 - SQLite: Finnhub price quotes, Twelve Data daily OHLCV (400 data points), momentum ROC state
 - JSON: target prices, sector performance, insider transactions, RS streaks, RSI data, feature toggles, stock symbols

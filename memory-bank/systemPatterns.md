@@ -36,7 +36,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`TargetPriceProvider`:** Manages the watchlist of symbols to be monitored.
 -   **`RootErrorHandler`:** Centralized error handler wrapping all scheduled tasks. `run()` preserves fire-and-log; `runWithStatus()` adds boolean success/failure for dev triggers.
 -   **`DevDataSeeder`:** `dev`-only startup seeder that populates SQLite quote history, OHLCV data (400 days), RSI/RS/ROC state.
--   **`DevJobController`:** `dev`-only manual trigger surface. Endpoints return HTTP 200/500.
+-   **`DevJobController`:** `dev`-only manual trigger surface. 14 individual endpoints + 1 composite `run-all` endpoint. Individual endpoints return HTTP 200/500. `run-all` orchestrates 4-phase smoke test execution.
 
 ## External API Clients
 
@@ -62,6 +62,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **Strategy Pattern**: Different `PriceEvaluator` implementations for different data sources.
 -   **Facade Pattern**: `TelegramClient` simplifies Telegram Bot API interaction.
 -   **Data Source Fallback**: `DailyPriceProvider` tries OHLCV first, falls back to Finnhub.
+-   **Phased Smoke Test**: `DevJobController.runAll()` executes 13 jobs in 4 dependency-ordered phases (seed → OHLCV fetch → parallel independents → VFI). Returns aggregate pass/fail with per-job results. `RootErrorHandler.runWithStatus()` provides boolean success/failure without propagating exceptions.
 
 ## Scheduled Tasks
 

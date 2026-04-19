@@ -41,6 +41,14 @@ Implemented issues #248 + #249 from PRD #244.
 
 **Design Decision:** VFI report runs daily at 9:00 CET (pre-market), not hourly, because VFI uses daily OHLCV bars that don't change intraday. Issue #258 can upgrade to hourly when intraday OHLCV is available.
 
+### Pre-Deployment Smoke Test Infrastructure (April 2026) ✅ COMPLETE
+Implemented issue #293 — phased `run-all` dev endpoint and smoke test script for pre-deployment validation.
+
+**Components:**
+- `DevJobController.runAll()` — 4-phase execution: seed → OHLCV fetch (3 symbols) → 10 parallel jobs → VFI report
+- `scripts/run-smoke-test.sh` — bash script that curls `run-all` and validates JSON response
+- Bruno API collection (`TradeliteBrunoCollection/DevController/`) — 14 individual + 1 run-all request for manual testing via Bruno API client
+
 ### Previous Completed Work (Summarized)
 - **Yahoo Finance Client + SQLite OHLCV Storage** (#245) — foundational data layer
 - **VFI Calculation Engine** (#247) — VfiService, VfiAnalysis, CombinedSignalType
