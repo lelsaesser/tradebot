@@ -36,6 +36,18 @@ public class SectorRsStreakPersistence {
     }
 
     /**
+     * Result of a streak update, carrying both the new streak and information about whether the
+     * previous streak ended.
+     *
+     * @param newStreak The updated streak record
+     * @param previousStreakDays The number of days in the previous streak (0 if no direction
+     *     change)
+     * @param directionChanged True if the performance direction flipped
+     */
+    public record StreakUpdateResult(
+            SectorRsStreak newStreak, int previousStreakDays, boolean directionChanged) {}
+
+    /**
      * Updates the streak for a sector based on current performance.
      *
      * <p>If the sector maintains the same direction (outperforming/underperforming), the streak is
@@ -44,15 +56,18 @@ public class SectorRsStreakPersistence {
      * @param symbol The sector ETF symbol
      * @param isOutperforming True if currently outperforming SPY
      * @param date The current date
-     * @return The updated streak
+     * @return The update result containing the new streak and direction change info
      * @throws IOException if persistence fails
      */
-    public SectorRsStreak updateStreak(String symbol, boolean isOutperforming, LocalDate date)
+    public StreakUpdateResult updateStreak(String symbol, boolean isOutperforming, LocalDate date)
             throws IOException {
         Map<String, SectorRsStreak> streaks = loadStreaks();
         SectorRsStreak currentStreak = streaks.get(symbol);
 
         SectorRsStreak newStreak;
+        int previousStreakDays = 0;
+        boolean directionChanged = false;
+
         if (currentStreak == null) {
             // First time tracking this sector
             newStreak = SectorRsStreak.newStreak(symbol, isOutperforming, date);
@@ -62,28 +77,31 @@ public class SectorRsStreakPersistence {
                     isOutperforming ? "outperforming" : "underperforming");
         } else if (currentStreak.lastUpdated().equals(date)) {
             // Already updated today, return existing
-            return currentStreak;
+            return new StreakUpdateResult(currentStreak, 0, false);
         } else {
             // Update existing streak
-            newStreak = currentStreak.update(isOutperforming, date);
-            if (isOutperforming != currentStreak.isOutperforming()) {
+            directionChanged = (isOutperforming != currentStreak.isOutperforming());
+            if (directionChanged) {
+                previousStreakDays = currentStreak.streakDays();
                 log.info(
-                        "Streak reset for {}: {} -> {} (day 1)",
+                        "Streak reset for {}: {} -> {} (was {} days, now day 1)",
                         symbol,
                         currentStreak.isOutperforming() ? "outperforming" : "underperforming",
-                        isOutperforming ? "outperforming" : "underperforming");
+                        isOutperforming ? "outperforming" : "underperforming",
+                        previousStreakDays);
             } else {
                 log.info(
                         "Streak extended for {}: {} day {}",
                         symbol,
                         isOutperforming ? "outperforming" : "underperforming",
-                        newStreak.streakDays());
+                        currentStreak.streakDays() + 1);
             }
+            newStreak = currentStreak.update(isOutperforming, date);
         }
 
         streaks.put(symbol, newStreak);
         saveStreaks(streaks);
-        return newStreak;
+        return new StreakUpdateResult(newStreak, previousStreakDays, directionChanged);
     }
 
     /**

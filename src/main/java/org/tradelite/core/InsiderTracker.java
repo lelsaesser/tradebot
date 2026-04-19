@@ -216,6 +216,9 @@ public class InsiderTracker {
 
     private void addHistoryTransactionCountDiff(
             int currentCount, int historicCount, StockSymbol symbol, StringBuilder report) {
+        if (currentCount == 0 && historicCount == 0) {
+            return;
+        }
         String sign = "";
         int difference = currentCount - historicCount;
         if (difference > 0) {

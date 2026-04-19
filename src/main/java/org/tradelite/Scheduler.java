@@ -131,12 +131,6 @@ public class Scheduler {
         log.info("Daily tail risk monitoring completed.");
     }
 
-    @Scheduled(cron = "0 40 15 * * MON-FRI", zone = "CET")
-    protected void dailyBollingerBandReport() {
-        rootErrorHandler.run(bollingerBandTracker::sendDailyReport);
-        log.info("Daily Bollinger Band report completed.");
-    }
-
     @Scheduled(cron = "0 50 15 * * MON-FRI", zone = "CET")
     protected void dailyEmaReport() {
         rootErrorHandler.run(emaTracker::sendDailyReport);
@@ -282,12 +276,6 @@ public class Scheduler {
         success &= rootErrorHandler.runWithStatus(tailRiskTracker::sendDailyReport);
         success &= rootErrorHandler.runWithStatus(tailRiskTracker::trackAndAlert);
         log.info("Manual tail risk monitoring completed.");
-        return success;
-    }
-
-    public boolean manualDailyBollingerBandReport() {
-        boolean success = rootErrorHandler.runWithStatus(bollingerBandTracker::sendDailyReport);
-        log.info("Manual Bollinger Band report completed.");
         return success;
     }
 

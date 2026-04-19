@@ -122,17 +122,6 @@ class DevJobControllerTest {
     }
 
     @Test
-    void bollingerReport_callsJob() {
-        when(scheduler.manualDailyBollingerBandReport()).thenReturn(true);
-
-        ResponseEntity<Map<String, String>> response = controller.bollingerReport();
-
-        verify(scheduler, times(1)).manualDailyBollingerBandReport();
-        assertThat(response.getStatusCode(), is(HttpStatus.OK));
-        assertThat(response.getBody().get("job"), is("bollinger-report"));
-    }
-
-    @Test
     void monthlyApiUsage_callsJob() {
         when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
 
@@ -242,7 +231,6 @@ class DevJobControllerTest {
         when(scheduler.manualDailySectorRotationTracking()).thenReturn(true);
         when(scheduler.manualDailySectorRelativeStrengthReport()).thenReturn(true);
         when(scheduler.manualDailyTailRiskMonitoring()).thenReturn(true);
-        when(scheduler.manualDailyBollingerBandReport()).thenReturn(true);
         when(scheduler.manualEmaReport()).thenReturn(true);
         when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
@@ -252,7 +240,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatus.OK));
         assertThat(response.getBody().get("status"), is("ok"));
         assertThat(response.getBody().get("failed"), is(0));
-        assertThat(response.getBody().get("total"), is(14));
+        assertThat(response.getBody().get("total"), is(13));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("vfi-report"), is("ok"));
@@ -272,7 +260,6 @@ class DevJobControllerTest {
         when(scheduler.manualDailySectorRotationTracking()).thenReturn(true);
         when(scheduler.manualDailySectorRelativeStrengthReport()).thenReturn(true);
         when(scheduler.manualDailyTailRiskMonitoring()).thenReturn(true);
-        when(scheduler.manualDailyBollingerBandReport()).thenReturn(true);
         when(scheduler.manualEmaReport()).thenReturn(true);
         when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
@@ -282,7 +269,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatusCode.valueOf(207)));
         assertThat(response.getBody().get("status"), is("partial"));
         assertThat(response.getBody().get("failed"), is(1));
-        assertThat(response.getBody().get("passed"), is(13));
+        assertThat(response.getBody().get("passed"), is(12));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("crypto-monitoring"), is("error"));

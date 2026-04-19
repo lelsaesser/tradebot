@@ -67,11 +67,6 @@ public class DevJobController {
         return runJob("tail-risk", scheduler::manualDailyTailRiskMonitoring);
     }
 
-    @PostMapping("/bollinger-report")
-    public ResponseEntity<Map<String, String>> bollingerReport() {
-        return runJob("bollinger-report", scheduler::manualDailyBollingerBandReport);
-    }
-
     @PostMapping("/ema-report")
     public ResponseEntity<Map<String, String>> emaReport() {
         return runJob("ema-report", scheduler::manualEmaReport);
@@ -138,9 +133,6 @@ public class DevJobController {
                         "sector-rs-summary",
                         scheduler::manualDailySectorRelativeStrengthReport);
         failures += runAndRecord(results, "tail-risk", scheduler::manualDailyTailRiskMonitoring);
-        failures +=
-                runAndRecord(
-                        results, "bollinger-report", scheduler::manualDailyBollingerBandReport);
         failures += runAndRecord(results, "ema-report", scheduler::manualEmaReport);
         failures +=
                 runAndRecord(results, "monthly-api-usage", scheduler::manualMonthlyApiUsageReport);

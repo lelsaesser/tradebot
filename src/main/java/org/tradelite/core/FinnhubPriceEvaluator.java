@@ -134,12 +134,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             log.info("High price change detected for {}: {}%", displayName, percentChange);
             String emoji = percentChange > 0 ? "📈" : "📉";
             telegramClient.sendMessage(
-                    emoji
-                            + " High daily price swing detected for "
-                            + displayName
-                            + ": "
-                            + String.format("%.2f", percentChange)
-                            + "%");
+                    emoji + " " + displayName + ": " + String.format("%.2f", percentChange) + "%");
             targetPriceProvider.addIgnoredSymbol(
                     priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
         }

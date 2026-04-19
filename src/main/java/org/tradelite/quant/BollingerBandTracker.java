@@ -102,13 +102,6 @@ public class BollingerBandTracker {
         }
     }
 
-    /** Sends a full daily report of Bollinger Band state for all sectors and stocks. */
-    public void sendDailyReport() {
-        String report = buildSummaryReport();
-        telegramClient.sendMessage(report);
-        log.info("Daily Bollinger Band report sent");
-    }
-
     private void deletePreviousTelegramReport() {
         if (lastTelegramReportMessageId != null) {
             log.info(
@@ -179,70 +172,6 @@ public class BollingerBandTracker {
             sb.append(analysis.toCompactLine()).append(" ");
         }
         sb.append("\n\n");
-
-        sb.append("_%B = position within bands (0=lower, 1=upper)_\n");
-        sb.append("_BW = bandwidth; P = bandwidth percentile_");
-
-        return sb.toString();
-    }
-
-    /** Builds a summary report of all Bollinger Band states for display. */
-    public String buildSummaryReport() {
-        List<BollingerBandAnalysis> sectorAnalyses = analyzeAllSectors();
-        List<BollingerBandAnalysis> stockAnalyses = analyzeAllStocks();
-
-        if (sectorAnalyses.isEmpty() && stockAnalyses.isEmpty()) {
-            return "*Bollinger Band Report*\n\n_Insufficient data for analysis._";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("*Bollinger Band Report*\n\n");
-
-        if (!sectorAnalyses.isEmpty()) {
-            sb.append("*Sector ETFs:*\n");
-            for (BollingerBandAnalysis analysis : sectorAnalyses) {
-                sb.append(analysis.toSummaryLine()).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        if (!stockAnalyses.isEmpty()) {
-            sb.append("*Stocks:*\n");
-            for (BollingerBandAnalysis analysis : stockAnalyses) {
-                sb.append(analysis.toSummaryLine()).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        List<BollingerBandAnalysis> allAnalyses = new ArrayList<>(sectorAnalyses);
-        allAnalyses.addAll(stockAnalyses);
-
-        long signalCount = allAnalyses.stream().filter(BollingerBandAnalysis::hasSignals).count();
-        long squeezeCount =
-                allAnalyses.stream().filter(a -> a.isSqueeze() || a.isHistoricalSqueeze()).count();
-        long overextendedCount =
-                allAnalyses.stream().filter(BollingerBandAnalysis::isOverextended).count();
-        long underextendedCount =
-                allAnalyses.stream().filter(BollingerBandAnalysis::isUnderextended).count();
-
-        if (signalCount == 0) {
-            sb.append("✅ All symbols trading within normal Bollinger Band range.");
-        } else {
-            sb.append(String.format("⚠️ %d symbol(s) with active signals.%n", signalCount));
-            if (squeezeCount > 0) {
-                sb.append(String.format("   🔵 %d squeeze(s) — breakout expected%n", squeezeCount));
-            }
-            if (overextendedCount > 0) {
-                sb.append(
-                        String.format(
-                                "   ⬆️ %d overextended (above upper band)%n", overextendedCount));
-            }
-            if (underextendedCount > 0) {
-                sb.append(
-                        String.format(
-                                "   ⬇️ %d underextended (below lower band)", underextendedCount));
-            }
-        }
 
         return sb.toString();
     }

@@ -92,7 +92,7 @@ public record BollingerBandAnalysis(
     /**
      * Formats the analysis as a single-line summary for Telegram messages.
      *
-     * @return Formatted string like "• *Energy* (XLE): %B 1.05 | BW 4.2% (P15) ⬆️"
+     * @return Formatted string like "• *Energy* (XLE) ⬆️"
      */
     public String toSummaryLine() {
         String signalEmojis =
@@ -102,9 +102,7 @@ public record BollingerBandAnalysis(
                                 .map(BollingerSignalType::getEmoji)
                                 .reduce("", (a, b) -> a + b);
 
-        return String.format(
-                "• *%s* (%s): %%B %.2f | BW %.1f%% (P%.0f) %s",
-                displayName, symbol, percentB, bandwidth * 100, bandwidthPercentile, signalEmojis);
+        return String.format("• *%s* (%s) %s", displayName, symbol, signalEmojis);
     }
 
     /**

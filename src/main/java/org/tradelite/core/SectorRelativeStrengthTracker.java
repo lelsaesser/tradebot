@@ -190,9 +190,9 @@ public class SectorRelativeStrengthTracker {
                     boolean isOutperforming = percentageDiff >= 0;
 
                     // Update streak and get current streak days
-                    SectorRsStreak streak =
+                    SectorRsStreakPersistence.StreakUpdateResult streakResult =
                             streakPersistence.updateStreak(symbol, isOutperforming, today);
-                    int streakDays = streak.streakDays();
+                    int streakDays = streakResult.newStreak().streakDays();
 
                     sectorData.add(
                             new SectorRsData(
@@ -203,7 +203,9 @@ public class SectorRelativeStrengthTracker {
                                     percentageDiff,
                                     result.dataPoints(),
                                     result.isComplete(),
-                                    streakDays));
+                                    streakDays,
+                                    streakResult.previousStreakDays(),
+                                    streakResult.directionChanged()));
                 } else {
                     log.debug("No RS data available for {}", symbol);
                 }
@@ -291,17 +293,31 @@ public class SectorRelativeStrengthTracker {
     private String formatSectorLine(int rank, SectorRsData sector) {
         String streakIndicator = String.format("📅%d", sector.streakDays());
 
+        String endedStreakInfo = "";
+        if (sector.streakJustEnded() && sector.previousStreakDays() > 1) {
+            String previousDirection =
+                    sector.percentageDiff() >= 0 ? "underperforming" : "outperforming";
+            endedStreakInfo =
+                    String.format(
+                            " 🔄 ended %d-day %s", sector.previousStreakDays(), previousDirection);
+        }
+
         if (sector.isComplete()) {
             return String.format(
-                    "%d. *%s*: %+.1f%% %s%n",
-                    rank, sector.displayName(), sector.percentageDiff(), streakIndicator);
-        } else {
-            return String.format(
-                    "%d. *%s*: %+.1f%% %s (%d days)%n",
+                    "%d. *%s*: %+.1f%% %s%s%n",
                     rank,
                     sector.displayName(),
                     sector.percentageDiff(),
                     streakIndicator,
+                    endedStreakInfo);
+        } else {
+            return String.format(
+                    "%d. *%s*: %+.1f%% %s%s (%d days)%n",
+                    rank,
+                    sector.displayName(),
+                    sector.percentageDiff(),
+                    streakIndicator,
+                    endedStreakInfo,
                     sector.dataPoints());
         }
     }

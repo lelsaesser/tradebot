@@ -54,7 +54,7 @@ public class SectorRotationTracker {
             report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
-        report.append("\n*❄Bottom 5 Daily Performers:*\n");
+        report.append("\n*Bottom 5 Daily Performers:*\n");
         List<IndustryPerformance> bottomDaily =
                 persistence.getBottomPerformers(5, PerformancePeriod.DAILY);
         for (int i = 0; i < bottomDaily.size(); i++) {
@@ -151,7 +151,7 @@ public class SectorRotationTracker {
             report.append(String.format(DATE_PATTERN, i + 1, p.name(), p.change().doubleValue()));
         }
 
-        report.append("\n*❄️ Bottom 10 Daily Performers:*\n");
+        report.append("\n*Bottom 10 Daily Performers:*\n");
         List<IndustryPerformance> bottomDaily =
                 persistence.getBottomPerformers(10, PerformancePeriod.DAILY);
         for (int i = 0; i < bottomDaily.size(); i++) {

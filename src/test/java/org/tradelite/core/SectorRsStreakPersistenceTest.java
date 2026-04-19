@@ -34,12 +34,15 @@ class SectorRsStreakPersistenceTest {
     void updateStreak_newSector_createsStreakWithDayOne() throws IOException {
         LocalDate today = LocalDate.of(2026, 3, 19);
 
-        SectorRsStreak streak = persistence.updateStreak("XLK", true, today);
+        SectorRsStreakPersistence.StreakUpdateResult result =
+                persistence.updateStreak("XLK", true, today);
 
-        assertEquals("XLK", streak.symbol());
-        assertEquals(1, streak.streakDays());
-        assertTrue(streak.isOutperforming());
-        assertEquals(today, streak.lastUpdated());
+        assertEquals("XLK", result.newStreak().symbol());
+        assertEquals(1, result.newStreak().streakDays());
+        assertTrue(result.newStreak().isOutperforming());
+        assertEquals(today, result.newStreak().lastUpdated());
+        assertFalse(result.directionChanged());
+        assertEquals(0, result.previousStreakDays());
     }
 
     @Test
@@ -48,10 +51,13 @@ class SectorRsStreakPersistenceTest {
         LocalDate day2 = LocalDate.of(2026, 3, 19);
 
         persistence.updateStreak("XLK", true, day1);
-        SectorRsStreak streak = persistence.updateStreak("XLK", true, day2);
+        SectorRsStreakPersistence.StreakUpdateResult result =
+                persistence.updateStreak("XLK", true, day2);
 
-        assertEquals(2, streak.streakDays());
-        assertTrue(streak.isOutperforming());
+        assertEquals(2, result.newStreak().streakDays());
+        assertTrue(result.newStreak().isOutperforming());
+        assertFalse(result.directionChanged());
+        assertEquals(0, result.previousStreakDays());
     }
 
     @Test
@@ -60,21 +66,27 @@ class SectorRsStreakPersistenceTest {
         LocalDate day2 = LocalDate.of(2026, 3, 19);
 
         persistence.updateStreak("XLK", true, day1);
-        SectorRsStreak streak = persistence.updateStreak("XLK", false, day2);
+        SectorRsStreakPersistence.StreakUpdateResult result =
+                persistence.updateStreak("XLK", false, day2);
 
-        assertEquals(1, streak.streakDays());
-        assertFalse(streak.isOutperforming());
+        assertEquals(1, result.newStreak().streakDays());
+        assertFalse(result.newStreak().isOutperforming());
+        assertTrue(result.directionChanged());
+        assertEquals(1, result.previousStreakDays());
     }
 
     @Test
     void updateStreak_sameDay_returnsExistingStreak() throws IOException {
         LocalDate today = LocalDate.of(2026, 3, 19);
 
-        SectorRsStreak first = persistence.updateStreak("XLK", true, today);
-        SectorRsStreak second = persistence.updateStreak("XLK", true, today);
+        SectorRsStreakPersistence.StreakUpdateResult first =
+                persistence.updateStreak("XLK", true, today);
+        SectorRsStreakPersistence.StreakUpdateResult second =
+                persistence.updateStreak("XLK", true, today);
 
-        assertEquals(first.streakDays(), second.streakDays());
-        assertEquals(1, second.streakDays());
+        assertEquals(first.newStreak().streakDays(), second.newStreak().streakDays());
+        assertEquals(1, second.newStreak().streakDays());
+        assertFalse(second.directionChanged());
     }
 
     @Test
@@ -149,9 +161,10 @@ class SectorRsStreakPersistenceTest {
         // Create new instance pointing to same file
         SectorRsStreakPersistence newPersistence =
                 new SectorRsStreakPersistence(objectMapper, testFilePath);
-        SectorRsStreak streak = newPersistence.updateStreak("XLK", true, day2);
+        SectorRsStreakPersistence.StreakUpdateResult result =
+                newPersistence.updateStreak("XLK", true, day2);
 
-        assertEquals(2, streak.streakDays());
+        assertEquals(2, result.newStreak().streakDays());
     }
 
     @Test
@@ -187,6 +200,30 @@ class SectorRsStreakPersistenceTest {
         SectorRsStreak streak = persistence.getStreak("XLK").orElseThrow();
         assertEquals(15, streak.streakDays());
         assertTrue(streak.isOutperforming());
+    }
+
+    @Test
+    void updateStreak_directionChange_returnsPreviousStreakDays() throws IOException {
+        LocalDate day1 = LocalDate.of(2026, 3, 15);
+        LocalDate day2 = LocalDate.of(2026, 3, 16);
+        LocalDate day3 = LocalDate.of(2026, 3, 17);
+        LocalDate day4 = LocalDate.of(2026, 3, 18);
+        LocalDate day5 = LocalDate.of(2026, 3, 19);
+
+        // Build up a 4-day outperforming streak
+        persistence.updateStreak("XLK", true, day1);
+        persistence.updateStreak("XLK", true, day2);
+        persistence.updateStreak("XLK", true, day3);
+        persistence.updateStreak("XLK", true, day4);
+
+        // Direction changes on day 5
+        SectorRsStreakPersistence.StreakUpdateResult result =
+                persistence.updateStreak("XLK", false, day5);
+
+        assertTrue(result.directionChanged());
+        assertEquals(4, result.previousStreakDays());
+        assertEquals(1, result.newStreak().streakDays());
+        assertFalse(result.newStreak().isOutperforming());
     }
 
     @Test
