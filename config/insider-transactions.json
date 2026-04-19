@@ -1,114 +1,210 @@
 {
   "AAPL" : {
-    "S" : 2,
-    "S_HISTORIC" : 2
+    "P" : 0,
+    "S" : 8,
+    "S/V" : 0,
+    "S_HISTORIC" : 8,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "AMD" : {
-    "S" : 5,
-    "S_HISTORIC" : 5
+    "P" : 0,
+    "S" : 13,
+    "S/V" : 0,
+    "S_HISTORIC" : 13,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "META" : {
-    "S" : 72,
-    "S_HISTORIC" : 72
+    "P" : 0,
+    "S" : 71,
+    "S/V" : 0,
+    "S_HISTORIC" : 71,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "NFLX" : {
-    "S" : 223,
-    "S_HISTORIC" : 223
+    "P" : 0,
+    "S" : 10,
+    "S/V" : 0,
+    "S_HISTORIC" : 10,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "NVDA" : {
-    "S" : 7,
-    "S_HISTORIC" : 7
+    "P" : 0,
+    "S" : 38,
+    "S/V" : 0,
+    "S_HISTORIC" : 38,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "TSLA" : {
-    "S" : 69,
-    "S_HISTORIC" : 69
+    "P" : 0,
+    "S" : 23,
+    "S/V" : 0,
+    "S_HISTORIC" : 23,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "COIN" : {
-    "S" : 57,
-    "S_HISTORIC" : 57
+    "P" : 0,
+    "S" : 18,
+    "S/V" : 0,
+    "S_HISTORIC" : 18,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "MSTR" : {
-    "S" : 69,
-    "S_HISTORIC" : 69
+    "P" : 1,
+    "S" : 22,
+    "S/V" : 0,
+    "S_HISTORIC" : 22,
+    "P_HISTORIC" : 1,
+    "P/V" : 0
   },
   "RKLB" : {
-    "S" : 13,
-    "S_HISTORIC" : 13
+    "P" : 0,
+    "S" : 31,
+    "S/V" : 0,
+    "S_HISTORIC" : 31,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "UBER" : {
-    "S" : 2,
-    "S_HISTORIC" : 2
+    "P" : 2,
+    "S" : 1,
+    "S/V" : 0,
+    "S_HISTORIC" : 1,
+    "P_HISTORIC" : 2,
+    "P/V" : 0
   },
   "PLTR" : {
-    "S" : 63,
-    "S_HISTORIC" : 63
+    "P" : 0,
+    "S" : 54,
+    "S/V" : 0,
+    "S_HISTORIC" : 54,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "SPOT" : {
-    "S" : 0,
-    "S_HISTORIC" : 0
+    "P" : 0,
+    "S" : 2,
+    "S/V" : 0,
+    "S_HISTORIC" : 2,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "HOOD" : {
-    "S" : 15,
-    "S_HISTORIC" : 15
+    "P" : 0,
+    "S" : 36,
+    "S/V" : 0,
+    "S_HISTORIC" : 36,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "NET" : {
-    "S" : 81,
-    "S_HISTORIC" : 81
+    "P" : 0,
+    "S" : 157,
+    "S/V" : 0,
+    "S_HISTORIC" : 157,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "AVGO" : {
-    "S" : 4,
-    "S_HISTORIC" : 4
+    "P" : 0,
+    "S" : 95,
+    "S/V" : 0,
+    "S_HISTORIC" : 95,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "AXON" : {
-    "S" : 62,
-    "S_HISTORIC" : 62
+    "P" : 0,
+    "S" : 56,
+    "S/V" : 0,
+    "S_HISTORIC" : 56,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "CRWD" : {
-    "S" : 75,
-    "S_HISTORIC" : 75
+    "P" : 0,
+    "S" : 16,
+    "S/V" : 0,
+    "S_HISTORIC" : 16,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "OKTA" : {
-    "S" : 2,
-    "S_HISTORIC" : 2
+    "P" : 0,
+    "S" : 13,
+    "S/V" : 0,
+    "S_HISTORIC" : 13,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "GOOG" : {
+    "P" : 0,
     "S" : 43,
-    "S_HISTORIC" : 43
+    "S/V" : 0,
+    "S_HISTORIC" : 43,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "AMZN" : {
-    "S" : 23,
-    "S_HISTORIC" : 23
+    "P" : 0,
+    "S" : 28,
+    "S/V" : 0,
+    "S_HISTORIC" : 28,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "GLXY" : {
-    "S" : 8,
-    "S_HISTORIC" : 8
+    "P" : 0,
+    "S" : 0,
+    "S/V" : 0,
+    "S_HISTORIC" : 0,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "BABA" : {
-    "S" : 0,
-    "S_HISTORIC" : 0
+    "P" : 0,
+    "S" : 3,
+    "S/V" : 0,
+    "S_HISTORIC" : 3,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "PANW" : {
-    "S" : 21,
-    "S_HISTORIC" : 21
+    "P" : 2,
+    "S" : 8,
+    "S/V" : 0,
+    "S_HISTORIC" : 8,
+    "P_HISTORIC" : 2,
+    "P/V" : 0
   },
   "MP" : {
+    "P" : 0,
     "S" : 2,
-    "S_HISTORIC" : 2
+    "S/V" : 0,
+    "S_HISTORIC" : 2,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "APP" : {
-    "S" : 215,
-    "S_HISTORIC" : 215
+    "P" : 0,
+    "S" : 189,
+    "S/V" : 0,
+    "S_HISTORIC" : 189,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   },
   "ASML" : {
+    "P" : 0,
     "S" : 0,
-    "S_HISTORIC" : 0
-  },
-  "COST" : {
-    "S" : 4,
-    "S_HISTORIC" : 4
-  },
-  "WMT" : {
-    "S" : 26,
-    "S_HISTORIC" : 26
+    "S/V" : 0,
+    "S_HISTORIC" : 0,
+    "P_HISTORIC" : 0,
+    "P/V" : 0
   }
 }

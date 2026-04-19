@@ -291,6 +291,12 @@ public class Scheduler {
         return success;
     }
 
+    public boolean manualEmaReport() {
+        boolean success = rootErrorHandler.runWithStatus(emaTracker::sendDailyReport);
+        log.info("Manual EMA report completed.");
+        return success;
+    }
+
     public boolean manualMonthlyApiUsageReport() {
         boolean success = rootErrorHandler.runWithStatus(this::doMonthlyApiUsageReport);
         log.info("Manual monthly API usage report completed.");
@@ -300,6 +306,14 @@ public class Scheduler {
     public boolean manualOhlcvFetch() {
         boolean success = rootErrorHandler.runWithStatus(ohlcvFetcher::fetchAndBackfillOhlcv);
         log.info("Manual OHLCV fetch completed.");
+        return success;
+    }
+
+    public boolean manualOhlcvFetchLimited(int maxSymbols) {
+        boolean success =
+                rootErrorHandler.runWithStatus(
+                        () -> ohlcvFetcher.fetchAndBackfillOhlcv(maxSymbols));
+        log.info("Manual OHLCV fetch (limited to {} symbols) completed.", maxSymbols);
         return success;
     }
 
