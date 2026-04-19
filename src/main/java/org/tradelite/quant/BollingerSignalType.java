@@ -28,7 +28,7 @@ public enum BollingerSignalType {
     SQUEEZE("🔄", "Squeeze"),
 
     /** Bandwidth at historically low percentile vs. recent history — requires 40+ data points. */
-    HISTORICAL_SQUEEZE("📊", "Historical Squeeze");
+    HISTORICAL_SQUEEZE("🔵", "Historical Squeeze");
 
     private final String emoji;
     private final String label;

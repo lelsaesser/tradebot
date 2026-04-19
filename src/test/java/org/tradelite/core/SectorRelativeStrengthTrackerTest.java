@@ -275,7 +275,8 @@ class SectorRelativeStrengthTrackerTest {
                             String symbol = invocation.getArgument(0);
                             boolean isOutperforming = invocation.getArgument(1);
                             LocalDate date = invocation.getArgument(2);
-                            return new SectorRsStreak(symbol, 3, isOutperforming, date);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 3, isOutperforming, date), 0, false);
                         });
 
         // When
@@ -324,7 +325,8 @@ class SectorRelativeStrengthTrackerTest {
                             String symbol = invocation.getArgument(0);
                             boolean isOutperforming = invocation.getArgument(1);
                             LocalDate date = invocation.getArgument(2);
-                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 1, isOutperforming, date), 0, false);
                         });
 
         // When
@@ -355,7 +357,8 @@ class SectorRelativeStrengthTrackerTest {
                             String symbol = invocation.getArgument(0);
                             boolean isOutperforming = invocation.getArgument(1);
                             LocalDate date = invocation.getArgument(2);
-                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 1, isOutperforming, date), 0, false);
                         });
 
         // When
@@ -397,7 +400,8 @@ class SectorRelativeStrengthTrackerTest {
                             String symbol = invocation.getArgument(0);
                             boolean isOutperforming = invocation.getArgument(1);
                             LocalDate date = invocation.getArgument(2);
-                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 1, isOutperforming, date), 0, false);
                         });
 
         // When
@@ -430,7 +434,9 @@ class SectorRelativeStrengthTrackerTest {
 
         // Mock streak persistence
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
-                .thenReturn(new SectorRsStreak("XLK", 1, true, LocalDate.now()));
+                .thenReturn(
+                        new SectorRsStreakPersistence.StreakUpdateResult(
+                                new SectorRsStreak("XLK", 1, true, LocalDate.now()), 0, false));
 
         // When
         tracker.sendDailySectorRsSummary();
@@ -466,7 +472,9 @@ class SectorRelativeStrengthTrackerTest {
 
         // Mock streak persistence
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
-                .thenReturn(new SectorRsStreak("XLF", 1, true, LocalDate.now()));
+                .thenReturn(
+                        new SectorRsStreakPersistence.StreakUpdateResult(
+                                new SectorRsStreak("XLF", 1, true, LocalDate.now()), 0, false));
 
         // When
         List<SectorRsData> result = tracker.collectSectorRsData();
@@ -496,7 +504,9 @@ class SectorRelativeStrengthTrackerTest {
 
         // Mock streak persistence - return 5 day streak
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
-                .thenReturn(new SectorRsStreak("XLK", 5, true, LocalDate.now()));
+                .thenReturn(
+                        new SectorRsStreakPersistence.StreakUpdateResult(
+                                new SectorRsStreak("XLK", 5, true, LocalDate.now()), 0, false));
 
         // When
         tracker.sendDailySectorRsSummary();
@@ -530,7 +540,9 @@ class SectorRelativeStrengthTrackerTest {
 
         // Mock streak persistence
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
-                .thenReturn(new SectorRsStreak("XLK", 1, true, LocalDate.now()));
+                .thenReturn(
+                        new SectorRsStreakPersistence.StreakUpdateResult(
+                                new SectorRsStreak("XLK", 1, true, LocalDate.now()), 0, false));
 
         // When
         tracker.sendDailySectorRsSummary();
@@ -570,7 +582,8 @@ class SectorRelativeStrengthTrackerTest {
                             String symbol = invocation.getArgument(0);
                             boolean isOutperforming = invocation.getArgument(1);
                             LocalDate date = invocation.getArgument(2);
-                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 1, isOutperforming, date), 0, false);
                         });
 
         // When
@@ -620,7 +633,9 @@ class SectorRelativeStrengthTrackerTest {
 
         // Mock streak persistence
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
-                .thenReturn(new SectorRsStreak("XLK", 1, true, LocalDate.now()));
+                .thenReturn(
+                        new SectorRsStreakPersistence.StreakUpdateResult(
+                                new SectorRsStreak("XLK", 1, true, LocalDate.now()), 0, false));
 
         // When
         tracker.sendDailySectorRsSummary();
@@ -666,7 +681,8 @@ class SectorRelativeStrengthTrackerTest {
                             String symbol = invocation.getArgument(0);
                             boolean isOutperforming = invocation.getArgument(1);
                             LocalDate date = invocation.getArgument(2);
-                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 1, isOutperforming, date), 0, false);
                         });
 
         // When
@@ -711,7 +727,9 @@ class SectorRelativeStrengthTrackerTest {
 
         // Mock streak persistence with 7 day streak
         when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
-                .thenReturn(new SectorRsStreak("XLK", 7, true, LocalDate.now()));
+                .thenReturn(
+                        new SectorRsStreakPersistence.StreakUpdateResult(
+                                new SectorRsStreak("XLK", 7, true, LocalDate.now()), 0, false));
 
         // When
         List<SectorRsData> result = tracker.collectSectorRsData();
@@ -726,6 +744,8 @@ class SectorRelativeStrengthTrackerTest {
         assertEquals(45, data.dataPoints());
         assertFalse(data.isComplete());
         assertEquals(7, data.streakDays());
+        assertEquals(0, data.previousStreakDays());
+        assertFalse(data.streakJustEnded());
     }
 
     @Test
@@ -754,7 +774,8 @@ class SectorRelativeStrengthTrackerTest {
                             String symbol = invocation.getArgument(0);
                             boolean isOutperforming = invocation.getArgument(1);
                             LocalDate date = invocation.getArgument(2);
-                            return new SectorRsStreak(symbol, 1, isOutperforming, date);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 1, isOutperforming, date), 0, false);
                         });
 
         // When

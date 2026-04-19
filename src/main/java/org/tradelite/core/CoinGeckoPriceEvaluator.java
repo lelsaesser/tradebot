@@ -91,7 +91,7 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
             String emoji = percentChange > 0 ? "📈" : "📉";
             telegramClient.sendMessage(
                     emoji
-                            + " High daily price swing detected for "
+                            + " "
                             + coinId.getId()
                             + ": "
                             + String.format("%.2f", percentChange)

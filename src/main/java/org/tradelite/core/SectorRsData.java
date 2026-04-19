@@ -11,6 +11,8 @@ package org.tradelite.core;
  * @param dataPoints The number of data points used in calculation
  * @param isComplete Whether enough data points exist for reliable EMA
  * @param streakDays Consecutive days of current performance direction
+ * @param previousStreakDays Days in the previous streak (non-zero only when streak just ended)
+ * @param streakJustEnded True if the performance direction changed on this update
  */
 public record SectorRsData(
         String symbol,
@@ -20,4 +22,6 @@ public record SectorRsData(
         double percentageDiff,
         int dataPoints,
         boolean isComplete,
-        int streakDays) {}
+        int streakDays,
+        int previousStreakDays,
+        boolean streakJustEnded) {}

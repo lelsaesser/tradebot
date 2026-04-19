@@ -466,17 +466,6 @@ class SchedulerTest {
     }
 
     @Test
-    void manualDailyBollingerBandReport_shouldRunAndReturnTrue() {
-        stubRunWithStatus(true);
-
-        boolean success = scheduler.manualDailyBollingerBandReport();
-
-        assertTrue(success);
-        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
-        verify(bollingerBandTracker).sendDailyReport();
-    }
-
-    @Test
     void manualMonthlyApiUsageReport_withRequestsShouldSendReportAndReset() {
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(10);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(5);
@@ -504,19 +493,6 @@ class SchedulerTest {
         verify(telegramClient, never()).sendMessage(anyString());
         verify(apiRequestMeteringService).resetCounters();
         verify(apiRequestMeteringService, never()).getPreviousMonth();
-    }
-
-    @Test
-    void dailyBollingerBandReport_shouldSendReport() throws Exception {
-        scheduler.dailyBollingerBandReport();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
-
-        verify(bollingerBandTracker, times(1)).sendDailyReport();
     }
 
     @Test

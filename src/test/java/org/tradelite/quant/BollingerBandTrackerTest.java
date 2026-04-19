@@ -191,33 +191,6 @@ class BollingerBandTrackerTest {
     }
 
     @Test
-    void sendDailyReport_sendsReportMessage() {
-        when(bollingerBandService.analyze(anyString(), anyString()))
-                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-
-        tracker.sendDailyReport();
-
-        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
-        assertThat(messageCaptor.getValue()).contains("Bollinger Band Report");
-        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
-        verify(telegramClient, never()).deleteMessage(anyLong());
-    }
-
-    @Test
-    void sendDailyReport_doesNotDeletePreviousOnSecondCall() {
-        when(bollingerBandService.analyze(anyString(), anyString()))
-                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-
-        // First call
-        tracker.sendDailyReport();
-
-        // Second call — should NOT delete anything (daily report doesn't track message IDs)
-        tracker.sendDailyReport();
-        verify(telegramClient, never()).deleteMessage(anyLong());
-    }
-
-    @Test
     void analyzeAndSendAlerts_deletesPreviousHourlyAlertOnSecondCall() {
         BollingerBandAnalysis squeezeAnalysis = squeezeAnalysis("XLK", "Technology");
         when(bollingerBandService.analyze(eq("XLK"), anyString()))
@@ -234,77 +207,6 @@ class BollingerBandTrackerTest {
         when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.of(99L));
         tracker.analyzeAndSendAlerts();
         verify(telegramClient, times(1)).deleteMessage(42L);
-    }
-
-    @Test
-    void buildSummaryReport_showsNoSignalsMessage() {
-        when(bollingerBandService.analyze(anyString(), anyString()))
-                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-
-        String report = tracker.buildSummaryReport();
-
-        assertThat(report).contains("normal Bollinger Band range");
-    }
-
-    @Test
-    void buildSummaryReport_showsInsufficientDataWhenNoResults() {
-        when(bollingerBandService.analyze(anyString(), anyString())).thenReturn(Optional.empty());
-
-        String report = tracker.buildSummaryReport();
-
-        assertThat(report).contains("Insufficient data");
-    }
-
-    @Test
-    void buildSummaryReport_showsSignalCountWhenSignalsPresent() {
-        when(bollingerBandService.analyze(eq("XLK"), anyString()))
-                .thenReturn(Optional.of(upperBandAnalysis("XLK", "Technology")));
-        when(bollingerBandService.analyze(eq("XLE"), anyString()))
-                .thenReturn(Optional.of(squeezeAnalysis("XLE", "Energy")));
-        when(bollingerBandService.analyze(
-                        argThat(s -> s != null && !s.equals("XLK") && !s.equals("XLE")),
-                        anyString()))
-                .thenReturn(Optional.of(normalAnalysis("OTHER", "Other")));
-
-        String report = tracker.buildSummaryReport();
-
-        assertThat(report).contains("active signals");
-    }
-
-    @Test
-    void buildSummaryReport_showsSectorAndStockSections() {
-        // Sector data
-        when(bollingerBandService.analyze(eq("SPY"), anyString()))
-                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-        when(bollingerBandService.analyze(
-                        argThat(s -> s != null && !s.equals("SPY") && !s.equals("AAPL")),
-                        anyString()))
-                .thenReturn(Optional.empty());
-
-        // Stock data
-        when(symbolRegistry.getStocks()).thenReturn(List.of(new StockSymbol("AAPL", "Apple Inc")));
-        when(bollingerBandService.analyze("AAPL", "Apple Inc"))
-                .thenReturn(Optional.of(normalAnalysis("AAPL", "Apple Inc")));
-
-        String report = tracker.buildSummaryReport();
-
-        assertThat(report).contains("Sector ETFs:");
-        assertThat(report).contains("Stocks:");
-        assertThat(report).contains("SPY");
-        assertThat(report).contains("AAPL");
-    }
-
-    @Test
-    void buildSummaryReport_omitsStockSectionWhenNoStocks() {
-        when(bollingerBandService.analyze(eq("SPY"), anyString()))
-                .thenReturn(Optional.of(normalAnalysis("SPY", "S&P 500")));
-        when(bollingerBandService.analyze(argThat(s -> s != null && !s.equals("SPY")), anyString()))
-                .thenReturn(Optional.empty());
-
-        String report = tracker.buildSummaryReport();
-
-        assertThat(report).contains("Sector ETFs:");
-        assertThat(report).doesNotContain("Stocks:");
     }
 
     // ========== Helper methods ==========

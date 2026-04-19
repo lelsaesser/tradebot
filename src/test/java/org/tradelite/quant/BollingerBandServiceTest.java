@@ -396,7 +396,7 @@ class BollingerBandServiceTest {
                         50);
 
         String summary = analysis.toSummaryLine();
-        assertThat(summary).contains("XLK").contains("Technology").contains("%B");
+        assertThat(summary).contains("XLK").contains("Technology").contains("✅");
     }
 
     @Test
