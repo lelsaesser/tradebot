@@ -20,6 +20,7 @@ public class TelegramClient implements TelegramGateway {
 
     protected static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage";
     protected static final String DELETE_URL = "https://api.telegram.org/bot%s/deleteMessage";
+    static final int TELEGRAM_MESSAGE_CHAR_LIMIT = 4096;
 
     private final RestTemplate restTemplate;
     private final String botToken;
@@ -44,6 +45,13 @@ public class TelegramClient implements TelegramGateway {
      */
     @Override
     public OptionalLong sendMessageAndReturnId(String message) {
+        if (message.length() > TELEGRAM_MESSAGE_CHAR_LIMIT) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Telegram message exceeds %d char limit (was %d chars)",
+                            TELEGRAM_MESSAGE_CHAR_LIMIT, message.length()));
+        }
+
         String url = String.format(BASE_URL, botToken);
 
         Map<String, Object> payload = new HashMap<>();
@@ -119,7 +127,7 @@ public class TelegramClient implements TelegramGateway {
             return response.getBody().getResult();
         } catch (Exception e) {
             log.error("Error fetching chat updates: {}", e.getMessage());
-            throw new IllegalStateException("Error fetching chat updates: " + e.getMessage());
+            throw new IllegalStateException("Error while fetching chat updates: " + e.getMessage());
         }
     }
 }

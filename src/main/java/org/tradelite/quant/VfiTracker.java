@@ -111,14 +111,6 @@ public class VfiTracker {
             sb.append("\n");
         }
 
-        if (!yellow.isEmpty()) {
-            sb.append("\uD83D\uDFE1 *Mixed Signal:*\n");
-            for (SymbolResult r : yellow) {
-                sb.append(formatLine(r)).append("\n");
-            }
-            sb.append("\n");
-        }
-
         if (!red.isEmpty()) {
             sb.append("\uD83D\uDD34 *Both Negative (RS↓ + VFI↓):*\n");
             for (SymbolResult r : red) {
@@ -129,7 +121,7 @@ public class VfiTracker {
 
         sb.append(
                 String.format(
-                        "_\uD83D\uDFE2 %d | \uD83D\uDFE1 %d | \uD83D\uDD34 %d_",
+                        "_\uD83D\uDFE2 %d | \uD83D\uDFE1 %d (not shown) | \uD83D\uDD34 %d_",
                         green.size(), yellow.size(), red.size()));
 
         return sb.toString();
