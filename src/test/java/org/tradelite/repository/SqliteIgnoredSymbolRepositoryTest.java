@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository.IgnoredSymbolRow;
 
+@SuppressWarnings("ResultOfMethodCallIgnored")
 class SqliteIgnoredSymbolRepositoryTest {
 
     private SqliteIgnoredSymbolRepository repository;

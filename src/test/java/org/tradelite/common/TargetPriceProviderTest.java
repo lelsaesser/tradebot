@@ -17,6 +17,7 @@ import org.sqlite.SQLiteDataSource;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository;
 
+@SuppressWarnings("ResultOfMethodCallIgnored")
 class TargetPriceProviderTest {
 
     private static final String FILE_PATH = "config/target-prices-test.json";
