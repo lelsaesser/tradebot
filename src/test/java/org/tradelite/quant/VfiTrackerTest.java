@@ -158,6 +158,28 @@ class VfiTrackerTest {
     }
 
     @Test
+    void analyzeAllSymbols_skipsBenchmarkSymbol() {
+        when(symbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol(
+                                        SymbolRegistry.BENCHMARK_SYMBOL,
+                                        SymbolRegistry.BENCHMARK_NAME),
+                                new StockSymbol("XLK", "Technology")));
+
+        mockVfi("XLK", "Technology", 3.4, 2.1);
+        mockRs("XLK", 1.05, 1.04);
+
+        List<VfiTracker.SymbolResult> results = tracker.analyzeAllSymbols();
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).symbol()).isEqualTo("XLK");
+        verify(vfiService, never()).analyze(eq(SymbolRegistry.BENCHMARK_SYMBOL), anyString());
+        verify(relativeStrengthService, never())
+                .getCurrentRsResult(SymbolRegistry.BENCHMARK_SYMBOL);
+    }
+
+    @Test
     void sendDailyReport_includesStocksExcludingEtfs() {
         StockSymbol aapl = new StockSymbol("AAPL", "Apple Inc");
         StockSymbol xlk = new StockSymbol("XLK", "Technology");

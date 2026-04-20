@@ -55,6 +55,9 @@ public class VfiTracker {
         List<SymbolResult> results = new ArrayList<>();
 
         for (StockSymbol stock : symbolRegistry.getAll()) {
+            if (SymbolRegistry.BENCHMARK_SYMBOL.equals(stock.getTicker())) {
+                continue;
+            }
             analyzeSymbol(stock.getTicker(), stock.getCompanyName()).ifPresent(results::add);
         }
 
