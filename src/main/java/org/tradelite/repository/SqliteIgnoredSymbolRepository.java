@@ -94,8 +94,7 @@ public class SqliteIgnoredSymbolRepository {
                 }
             }
         } catch (SQLException e) {
-            log.error(
-                    "Failed to find ignored symbol: {} reason: {}", symbol, reason, e);
+            log.error("Failed to find ignored symbol: {} reason: {}", symbol, reason, e);
             throw new IllegalStateException("Failed to find ignored symbol", e);
         }
         return Optional.empty();

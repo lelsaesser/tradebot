@@ -66,8 +66,7 @@ public class TargetPriceProvider {
 
     public boolean isSymbolIgnored(TickerSymbol symbol, IgnoreReason reason, int alertThreshold) {
         Optional<IgnoredSymbolRow> row =
-                ignoredSymbolRepository.findBySymbolAndReason(
-                        symbol.getName(), reason.getReason());
+                ignoredSymbolRepository.findBySymbolAndReason(symbol.getName(), reason.getReason());
 
         if (row.isEmpty()) {
             return false;
