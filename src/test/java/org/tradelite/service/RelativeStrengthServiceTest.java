@@ -25,7 +25,7 @@ import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.service.model.DailyPrice;
 
-@SuppressWarnings("SameParameterValue")
+@SuppressWarnings({"SameParameterValue", "ResultOfMethodCallIgnored"})
 @ExtendWith(MockitoExtension.class)
 class RelativeStrengthServiceTest {
 
