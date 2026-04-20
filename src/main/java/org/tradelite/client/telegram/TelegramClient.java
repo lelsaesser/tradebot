@@ -127,7 +127,7 @@ public class TelegramClient implements TelegramGateway {
             return response.getBody().getResult();
         } catch (Exception e) {
             log.error("Error fetching chat updates: {}", e.getMessage());
-            throw new IllegalStateException("Error fetching chat updates: " + e.getMessage());
+            throw new IllegalStateException("Error while fetching chat updates: " + e.getMessage());
         }
     }
 }
