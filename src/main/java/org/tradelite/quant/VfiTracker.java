@@ -111,7 +111,6 @@ public class VfiTracker {
             sb.append("\n");
         }
 
-
         if (!red.isEmpty()) {
             sb.append("\uD83D\uDD34 *Both Negative (RS↓ + VFI↓):*\n");
             for (SymbolResult r : red) {
