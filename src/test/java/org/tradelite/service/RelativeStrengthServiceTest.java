@@ -558,9 +558,7 @@ class RelativeStrengthServiceTest {
                 relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
 
         assertThat(
-                "Exact dead zone boundary should not trigger signal",
-                signal.isEmpty(),
-                is(true));
+                "Exact dead zone boundary should not trigger signal", signal.isEmpty(), is(true));
     }
 
     // --- helpers ---
