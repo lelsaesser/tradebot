@@ -25,7 +25,7 @@ import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.service.model.DailyPrice;
 
-@SuppressWarnings("SameParameterValue")
+@SuppressWarnings({"SameParameterValue", "ResultOfMethodCallIgnored"})
 @ExtendWith(MockitoExtension.class)
 class RelativeStrengthServiceTest {
 
@@ -436,6 +436,129 @@ class RelativeStrengthServiceTest {
         assertThat(result.ema(), is(1.20));
         assertThat(result.dataPoints(), is(45));
         assertThat(result.isComplete(), is(false));
+    }
+
+    @Test
+    void testCrossover_belowDeadZoneToAboveDeadZone_signalGenerated() {
+        // Initialize
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 400.0));
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        // Previous: RS meaningfully below EMA (> 0.2% below)
+        var rsData = relativeStrengthService.getRsHistory().get("NVDA");
+        rsData.setPreviousRs(0.80);
+        rsData.setPreviousEma(0.85); // pctDiff = ((0.80 - 0.85)/0.85)*100 = -5.88%
+
+        // Current: RS meaningfully above EMA (> 0.2% above)
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", risingPrices(60, 500.0, 700.0));
+
+        Optional<RelativeStrengthSignal> signal =
+                relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        assertThat(signal.isPresent(), is(true));
+        assertThat(signal.get().signalType(), is(RelativeStrengthSignal.SignalType.OUTPERFORMING));
+    }
+
+    @Test
+    void testCrossover_aboveDeadZoneToBelowDeadZone_signalGenerated() {
+        // Initialize
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        // Previous: RS meaningfully above EMA (> 0.2% above)
+        var rsData = relativeStrengthService.getRsHistory().get("NVDA");
+        rsData.setPreviousRs(1.30);
+        rsData.setPreviousEma(1.20); // pctDiff = ((1.30 - 1.20)/1.20)*100 = +8.33%
+
+        // Current: RS meaningfully below EMA (> 0.2% below)
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", risingPrices(60, 700.0, 400.0));
+
+        Optional<RelativeStrengthSignal> signal =
+                relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        assertThat(signal.isPresent(), is(true));
+        assertThat(
+                signal.get().signalType(), is(RelativeStrengthSignal.SignalType.UNDERPERFORMING));
+    }
+
+    @Test
+    void testCrossover_withinDeadZone_noSignal() {
+        // Initialize with constant prices: RS = 600/500 = 1.2, EMA converges to 1.2
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        // Previous: RS slightly below EMA, but within dead zone (< 0.2%)
+        var rsData = relativeStrengthService.getRsHistory().get("NVDA");
+        rsData.setPreviousRs(1.199);
+        rsData.setPreviousEma(1.200); // pctDiff = ((1.199-1.200)/1.200)*100 = -0.083%
+
+        // Current: constant prices → RS ≈ EMA, pctDiff ≈ 0% (within dead zone)
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 601.0));
+
+        Optional<RelativeStrengthSignal> signal =
+                relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        assertThat(
+                "Should not trigger signal when both values are within dead zone",
+                signal.isEmpty(),
+                is(true));
+    }
+
+    @Test
+    void testCrossover_previousInsideDeadZoneCurrentOutside_noSignal() {
+        // Initialize
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        // Previous: RS slightly below EMA but inside dead zone
+        var rsData = relativeStrengthService.getRsHistory().get("NVDA");
+        rsData.setPreviousRs(1.199);
+        rsData.setPreviousEma(1.200); // pctDiff = -0.083%, inside ±0.2%
+
+        // Current: RS meaningfully above EMA (outside dead zone)
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", risingPrices(60, 500.0, 700.0));
+
+        Optional<RelativeStrengthSignal> signal =
+                relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        assertThat(
+                "Should not trigger when previous RS is inside dead zone",
+                signal.isEmpty(),
+                is(true));
+    }
+
+    @Test
+    void testCrossover_deadZoneBoundary_noSignal() {
+        // Initialize
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        // Previous: RS exactly at dead zone boundary below EMA
+        // pctDiff = exactly -RS_EMA_DEAD_ZONE = -0.2%
+        // prevRs = prevEma * (1 - 0.002) = 1.200 * 0.998 = 1.1976
+        var rsData = relativeStrengthService.getRsHistory().get("NVDA");
+        double ema = 1.200;
+        rsData.setPreviousRs(ema * (1.0 - RelativeStrengthService.RS_EMA_DEAD_ZONE / 100.0));
+        rsData.setPreviousEma(ema);
+
+        // Current: RS meaningfully above EMA
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", risingPrices(60, 500.0, 700.0));
+
+        Optional<RelativeStrengthSignal> signal =
+                relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        assertThat(
+                "Exact dead zone boundary should not trigger signal", signal.isEmpty(), is(true));
     }
 
     // --- helpers ---

@@ -37,6 +37,13 @@ public class RelativeStrengthService {
     /** Number of calendar days to fetch for RS calculation (with buffer for weekends/holidays) */
     private static final int RS_LOOKBACK_DAYS = 80;
 
+    /**
+     * Dead zone around the EMA (percentage-based) to filter noise. RS must deviate more than
+     * ±RS_EMA_DEAD_ZONE percent from EMA to count as meaningfully above or below. This prevents
+     * false crossover alerts when RS oscillates tightly around the EMA in range-bound markets.
+     */
+    static final double RS_EMA_DEAD_ZONE = 0.2;
+
     /** Result of RS and EMA calculation with data completeness info */
     public record RsResult(double rs, double ema, int dataPoints, boolean isComplete) {
         /** Returns true if we have at least the full EMA period of data */
@@ -163,21 +170,23 @@ public class RelativeStrengthService {
         double previousRs = rsData.getPreviousRs();
         double previousEma = rsData.getPreviousEma();
 
-        // Crossover up: was below EMA, now above EMA
-        boolean wasBelow = previousRs < previousEma;
-        boolean isAbove = currentRs > currentEma;
-        boolean crossoverUp = wasBelow && isAbove;
+        double previousPctDiff = ((previousRs - previousEma) / previousEma) * 100;
+        double currentPctDiff = ((currentRs - currentEma) / currentEma) * 100;
 
-        // Crossover down: was above EMA, now below EMA
-        boolean wasAbove = previousRs > previousEma;
-        boolean isBelow = currentRs < currentEma;
-        boolean crossoverDown = wasAbove && isBelow;
+        // Crossover up: was meaningfully below EMA, now meaningfully above EMA
+        boolean wasMeaningfullyBelow = previousPctDiff < -RS_EMA_DEAD_ZONE;
+        boolean isMeaningfullyAbove = currentPctDiff > RS_EMA_DEAD_ZONE;
+        boolean crossoverUp = wasMeaningfullyBelow && isMeaningfullyAbove;
+
+        // Crossover down: was meaningfully above EMA, now meaningfully below EMA
+        boolean wasMeaningfullyAbove = previousPctDiff > RS_EMA_DEAD_ZONE;
+        boolean isMeaningfullyBelow = currentPctDiff < -RS_EMA_DEAD_ZONE;
+        boolean crossoverDown = wasMeaningfullyAbove && isMeaningfullyBelow;
 
         if (crossoverUp) {
-            double percentageDiff = ((currentRs - currentEma) / currentEma) * 100;
             log.info(
                     "RS crossover UP for {}: RS={}, EMA={} (+{}%)",
-                    symbol, currentRs, currentEma, percentageDiff);
+                    symbol, currentRs, currentEma, currentPctDiff);
             return Optional.of(
                     new RelativeStrengthSignal(
                             symbol,
@@ -185,14 +194,13 @@ public class RelativeStrengthService {
                             RelativeStrengthSignal.SignalType.OUTPERFORMING,
                             currentRs,
                             currentEma,
-                            percentageDiff));
+                            currentPctDiff));
         }
 
         if (crossoverDown) {
-            double percentageDiff = ((currentRs - currentEma) / currentEma) * 100;
             log.info(
                     "RS crossover DOWN for {}: RS={}, EMA={} ({}%)",
-                    symbol, currentRs, currentEma, percentageDiff);
+                    symbol, currentRs, currentEma, currentPctDiff);
             return Optional.of(
                     new RelativeStrengthSignal(
                             symbol,
@@ -200,7 +208,7 @@ public class RelativeStrengthService {
                             RelativeStrengthSignal.SignalType.UNDERPERFORMING,
                             currentRs,
                             currentEma,
-                            percentageDiff));
+                            currentPctDiff));
         }
 
         return Optional.empty();
