@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +44,9 @@ class VfiTrackerTest {
                         featureToggleService);
         lenient().when(featureToggleService.isEnabled(FeatureToggle.VFI_REPORT)).thenReturn(true);
         lenient().when(symbolRegistry.getAll()).thenReturn(List.of());
+        lenient()
+                .when(telegramClient.sendMessageAndReturnId(anyString()))
+                .thenReturn(OptionalLong.of(1L));
     }
 
     @Test
@@ -51,7 +55,7 @@ class VfiTrackerTest {
 
         tracker.sendDailyReport();
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
         verify(vfiService, never()).analyze(anyString(), anyString());
     }
 
@@ -79,7 +83,7 @@ class VfiTrackerTest {
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(captor.capture());
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
 
         String report = captor.getValue();
         assertThat(report).contains("*RS + VFI Combined Report*");
@@ -103,7 +107,7 @@ class VfiTrackerTest {
 
         tracker.sendDailyReport();
 
-        verify(telegramClient, never()).sendMessage(anyString());
+        verify(telegramClient, never()).sendMessageAndReturnId(anyString());
     }
 
     @Test
@@ -123,7 +127,7 @@ class VfiTrackerTest {
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(captor.capture());
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
         String report = captor.getValue();
         assertThat(report).contains("XLK");
         assertThat(report).doesNotContain("XLF");
@@ -147,7 +151,7 @@ class VfiTrackerTest {
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(captor.capture());
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
         String report = captor.getValue();
         assertThat(report).contains("XLK");
         assertThat(report).doesNotContain("XLF");
@@ -169,7 +173,7 @@ class VfiTrackerTest {
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(captor.capture());
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
         String report = captor.getValue();
         assertThat(report).contains("AAPL (Apple Inc)");
     }
@@ -194,7 +198,7 @@ class VfiTrackerTest {
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(captor.capture());
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
         String report = captor.getValue();
         assertThat(report).contains("🟢 2 | 🟡 1 | 🔴 0");
     }
@@ -210,7 +214,7 @@ class VfiTrackerTest {
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(captor.capture());
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
         String report = captor.getValue();
         assertThat(report).contains("RS +1.0%");
     }
@@ -232,13 +236,26 @@ class VfiTrackerTest {
         tracker.sendDailyReport();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(captor.capture());
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
         String report = captor.getValue();
         assertThat(report).contains("*Both Positive (RS↑ + VFI↑):*");
         assertThat(report).doesNotContain("*Mixed Signal:*");
         assertThat(report).doesNotContain("*Both Negative (RS↓ + VFI↓):*");
         // Footer still shows all three counts
         assertThat(report).contains("🟢 2 | 🟡 0 | 🔴 0");
+    }
+
+    @Test
+    void sendDailyReport_doesNotThrowOnSendFailure() {
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("XLK", "Technology")));
+        mockVfi("XLK", "Technology", 3.4, 2.1);
+        mockRs("XLK", 1.05, 1.04);
+
+        when(telegramClient.sendMessageAndReturnId(anyString())).thenReturn(OptionalLong.empty());
+
+        tracker.sendDailyReport();
+
+        verify(telegramClient).sendMessageAndReturnId(anyString());
     }
 
     private void mockVfi(String symbol, String displayName, double vfi, double signal) {

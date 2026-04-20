@@ -3,6 +3,7 @@ package org.tradelite.quant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,8 +40,15 @@ public class VfiTracker {
         }
 
         String report = buildReport(results);
-        telegramClient.sendMessage(report);
-        log.info("Daily RS+VFI report sent: {} symbols analyzed", results.size());
+        OptionalLong messageId = telegramClient.sendMessageAndReturnId(report);
+        if (messageId.isPresent()) {
+            log.info("Daily RS+VFI report sent: {} symbols analyzed", results.size());
+        } else {
+            log.warn(
+                    "Failed to send daily RS+VFI report ({} chars, {} symbols)",
+                    report.length(),
+                    results.size());
+        }
     }
 
     List<SymbolResult> analyzeAllSymbols() {
