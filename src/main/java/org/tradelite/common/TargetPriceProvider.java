@@ -8,13 +8,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.core.IgnoreReason;
-import org.tradelite.core.IgnoredSymbol;
+import org.tradelite.repository.SqliteIgnoredSymbolRepository;
+import org.tradelite.repository.SqliteIgnoredSymbolRepository.IgnoredSymbolRow;
 
 @Slf4j
 @Component
@@ -24,12 +25,14 @@ public class TargetPriceProvider {
     public static final String FILE_PATH_COINS = "config/target-prices-coins.json";
     public static final long IGNORE_DURATION_TTL_SECONDS = 3600L * 12; // 12 hours
 
-    protected final Map<String, IgnoredSymbol> ignoredSymbols = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
+    private final SqliteIgnoredSymbolRepository ignoredSymbolRepository;
 
     @Autowired
-    public TargetPriceProvider(ObjectMapper objectMapper) {
+    public TargetPriceProvider(
+            ObjectMapper objectMapper, SqliteIgnoredSymbolRepository ignoredSymbolRepository) {
         this.objectMapper = objectMapper;
+        this.ignoredSymbolRepository = ignoredSymbolRepository;
     }
 
     public List<TargetPrice> getStockTargetPrices() {
@@ -50,10 +53,11 @@ public class TargetPriceProvider {
     }
 
     public void addIgnoredSymbol(TickerSymbol symbol, IgnoreReason reason, int alertThreshold) {
-        IgnoredSymbol existingSymbol =
-                ignoredSymbols.computeIfAbsent(symbol.getName(), _ -> new IgnoredSymbol(symbol));
-        existingSymbol.getIgnoreTimes().put(reason, Instant.now());
-        existingSymbol.getAlertThresholds().put(reason, alertThreshold);
+        ignoredSymbolRepository.save(
+                symbol.getName(),
+                reason.getReason(),
+                Instant.now().getEpochSecond(),
+                alertThreshold == 0 ? null : alertThreshold);
     }
 
     public void addIgnoredSymbol(TickerSymbol symbol, IgnoreReason reason) {
@@ -61,23 +65,22 @@ public class TargetPriceProvider {
     }
 
     public boolean isSymbolIgnored(TickerSymbol symbol, IgnoreReason reason, int alertThreshold) {
-        IgnoredSymbol ignoredSymbol = ignoredSymbols.get(symbol.getName());
+        Optional<IgnoredSymbolRow> row =
+                ignoredSymbolRepository.findBySymbolAndReason(
+                        symbol.getName(), reason.getReason());
 
-        if (ignoredSymbol == null) {
+        if (row.isEmpty()) {
             return false;
         }
 
         if (alertThreshold > 0) {
-            Integer lastAlertedThreshold = ignoredSymbol.getAlertThresholds().get(reason);
+            Integer lastAlertedThreshold = row.get().alertThreshold();
             return lastAlertedThreshold != null && alertThreshold <= lastAlertedThreshold;
         }
 
-        Instant ignoreTime = ignoredSymbol.getIgnoreTimes().get(reason);
-        if (ignoreTime == null) {
-            return false;
-        }
-
-        long elapsedSeconds = Duration.between(ignoreTime, Instant.now()).getSeconds();
+        long elapsedSeconds =
+                Duration.between(Instant.ofEpochSecond(row.get().ignoredAt()), Instant.now())
+                        .getSeconds();
         if (elapsedSeconds < IGNORE_DURATION_TTL_SECONDS) {
             log.info(
                     "{} is ignored for reason {}. Time remaining: {} seconds",
@@ -94,22 +97,8 @@ public class TargetPriceProvider {
     }
 
     public void cleanupIgnoreSymbols(long ttlSeconds) {
-        Instant now = Instant.now();
-
-        for (IgnoredSymbol ignoredSymbol : ignoredSymbols.values()) {
-            Map<IgnoreReason, Instant> reasons = ignoredSymbol.getIgnoreTimes();
-            List<IgnoreReason> toRemove = new ArrayList<>();
-            for (Map.Entry<IgnoreReason, Instant> entry : reasons.entrySet()) {
-                long duration = now.getEpochSecond() - entry.getValue().getEpochSecond();
-                if (duration > ttlSeconds) {
-                    toRemove.add(entry.getKey());
-                }
-            }
-            toRemove.forEach(reasons::remove);
-            toRemove.forEach(ignoredSymbol.getAlertThresholds()::remove);
-        }
-
-        ignoredSymbols.entrySet().removeIf(entry -> entry.getValue().getIgnoreTimes().isEmpty());
+        long cutoff = Instant.now().getEpochSecond() - ttlSeconds;
+        ignoredSymbolRepository.deleteExpiredEntries(cutoff);
     }
 
     public synchronized void updateTargetPrice(

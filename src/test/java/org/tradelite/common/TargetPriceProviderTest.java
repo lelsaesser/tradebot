@@ -7,23 +7,35 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
 import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.sqlite.SQLiteDataSource;
 import org.tradelite.core.IgnoreReason;
+import org.tradelite.repository.SqliteIgnoredSymbolRepository;
 
-@ExtendWith(MockitoExtension.class)
 class TargetPriceProviderTest {
 
     private static final String FILE_PATH = "config/target-prices-test.json";
 
     private TargetPriceProvider targetPriceProvider;
+    private String testDbPath;
 
     @BeforeEach
     void setUp() {
-        targetPriceProvider = new TargetPriceProvider(new ObjectMapper());
+        testDbPath = "target/test-target-price-provider-" + UUID.randomUUID() + ".db";
+        SQLiteDataSource dataSource = new SQLiteDataSource();
+        dataSource.setUrl("jdbc:sqlite:" + testDbPath);
+        SqliteIgnoredSymbolRepository repository = new SqliteIgnoredSymbolRepository(dataSource);
+        targetPriceProvider = new TargetPriceProvider(new ObjectMapper(), repository);
+    }
+
+    @AfterEach
+    void tearDown() {
+        new File(testDbPath).delete();
     }
 
     private boolean fileContainsSymbol(TickerSymbol symbol) {
@@ -44,40 +56,42 @@ class TargetPriceProviderTest {
     @Test
     void addIgnoreSymbol_symbolNotExists() {
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
-
-        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(1));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.BUY_ALERT),
+                is(true));
 
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT),
+                is(true));
 
-        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
-
+        // Adding same symbol/reason again should not break anything
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.SELL_ALERT);
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.SELL_ALERT);
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
-        targetPriceProvider.addIgnoredSymbol(
-                new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
 
-        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
+        // Both reasons for SOLANA should be ignored
         assertThat(
-                targetPriceProvider.ignoredSymbols.get(CoinId.SOLANA.getName()).getIgnoreTimes(),
-                aMapWithSize(2));
+                targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.BUY_ALERT),
+                is(true));
         assertThat(
-                targetPriceProvider
-                        .ignoredSymbols
-                        .get(new StockSymbol("AMZN", "Amazon").getName())
-                        .getIgnoreTimes(),
-                aMapWithSize(1));
+                targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.SELL_ALERT),
+                is(true));
 
+        // Adding BUY_ALERT for AMZN
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("AMZN", "Amazon"), IgnoreReason.BUY_ALERT);
         assertThat(
-                targetPriceProvider
-                        .ignoredSymbols
-                        .get(new StockSymbol("AMZN", "Amazon").getName())
-                        .getIgnoreTimes(),
-                aMapWithSize(2));
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMZN", "Amazon"), IgnoreReason.BUY_ALERT),
+                is(true));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT),
+                is(true));
     }
 
     @Test
@@ -130,10 +144,24 @@ class TargetPriceProviderTest {
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
 
-        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.BUY_ALERT),
+                is(true));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT),
+                is(true));
+
         Thread.sleep(3000);
         targetPriceProvider.cleanupIgnoreSymbols(1L);
-        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(0));
+
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(CoinId.SOLANA, IgnoreReason.BUY_ALERT),
+                is(false));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT),
+                is(false));
 
         targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.BUY_ALERT);
         targetPriceProvider.addIgnoredSymbol(
@@ -141,13 +169,36 @@ class TargetPriceProviderTest {
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("PLTR", "Palantir"), IgnoreReason.BUY_ALERT);
 
-        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(3));
         Thread.sleep(3500);
+
+        // Add fresh entries for BTC and META (different reasons)
         targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.SELL_ALERT);
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("META", "Meta Platforms"), IgnoreReason.BUY_ALERT);
+
         targetPriceProvider.cleanupIgnoreSymbols(1L);
-        assertThat(targetPriceProvider.ignoredSymbols, aMapWithSize(2));
+
+        // Old entries should be cleaned up
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.BUY_ALERT),
+                is(false));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("META", "Meta Platforms"), IgnoreReason.SELL_ALERT),
+                is(false));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("PLTR", "Palantir"), IgnoreReason.BUY_ALERT),
+                is(false));
+
+        // Fresh entries should still exist
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(CoinId.BITCOIN, IgnoreReason.SELL_ALERT),
+                is(true));
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(
+                        new StockSymbol("META", "Meta Platforms"), IgnoreReason.BUY_ALERT),
+                is(true));
     }
 
     @Test
