@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.tradelite.client.telegram.TelegramClient.BASE_URL;
 import static org.tradelite.client.telegram.TelegramClient.DELETE_URL;
+import static org.tradelite.client.telegram.TelegramClient.TELEGRAM_MESSAGE_CHAR_LIMIT;
 
 import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
@@ -162,6 +163,43 @@ class TelegramClientTest {
                 .thenThrow(new RuntimeException("Network error"));
 
         assertDoesNotThrow(() -> telegramClient.deleteMessage(123L));
+    }
+
+    @Test
+    void sendMessageAndReturnId_exceedsCharLimit_throwsException() {
+        String oversizedMessage = "x".repeat(TELEGRAM_MESSAGE_CHAR_LIMIT + 1);
+
+        IllegalArgumentException ex =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> telegramClient.sendMessageAndReturnId(oversizedMessage));
+
+        assertTrue(ex.getMessage().contains("exceeds"));
+        assertTrue(ex.getMessage().contains(String.valueOf(TELEGRAM_MESSAGE_CHAR_LIMIT)));
+        verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void sendMessageAndReturnId_exactlyAtCharLimit_doesNotThrow() {
+        String maxMessage = "x".repeat(TELEGRAM_MESSAGE_CHAR_LIMIT);
+
+        TelegramMessage message = new TelegramMessage();
+        message.setMessageId(1L);
+        TelegramSendMessageResponse body = new TelegramSendMessageResponse();
+        body.setOk(true);
+        body.setResult(message);
+
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
+
+        OptionalLong result = telegramClient.sendMessageAndReturnId(maxMessage);
+
+        assertTrue(result.isPresent());
     }
 
     @Test

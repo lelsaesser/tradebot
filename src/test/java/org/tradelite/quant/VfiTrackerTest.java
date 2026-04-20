@@ -88,10 +88,10 @@ class VfiTrackerTest {
         String report = captor.getValue();
         assertThat(report).contains("*RS + VFI Combined Report*");
         assertThat(report).contains("*Both Positive (RS↑ + VFI↑):*");
-        assertThat(report).contains("*Mixed Signal:*");
+        assertThat(report).doesNotContain("*Mixed Signal:*");
         assertThat(report).contains("*Both Negative (RS↓ + VFI↓):*");
         assertThat(report).contains("XLK (Technology)");
-        assertThat(report).contains("XLF (Financials)");
+        assertThat(report).doesNotContain("XLF (Financials)");
         assertThat(report).contains("XLU (Utilities)");
     }
 
@@ -200,7 +200,7 @@ class VfiTrackerTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessageAndReturnId(captor.capture());
         String report = captor.getValue();
-        assertThat(report).contains("🟢 2 | 🟡 1 | 🔴 0");
+        assertThat(report).contains("🟢 2 | 🟡 1 (not shown) | 🔴 0");
     }
 
     @Test
@@ -242,7 +242,35 @@ class VfiTrackerTest {
         assertThat(report).doesNotContain("*Mixed Signal:*");
         assertThat(report).doesNotContain("*Both Negative (RS↓ + VFI↓):*");
         // Footer still shows all three counts
-        assertThat(report).contains("🟢 2 | 🟡 0 | 🔴 0");
+        assertThat(report).contains("🟢 2 | 🟡 0 (not shown) | 🔴 0");
+    }
+
+    @Test
+    void sendDailyReport_yellowOnlySymbols_showsFooterButNoDetailLines() {
+        when(symbolRegistry.getAll())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("XLF", "Financials"),
+                                new StockSymbol("XLU", "Utilities")));
+
+        // XLF: YELLOW (RS positive + VFI negative)
+        mockVfi("XLF", "Financials", 0.8, -0.3);
+        mockRs("XLF", 1.02, 1.01);
+
+        // XLU: YELLOW (RS negative + VFI positive)
+        mockVfi("XLU", "Utilities", 2.0, 1.5);
+        mockRs("XLU", 0.95, 0.98);
+
+        tracker.sendDailyReport();
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessageAndReturnId(captor.capture());
+        String report = captor.getValue();
+        assertThat(report).contains("*RS + VFI Combined Report*");
+        assertThat(report).doesNotContain("*Mixed Signal:*");
+        assertThat(report).doesNotContain("XLF");
+        assertThat(report).doesNotContain("XLU");
+        assertThat(report).contains("🟢 0 | 🟡 2 (not shown) | 🔴 0");
     }
 
     @Test
