@@ -64,7 +64,14 @@ public class SymbolRegistry {
                     Map.entry("XBI", "Biotech"),
                     Map.entry("UFO", "Space"),
                     Map.entry("TAN", "Solar"),
-                    Map.entry("URA", "Uranium & Nuclear"));
+                    Map.entry("URA", "Uranium & Nuclear"),
+                    Map.entry("REMX", "Rare Earths"),
+                    Map.entry("QTUM", "Quantum"),
+                    Map.entry("DTCR", "Data Centers"),
+                    Map.entry("FINX", "FinTech"),
+                    Map.entry("LIT", "Batteries"),
+                    Map.entry("BOTZ", "Robotics"),
+                    Map.entry("STCE", "Crypto"));
 
     private static final String STOCK_SYMBOLS_FILE = "config/stock-symbols.json";
 
