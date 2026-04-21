@@ -15,6 +15,7 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
+import org.tradelite.quant.PullbackBuyTracker;
 import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
@@ -44,6 +45,7 @@ public class Scheduler {
     private final EmaTracker emaTracker;
     private final OhlcvFetcher ohlcvFetcher;
     private final VfiTracker vfiTracker;
+    private final PullbackBuyTracker pullbackBuyTracker;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -66,7 +68,8 @@ public class Scheduler {
             RsiTracker rsiTracker,
             EmaTracker emaTracker,
             OhlcvFetcher ohlcvFetcher,
-            VfiTracker vfiTracker) {
+            VfiTracker vfiTracker,
+            PullbackBuyTracker pullbackBuyTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
@@ -85,12 +88,14 @@ public class Scheduler {
         this.emaTracker = emaTracker;
         this.ohlcvFetcher = ohlcvFetcher;
         this.vfiTracker = vfiTracker;
+        this.pullbackBuyTracker = pullbackBuyTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     public void stockMarketMonitoring() {
         if (DateUtil.isStockMarketOpen(marketDateTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
+            rootErrorHandler.run(pullbackBuyTracker::analyzeAndSendAlerts);
             // Analyze sector ETFs in real-time for rotation signals
             rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
@@ -220,6 +225,7 @@ public class Scheduler {
     public boolean manualStockMarketMonitoring() {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(finnhubPriceEvaluator::evaluatePrice);
+        success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
         success &=
                 rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
         success &= rootErrorHandler.runWithStatus(sectorMomentumRocTracker::analyzeAndSendAlerts);
@@ -308,6 +314,12 @@ public class Scheduler {
     public boolean manualVfiReport() {
         boolean success = rootErrorHandler.runWithStatus(vfiTracker::sendDailyReport);
         log.info("Manual VFI report completed.");
+        return success;
+    }
+
+    public boolean manualPullbackBuyAlert() {
+        boolean success = rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
+        log.info("Manual pullback buy alert scan completed.");
         return success;
     }
 }

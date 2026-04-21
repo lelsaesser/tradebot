@@ -1,5 +1,6 @@
 {
   "finnhubPriceCollection": true,
   "emaReport": true,
-  "vfiReport": true
+  "vfiReport": true,
+  "pullbackBuyAlert": true
 }

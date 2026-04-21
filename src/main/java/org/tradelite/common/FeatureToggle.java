@@ -19,7 +19,10 @@ public enum FeatureToggle {
     EMA_REPORT("emaReport"),
 
     /** Controls whether the daily combined RS+VFI report is sent via Telegram */
-    VFI_REPORT("vfiReport");
+    VFI_REPORT("vfiReport"),
+
+    /** Controls whether real-time EMA pullback buy alerts are sent via Telegram */
+    PULLBACK_BUY_ALERT("pullbackBuyAlert");
 
     private final String key;
 }

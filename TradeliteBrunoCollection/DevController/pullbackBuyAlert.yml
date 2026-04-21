@@ -1,0 +1,15 @@
+info:
+  name: pullbackBuyAlert
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: http://localhost:9090/dev/jobs/pullback-buy-alert
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -28,6 +28,7 @@ import org.tradelite.core.SectorRelativeStrengthTracker;
 import org.tradelite.core.SectorRotationTracker;
 import org.tradelite.quant.BollingerBandTracker;
 import org.tradelite.quant.EmaTracker;
+import org.tradelite.quant.PullbackBuyTracker;
 import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
@@ -55,6 +56,7 @@ class SchedulerTest {
     @Mock private EmaTracker emaTracker;
     @Mock private OhlcvFetcher ohlcvFetcher;
     @Mock private VfiTracker vfiTracker;
+    @Mock private PullbackBuyTracker pullbackBuyTracker;
 
     private Scheduler scheduler;
 
@@ -79,7 +81,8 @@ class SchedulerTest {
                         rsiTracker,
                         emaTracker,
                         ohlcvFetcher,
-                        vfiTracker);
+                        vfiTracker,
+                        pullbackBuyTracker);
     }
 
     @Test
@@ -90,12 +93,12 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        // Called 3 times: finnhubPriceEvaluator, sectorRelativeStrengthTracker,
-        // sectorMomentumRocTracker (BB moved to hourly schedule)
-        verify(rootErrorHandler, times(3)).run(any(ThrowingRunnable.class));
+        // Called 4 times: finnhubPriceEvaluator, pullbackBuyTracker,
+        // sectorRelativeStrengthTracker, sectorMomentumRocTracker
+        verify(rootErrorHandler, times(4)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(3)).run(captor.capture());
+        verify(rootErrorHandler, times(4)).run(captor.capture());
 
         // Execute all captured runnables
         for (ThrowingRunnable runnable : captor.getAllValues()) {
@@ -103,6 +106,7 @@ class SchedulerTest {
         }
 
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
+        verify(pullbackBuyTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
         verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
@@ -364,16 +368,17 @@ class SchedulerTest {
 
         boolean success = scheduler.manualStockMarketMonitoring();
 
-        verify(rootErrorHandler, times(3)).runWithStatus(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(4)).runWithStatus(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(3)).runWithStatus(captor.capture());
+        verify(rootErrorHandler, times(4)).runWithStatus(captor.capture());
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
         }
 
         assertTrue(success);
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
+        verify(pullbackBuyTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
     }
@@ -554,6 +559,17 @@ class SchedulerTest {
         assertTrue(success);
         verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
         verify(vfiTracker).sendDailyReport();
+    }
+
+    @Test
+    void manualPullbackBuyAlert_shouldRunAndReturnTrue() {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualPullbackBuyAlert();
+
+        assertTrue(success);
+        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
+        verify(pullbackBuyTracker).analyzeAndSendAlerts();
     }
 
     @Test

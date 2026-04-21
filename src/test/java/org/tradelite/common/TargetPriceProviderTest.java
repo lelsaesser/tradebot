@@ -359,6 +359,20 @@ class TargetPriceProviderTest {
     }
 
     @Test
+    void isSymbolIgnored_perReasonTtl_usesReasonSpecificTtl() {
+        StockSymbol stock = new StockSymbol("AAPL", "Apple");
+        targetPriceProvider.addIgnoredSymbol(stock, IgnoreReason.PULLBACK_BUY_ALERT);
+
+        assertThat(
+                targetPriceProvider.isSymbolIgnored(stock, IgnoreReason.PULLBACK_BUY_ALERT),
+                is(true));
+
+        // Verify the TTL values are reason-specific
+        assertThat(IgnoreReason.BUY_ALERT.getTtlSeconds(), is(3600L * 12));
+        assertThat(IgnoreReason.PULLBACK_BUY_ALERT.getTtlSeconds(), is(3600L * 8));
+    }
+
+    @Test
     void getStockTargetPrices_ok() {
         List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
 

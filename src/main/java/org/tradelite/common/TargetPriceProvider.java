@@ -80,12 +80,12 @@ public class TargetPriceProvider {
         long elapsedSeconds =
                 Duration.between(Instant.ofEpochSecond(row.get().ignoredAt()), Instant.now())
                         .getSeconds();
-        if (elapsedSeconds < IGNORE_DURATION_TTL_SECONDS) {
+        if (elapsedSeconds < reason.getTtlSeconds()) {
             log.info(
                     "{} is ignored for reason {}. Time remaining: {} seconds",
                     symbol.getName(),
                     reason,
-                    IGNORE_DURATION_TTL_SECONDS - elapsedSeconds);
+                    reason.getTtlSeconds() - elapsedSeconds);
             return true;
         }
         return false;
