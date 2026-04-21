@@ -1,6 +1,43 @@
 # Progress Tracking
 
-## Latest Milestone: Unified SymbolRegistry ✅ COMPLETE
+## Latest Milestone: EMA Pullback Buy Alert (#307) — IN PROGRESS
+
+**Status**: 🔧 **FEATURE CODE COMPLETE, DEV TESTING**
+
+### Implementation (April 21, 2026)
+
+#### Purpose
+Real-time detection of "healthy pullback" buy opportunities. When a stock pulls back below EMA 9/21 but stays above EMA 50/100/200, and both RS vs SPY and VFI are positive, send a Telegram buy alert.
+
+#### New Components
+- `PullbackBuyTracker` — real-time pullback detector, runs every 5 min in `stockMarketMonitoring()`
+- 22 unit tests
+
+#### Key Changes
+- `IgnoreReason` — per-reason TTL (`ttlSeconds` field), new `PULLBACK_BUY_ALERT` (8h)
+- `TargetPriceProvider` — uses `reason.getTtlSeconds()` in `isSymbolIgnored()`
+- `FeatureToggle` — added `PULLBACK_BUY_ALERT`
+- `Scheduler` — pullback tracker wired after `evaluatePrice()`, manual method
+- `DevJobController` — new endpoint + smoke test entry (14 jobs total)
+- `DevDataSeeder` — seeds OHLCV for all bundle symbols, seeds price cache, crafts pullback price using OHLCV-based EMAs, injected `FinnhubPriceEvaluator`
+- Bruno collection — added `pullbackBuyAlert.yml`
+
+#### Design Decisions
+- No separate Finnhub API calls — reuses `FinnhubPriceEvaluator.lastPriceCache`
+- Strict conditions — ALL of EMA 50/100/200 must be above price
+- 8h cooldown (once per trading day, re-alert next morning)
+- One message per stock, no emoji
+- Per-reason TTL in `IgnoreReason` enum
+
+#### Tests: 926 total, all passing
+
+#### Related Issues
+- #307: EMA pullback buy alert (this scope)
+- #308: Future extension — sector trend filtering (requires sector membership mapping)
+
+---
+
+## Previous Milestone: Unified SymbolRegistry ✅ COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -101,6 +138,7 @@ Follow-up issues (open):
 | **Bollinger Bands** | `BollingerBandTracker` | Band touch + squeeze detection | Hourly + Daily 15:40 CET |
 | **EMA Classification** | `EmaTracker` | Price vs 5 EMAs (green/yellow/red) | Daily 15:50 CET |
 | **VFI + RS Combined** | `VfiTracker` | Volume flow + RS confirmation | Daily 09:00 CET |
+| **EMA Pullback Buy** | `PullbackBuyTracker` | Pullback into 21-50 EMA zone + RS↑ + VFI↑ | Real-time (5 min) |
 
 ---
 
@@ -123,10 +161,11 @@ Follow-up issues (open):
 - **VFI + RS combined daily report** (traffic-light classification)
 - **DailyPriceProvider** (OHLCV-first, Finnhub-fallback)
 - **Unified SymbolRegistry** (single source of truth for all symbols)
+- **EMA Pullback Buy Alerts** (real-time pullback detection with RS+VFI confirmation)
 
 ### Dev Tooling & Smoke Test ✅
-- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 14 endpoint requests
-- DevJobController with 14 individual endpoints + phased `run-all` composite endpoint
+- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 15 endpoint requests
+- DevJobController with 15 individual endpoints + phased `run-all` composite endpoint (14 jobs)
 - Pre-deployment smoke test script (`scripts/run-smoke-test.sh`) — validates all 13 jobs in 4 phases
 - DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
 
@@ -148,11 +187,12 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: 923
+- Total Tests: 926
 
 ## Future Enhancements
 
 ### Statistical (Open Issues)
+- **#308**: Extend pullback buy alert with sector trend filtering (requires sector membership mapping)
 - **#258**: Intraday OHLCV + intraday VFI (would enable hourly VFI)
 - **#265**: Twelve Data API key in production
 - **#257**: Bug: ETF symbols can be added to stock symbols list

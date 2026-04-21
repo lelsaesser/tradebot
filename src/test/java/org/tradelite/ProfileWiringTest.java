@@ -19,6 +19,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.config.TradebotTelegramProperties;
+import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
@@ -127,6 +128,11 @@ class ProfileWiringTest {
         @Bean
         OhlcvRepository ohlcvRepository() {
             return mock(OhlcvRepository.class);
+        }
+
+        @Bean
+        FinnhubPriceEvaluator finnhubPriceEvaluator() {
+            return mock(FinnhubPriceEvaluator.class);
         }
     }
 }

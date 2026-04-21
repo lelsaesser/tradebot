@@ -208,6 +208,29 @@ class DevJobControllerTest {
     }
 
     @Test
+    void pullbackBuyAlert_callsManualJob() {
+        when(scheduler.manualPullbackBuyAlert()).thenReturn(true);
+
+        ResponseEntity<Map<String, String>> response = controller.pullbackBuyAlert();
+
+        verify(scheduler, times(1)).manualPullbackBuyAlert();
+        assertThat(response.getStatusCode(), is(HttpStatus.OK));
+        assertThat(response.getBody().get("status"), is("ok"));
+        assertThat(response.getBody().get("job"), is("pullback-buy-alert"));
+    }
+
+    @Test
+    void pullbackBuyAlert_returnsServerErrorWhenJobFails() {
+        when(scheduler.manualPullbackBuyAlert()).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = controller.pullbackBuyAlert();
+
+        assertThat(response.getStatusCode(), is(HttpStatus.INTERNAL_SERVER_ERROR));
+        assertThat(response.getBody().get("status"), is("error"));
+        assertThat(response.getBody().get("job"), is("pullback-buy-alert"));
+    }
+
+    @Test
     void emaReport_callsJob() {
         when(scheduler.manualEmaReport()).thenReturn(true);
 
@@ -233,6 +256,7 @@ class DevJobControllerTest {
         when(scheduler.manualDailyTailRiskMonitoring()).thenReturn(true);
         when(scheduler.manualEmaReport()).thenReturn(true);
         when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
+        when(scheduler.manualPullbackBuyAlert()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
         ResponseEntity<Map<String, Object>> response = controller.runAll();
@@ -240,11 +264,12 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatus.OK));
         assertThat(response.getBody().get("status"), is("ok"));
         assertThat(response.getBody().get("failed"), is(0));
-        assertThat(response.getBody().get("total"), is(13));
+        assertThat(response.getBody().get("total"), is(14));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("vfi-report"), is("ok"));
         assertThat(results.get("seed-analytics"), is("ok"));
+        assertThat(results.get("pullback-buy-alert"), is("ok"));
     }
 
     @Test
@@ -262,6 +287,7 @@ class DevJobControllerTest {
         when(scheduler.manualDailyTailRiskMonitoring()).thenReturn(true);
         when(scheduler.manualEmaReport()).thenReturn(true);
         when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
+        when(scheduler.manualPullbackBuyAlert()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
         ResponseEntity<Map<String, Object>> response = controller.runAll();
@@ -269,7 +295,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatusCode.valueOf(207)));
         assertThat(response.getBody().get("status"), is("partial"));
         assertThat(response.getBody().get("failed"), is(1));
-        assertThat(response.getBody().get("passed"), is(12));
+        assertThat(response.getBody().get("passed"), is(13));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("crypto-monitoring"), is("error"));

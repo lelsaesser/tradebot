@@ -28,6 +28,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
@@ -45,7 +46,6 @@ public class DevDataSeeder implements ApplicationRunner {
     private static final int LOOKBACK_DAYS = 90;
     private static final int OHLCV_LOOKBACK_DAYS = 400;
     private static final int SAMPLE_STOCK_LIMIT = 5;
-    private static final int OHLCV_SYMBOL_LIMIT = 10;
     private static final String QUOTES_TABLE = "finnhub_price_quotes";
     private static final String MOMENTUM_TABLE = "momentum_roc_state";
     private static final String OHLCV_TABLE = "twelvedata_daily_ohlcv";
@@ -58,6 +58,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final TargetPriceProvider targetPriceProvider;
     private final SymbolRegistry symbolRegistry;
     private final OhlcvRepository ohlcvRepository;
+    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final Path rsDataFilePath;
 
     @Autowired
@@ -68,7 +69,8 @@ public class DevDataSeeder implements ApplicationRunner {
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
-            OhlcvRepository ohlcvRepository) {
+            OhlcvRepository ohlcvRepository,
+            FinnhubPriceEvaluator finnhubPriceEvaluator) {
         this(
                 dataSource,
                 objectMapper,
@@ -77,6 +79,7 @@ public class DevDataSeeder implements ApplicationRunner {
                 targetPriceProvider,
                 symbolRegistry,
                 ohlcvRepository,
+                finnhubPriceEvaluator,
                 Path.of("config/rs-data.json"));
     }
 
@@ -88,6 +91,7 @@ public class DevDataSeeder implements ApplicationRunner {
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
+            FinnhubPriceEvaluator finnhubPriceEvaluator,
             Path rsDataFilePath) {
         this.dataSource = dataSource;
         this.objectMapper = objectMapper;
@@ -96,6 +100,7 @@ public class DevDataSeeder implements ApplicationRunner {
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;
         this.ohlcvRepository = ohlcvRepository;
+        this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.rsDataFilePath = rsDataFilePath;
     }
 
@@ -124,6 +129,7 @@ public class DevDataSeeder implements ApplicationRunner {
             seedRelativeStrengthHistory(bundle);
             seedMomentumState(bundle);
             seedOhlcvData(bundle);
+            seedPriceCache(bundle);
             log.info(
                     "Seeded dev analytics data for {} symbols",
                     bundle.priceSeriesBySymbol().size());
@@ -394,15 +400,67 @@ public class DevDataSeeder implements ApplicationRunner {
     private void seedOhlcvData(SeedBundle bundle) {
         int count = 0;
         for (Map.Entry<String, String> entry : bundle.displayNamesBySymbol().entrySet()) {
-            if (count >= OHLCV_SYMBOL_LIMIT) {
-                break;
-            }
             String symbol = entry.getKey();
             List<OhlcvRecord> records = buildOhlcvSeries(symbol);
             ohlcvRepository.saveAll(records);
             count++;
         }
         log.info("Seeded OHLCV data for {} symbols ({} days each)", count, OHLCV_LOOKBACK_DAYS);
+    }
+
+    private void seedPriceCache(SeedBundle bundle) {
+        Map<String, Double> cache = finnhubPriceEvaluator.getLastPriceCache();
+        for (Map.Entry<String, List<DailyPrice>> entry : bundle.priceSeriesBySymbol().entrySet()) {
+            List<DailyPrice> series = entry.getValue();
+            if (!series.isEmpty()) {
+                cache.put(entry.getKey(), series.getLast().getPrice());
+            }
+        }
+
+        // Set one stock's cached price to a pullback level (below EMA 9/21, above EMA 50)
+        // so the pullback buy alert can fire in dev mode
+        seedPullbackPrice(bundle, cache);
+
+        log.info("Seeded price cache for {} symbols", cache.size());
+    }
+
+    private void seedPullbackPrice(SeedBundle bundle, Map<String, Double> cache) {
+        for (StockSymbol stock : symbolRegistry.getStocks()) {
+            if (!bundle.displayNamesBySymbol().containsKey(stock.getTicker())) {
+                continue;
+            }
+
+            // Use the OHLCV series (400 days) — same data that EmaService.analyze() will read
+            List<OhlcvRecord> ohlcvRecords = buildOhlcvSeries(stock.getTicker());
+            if (ohlcvRecords.size() < 200) {
+                continue;
+            }
+
+            List<Double> prices = ohlcvRecords.stream().map(OhlcvRecord::close).toList();
+            double ema9 = StatisticsUtil.calculateEma(prices, 9);
+            double ema21 = StatisticsUtil.calculateEma(prices, 21);
+            double ema50 = StatisticsUtil.calculateEma(prices, 50);
+            double ema100 = StatisticsUtil.calculateEma(prices, 100);
+            double ema200 = StatisticsUtil.calculateEma(prices, 200);
+
+            if (ema50 < ema21 && ema100 < ema50 && ema200 < ema100) {
+                // Place price between EMA 21 and EMA 50 — below short-term, above long-term
+                double pullbackPrice = StatisticsUtil.roundTo2Decimals((ema21 + ema50) / 2.0);
+                cache.put(stock.getTicker(), pullbackPrice);
+                log.info(
+                        "Seeded pullback price for {}: ${} (ema9={}, ema21={}, ema50={}, ema100={},"
+                                + " ema200={})",
+                        stock.getTicker(),
+                        pullbackPrice,
+                        StatisticsUtil.roundTo2Decimals(ema9),
+                        StatisticsUtil.roundTo2Decimals(ema21),
+                        StatisticsUtil.roundTo2Decimals(ema50),
+                        StatisticsUtil.roundTo2Decimals(ema100),
+                        StatisticsUtil.roundTo2Decimals(ema200));
+                return;
+            }
+        }
+        log.info("No stock with a valid pullback pattern found for seeding");
     }
 
     private List<OhlcvRecord> buildOhlcvSeries(String symbol) {

@@ -30,6 +30,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`EmaTracker`:** Orchestrates daily EMA report across all tracked stocks via `SymbolRegistry.getAll()`.
 -   **`VfiService`:** Calculates Volume Flow Indicator from OHLCV data (130-day lookback, 5-period signal line EMA). Returns `Optional<VfiAnalysis>`.
 -   **`VfiTracker`:** Orchestrates daily RS+VFI combined report. Iterates `SymbolRegistry.getAll()`, classifies each symbol as GREEN (RS↑ + VFI↑), YELLOW (mixed), or RED (RS↓ + VFI↓) via `CombinedSignalType`. Sends via `TelegramGateway.sendMessage()` at 9:00 CET pre-market.
+-   **`PullbackBuyTracker`:** Real-time EMA pullback buy alerts. Runs every 5 min during market hours (inside `stockMarketMonitoring`). Detects stocks below EMA 9/21 but above EMA 50/100/200, with positive RS and VFI. Reads live prices from `FinnhubPriceEvaluator.lastPriceCache` (no separate API calls). Per-stock Telegram alerts with 8-hour cooldown via `IgnoreReason.PULLBACK_BUY_ALERT`.
 -   **`OhlcvFetcher`:** Fetches daily OHLCV data from Twelve Data for all tracked symbols (ETFs + stocks via `SymbolRegistry.getAll()`). Backfill: 400 data points. Refresh: 5 data points. 8-second delay between requests.
 -   **`TelegramClient` / `LocalTelegramGateway` / `TelegramMessageProcessor`:** Telegram integration is profile-aware. All sending components inject `TelegramGateway` interface.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern.
@@ -62,13 +63,15 @@ The application follows a modular, component-based architecture built on the Spr
 -   **Strategy Pattern**: Different `PriceEvaluator` implementations for different data sources.
 -   **Facade Pattern**: `TelegramClient` simplifies Telegram Bot API interaction.
 -   **Data Source Fallback**: `DailyPriceProvider` tries OHLCV first, falls back to Finnhub.
--   **Phased Smoke Test**: `DevJobController.runAll()` executes 13 jobs in 4 dependency-ordered phases (seed → OHLCV fetch → parallel independents → VFI). Returns aggregate pass/fail with per-job results. `RootErrorHandler.runWithStatus()` provides boolean success/failure without propagating exceptions.
+-   **Per-Reason TTL**: `IgnoreReason` enum carries `ttlSeconds` per value. `TargetPriceProvider.isSymbolIgnored()` uses `reason.getTtlSeconds()` instead of a global constant. Existing alerts use 12h, pullback uses 8h.
+-   **Finnhub as Data Ingestion Layer**: `FinnhubPriceEvaluator` fetches live prices and populates `lastPriceCache`. All downstream indicators/trackers read from the cache or SQLite — never make their own Finnhub API calls.
+-   **Phased Smoke Test**: `DevJobController.runAll()` executes 14 jobs in 4 dependency-ordered phases (seed → OHLCV fetch → parallel independents → VFI). Returns aggregate pass/fail with per-job results. `RootErrorHandler.runWithStatus()` provides boolean success/failure without propagating exceptions.
 
 ## Scheduled Tasks
 
 | Task | Schedule | Zone | Description |
 |------|----------|------|-------------|
-| `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock prices + RS alerts + ROC alerts |
+| `stockMarketMonitoring` | Every 5 min (9:30-16:00, Mon-Fri) | America/New_York | Stock prices + RS alerts + ROC alerts + pullback buy alerts |
 | `hourlySignalMonitoring` | Every 60 min (9:30-16:00, Mon-Fri) | America/New_York | BB + RSI reports (delete previous, send new) |
 | `cryptoMarketMonitoring` | Every 7 min | UTC | 24/7 crypto monitoring |
 | `rsiStockMonitoring` | Daily 23:00 (Mon-Fri) | CET | Stock RSI + RS analysis |
@@ -106,6 +109,8 @@ Scheduler
 ├── EmaTracker → EmaService + SymbolRegistry
 ├── VfiTracker → VfiService + RelativeStrengthService + SymbolRegistry
 │   └── CombinedSignalType: GREEN/YELLOW/RED classification
+├── PullbackBuyTracker → EmaService + RelativeStrengthService + VfiService + FinnhubPriceEvaluator (cache) + SymbolRegistry
+│   └── Per-stock alerts with 8h cooldown via IgnoreReason.PULLBACK_BUY_ALERT
 ├── OhlcvFetcher → TwelveDataClient + SymbolRegistry
 ├── StatisticsUtil (shared math: mean, stddev, EMA, ROC, zScore)
 ├── InsiderTracker → InsiderPersistence
