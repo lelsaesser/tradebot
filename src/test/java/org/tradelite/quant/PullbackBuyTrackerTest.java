@@ -28,6 +28,7 @@ import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
+@SuppressWarnings("SameParameterValue")
 @ExtendWith(MockitoExtension.class)
 class PullbackBuyTrackerTest {
 
