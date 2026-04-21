@@ -61,7 +61,7 @@ This document covers the technologies used, development setup, technical constra
 | `config/target-prices-coins.json` | JSON | Crypto buy/sell targets |
 | `config/sector-performance.json` | JSON | Sector performance history |
 | `config/insider-transactions.json` | JSON | Insider trading data |
-| `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT) |
+| `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT) |
 | `config/finnhub-monthly-requests.txt` | Text | Finnhub API metering |
 | `config/coingecko-monthly-requests.txt` | Text | CoinGecko API metering |
 | `config/twelvedata-monthly-requests.txt` | Text | Twelve Data API metering |
@@ -103,7 +103,8 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/seed-analytics` | Reseed all dev data from scratch |
 | `/dev/jobs/ohlcv-fetch` | OHLCV data fetch from Twelve Data |
 | `/dev/jobs/vfi-report` | VFI + RS combined report |
-| `/dev/jobs/run-all` | Phased smoke test (runs all 13 jobs) |
+| `/dev/jobs/pullback-buy-alert` | EMA pullback buy alert scan |
+| `/dev/jobs/run-all` | Phased smoke test (runs all 14 jobs) |
 
 ### Bruno API Collection
 
@@ -127,7 +128,7 @@ Bash script that validates all system components work together before deployment
 |-------|------|---------|
 | 1 | `seed-analytics` | Reseed dev database (clean slate) |
 | 2 | `ohlcv-fetch` (3 symbols only) | Minimal OHLCV data for VFI dependency |
-| 3 | 10 jobs in parallel: stock-monitoring, hourly-signals, crypto-monitoring, rs-monitoring, insider-report, sector-rotation, sector-rs-summary, tail-risk, ema-report, monthly-api-usage | All independent jobs |
+| 3 | 10 jobs in parallel: stock-monitoring, hourly-signals, crypto-monitoring, rs-monitoring, insider-report, sector-rotation, sector-rs-summary, tail-risk, ema-report, monthly-api-usage, pullback-buy-alert | All independent jobs |
 | 4 | `vfi-report` | Depends on OHLCV data from Phase 2 |
 
 **Response format:**
@@ -202,7 +203,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** 923
+- **Total Tests:** 926
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes
