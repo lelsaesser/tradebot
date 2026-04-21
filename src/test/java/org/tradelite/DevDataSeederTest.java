@@ -31,6 +31,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.service.RelativeStrengthService;
@@ -41,11 +42,15 @@ class DevDataSeederTest {
     @TempDir Path tempDir;
 
     private ObjectMapper objectMapper;
+    private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
     @BeforeEach
     void setUpObjectMapper() {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
+        finnhubPriceEvaluator = mock(FinnhubPriceEvaluator.class);
+        when(finnhubPriceEvaluator.getLastPriceCache())
+                .thenReturn(new java.util.concurrent.ConcurrentHashMap<>());
     }
 
     @Test
@@ -84,6 +89,7 @@ class DevDataSeederTest {
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
+                        finnhubPriceEvaluator,
                         tempDir.resolve("rs-data.json"));
 
         seeder.reseed();
@@ -130,6 +136,7 @@ class DevDataSeederTest {
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
+                        finnhubPriceEvaluator,
                         tempDir.resolve("rs-data.json"));
 
         assertThat(seeder.seedIfMissing(), is(false));
@@ -192,6 +199,7 @@ class DevDataSeederTest {
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
+                        finnhubPriceEvaluator,
                         tempDir.resolve("rs-fallback.json"));
 
         seeder.reseed();
@@ -226,6 +234,7 @@ class DevDataSeederTest {
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
+                        finnhubPriceEvaluator,
                         tempDir.resolve("rs-error.json"));
 
         IllegalStateException exception =
@@ -263,6 +272,7 @@ class DevDataSeederTest {
                 targetPriceProvider,
                 symbolRegistry,
                 ohlcvRepository,
+                finnhubPriceEvaluator,
                 rsPath);
     }
 

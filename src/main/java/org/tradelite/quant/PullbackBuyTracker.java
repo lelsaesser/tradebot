@@ -59,27 +59,56 @@ public class PullbackBuyTracker {
             if (Double.isNaN(ema.ema50())
                     || Double.isNaN(ema.ema100())
                     || Double.isNaN(ema.ema200())) {
+                log.info(
+                        "Skipping {} — insufficient EMA data (ema50={}, ema100={}, ema200={})",
+                        stock.getTicker(),
+                        ema.ema50(),
+                        ema.ema100(),
+                        ema.ema200());
                 continue;
             }
 
             Double livePrice = priceCache.get(stock.getTicker());
             if (livePrice == null) {
+                log.info("Skipping {} — no cached price", stock.getTicker());
                 continue;
             }
 
             if (!isPullbackPattern(livePrice, ema)) {
+                log.info(
+                        "Skipping {} — no pullback pattern (price={}, ema9={}, ema21={}, ema50={},"
+                                + " ema100={}, ema200={})",
+                        stock.getTicker(),
+                        livePrice,
+                        ema.ema9(),
+                        ema.ema21(),
+                        ema.ema50(),
+                        ema.ema100(),
+                        ema.ema200());
                 continue;
             }
 
             Optional<RsResult> rsOpt =
                     relativeStrengthService.getCurrentRsResult(stock.getTicker());
             if (rsOpt.isEmpty() || rsOpt.get().rs() <= rsOpt.get().ema()) {
+                log.info(
+                        "Skipping {} — RS not positive (present={}, rs={}, ema={})",
+                        stock.getTicker(),
+                        rsOpt.isPresent(),
+                        rsOpt.map(RsResult::rs).orElse(0.0),
+                        rsOpt.map(RsResult::ema).orElse(0.0));
                 continue;
             }
 
             Optional<VfiAnalysis> vfiOpt =
                     vfiService.analyze(stock.getTicker(), stock.getCompanyName());
             if (vfiOpt.isEmpty() || !vfiOpt.get().isVfiPositive()) {
+                log.info(
+                        "Skipping {} — VFI not positive (present={}, vfi={}, signal={})",
+                        stock.getTicker(),
+                        vfiOpt.isPresent(),
+                        vfiOpt.map(VfiAnalysis::vfiValue).orElse(0.0),
+                        vfiOpt.map(VfiAnalysis::signalLineValue).orElse(0.0));
                 continue;
             }
 
