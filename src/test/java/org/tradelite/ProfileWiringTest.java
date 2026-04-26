@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestTemplate;
+import org.sqlite.SQLiteDataSource;
 import org.tradelite.client.telegram.LocalTelegramGateway;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.client.telegram.TelegramGateway;
@@ -92,8 +94,46 @@ class ProfileWiringTest {
     static class DevSeederTestConfig {
 
         @Bean
-        JdbcTemplate jdbcTemplate() {
-            return mock(JdbcTemplate.class);
+        DataSource dataSource() {
+            SQLiteDataSource ds = new SQLiteDataSource();
+            ds.setUrl("jdbc:sqlite:file::memory:?cache=shared");
+            return ds;
+        }
+
+        @Bean
+        JdbcTemplate jdbcTemplate(DataSource dataSource) {
+            JdbcTemplate jt = new JdbcTemplate(dataSource);
+            jt.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        symbol TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        current_price REAL NOT NULL,
+                        daily_open REAL, daily_high REAL, daily_low REAL,
+                        change_amount REAL, change_percent REAL, previous_close REAL,
+                        UNIQUE(symbol, timestamp)
+                    )
+                    """);
+            jt.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS momentum_roc_state (
+                        symbol TEXT PRIMARY KEY,
+                        previous_roc10 REAL NOT NULL,
+                        previous_roc20 REAL NOT NULL,
+                        initialized INTEGER NOT NULL DEFAULT 0,
+                        updated_at INTEGER NOT NULL
+                    )
+                    """);
+            jt.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS twelvedata_daily_ohlcv (
+                        symbol TEXT NOT NULL, date TEXT NOT NULL,
+                        open REAL, high REAL, low REAL, close REAL, volume INTEGER,
+                        UNIQUE(symbol, date)
+                    )
+                    """);
+            return jt;
         }
 
         @Bean
