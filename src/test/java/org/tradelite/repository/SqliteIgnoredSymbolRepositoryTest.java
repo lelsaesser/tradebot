@@ -15,7 +15,6 @@ import org.tradelite.repository.SqliteIgnoredSymbolRepository.IgnoredSymbolRow;
 @JdbcTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Sql("classpath:schema.sql")
-@SuppressWarnings("ResultOfMethodCallIgnored")
 class SqliteIgnoredSymbolRepositoryTest {
 
     @Autowired private JdbcTemplate jdbcTemplate;

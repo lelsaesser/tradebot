@@ -53,7 +53,7 @@ class DevDataSeederTest {
     }
 
     @Test
-    void reseed_populatesSqliteAndIndicatorState() throws Exception {
+    void reseed_populatesSqliteAndIndicatorState() {
         SQLiteDataSource dataSource = createDataSource("tradebot-dev.db");
         JdbcTemplate jdbcTemplate = createJdbcTemplateWithSchema(dataSource);
         PriceQuoteRepository priceQuoteRepository = mock(PriceQuoteRepository.class);

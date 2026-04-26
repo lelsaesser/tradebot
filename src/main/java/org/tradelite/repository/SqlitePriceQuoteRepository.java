@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -72,7 +73,8 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 sql,
                 new BatchPreparedStatementSetter() {
                     @Override
-                    public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    public void setValues(@NonNull PreparedStatement ps, int i)
+                            throws SQLException {
                         PriceQuoteResponse pq = priceQuotes.get(i);
                         ps.setString(1, pq.getStockSymbol().getTicker());
                         ps.setLong(2, pq.getTimestamp());
@@ -189,7 +191,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
 
         return jdbcTemplate.query(
                 sql,
-                (rs, rowNum) -> {
+                (rs, _) -> {
                     DailyPrice dailyPrice = new DailyPrice();
                     dailyPrice.setDate(LocalDate.parse(rs.getString("price_date")));
                     dailyPrice.setPrice(rs.getDouble("current_price"));
@@ -216,6 +218,6 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 """;
 
         return jdbcTemplate.query(
-                sql, (rs, rowNum) -> rs.getDouble("change_percent"), symbol, startTimestamp);
+                sql, (rs, _) -> rs.getDouble("change_percent"), symbol, startTimestamp);
     }
 }

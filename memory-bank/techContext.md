@@ -4,31 +4,33 @@ This document covers the technologies used, development setup, technical constra
 
 ## Technologies
 - **Language:** Java 23
-- **Framework:** Spring Boot 3.5.7
+- **Framework:** Spring Boot 4.0.6
 - **Build Tool:** Maven 
-- **Database:** SQLite (embedded)
+- **Database:** SQLite (embedded, via JdbcTemplate)
 
 ## Dependencies
 - **Spring Boot Starters:** 
   - `spring-boot-starter`: Core Spring Boot functionality
   - `spring-boot-starter-web`: Web application support with embedded Tomcat
   - `spring-boot-starter-validation`: Bean validation with Hibernate validator
+  - `spring-boot-starter-jdbc`: JdbcTemplate + HikariCP connection pool + schema.sql auto-init
   - `spring-boot-starter-test`: Testing support (test scope)
+  - `spring-boot-starter-jdbc-test`: @JdbcTest slice test support (test scope)
 - **Lombok 1.18.34:** Reduces boilerplate code with annotations like `@Slf4j`, `@RequiredArgsConstructor`, `@Getter`, etc.
 - **Jackson:** JSON serialization/deserialization with JSR-310 (Java Time) datatype support
-- **JSoup 1.22.1:** HTML parsing library for web scraping (FinViz sector data)
-- **SQLite JDBC 3.49.0.0:** Embedded SQLite database driver for historical price storage
+- **JSoup 1.22.2:** HTML parsing library for web scraping (FinViz sector data)
+- **SQLite JDBC 3.53.0.0:** Embedded SQLite database driver for historical price storage
 - **Testing:** 
-  - JUnit Jupiter 6.0.1
-  - Mockito 5.20.0 (core and junit-jupiter integration)
+  - JUnit Jupiter 6.0.3
+  - Mockito 5.23.0 (core and junit-jupiter integration)
   - Hamcrest 3.0
   - Spring Boot Test support
 
 ## Build Configuration
-- **Compiler:** `maven-compiler-plugin` 3.14.1 configured for Java 23 with Lombok annotation processing
+- **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 23 with Lombok annotation processing
 - **Packaging:** `spring-boot-maven-plugin` for creating executable JARs
 - **Code Coverage:** `jacoco-maven-plugin` 0.8.14 enforces 97% instruction coverage ratio
-- **Code Formatting:** `spotless-maven-plugin` 3.0.0 with Google Java Format 1.30.0 (AOSP style)
+- **Code Formatting:** `spotless-maven-plugin` 3.4.0 with Google Java Format 1.30.0 (AOSP style)
 
 ## External Data Sources
 
@@ -51,6 +53,9 @@ This document covers the technologies used, development setup, technical constra
 | `finnhub_price_quotes` | `SqlitePriceQuoteRepository` | Historical Finnhub price quotes |
 | `momentum_roc_state` | `SqliteMomentumRocRepository` | Momentum ROC state |
 | `twelvedata_daily_ohlcv` | `SqliteOhlcvRepository` | Twelve Data daily OHLCV (400 data points) |
+| `ignored_symbols` | `SqliteIgnoredSymbolRepository` | Per-symbol alert suppression with reason and TTL |
+
+All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centralized in `src/main/resources/schema.sql` and auto-initialized via `spring.sql.init.mode=always`. DataSource is auto-configured via `application.yaml` (`spring.datasource.*`) with HikariCP connection pool (max pool size 1 for SQLite single-writer). `DatabaseDirectoryInitializer` ensures the DB parent directory exists at startup.
 
 ## Configuration Files
 
@@ -166,6 +171,10 @@ src/main/java/org/tradelite/
 │   ├── FeatureToggle.java       # Feature toggle enum
 │   └── ...
 ├── config/                      # Spring configuration
+│   ├── BeanConfig.java          # RestTemplate + ObjectMapper beans
+│   ├── DatabaseDirectoryInitializer.java  # @PostConstruct DB dir creation
+│   ├── TradebotApiProperties.java
+│   └── TradebotTelegramProperties.java
 ├── core/                        # Business logic
 │   ├── *PriceEvaluator.java     # Price evaluation
 │   ├── InsiderTracker.java      # Insider monitoring
@@ -203,14 +212,15 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** 926
+- **Total Tests:** ~915
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes
 - **Mocking:** External dependencies mocked with Mockito
 - **Argument Captors:** For verifying complex method arguments
 - **Temp Files:** `@TempDir` for file persistence tests
-- **In-Memory SQLite:** Unique temp DB files per test
+- **Repository Slice Tests:** `@JdbcTest` + `@AutoConfigureTestDatabase(replace = NONE)` + `@Sql("classpath:schema.sql")` for repository tests with Spring-managed in-memory SQLite. Note: Spring Boot 4 relocated these annotations to `org.springframework.boot.jdbc.test.autoconfigure`.
+- **Plain JUnit + JdbcTemplate:** Tests that construct repositories manually (e.g., `TargetPriceProviderTest`) use file-based temp SQLite DBs with `JdbcTemplate` and manual schema init.
 - **Lenient stubs:** For SymbolRegistry mocks (real ETF constants + specific symbol stubs)
 - **Configurable delays:** `OhlcvFetcher.setRequestDelayMs(0)` in tests to avoid 8s sleeps
 

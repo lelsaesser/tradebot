@@ -53,7 +53,7 @@ public class SqliteMomentumRocRepository implements MomentumRocRepository {
         List<MomentumRocData> results =
                 jdbcTemplate.query(
                         sql,
-                        (rs, rowNum) -> {
+                        (rs, _) -> {
                             MomentumRocData data = new MomentumRocData();
                             data.setPreviousRoc10(rs.getDouble("previous_roc10"));
                             data.setPreviousRoc20(rs.getDouble("previous_roc20"));

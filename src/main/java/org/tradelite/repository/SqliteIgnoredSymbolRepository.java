@@ -39,7 +39,7 @@ public class SqliteIgnoredSymbolRepository {
         List<IgnoredSymbolRow> results =
                 jdbcTemplate.query(
                         sql,
-                        (rs, rowNum) -> {
+                        (rs, _) -> {
                             long ignoredAt = rs.getLong("ignored_at");
                             int threshold = rs.getInt("alert_threshold");
                             Integer alertThreshold = rs.wasNull() ? null : threshold;
