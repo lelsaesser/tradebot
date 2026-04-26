@@ -57,3 +57,19 @@ CREATE TABLE IF NOT EXISTS ignored_symbols (
     alert_threshold INTEGER,
     PRIMARY KEY (symbol, reason)
 );
+
+-- sector_rs_streaks: Consecutive days of outperformance/underperformance vs SPY per sector ETF
+CREATE TABLE IF NOT EXISTS sector_rs_streaks (
+    symbol TEXT PRIMARY KEY,
+    streak_days INTEGER NOT NULL DEFAULT 1,
+    is_outperforming INTEGER NOT NULL,
+    last_updated TEXT NOT NULL
+);
+
+-- insider_transactions: Weekly insider transaction counts per symbol (full replace each week)
+CREATE TABLE IF NOT EXISTS insider_transactions (
+    symbol TEXT NOT NULL,
+    transaction_type TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (symbol, transaction_type)
+);
