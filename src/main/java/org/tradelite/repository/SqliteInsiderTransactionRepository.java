@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -41,7 +42,8 @@ public class SqliteInsiderTransactionRepository implements InsiderTransactionRep
                 sql,
                 new BatchPreparedStatementSetter() {
                     @Override
-                    public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    public void setValues(@NonNull PreparedStatement ps, int i)
+                            throws SQLException {
                         InsiderTransactionRow row = rows.get(i);
                         ps.setString(1, row.symbol());
                         ps.setString(2, row.transactionType());
