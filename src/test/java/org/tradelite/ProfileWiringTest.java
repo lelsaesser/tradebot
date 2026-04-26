@@ -12,7 +12,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.web.client.RestTemplate;
+import org.sqlite.SQLiteDataSource;
 import org.tradelite.client.telegram.LocalTelegramGateway;
 import org.tradelite.client.telegram.TelegramClient;
 import org.tradelite.client.telegram.TelegramGateway;
@@ -22,6 +26,7 @@ import org.tradelite.config.TradebotTelegramProperties;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
+import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 
@@ -92,7 +97,15 @@ class ProfileWiringTest {
 
         @Bean
         DataSource dataSource() {
-            return mock(DataSource.class);
+            SQLiteDataSource ds = new SQLiteDataSource();
+            ds.setUrl("jdbc:sqlite:file::memory:?cache=shared");
+            new ResourceDatabasePopulator(new ClassPathResource("schema.sql")).execute(ds);
+            return ds;
+        }
+
+        @Bean
+        JdbcTemplate jdbcTemplate(DataSource dataSource) {
+            return new JdbcTemplate(dataSource);
         }
 
         @Bean
@@ -103,6 +116,11 @@ class ProfileWiringTest {
         @Bean
         MomentumRocRepository momentumRocRepository() {
             return mock(MomentumRocRepository.class);
+        }
+
+        @Bean
+        PriceQuoteRepository priceQuoteRepository() {
+            return mock(PriceQuoteRepository.class);
         }
 
         @Bean

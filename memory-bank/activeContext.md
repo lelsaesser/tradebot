@@ -2,28 +2,24 @@
 
 ## Current Work Focus
 
-### EMA Pullback Buy Alert (#307) (April 21, 2026) — IN PROGRESS
-Implementing real-time EMA pullback buy alerts. Sends Telegram alerts when a stock pulls back below EMA 9/21 but stays above EMA 50/100/200, with positive RS vs SPY and VFI confirmation.
+### JdbcTemplate Migration (#314) (April 26, 2026) — COMPLETE
+Migrated all 4 SQLite repository implementations and DevDataSeeder from raw JDBC to Spring's JdbcTemplate. Evaluated ORM options in #305 — concluded that Hibernate/JPA and lighter ORMs (jOOQ, MyBatis, JDBI, Spring Data JDBC) are all poor fits for this project (no entity relationships, SQLite-specific SQL, only 4 tables). JdbcTemplate is the right middle ground.
 
-**New Files:**
-- `quant/PullbackBuyTracker.java` — detects pullback patterns, sends per-stock alerts via TelegramGateway
-- `quant/PullbackBuyTrackerTest.java` — 22 tests
+**Key Changes:**
+- Added `spring-boot-starter-jdbc` (HikariCP + JdbcTemplate + schema.sql auto-init)
+- Added `spring-boot-starter-jdbc-test` (test scope, provides `@JdbcTest` for Spring Boot 4)
+- Centralized all DDL into `src/main/resources/schema.sql` (4 tables, 6 indexes)
+- Created `DatabaseDirectoryInitializer` (@PostConstruct for DB dir creation)
+- DataSource auto-configured via `spring.datasource.*` properties with HikariCP (pool size 1)
+- Removed manual `DataSource` bean from `BeanConfig`
+- All 4 repositories rewritten: constructor takes `JdbcTemplate`, no `initializeSchema()`
+- Added `PriceQuoteRepository.saveAll()` batch method + `PriceQuoteResponse.timestamp` field
+- DevDataSeeder: routes inserts through `PriceQuoteRepository`, uses `JdbcTemplate` for queries
+- Repository tests: `@JdbcTest` slice tests with `@AutoConfigureTestDatabase(replace = NONE)`
+- Dropped 12 error-path tests (tested raw JDBC exception wrapping, no longer applicable)
+- Spring `DataAccessException` propagates naturally (no manual `IllegalStateException` wrapping)
 
-**Modified Files:**
-- `core/IgnoreReason.java` — added `ttlSeconds` field for per-reason TTL, new `PULLBACK_BUY_ALERT` value (8h cooldown)
-- `common/TargetPriceProvider.java` — `isSymbolIgnored()` uses `reason.getTtlSeconds()` instead of global constant
-- `common/FeatureToggle.java` — added `PULLBACK_BUY_ALERT`
-- `config/feature-toggles.json` — added `pullbackBuyAlert: true`
-- `Scheduler.java` — PullbackBuyTracker injected, runs after `evaluatePrice()` in `stockMarketMonitoring()`, manual method added
-- `DevJobController.java` — `POST /dev/jobs/pullback-buy-alert` endpoint, added to `runAll()` Phase 3
-- `DevDataSeeder.java` — seeds OHLCV for all bundle symbols (not just first 10), seeds price cache from last closing price, crafts a pullback price for first qualifying stock using OHLCV-based EMAs, injected `FinnhubPriceEvaluator` for cache access
+**Build:** All tests pass, 97% coverage maintained, spotless clean.
 
-**Key Design Decisions:**
-- **No separate Finnhub API calls** — reuses `FinnhubPriceEvaluator.lastPriceCache` (populated every 5 min). Principle: Finnhub is the data ingestion layer, all indicators consume from cache/SQLite.
-- **Strict EMA conditions** — ALL of EMA 50/100/200 must be above price. Highest quality setups only.
-- **8-hour cooldown** — effectively once per trading day (6.5h session), allows re-alert next morning if pullback persists.
-- **Per-reason TTL** — `IgnoreReason` enum now has `ttlSeconds` field. Existing reasons keep 12h, pullback gets 8h.
-- **One message per stock, no emoji:** `Potential buy for Broadcom (AVGO) at $178.50. 21 EMA pullback while volume and relative strength stay bullish`
-- **Static wording** — always "21 EMA pullback" regardless of actual pullback depth.
-
-**Status:** Feature code complete, tests passing (926 total), debugging dev seeder to produce a visible alert in dev mode. The dev seeder race condition (scheduler fires before seeding completes) is a pre-existing issue, not introduced by this feature.
+### EMA Pullback Buy Alert (#307) (April 21, 2026) — COMPLETE
+Real-time EMA pullback buy alerts. Sends Telegram alerts when a stock pulls back below EMA 9/21 but stays above EMA 50/100/200, with positive RS vs SPY and VFI confirmation.

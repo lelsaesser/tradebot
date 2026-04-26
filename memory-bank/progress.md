@@ -1,8 +1,38 @@
 # Progress Tracking
 
-## Latest Milestone: EMA Pullback Buy Alert (#307) — IN PROGRESS
+## Latest Milestone: JdbcTemplate Migration (#314) — COMPLETE
 
-**Status**: 🔧 **FEATURE CODE COMPLETE, DEV TESTING**
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (April 26, 2026)
+
+#### Purpose
+Migrate repository layer from raw JDBC (DataSource.getConnection / PreparedStatement / ResultSet) to Spring's JdbcTemplate. Eliminates ~76 instances of repetitive connection management boilerplate and prevents future technical debt. Evaluated in #305 — ORM (Hibernate/JPA and alternatives) not appropriate for this project.
+
+#### Key Changes
+- Added `spring-boot-starter-jdbc` + `spring-boot-starter-jdbc-test`
+- Centralized DDL into `src/main/resources/schema.sql` (4 tables, 6 indexes)
+- Created `DatabaseDirectoryInitializer` for DB parent dir creation
+- DataSource auto-configured via `spring.datasource.*` with HikariCP (pool size 1)
+- Removed manual `DataSource` bean from `BeanConfig`
+- All 4 repositories rewritten to use `JdbcTemplate`
+- Added `PriceQuoteRepository.saveAll()` + `PriceQuoteResponse.timestamp` field
+- DevDataSeeder: routes inserts through `PriceQuoteRepository`, uses `JdbcTemplate`
+- Repository tests: `@JdbcTest` slice tests (Spring Boot 4: `org.springframework.boot.jdbc.test.autoconfigure`)
+- Dropped 12 error-path tests (tested framework behavior)
+- Spring `DataAccessException` propagates naturally
+
+#### Tests: ~915 total, all passing
+
+#### Related Issues
+- #305: ORM evaluation (closed — not appropriate for this project)
+- #314: JdbcTemplate migration (this scope)
+
+---
+
+## Previous Milestone: EMA Pullback Buy Alert (#307) ✅ COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
 
 ### Implementation (April 21, 2026)
 
@@ -170,7 +200,7 @@ Follow-up issues (open):
 - DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
 
 ### Data Persistence ✅
-- SQLite: Finnhub price quotes, Twelve Data daily OHLCV (400 data points), momentum ROC state
+- SQLite via JdbcTemplate: Finnhub price quotes, Twelve Data daily OHLCV (400 data points), momentum ROC state, ignored symbols. Schema centralized in `schema.sql`.
 - JSON: target prices, sector performance, insider transactions, RS streaks, RSI data, feature toggles, stock symbols
 - API metering: Finnhub, CoinGecko, Twelve Data
 
@@ -187,7 +217,7 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: 926
+- Total Tests: ~915
 
 ## Future Enhancements
 

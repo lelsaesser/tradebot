@@ -36,7 +36,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern.
 -   **`TargetPriceProvider`:** Manages the watchlist of symbols to be monitored.
 -   **`RootErrorHandler`:** Centralized error handler wrapping all scheduled tasks. `run()` preserves fire-and-log; `runWithStatus()` adds boolean success/failure for dev triggers.
--   **`DevDataSeeder`:** `dev`-only startup seeder that populates SQLite quote history, OHLCV data (400 days), RSI/RS/ROC state.
+-   **`DevDataSeeder`:** `dev`-only startup seeder that populates SQLite quote history (via `PriceQuoteRepository.saveAll()`), OHLCV data (400 days), RSI/RS/ROC state. Uses `JdbcTemplate` for direct table operations (DELETE, COUNT queries).
 -   **`DevJobController`:** `dev`-only manual trigger surface. 14 individual endpoints + 1 composite `run-all` endpoint. Individual endpoints return HTTP 200/500. `run-all` orchestrates 4-phase smoke test execution.
 
 ## External API Clients
@@ -48,14 +48,17 @@ The application follows a modular, component-based architecture built on the Spr
 
 ## Data Persistence Components
 
--   **`SqlitePriceQuoteRepository`:** Historical Finnhub price quotes. Used by TailRiskService (for `findDailyChangePercents()`) and as fallback for DailyPriceProvider.
--   **`SqliteMomentumRocRepository`:** Momentum ROC state (previous ROC values for crossover detection).
--   **`SqliteOhlcvRepository`:** Twelve Data daily OHLCV data in `twelvedata_daily_ohlcv` table. Primary source for DailyPriceProvider and VfiService.
+-   **`SqlitePriceQuoteRepository`:** Historical Finnhub price quotes via `JdbcTemplate`. Used by TailRiskService (for `findDailyChangePercents()`) and as fallback for DailyPriceProvider. Supports batch insert via `saveAll()`.
+-   **`SqliteMomentumRocRepository`:** Momentum ROC state via `JdbcTemplate` (previous ROC values for crossover detection).
+-   **`SqliteOhlcvRepository`:** Twelve Data daily OHLCV data via `JdbcTemplate` in `twelvedata_daily_ohlcv` table. Primary source for DailyPriceProvider and VfiService. Batch insert via `BatchPreparedStatementSetter`.
+-   **`SqliteIgnoredSymbolRepository`:** Per-symbol alert suppression via `JdbcTemplate` with reason codes and optional alert thresholds.
 -   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence and caching.
+-   **`DatabaseDirectoryInitializer`:** `@PostConstruct` component that ensures the SQLite database parent directory exists at startup. Parses `spring.datasource.url` to extract the file path.
+-   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (4 tables, 6 indexes). Auto-executed on startup via `spring.sql.init.mode=always`.
 
 ## Design Patterns
 
--   **Repository Pattern:** Interface-implementation separation. `PriceQuoteRepository`, `OhlcvRepository`, `MomentumRocRepository`.
+-   **Repository Pattern:** Interface-implementation separation. `PriceQuoteRepository`, `OhlcvRepository`, `MomentumRocRepository`. All implementations use Spring's `JdbcTemplate` (not raw JDBC). DataSource auto-configured via `spring.datasource.*` with HikariCP (pool size 1 for SQLite). Spring's `DataAccessException` propagates naturally (no manual `IllegalStateException` wrapping).
 -   **Command Pattern**: Telegram command processing (`/add`, `/remove`, `/rsi`, `/show`, `/set`).
 -   **Dependency Injection**: Constructor injection via `@RequiredArgsConstructor`. All major components injected.
 -   **Profile Gating**: Default = production. `dev` = opt-in local profile.
@@ -138,6 +141,7 @@ Daily reports (VFI, EMA, Tail Risk, BB daily) use regular `sendMessage()` — ea
 - **Mock-based testing**: External dependencies mocked with Mockito
 - **Argument Captors**: For verifying complex method arguments
 - **Temp Files**: `@TempDir` for file persistence tests
-- **In-Memory SQLite**: Unique temp DB files per test with UUID naming
+- **Repository Slice Tests**: `@JdbcTest` + `@AutoConfigureTestDatabase(replace = NONE)` + `@Sql("classpath:schema.sql")`. Spring Boot 4 package: `org.springframework.boot.jdbc.test.autoconfigure`. Uses Spring-managed in-memory SQLite with transactional rollback per test.
+- **Plain JUnit + JdbcTemplate**: Tests constructing repositories directly use file-based temp SQLite DBs with manual schema init via `JdbcTemplate.execute()`.
 - **Configurable File Paths**: Constructor injection for file paths in tests
 - **Lenient stubs**: Used when SymbolRegistry methods return real ETF data via static constants but only specific symbols are relevant to the test

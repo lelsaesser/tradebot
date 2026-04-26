@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository;
@@ -30,7 +31,18 @@ class TargetPriceProviderTest {
         testDbPath = "target/test-target-price-provider-" + UUID.randomUUID() + ".db";
         SQLiteDataSource dataSource = new SQLiteDataSource();
         dataSource.setUrl("jdbc:sqlite:" + testDbPath);
-        SqliteIgnoredSymbolRepository repository = new SqliteIgnoredSymbolRepository(dataSource);
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ignored_symbols (
+                    symbol          TEXT    NOT NULL,
+                    reason          TEXT    NOT NULL,
+                    ignored_at      INTEGER NOT NULL,
+                    alert_threshold INTEGER,
+                    PRIMARY KEY (symbol, reason)
+                )
+                """);
+        SqliteIgnoredSymbolRepository repository = new SqliteIgnoredSymbolRepository(jdbcTemplate);
         targetPriceProvider = new TargetPriceProvider(new ObjectMapper(), repository);
     }
 
