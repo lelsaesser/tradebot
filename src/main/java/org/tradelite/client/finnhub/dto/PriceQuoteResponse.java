@@ -11,6 +11,8 @@ public class PriceQuoteResponse {
 
     StockSymbol stockSymbol;
 
+    long timestamp;
+
     @JsonProperty("c")
     double currentPrice;
 

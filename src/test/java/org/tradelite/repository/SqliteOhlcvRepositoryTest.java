@@ -4,32 +4,30 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.sqlite.SQLiteDataSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
 import org.tradelite.common.OhlcvRecord;
 
+@JdbcTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Sql("classpath:schema.sql")
 class SqliteOhlcvRepositoryTest {
+
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private SqliteOhlcvRepository repository;
 
     @BeforeEach
     void setUp() {
-        String testDbPath = "target/test-ohlcv-" + UUID.randomUUID() + ".db";
-        SQLiteDataSource dataSource = new SQLiteDataSource();
-        dataSource.setUrl("jdbc:sqlite:" + testDbPath);
-        repository = new SqliteOhlcvRepository(dataSource);
+        repository = new SqliteOhlcvRepository(jdbcTemplate);
     }
 
     @Test
@@ -191,55 +189,6 @@ class SqliteOhlcvRepositoryTest {
     }
 
     @Test
-    void constructor_failedSchemaInit_throwsException() throws SQLException {
-        DataSource mockDataSource = mock(DataSource.class);
-        Connection mockConnection = mock(Connection.class);
-        when(mockDataSource.getConnection()).thenReturn(mockConnection);
-        when(mockConnection.createStatement()).thenThrow(new SQLException("Schema init failed"));
-
-        assertThrows(IllegalStateException.class, () -> new SqliteOhlcvRepository(mockDataSource));
-    }
-
-    @Test
-    void saveAll_sqlException_throwsIllegalState() throws SQLException {
-        DataSource mockDataSource = mock(DataSource.class);
-        Connection mockConnection = mock(Connection.class);
-
-        // First call for schema init succeeds
-        when(mockDataSource.getConnection()).thenReturn(mockConnection);
-        when(mockConnection.createStatement())
-                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
-
-        SqliteOhlcvRepository repoWithMock = new SqliteOhlcvRepository(mockDataSource);
-
-        // Second call for save fails
-        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
-
-        List<OhlcvRecord> records =
-                List.of(createRecord("AAPL", LocalDate.of(2026, 4, 10), 170.0, 174.0));
-
-        assertThrows(IllegalStateException.class, () -> repoWithMock.saveAll(records));
-    }
-
-    @Test
-    void findBySymbol_sqlException_throwsIllegalState() throws SQLException {
-        DataSource mockDataSource = mock(DataSource.class);
-        Connection mockConnection = mock(Connection.class);
-
-        // First call for schema init succeeds
-        when(mockDataSource.getConnection()).thenReturn(mockConnection);
-        when(mockConnection.createStatement())
-                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
-
-        SqliteOhlcvRepository repoWithMock = new SqliteOhlcvRepository(mockDataSource);
-
-        // Second call for findBySymbol fails
-        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
-
-        assertThrows(IllegalStateException.class, () -> repoWithMock.findBySymbol("AAPL", 365));
-    }
-
-    @Test
     void deleteBySymbol_deletesOnlyTargetSymbol() {
         repository.saveAll(
                 List.of(
@@ -259,22 +208,6 @@ class SqliteOhlcvRepositoryTest {
         int deleted = repository.deleteBySymbol("UNKNOWN");
 
         assertThat(deleted, is(0));
-    }
-
-    @Test
-    void deleteBySymbol_sqlException_throwsIllegalState() throws SQLException {
-        DataSource mockDataSource = mock(DataSource.class);
-        Connection mockConnection = mock(Connection.class);
-
-        when(mockDataSource.getConnection()).thenReturn(mockConnection);
-        when(mockConnection.createStatement())
-                .thenReturn(mock(java.sql.Statement.class, RETURNS_DEEP_STUBS));
-
-        SqliteOhlcvRepository repoWithMock = new SqliteOhlcvRepository(mockDataSource);
-
-        when(mockDataSource.getConnection()).thenThrow(new SQLException("Connection failed"));
-
-        assertThrows(IllegalStateException.class, () -> repoWithMock.deleteBySymbol("AAPL"));
     }
 
     private OhlcvRecord createRecord(String symbol, LocalDate date, double open, double close) {

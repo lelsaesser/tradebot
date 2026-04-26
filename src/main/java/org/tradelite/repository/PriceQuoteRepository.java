@@ -10,6 +10,8 @@ public interface PriceQuoteRepository {
 
     void save(PriceQuoteResponse priceQuote);
 
+    void saveAll(List<PriceQuoteResponse> priceQuotes);
+
     List<PriceQuoteEntity> findBySymbol(String symbol);
 
     List<PriceQuoteEntity> findBySymbolAndDate(String symbol, LocalDate date);

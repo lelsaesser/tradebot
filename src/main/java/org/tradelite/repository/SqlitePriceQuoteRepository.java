@@ -1,75 +1,27 @@
 package org.tradelite.repository;
 
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import javax.sql.DataSource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.service.model.DailyPrice;
 
 @Slf4j
 @Repository
+@RequiredArgsConstructor
 public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
 
-    private final DataSource dataSource;
-
-    @Autowired
-    public SqlitePriceQuoteRepository(DataSource dataSource) {
-        this.dataSource = dataSource;
-        initializeSchema();
-    }
-
-    private void initializeSchema() {
-        String createTableSql =
-                """
-                CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    symbol TEXT NOT NULL,
-                    timestamp INTEGER NOT NULL,
-                    current_price REAL NOT NULL,
-                    daily_open REAL,
-                    daily_high REAL,
-                    daily_low REAL,
-                    change_amount REAL,
-                    change_percent REAL,
-                    previous_close REAL,
-                    UNIQUE(symbol, timestamp)
-                )
-                """;
-
-        String createSymbolIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_finnhub_price_quotes_symbol ON finnhub_price_quotes(symbol)";
-
-        String createTimestampIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_finnhub_price_quotes_timestamp ON finnhub_price_quotes(timestamp)";
-
-        String createCompositeIndexSql =
-                "CREATE INDEX IF NOT EXISTS idx_finnhub_price_quotes_symbol_timestamp "
-                        + "ON finnhub_price_quotes(symbol, timestamp)";
-
-        try (Connection conn = dataSource.getConnection();
-                Statement stmt = conn.createStatement()) {
-            stmt.execute(createTableSql);
-            stmt.execute(createSymbolIndexSql);
-            stmt.execute(createTimestampIndexSql);
-            stmt.execute(createCompositeIndexSql);
-            log.info("SQLite finnhub_price_quotes table and indexes initialized successfully");
-        } catch (SQLException e) {
-            log.error("Failed to initialize SQLite schema", e);
-            throw new IllegalStateException("Failed to initialize SQLite schema", e);
-        }
-    }
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public void save(PriceQuoteResponse priceQuote) {
@@ -81,31 +33,64 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
 
-        long timestamp = Instant.now().getEpochSecond();
+        long timestamp =
+                priceQuote.getTimestamp() > 0
+                        ? priceQuote.getTimestamp()
+                        : Instant.now().getEpochSecond();
+        jdbcTemplate.update(
+                sql,
+                priceQuote.getStockSymbol().getTicker(),
+                timestamp,
+                priceQuote.getCurrentPrice(),
+                priceQuote.getDailyOpen(),
+                priceQuote.getDailyHigh(),
+                priceQuote.getDailyLow(),
+                priceQuote.getChange(),
+                priceQuote.getChangePercent(),
+                priceQuote.getPreviousClose());
+        log.debug(
+                "Saved price quote for {} at timestamp {}",
+                priceQuote.getStockSymbol().getTicker(),
+                timestamp);
+    }
 
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, priceQuote.getStockSymbol().getTicker());
-            pstmt.setLong(2, timestamp);
-            pstmt.setDouble(3, priceQuote.getCurrentPrice());
-            pstmt.setDouble(4, priceQuote.getDailyOpen());
-            pstmt.setDouble(5, priceQuote.getDailyHigh());
-            pstmt.setDouble(6, priceQuote.getDailyLow());
-            pstmt.setDouble(7, priceQuote.getChange());
-            pstmt.setDouble(8, priceQuote.getChangePercent());
-            pstmt.setDouble(9, priceQuote.getPreviousClose());
-            pstmt.executeUpdate();
-            log.debug(
-                    "Saved price quote for {} at timestamp {}",
-                    priceQuote.getStockSymbol().getTicker(),
-                    timestamp);
-        } catch (SQLException e) {
-            log.error(
-                    "Failed to save price quote for {}",
-                    priceQuote.getStockSymbol().getTicker(),
-                    e);
-            throw new IllegalStateException("Failed to save price quote", e);
+    @Override
+    public void saveAll(List<PriceQuoteResponse> priceQuotes) {
+        if (priceQuotes.isEmpty()) {
+            return;
         }
+
+        String sql =
+                """
+                INSERT OR REPLACE INTO finnhub_price_quotes
+                (symbol, timestamp, current_price, daily_open, daily_high, daily_low,
+                 change_amount, change_percent, previous_close)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+
+        jdbcTemplate.batchUpdate(
+                sql,
+                new BatchPreparedStatementSetter() {
+                    @Override
+                    public void setValues(PreparedStatement ps, int i) throws SQLException {
+                        PriceQuoteResponse pq = priceQuotes.get(i);
+                        ps.setString(1, pq.getStockSymbol().getTicker());
+                        ps.setLong(2, pq.getTimestamp());
+                        ps.setDouble(3, pq.getCurrentPrice());
+                        ps.setDouble(4, pq.getDailyOpen());
+                        ps.setDouble(5, pq.getDailyHigh());
+                        ps.setDouble(6, pq.getDailyLow());
+                        ps.setDouble(7, pq.getChange());
+                        ps.setDouble(8, pq.getChangePercent());
+                        ps.setDouble(9, pq.getPreviousClose());
+                    }
+
+                    @Override
+                    public int getBatchSize() {
+                        return priceQuotes.size();
+                    }
+                });
+        log.debug("Saved {} price quotes in batch", priceQuotes.size());
     }
 
     @Override
@@ -120,19 +105,9 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 LIMIT 1
                 """;
 
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, symbol);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(mapResultSetToEntity(rs));
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Failed to find latest price quote for symbol {}", symbol, e);
-            throw new IllegalStateException("Failed to find latest price quote", e);
-        }
-        return Optional.empty();
+        List<PriceQuoteEntity> results =
+                jdbcTemplate.query(sql, this::mapResultSetToEntity, symbol);
+        return results.stream().findFirst();
     }
 
     @Override
@@ -146,20 +121,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 ORDER BY timestamp ASC
                 """;
 
-        List<PriceQuoteEntity> results = new ArrayList<>();
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, symbol);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    results.add(mapResultSetToEntity(rs));
-                }
-            }
-        } catch (SQLException e) {
-            log.error("Failed to find price quotes for symbol {}", symbol, e);
-            throw new IllegalStateException("Failed to find price quotes", e);
-        }
-        return results;
+        return jdbcTemplate.query(sql, this::mapResultSetToEntity, symbol);
     }
 
     @Override
@@ -190,30 +152,11 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 ORDER BY timestamp ASC
                 """;
 
-        List<PriceQuoteEntity> results = new ArrayList<>();
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, symbol);
-            pstmt.setLong(2, startTimestamp);
-            pstmt.setLong(3, endTimestamp);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    results.add(mapResultSetToEntity(rs));
-                }
-            }
-        } catch (SQLException e) {
-            log.error(
-                    "Failed to find price quotes for symbol {} in timestamp range [{}, {})",
-                    symbol,
-                    startTimestamp,
-                    endTimestamp,
-                    e);
-            throw new IllegalStateException("Failed to find price quotes", e);
-        }
-        return results;
+        return jdbcTemplate.query(
+                sql, this::mapResultSetToEntity, symbol, startTimestamp, endTimestamp);
     }
 
-    private PriceQuoteEntity mapResultSetToEntity(ResultSet rs) throws SQLException {
+    private PriceQuoteEntity mapResultSetToEntity(ResultSet rs, int rowNum) throws SQLException {
         return PriceQuoteEntity.builder()
                 .id(rs.getLong("id"))
                 .symbol(rs.getString("symbol"))
@@ -230,12 +173,9 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
 
     @Override
     public List<DailyPrice> findDailyClosingPrices(String symbol, int days) {
-        // Calculate the start timestamp (N days ago from now)
         long startTimestamp =
                 LocalDate.now().minusDays(days).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
 
-        // SQL query that groups by date and gets the latest price for each day
-        // Uses date() function to group timestamps by calendar day
         String sql =
                 """
                 SELECT date(timestamp, 'unixepoch', 'localtime') as price_date,
@@ -247,39 +187,23 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 ORDER BY price_date ASC
                 """;
 
-        List<DailyPrice> results = new ArrayList<>();
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, symbol);
-            pstmt.setLong(2, startTimestamp);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    LocalDate date = LocalDate.parse(rs.getString("price_date"));
-                    double price = rs.getDouble("current_price");
+        return jdbcTemplate.query(
+                sql,
+                (rs, rowNum) -> {
                     DailyPrice dailyPrice = new DailyPrice();
-                    dailyPrice.setDate(date);
-                    dailyPrice.setPrice(price);
-                    results.add(dailyPrice);
-                }
-            }
-        } catch (SQLException e) {
-            log.error(
-                    "Failed to find daily closing prices for symbol {} over {} days",
-                    symbol,
-                    days,
-                    e);
-            throw new IllegalStateException("Failed to find daily closing prices", e);
-        }
-        return results;
+                    dailyPrice.setDate(LocalDate.parse(rs.getString("price_date")));
+                    dailyPrice.setPrice(rs.getDouble("current_price"));
+                    return dailyPrice;
+                },
+                symbol,
+                startTimestamp);
     }
 
     @Override
     public List<Double> findDailyChangePercents(String symbol, int days) {
-        // Calculate the start timestamp (N days ago from now)
         long startTimestamp =
                 LocalDate.now().minusDays(days).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
 
-        // SQL query that groups by date and gets the change_percent for the latest record each day
         String sql =
                 """
                 SELECT date(timestamp, 'unixepoch', 'localtime') as price_date,
@@ -291,24 +215,7 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 ORDER BY price_date ASC
                 """;
 
-        List<Double> results = new ArrayList<>();
-        try (Connection conn = dataSource.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, symbol);
-            pstmt.setLong(2, startTimestamp);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    results.add(rs.getDouble("change_percent"));
-                }
-            }
-        } catch (SQLException e) {
-            log.error(
-                    "Failed to find daily change percents for symbol {} over {} days",
-                    symbol,
-                    days,
-                    e);
-            throw new IllegalStateException("Failed to find daily change percents", e);
-        }
-        return results;
+        return jdbcTemplate.query(
+                sql, (rs, rowNum) -> rs.getDouble("change_percent"), symbol, startTimestamp);
     }
 }

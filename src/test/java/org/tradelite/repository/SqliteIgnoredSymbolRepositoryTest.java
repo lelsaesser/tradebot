@@ -2,32 +2,29 @@ package org.tradelite.repository;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.File;
 import java.util.Optional;
-import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.sqlite.SQLiteDataSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository.IgnoredSymbolRow;
 
+@JdbcTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Sql("classpath:schema.sql")
 @SuppressWarnings("ResultOfMethodCallIgnored")
 class SqliteIgnoredSymbolRepositoryTest {
 
+    @Autowired private JdbcTemplate jdbcTemplate;
+
     private SqliteIgnoredSymbolRepository repository;
-    private String testDbPath;
 
     @BeforeEach
     void setUp() {
-        testDbPath = "target/test-ignored-symbols-" + UUID.randomUUID() + ".db";
-        SQLiteDataSource dataSource = new SQLiteDataSource();
-        dataSource.setUrl("jdbc:sqlite:" + testDbPath);
-        repository = new SqliteIgnoredSymbolRepository(dataSource);
-    }
-
-    @AfterEach
-    void tearDown() {
-        new File(testDbPath).delete();
+        repository = new SqliteIgnoredSymbolRepository(jdbcTemplate);
     }
 
     @Test

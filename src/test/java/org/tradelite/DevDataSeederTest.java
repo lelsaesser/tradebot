@@ -1,7 +1,6 @@
 package org.tradelite;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,14 +17,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -34,6 +32,7 @@ import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
+import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.RelativeStrengthData;
 
@@ -55,9 +54,9 @@ class DevDataSeederTest {
 
     @Test
     void reseed_populatesSqliteAndIndicatorState() throws Exception {
-        SQLiteDataSource dataSource = new SQLiteDataSource();
-        Path dbPath = tempDir.resolve("tradebot-dev.db");
-        dataSource.setUrl("jdbc:sqlite:" + dbPath);
+        SQLiteDataSource dataSource = createDataSource("tradebot-dev.db");
+        JdbcTemplate jdbcTemplate = createJdbcTemplateWithSchema(dataSource);
+        PriceQuoteRepository priceQuoteRepository = mock(PriceQuoteRepository.class);
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
@@ -82,9 +81,10 @@ class DevDataSeederTest {
 
         DevDataSeeder seeder =
                 new DevDataSeeder(
-                        dataSource,
+                        jdbcTemplate,
                         objectMapper,
                         momentumRocRepository,
+                        priceQuoteRepository,
                         relativeStrengthService,
                         targetPriceProvider,
                         symbolRegistry,
@@ -99,20 +99,15 @@ class DevDataSeederTest {
 
         verify(momentumRocRepository, atLeastOnce()).save(any(), any());
         verify(ohlcvRepository, atLeastOnce()).saveAll(anyList());
-
-        try (Connection connection = dataSource.getConnection();
-                Statement statement = connection.createStatement();
-                ResultSet resultSet =
-                        statement.executeQuery(
-                                "SELECT COUNT(*) FROM finnhub_price_quotes WHERE symbol = 'SPY'")) {
-            resultSet.next();
-            assertThat(resultSet.getInt(1), greaterThan(0));
-        }
+        verify(priceQuoteRepository, atLeastOnce()).saveAll(anyList());
     }
 
     @Test
     void seedIfMissing_skipsWhenFilesAndBenchmarkDataAlreadyExist() throws Exception {
-        DataSource dataSource = createPreseededDataSource();
+        SQLiteDataSource dataSource = createDataSource("preseeded.db");
+        JdbcTemplate jdbcTemplate = createJdbcTemplateWithSchema(dataSource);
+        preseedBenchmarkData(dataSource);
+        PriceQuoteRepository priceQuoteRepository = mock(PriceQuoteRepository.class);
 
         Files.writeString(tempDir.resolve("rs-data.json"), "{}");
 
@@ -129,9 +124,10 @@ class DevDataSeederTest {
 
         DevDataSeeder seeder =
                 new DevDataSeeder(
-                        dataSource,
+                        jdbcTemplate,
                         objectMapper,
                         momentumRocRepository,
+                        priceQuoteRepository,
                         relativeStrengthService,
                         targetPriceProvider,
                         symbolRegistry,
@@ -165,9 +161,9 @@ class DevDataSeederTest {
 
     @Test
     void reseed_usesStockRegistryFallbackAndLimitsToFiveNonEtfs() {
-        SQLiteDataSource dataSource = new SQLiteDataSource();
-        Path dbPath = tempDir.resolve("fallback.db");
-        dataSource.setUrl("jdbc:sqlite:" + dbPath);
+        SQLiteDataSource dataSource = createDataSource("fallback.db");
+        JdbcTemplate jdbcTemplate = createJdbcTemplateWithSchema(dataSource);
+        PriceQuoteRepository priceQuoteRepository = mock(PriceQuoteRepository.class);
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
@@ -192,9 +188,10 @@ class DevDataSeederTest {
 
         DevDataSeeder seeder =
                 new DevDataSeeder(
-                        dataSource,
+                        jdbcTemplate,
                         objectMapper,
                         momentumRocRepository,
+                        priceQuoteRepository,
                         relativeStrengthService,
                         targetPriceProvider,
                         symbolRegistry,
@@ -209,49 +206,14 @@ class DevDataSeederTest {
         assertThat(rsHistory.containsKey("GOOG"), is(false));
     }
 
-    @Test
-    void reseed_wrapsSqlExceptions() throws Exception {
-        DataSource dataSource = mock(DataSource.class);
-        when(dataSource.getConnection()).thenThrow(new java.sql.SQLException("db down"));
-
-        MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
-        RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
-        TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
-        SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
-        OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
-
-        when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
-        when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
-        when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
-        when(symbolRegistry.getStocks()).thenReturn(List.of());
-
-        DevDataSeeder seeder =
-                new DevDataSeeder(
-                        dataSource,
-                        objectMapper,
-                        momentumRocRepository,
-                        relativeStrengthService,
-                        targetPriceProvider,
-                        symbolRegistry,
-                        ohlcvRepository,
-                        finnhubPriceEvaluator,
-                        tempDir.resolve("rs-error.json"));
-
-        IllegalStateException exception =
-                org.junit.jupiter.api.Assertions.assertThrows(
-                        IllegalStateException.class, seeder::reseed);
-
-        assertThat(exception.getMessage(), is("Failed to seed dev analytics data"));
-    }
-
     private DevDataSeeder createSeederWithEmptySources() {
         return createSeederWithEmptySources(tempDir.resolve("generic-rs.json"));
     }
 
     private DevDataSeeder createSeederWithEmptySources(Path rsPath) {
-        SQLiteDataSource dataSource = new SQLiteDataSource();
-        Path dbPath = tempDir.resolve("generic.db");
-        dataSource.setUrl("jdbc:sqlite:" + dbPath);
+        SQLiteDataSource dataSource = createDataSource("generic.db");
+        JdbcTemplate jdbcTemplate = createJdbcTemplateWithSchema(dataSource);
+        PriceQuoteRepository priceQuoteRepository = mock(PriceQuoteRepository.class);
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
@@ -265,9 +227,10 @@ class DevDataSeederTest {
         when(symbolRegistry.getStocks()).thenReturn(List.of());
 
         return new DevDataSeeder(
-                dataSource,
+                jdbcTemplate,
                 objectMapper,
                 momentumRocRepository,
+                priceQuoteRepository,
                 relativeStrengthService,
                 targetPriceProvider,
                 symbolRegistry,
@@ -276,29 +239,60 @@ class DevDataSeederTest {
                 rsPath);
     }
 
-    private DataSource createPreseededDataSource() throws Exception {
+    private SQLiteDataSource createDataSource(String dbName) {
         SQLiteDataSource dataSource = new SQLiteDataSource();
-        Path dbPath = tempDir.resolve("preseeded.db");
+        Path dbPath = tempDir.resolve(dbName);
         dataSource.setUrl("jdbc:sqlite:" + dbPath);
+        return dataSource;
+    }
 
+    private JdbcTemplate createJdbcTemplateWithSchema(SQLiteDataSource dataSource) {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL,
+                    current_price REAL NOT NULL,
+                    daily_open REAL,
+                    daily_high REAL,
+                    daily_low REAL,
+                    change_amount REAL,
+                    change_percent REAL,
+                    previous_close REAL,
+                    UNIQUE(symbol, timestamp)
+                )
+                """);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS momentum_roc_state (
+                    symbol TEXT PRIMARY KEY,
+                    previous_roc10 REAL NOT NULL,
+                    previous_roc20 REAL NOT NULL,
+                    initialized INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER NOT NULL
+                )
+                """);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS twelvedata_daily_ohlcv (
+                    symbol TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    open REAL,
+                    high REAL,
+                    low REAL,
+                    close REAL,
+                    volume INTEGER,
+                    UNIQUE(symbol, date)
+                )
+                """);
+        return jdbcTemplate;
+    }
+
+    private void preseedBenchmarkData(SQLiteDataSource dataSource) throws Exception {
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        symbol TEXT NOT NULL,
-                        timestamp INTEGER NOT NULL,
-                        current_price REAL NOT NULL,
-                        daily_open REAL,
-                        daily_high REAL,
-                        daily_low REAL,
-                        change_amount REAL,
-                        change_percent REAL,
-                        previous_close REAL,
-                        UNIQUE(symbol, timestamp)
-                    )
-                    """);
             statement.executeUpdate(
                     """
                     INSERT INTO finnhub_price_quotes
@@ -307,7 +301,5 @@ class DevDataSeederTest {
                     VALUES ('SPY', 1, 500.0, 500.0, 501.0, 499.0, 1.0, 0.2, 499.0)
                     """);
         }
-
-        return dataSource;
     }
 }

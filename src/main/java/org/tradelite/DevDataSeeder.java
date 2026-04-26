@@ -4,10 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -15,14 +11,15 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -32,6 +29,7 @@ import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
+import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
@@ -46,14 +44,12 @@ public class DevDataSeeder implements ApplicationRunner {
     private static final int LOOKBACK_DAYS = 90;
     private static final int OHLCV_LOOKBACK_DAYS = 400;
     private static final int SAMPLE_STOCK_LIMIT = 5;
-    private static final String QUOTES_TABLE = "finnhub_price_quotes";
-    private static final String MOMENTUM_TABLE = "momentum_roc_state";
-    private static final String OHLCV_TABLE = "twelvedata_daily_ohlcv";
     private static final LocalTime SEEDED_CLOSE_TIME = LocalTime.of(20, 0);
 
-    private final DataSource dataSource;
+    private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final MomentumRocRepository momentumRocRepository;
+    private final PriceQuoteRepository priceQuoteRepository;
     private final RelativeStrengthService relativeStrengthService;
     private final TargetPriceProvider targetPriceProvider;
     private final SymbolRegistry symbolRegistry;
@@ -63,18 +59,20 @@ public class DevDataSeeder implements ApplicationRunner {
 
     @Autowired
     public DevDataSeeder(
-            DataSource dataSource,
+            JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
             MomentumRocRepository momentumRocRepository,
+            PriceQuoteRepository priceQuoteRepository,
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
             FinnhubPriceEvaluator finnhubPriceEvaluator) {
         this(
-                dataSource,
+                jdbcTemplate,
                 objectMapper,
                 momentumRocRepository,
+                priceQuoteRepository,
                 relativeStrengthService,
                 targetPriceProvider,
                 symbolRegistry,
@@ -84,18 +82,20 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     DevDataSeeder(
-            DataSource dataSource,
+            JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
             MomentumRocRepository momentumRocRepository,
+            PriceQuoteRepository priceQuoteRepository,
             RelativeStrengthService relativeStrengthService,
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             Path rsDataFilePath) {
-        this.dataSource = dataSource;
+        this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.momentumRocRepository = momentumRocRepository;
+        this.priceQuoteRepository = priceQuoteRepository;
         this.relativeStrengthService = relativeStrengthService;
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;
@@ -123,7 +123,6 @@ public class DevDataSeeder implements ApplicationRunner {
         log.info("Seeding dev analytics data");
         SeedBundle bundle = buildSeedBundle();
         try {
-            initializeSchema();
             clearExistingData();
             insertPriceHistory(bundle.priceSeriesBySymbol());
             seedRelativeStrengthHistory(bundle);
@@ -133,7 +132,7 @@ public class DevDataSeeder implements ApplicationRunner {
             log.info(
                     "Seeded dev analytics data for {} symbols",
                     bundle.priceSeriesBySymbol().size());
-        } catch (IOException | SQLException e) {
+        } catch (IOException e) {
             throw new IllegalStateException("Failed to seed dev analytics data", e);
         }
     }
@@ -143,71 +142,23 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private boolean hasPersistedQuotes(String symbol) {
-        String sql =
-                "SELECT COUNT(*) FROM " + QUOTES_TABLE + " WHERE symbol = ? AND current_price > 0";
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, symbol);
-            try (var resultSet = statement.executeQuery()) {
-                return resultSet.next() && resultSet.getInt(1) > 0;
-            }
-        } catch (SQLException _) {
+        try {
+            Integer count =
+                    jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM finnhub_price_quotes"
+                                    + " WHERE symbol = ? AND current_price > 0",
+                            Integer.class,
+                            symbol);
+            return count != null && count > 0;
+        } catch (Exception _) {
             return false;
         }
     }
 
-    private void initializeSchema() throws SQLException {
-        try (Connection connection = dataSource.getConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        symbol TEXT NOT NULL,
-                        timestamp INTEGER NOT NULL,
-                        current_price REAL NOT NULL,
-                        daily_open REAL,
-                        daily_high REAL,
-                        daily_low REAL,
-                        change_amount REAL,
-                        change_percent REAL,
-                        previous_close REAL,
-                        UNIQUE(symbol, timestamp)
-                    )
-                    """);
-            statement.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS momentum_roc_state (
-                        symbol TEXT PRIMARY KEY,
-                        previous_roc10 REAL NOT NULL,
-                        previous_roc20 REAL NOT NULL,
-                        initialized INTEGER NOT NULL DEFAULT 0,
-                        updated_at INTEGER NOT NULL
-                    )
-                    """);
-            statement.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS twelvedata_daily_ohlcv (
-                        symbol TEXT NOT NULL,
-                        date TEXT NOT NULL,
-                        open REAL,
-                        high REAL,
-                        low REAL,
-                        close REAL,
-                        volume INTEGER,
-                        UNIQUE(symbol, date)
-                    )
-                    """);
-        }
-    }
-
-    private void clearExistingData() throws SQLException, IOException {
-        try (Connection connection = dataSource.getConnection();
-                Statement statement = connection.createStatement()) {
-            statement.executeUpdate("DELETE FROM " + QUOTES_TABLE);
-            statement.executeUpdate("DELETE FROM " + MOMENTUM_TABLE);
-            statement.executeUpdate("DELETE FROM " + OHLCV_TABLE);
-        }
+    private void clearExistingData() throws IOException {
+        jdbcTemplate.update("DELETE FROM finnhub_price_quotes");
+        jdbcTemplate.update("DELETE FROM momentum_roc_state");
+        jdbcTemplate.update("DELETE FROM twelvedata_daily_ohlcv");
 
         Files.deleteIfExists(rsDataFilePath);
         relativeStrengthService.getRsHistory().clear();
@@ -282,61 +233,46 @@ public class DevDataSeeder implements ApplicationRunner {
                 .toList();
     }
 
-    private void insertPriceHistory(Map<String, List<DailyPrice>> priceSeriesBySymbol)
-            throws SQLException {
-        String sql =
-                """
-                INSERT OR REPLACE INTO finnhub_price_quotes
-                (symbol, timestamp, current_price, daily_open, daily_high, daily_low,
-                 change_amount, change_percent, previous_close)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """;
+    private void insertPriceHistory(Map<String, List<DailyPrice>> priceSeriesBySymbol) {
+        List<PriceQuoteResponse> allQuotes = new ArrayList<>();
 
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (Map.Entry<String, List<DailyPrice>> entry : priceSeriesBySymbol.entrySet()) {
-                List<DailyPrice> series = entry.getValue();
-                for (int index = 0; index < series.size(); index++) {
-                    DailyPrice current = series.get(index);
-                    double previousClose =
-                            index == 0
-                                    ? StatisticsUtil.roundTo2Decimals(current.getPrice() * 0.99)
-                                    : series.get(index - 1).getPrice();
-                    double open =
-                            StatisticsUtil.roundTo2Decimals(
-                                    (current.getPrice() + previousClose) / 2.0);
-                    double high =
-                            StatisticsUtil.roundTo2Decimals(
-                                    Math.max(open, current.getPrice()) * 1.01);
-                    double low =
-                            StatisticsUtil.roundTo2Decimals(
-                                    Math.min(open, current.getPrice()) * 0.99);
-                    double change =
-                            StatisticsUtil.roundTo2Decimals(current.getPrice() - previousClose);
-                    double changePercent =
-                            previousClose == 0.0
-                                    ? 0.0
-                                    : StatisticsUtil.roundTo2Decimals(
-                                            (change / previousClose) * 100.0);
-                    long timestamp =
-                            current.getDate()
-                                    .atTime(SEEDED_CLOSE_TIME)
-                                    .toEpochSecond(ZoneOffset.UTC);
+        for (Map.Entry<String, List<DailyPrice>> entry : priceSeriesBySymbol.entrySet()) {
+            List<DailyPrice> series = entry.getValue();
+            for (int index = 0; index < series.size(); index++) {
+                DailyPrice current = series.get(index);
+                double previousClose =
+                        index == 0
+                                ? StatisticsUtil.roundTo2Decimals(current.getPrice() * 0.99)
+                                : series.get(index - 1).getPrice();
+                double open =
+                        StatisticsUtil.roundTo2Decimals((current.getPrice() + previousClose) / 2.0);
+                double high =
+                        StatisticsUtil.roundTo2Decimals(Math.max(open, current.getPrice()) * 1.01);
+                double low =
+                        StatisticsUtil.roundTo2Decimals(Math.min(open, current.getPrice()) * 0.99);
+                double change = StatisticsUtil.roundTo2Decimals(current.getPrice() - previousClose);
+                double changePercent =
+                        previousClose == 0.0
+                                ? 0.0
+                                : StatisticsUtil.roundTo2Decimals((change / previousClose) * 100.0);
+                long timestamp =
+                        current.getDate().atTime(SEEDED_CLOSE_TIME).toEpochSecond(ZoneOffset.UTC);
 
-                    statement.setString(1, entry.getKey());
-                    statement.setLong(2, timestamp);
-                    statement.setDouble(3, current.getPrice());
-                    statement.setDouble(4, open);
-                    statement.setDouble(5, high);
-                    statement.setDouble(6, low);
-                    statement.setDouble(7, change);
-                    statement.setDouble(8, changePercent);
-                    statement.setDouble(9, previousClose);
-                    statement.addBatch();
-                }
+                PriceQuoteResponse quote = new PriceQuoteResponse();
+                quote.setStockSymbol(new StockSymbol(entry.getKey(), entry.getKey()));
+                quote.setTimestamp(timestamp);
+                quote.setCurrentPrice(current.getPrice());
+                quote.setDailyOpen(open);
+                quote.setDailyHigh(high);
+                quote.setDailyLow(low);
+                quote.setChange(change);
+                quote.setChangePercent(changePercent);
+                quote.setPreviousClose(previousClose);
+                allQuotes.add(quote);
             }
-            statement.executeBatch();
         }
+
+        priceQuoteRepository.saveAll(allQuotes);
     }
 
     private void seedRelativeStrengthHistory(SeedBundle bundle) throws IOException {

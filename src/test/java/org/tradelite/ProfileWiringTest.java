@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
@@ -12,6 +11,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestTemplate;
 import org.tradelite.client.telegram.LocalTelegramGateway;
 import org.tradelite.client.telegram.TelegramClient;
@@ -22,6 +22,7 @@ import org.tradelite.config.TradebotTelegramProperties;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
+import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 
@@ -91,8 +92,8 @@ class ProfileWiringTest {
     static class DevSeederTestConfig {
 
         @Bean
-        DataSource dataSource() {
-            return mock(DataSource.class);
+        JdbcTemplate jdbcTemplate() {
+            return mock(JdbcTemplate.class);
         }
 
         @Bean
@@ -103,6 +104,11 @@ class ProfileWiringTest {
         @Bean
         MomentumRocRepository momentumRocRepository() {
             return mock(MomentumRocRepository.class);
+        }
+
+        @Bean
+        PriceQuoteRepository priceQuoteRepository() {
+            return mock(PriceQuoteRepository.class);
         }
 
         @Bean

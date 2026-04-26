@@ -2,31 +2,28 @@ package org.tradelite.repository;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.File;
 import java.util.Optional;
-import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.sqlite.SQLiteDataSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
 import org.tradelite.service.model.MomentumRocData;
 
+@JdbcTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Sql("classpath:schema.sql")
 class SqliteMomentumRocRepositoryTest {
 
+    @Autowired private JdbcTemplate jdbcTemplate;
+
     private SqliteMomentumRocRepository repository;
-    private String testDbPath;
 
     @BeforeEach
     void setUp() {
-        testDbPath = "target/test-momentum-roc-" + UUID.randomUUID() + ".db";
-        SQLiteDataSource dataSource = new SQLiteDataSource();
-        dataSource.setUrl("jdbc:sqlite:" + testDbPath);
-        repository = new SqliteMomentumRocRepository(dataSource);
-    }
-
-    @AfterEach
-    void tearDown() {
-        new File(testDbPath).delete();
+        repository = new SqliteMomentumRocRepository(jdbcTemplate);
     }
 
     @Test
@@ -68,7 +65,6 @@ class SqliteMomentumRocRepositoryTest {
     @Test
     void findBySymbol_nonExistentSymbol_returnsEmpty() {
         Optional<MomentumRocData> result = repository.findBySymbol("NOTEXIST");
-
         assertTrue(result.isEmpty());
     }
 
@@ -81,7 +77,6 @@ class SqliteMomentumRocRepositoryTest {
         repository.save("XLF", data);
 
         Optional<MomentumRocData> result = repository.findBySymbol("XLF");
-
         assertTrue(result.isPresent());
         assertEquals(3.3, result.get().getPreviousRoc10(), 0.001);
         assertEquals(6.6, result.get().getPreviousRoc20(), 0.001);
@@ -97,7 +92,6 @@ class SqliteMomentumRocRepositoryTest {
         repository.save("XLE", data);
 
         Optional<MomentumRocData> result = repository.findBySymbol("XLE");
-
         assertTrue(result.isPresent());
         assertFalse(result.get().isInitialized());
     }
@@ -122,10 +116,8 @@ class SqliteMomentumRocRepositoryTest {
 
         assertTrue(resultXlk.isPresent());
         assertTrue(resultXlf.isPresent());
-
         assertEquals(1.0, resultXlk.get().getPreviousRoc10(), 0.001);
         assertTrue(resultXlk.get().isInitialized());
-
         assertEquals(-1.0, resultXlf.get().getPreviousRoc10(), 0.001);
         assertFalse(resultXlf.get().isInitialized());
     }
@@ -136,7 +128,6 @@ class SqliteMomentumRocRepositoryTest {
         data.setPreviousRoc10(0.0);
         data.setPreviousRoc20(0.0);
         data.setInitialized(true);
-
         repository.save("XLV", data);
 
         Optional<MomentumRocData> result = repository.findBySymbol("XLV");
@@ -151,7 +142,6 @@ class SqliteMomentumRocRepositoryTest {
         data.setPreviousRoc10(-15.5);
         data.setPreviousRoc20(-25.3);
         data.setInitialized(true);
-
         repository.save("XLU", data);
 
         Optional<MomentumRocData> result = repository.findBySymbol("XLU");
@@ -166,7 +156,6 @@ class SqliteMomentumRocRepositoryTest {
         data.setPreviousRoc10(999.99);
         data.setPreviousRoc20(-888.88);
         data.setInitialized(true);
-
         repository.save("XLRE", data);
 
         Optional<MomentumRocData> result = repository.findBySymbol("XLRE");
