@@ -12,7 +12,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.web.client.RestTemplate;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.client.telegram.LocalTelegramGateway;
@@ -97,43 +99,13 @@ class ProfileWiringTest {
         DataSource dataSource() {
             SQLiteDataSource ds = new SQLiteDataSource();
             ds.setUrl("jdbc:sqlite:file::memory:?cache=shared");
+            new ResourceDatabasePopulator(new ClassPathResource("schema.sql")).execute(ds);
             return ds;
         }
 
         @Bean
         JdbcTemplate jdbcTemplate(DataSource dataSource) {
-            JdbcTemplate jt = new JdbcTemplate(dataSource);
-            jt.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS finnhub_price_quotes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        symbol TEXT NOT NULL,
-                        timestamp INTEGER NOT NULL,
-                        current_price REAL NOT NULL,
-                        daily_open REAL, daily_high REAL, daily_low REAL,
-                        change_amount REAL, change_percent REAL, previous_close REAL,
-                        UNIQUE(symbol, timestamp)
-                    )
-                    """);
-            jt.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS momentum_roc_state (
-                        symbol TEXT PRIMARY KEY,
-                        previous_roc10 REAL NOT NULL,
-                        previous_roc20 REAL NOT NULL,
-                        initialized INTEGER NOT NULL DEFAULT 0,
-                        updated_at INTEGER NOT NULL
-                    )
-                    """);
-            jt.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS twelvedata_daily_ohlcv (
-                        symbol TEXT NOT NULL, date TEXT NOT NULL,
-                        open REAL, high REAL, low REAL, close REAL, volume INTEGER,
-                        UNIQUE(symbol, date)
-                    )
-                    """);
-            return jt;
+            return new JdbcTemplate(dataSource);
         }
 
         @Bean
