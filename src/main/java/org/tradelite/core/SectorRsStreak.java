@@ -1,7 +1,5 @@
 package org.tradelite.core;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDate;
 
 /**
@@ -16,10 +14,7 @@ import java.time.LocalDate;
  * @param lastUpdated The date when this streak was last updated
  */
 public record SectorRsStreak(
-        @JsonProperty("symbol") String symbol,
-        @JsonProperty("streakDays") int streakDays,
-        @JsonProperty("isOutperforming") boolean isOutperforming,
-        @JsonProperty("lastUpdated") @JsonFormat(pattern = "yyyy-MM-dd") LocalDate lastUpdated) {
+        String symbol, int streakDays, boolean isOutperforming, LocalDate lastUpdated) {
 
     /**
      * Creates a new streak starting at day 1.

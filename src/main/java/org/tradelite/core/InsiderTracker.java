@@ -11,6 +11,8 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.InsiderTransactionRepository;
+import org.tradelite.repository.InsiderTransactionRepository.InsiderTransactionRow;
 
 @Component
 public class InsiderTracker {
@@ -18,7 +20,7 @@ public class InsiderTracker {
     private final FinnhubClient finnhubClient;
     private final TelegramGateway telegramClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final InsiderPersistence insiderPersistence;
+    private final InsiderTransactionRepository insiderTransactionRepository;
     private final SymbolRegistry symbolRegistry;
 
     @Autowired
@@ -26,12 +28,12 @@ public class InsiderTracker {
             FinnhubClient finnhubClient,
             TelegramGateway telegramClient,
             TargetPriceProvider targetPriceProvider,
-            InsiderPersistence insiderPersistence,
+            InsiderTransactionRepository insiderTransactionRepository,
             SymbolRegistry symbolRegistry) {
         this.finnhubClient = finnhubClient;
         this.telegramClient = telegramClient;
         this.targetPriceProvider = targetPriceProvider;
-        this.insiderPersistence = insiderPersistence;
+        this.insiderTransactionRepository = insiderTransactionRepository;
         this.symbolRegistry = symbolRegistry;
     }
 
@@ -100,8 +102,14 @@ public class InsiderTracker {
             sendInsiderTransactionReport(insiderTransactions);
         }
 
-        insiderPersistence.persistToFile(
-                insiderTransactions, InsiderPersistence.PERSISTENCE_FILE_PATH);
+        List<InsiderTransactionRow> rows = new ArrayList<>();
+        for (Map.Entry<StockSymbol, Map<String, Integer>> entry : insiderTransactions.entrySet()) {
+            String symbol = entry.getKey().getTicker();
+            for (Map.Entry<String, Integer> txEntry : entry.getValue().entrySet()) {
+                rows.add(new InsiderTransactionRow(symbol, txEntry.getKey(), txEntry.getValue()));
+            }
+        }
+        insiderTransactionRepository.saveAll(rows);
     }
 
     protected void sendInsiderTransactionReport(
@@ -160,38 +168,36 @@ public class InsiderTracker {
 
     protected Map<StockSymbol, Map<String, Integer>> enrichWithHistoricData(
             Map<StockSymbol, Map<String, Integer>> insiderTransactions) {
-        List<InsiderTransactionHistoric> historicData =
-                insiderPersistence.readFromFile(InsiderPersistence.PERSISTENCE_FILE_PATH);
+        List<InsiderTransactionRow> historicRows = insiderTransactionRepository.findAll();
 
-        for (InsiderTransactionHistoric historic : historicData) {
-            StockSymbol symbol = historic.getSymbol();
+        // Group rows by symbol, resolve to StockSymbol, build historic data
+        Map<String, Map<String, Integer>> historicBySymbol = new HashMap<>();
+        for (InsiderTransactionRow row : historicRows) {
+            historicBySymbol
+                    .computeIfAbsent(row.symbol(), _ -> new HashMap<>())
+                    .put(row.transactionType(), row.count());
+        }
 
-            // Skip if symbol is not in current transactions (no longer monitored)
-            if (!insiderTransactions.containsKey(symbol)) {
+        for (Map.Entry<String, Map<String, Integer>> entry : historicBySymbol.entrySet()) {
+            Optional<StockSymbol> symbolOpt = symbolRegistry.fromString(entry.getKey());
+            if (symbolOpt.isEmpty() || !insiderTransactions.containsKey(symbolOpt.get())) {
                 continue;
             }
 
-            Integer historicSellTransactionCount =
-                    historic.getTransactions().get(InsiderTransactionCodes.SELL.getCode());
-            Integer historicBuyTransactionCount =
-                    historic.getTransactions().get(InsiderTransactionCodes.BUY.getCode());
-            if (historicBuyTransactionCount == null) {
-                historicBuyTransactionCount = 0;
-            }
-            if (historicSellTransactionCount == null) {
-                historicSellTransactionCount = 0;
-            }
+            StockSymbol symbol = symbolOpt.get();
+            Map<String, Integer> historic = entry.getValue();
+
+            Integer historicSellCount =
+                    historic.getOrDefault(InsiderTransactionCodes.SELL.getCode(), 0);
+            Integer historicBuyCount =
+                    historic.getOrDefault(InsiderTransactionCodes.BUY.getCode(), 0);
 
             insiderTransactions
                     .get(symbol)
-                    .put(
-                            InsiderTransactionCodes.SELL_HISTORIC.getCode(),
-                            historicSellTransactionCount);
+                    .put(InsiderTransactionCodes.SELL_HISTORIC.getCode(), historicSellCount);
             insiderTransactions
                     .get(symbol)
-                    .put(
-                            InsiderTransactionCodes.BUY_HISTORIC.getCode(),
-                            historicBuyTransactionCount);
+                    .put(InsiderTransactionCodes.BUY_HISTORIC.getCode(), historicBuyCount);
         }
 
         return insiderTransactions;
