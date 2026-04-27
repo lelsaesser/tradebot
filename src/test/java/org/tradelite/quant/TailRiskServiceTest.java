@@ -301,7 +301,7 @@ class TailRiskServiceTest {
 
         // First change (0 → 100) skipped, only 100 → 102 remains
         assertThat(changePercents).hasSize(1);
-        assertThat(changePercents.get(0)).isCloseTo(2.0, within(0.001));
+        assertThat(changePercents.getFirst()).isCloseTo(2.0, within(0.001));
     }
 
     // ========== Helpers ==========
