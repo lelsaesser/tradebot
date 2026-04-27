@@ -27,6 +27,7 @@ import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 
@@ -151,6 +152,11 @@ class ProfileWiringTest {
         @Bean
         FinnhubPriceEvaluator finnhubPriceEvaluator() {
             return mock(FinnhubPriceEvaluator.class);
+        }
+
+        @Bean
+        SectorPerformanceRepository sectorPerformanceRepository() {
+            return mock(SectorPerformanceRepository.class);
         }
     }
 }
