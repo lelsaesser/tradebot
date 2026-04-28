@@ -178,7 +178,7 @@ public class Scheduler {
         log.info("Daily sector rotation tracking completed.");
     }
 
-    @Scheduled(cron = "0 40 23 * * MON-FRI", zone = "CET")
+    @Scheduled(cron = "0 0 23 * * MON-FRI", zone = "CET")
     protected void dailyOhlcvFetch() {
         rootErrorHandler.run(ohlcvFetcher::fetchAndBackfillOhlcv);
         log.info("Daily OHLCV fetch completed.");
