@@ -200,24 +200,4 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 symbol,
                 startTimestamp);
     }
-
-    @Override
-    public List<Double> findDailyChangePercents(String symbol, int days) {
-        long startTimestamp =
-                LocalDate.now().minusDays(days).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
-
-        String sql =
-                """
-                SELECT date(timestamp, 'unixepoch', 'localtime') as price_date,
-                       change_percent
-                FROM finnhub_price_quotes
-                WHERE symbol = ? AND timestamp >= ?
-                GROUP BY price_date
-                HAVING timestamp = MAX(timestamp)
-                ORDER BY price_date ASC
-                """;
-
-        return jdbcTemplate.query(
-                sql, (rs, _) -> rs.getDouble("change_percent"), symbol, startTimestamp);
-    }
 }
