@@ -2,6 +2,7 @@ package org.tradelite;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -20,16 +21,19 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.client.finviz.dto.IndustryPerformance;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.FinnhubPriceEvaluator;
+import org.tradelite.core.SectorPerformanceSnapshot;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
@@ -44,7 +48,18 @@ public class DevDataSeeder implements ApplicationRunner {
     private static final int LOOKBACK_DAYS = 90;
     private static final int OHLCV_LOOKBACK_DAYS = 400;
     private static final int SAMPLE_STOCK_LIMIT = 5;
+    private static final int SECTOR_PERF_SEED_DAYS = 30;
     private static final LocalTime SEEDED_CLOSE_TIME = LocalTime.of(20, 0);
+    private static final List<String> SEEDED_INDUSTRIES =
+            List.of(
+                    "Technology",
+                    "Healthcare",
+                    "Energy",
+                    "Financials",
+                    "Consumer Cyclical",
+                    "Industrials",
+                    "Utilities",
+                    "Real Estate");
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -55,6 +70,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final SymbolRegistry symbolRegistry;
     private final OhlcvRepository ohlcvRepository;
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private final SectorPerformanceRepository sectorPerformanceRepository;
     private final Path rsDataFilePath;
 
     @Autowired
@@ -67,7 +83,8 @@ public class DevDataSeeder implements ApplicationRunner {
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
-            FinnhubPriceEvaluator finnhubPriceEvaluator) {
+            FinnhubPriceEvaluator finnhubPriceEvaluator,
+            SectorPerformanceRepository sectorPerformanceRepository) {
         this(
                 jdbcTemplate,
                 objectMapper,
@@ -78,6 +95,7 @@ public class DevDataSeeder implements ApplicationRunner {
                 symbolRegistry,
                 ohlcvRepository,
                 finnhubPriceEvaluator,
+                sectorPerformanceRepository,
                 Path.of("config/rs-data.json"));
     }
 
@@ -91,6 +109,7 @@ public class DevDataSeeder implements ApplicationRunner {
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
+            SectorPerformanceRepository sectorPerformanceRepository,
             Path rsDataFilePath) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -101,6 +120,7 @@ public class DevDataSeeder implements ApplicationRunner {
         this.symbolRegistry = symbolRegistry;
         this.ohlcvRepository = ohlcvRepository;
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
+        this.sectorPerformanceRepository = sectorPerformanceRepository;
         this.rsDataFilePath = rsDataFilePath;
     }
 
@@ -129,6 +149,7 @@ public class DevDataSeeder implements ApplicationRunner {
             seedMomentumState(bundle);
             seedOhlcvData(bundle);
             seedPriceCache(bundle);
+            seedSectorPerformance();
             log.info(
                     "Seeded dev analytics data for {} symbols",
                     bundle.priceSeriesBySymbol().size());
@@ -159,6 +180,7 @@ public class DevDataSeeder implements ApplicationRunner {
         jdbcTemplate.update("DELETE FROM finnhub_price_quotes");
         jdbcTemplate.update("DELETE FROM momentum_roc_state");
         jdbcTemplate.update("DELETE FROM twelvedata_daily_ohlcv");
+        jdbcTemplate.update("DELETE FROM industry_performance");
 
         Files.deleteIfExists(rsDataFilePath);
         relativeStrengthService.getRsHistory().clear();
@@ -397,6 +419,47 @@ public class DevDataSeeder implements ApplicationRunner {
             }
         }
         log.info("No stock with a valid pullback pattern found for seeding");
+    }
+
+    private void seedSectorPerformance() {
+        for (int day = SECTOR_PERF_SEED_DAYS - 1; day >= 0; day--) {
+            int dayOffset = day;
+            LocalDate date = LocalDate.now().minusDays(day);
+            List<IndustryPerformance> performances =
+                    SEEDED_INDUSTRIES.stream()
+                            .map(name -> buildIndustryPerformance(name, dayOffset))
+                            .toList();
+            sectorPerformanceRepository.saveSnapshot(
+                    new SectorPerformanceSnapshot(date, performances));
+        }
+        log.info(
+                "Seeded sector performance data: {} days, {} industries",
+                SECTOR_PERF_SEED_DAYS,
+                SEEDED_INDUSTRIES.size());
+    }
+
+    private IndustryPerformance buildIndustryPerformance(String industryName, int dayOffset) {
+        int hash = Math.abs(industryName.hashCode());
+        double base = ((hash % 20) - 10) * 0.5;
+        double variation = Math.sin((dayOffset + hash % 13) / 4.0) * 3.0;
+
+        double daily = StatisticsUtil.roundTo2Decimals(base + variation);
+        double weekly = StatisticsUtil.roundTo2Decimals(daily * 2.5);
+        double monthly = StatisticsUtil.roundTo2Decimals(daily * 5.0);
+        double quarterly = StatisticsUtil.roundTo2Decimals(daily * 8.0);
+        double halfYear = StatisticsUtil.roundTo2Decimals(daily * 12.0);
+        double yearly = StatisticsUtil.roundTo2Decimals(daily * 18.0);
+        double ytd = StatisticsUtil.roundTo2Decimals(daily * 10.0);
+
+        return new IndustryPerformance(
+                industryName,
+                BigDecimal.valueOf(weekly),
+                BigDecimal.valueOf(monthly),
+                BigDecimal.valueOf(quarterly),
+                BigDecimal.valueOf(halfYear),
+                BigDecimal.valueOf(yearly),
+                BigDecimal.valueOf(ytd),
+                BigDecimal.valueOf(daily));
     }
 
     private List<OhlcvRecord> buildOhlcvSeries(String symbol) {

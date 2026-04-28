@@ -2,93 +2,75 @@ package org.tradelite.core;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import java.io.File;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.finviz.dto.IndustryPerformance;
 import org.tradelite.core.SectorPerformancePersistence.PerformancePeriod;
+import org.tradelite.repository.SectorPerformanceRepository;
 
+@ExtendWith(MockitoExtension.class)
 class SectorPerformancePersistenceTest {
 
-    private static final String TEST_FILE_PATH = "config/sector-performance.json";
+    @Mock private SectorPerformanceRepository repository;
+
     private SectorPerformancePersistence persistence;
 
     @BeforeEach
     void setUp() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        persistence = new SectorPerformancePersistence(objectMapper);
-    }
-
-    @AfterEach
-    void tearDown() {
-        File file = new File(TEST_FILE_PATH);
-        if (file.exists()) {
-            file.delete();
-        }
+        persistence = new SectorPerformancePersistence(repository, new ObjectMapper());
     }
 
     @Test
-    void saveSnapshot_shouldSaveSnapshotToFile() throws IOException {
+    void saveSnapshot_shouldDelegateToRepository() {
         SectorPerformanceSnapshot snapshot = createTestSnapshot(LocalDate.now());
 
         persistence.saveSnapshot(snapshot);
 
-        File file = new File(TEST_FILE_PATH);
-        assertThat(file.exists(), is(true));
+        verify(repository).saveSnapshot(snapshot);
     }
 
     @Test
-    void loadHistory_shouldReturnEmptyListWhenFileDoesNotExist() {
-        List<SectorPerformanceSnapshot> history = persistence.loadHistory();
+    void loadHistory_shouldQueryWithMaxHistoryDaysWindow() {
+        when(repository.findSnapshotsSince(any())).thenReturn(List.of());
 
-        assertThat(history, is(empty()));
+        persistence.loadHistory();
+
+        ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);
+        verify(repository).findSnapshotsSince(captor.capture());
+        LocalDate since = captor.getValue();
+        assertThat(
+                since,
+                is(LocalDate.now().minusDays(SectorPerformancePersistence.MAX_HISTORY_DAYS)));
     }
 
     @Test
-    void loadHistory_shouldReturnSavedSnapshots() throws IOException {
+    void loadHistory_shouldReturnSnapshotsFromRepository() {
+        List<SectorPerformanceSnapshot> expected =
+                List.of(
+                        createTestSnapshot(LocalDate.now().minusDays(1)),
+                        createTestSnapshot(LocalDate.now()));
+        when(repository.findSnapshotsSince(any())).thenReturn(expected);
+
+        List<SectorPerformanceSnapshot> result = persistence.loadHistory();
+
+        assertThat(result, hasSize(2));
+    }
+
+    @Test
+    void getLatestSnapshot_shouldDelegateToRepository() {
         SectorPerformanceSnapshot snapshot = createTestSnapshot(LocalDate.now());
-        persistence.saveSnapshot(snapshot);
-
-        List<SectorPerformanceSnapshot> history = persistence.loadHistory();
-
-        assertThat(history, hasSize(1));
-        assertThat(history.getFirst().fetchDate(), is(LocalDate.now()));
-    }
-
-    @Test
-    void saveSnapshot_shouldReplaceSnapshotForSameDate() throws IOException {
-        LocalDate today = LocalDate.now();
-        SectorPerformanceSnapshot snapshot1 = createTestSnapshot(today);
-        SectorPerformanceSnapshot snapshot2 = createTestSnapshotWithDifferentData(today);
-
-        persistence.saveSnapshot(snapshot1);
-        persistence.saveSnapshot(snapshot2);
-
-        List<SectorPerformanceSnapshot> history = persistence.loadHistory();
-        assertThat(history, hasSize(1));
-    }
-
-    @Test
-    void getLatestSnapshot_shouldReturnEmptyWhenNoData() {
-        Optional<SectorPerformanceSnapshot> result = persistence.getLatestSnapshot();
-
-        assertThat(result.isEmpty(), is(true));
-    }
-
-    @Test
-    void getLatestSnapshot_shouldReturnLatestSnapshot() throws IOException {
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now().minusDays(1)));
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now()));
+        when(repository.findLatestSnapshot()).thenReturn(Optional.of(snapshot));
 
         Optional<SectorPerformanceSnapshot> result = persistence.getLatestSnapshot();
 
@@ -97,7 +79,30 @@ class SectorPerformancePersistenceTest {
     }
 
     @Test
+    void getLatestSnapshot_shouldReturnEmptyWhenNoData() {
+        when(repository.findLatestSnapshot()).thenReturn(Optional.empty());
+
+        Optional<SectorPerformanceSnapshot> result = persistence.getLatestSnapshot();
+
+        assertThat(result.isEmpty(), is(true));
+    }
+
+    @Test
+    void getSnapshotForDate_shouldDelegateToRepository() {
+        LocalDate date = LocalDate.of(2026, 4, 20);
+        SectorPerformanceSnapshot snapshot = createTestSnapshot(date);
+        when(repository.findByDate(date)).thenReturn(Optional.of(snapshot));
+
+        Optional<SectorPerformanceSnapshot> result = persistence.getSnapshotForDate(date);
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().fetchDate(), is(date));
+    }
+
+    @Test
     void getSnapshotForDate_shouldReturnEmptyWhenNotFound() {
+        when(repository.findByDate(any())).thenReturn(Optional.empty());
+
         Optional<SectorPerformanceSnapshot> result =
                 persistence.getSnapshotForDate(LocalDate.now());
 
@@ -105,26 +110,18 @@ class SectorPerformancePersistenceTest {
     }
 
     @Test
-    void getSnapshotForDate_shouldReturnSnapshotForDate() throws IOException {
-        LocalDate targetDate = LocalDate.now().minusDays(5);
-        persistence.saveSnapshot(createTestSnapshot(targetDate));
-
-        Optional<SectorPerformanceSnapshot> result = persistence.getSnapshotForDate(targetDate);
-
-        assertThat(result.isPresent(), is(true));
-        assertThat(result.get().fetchDate(), is(targetDate));
-    }
-
-    @Test
     void getTopPerformers_shouldReturnEmptyListWhenNoData() {
+        when(repository.findLatestSnapshot()).thenReturn(Optional.empty());
+
         List<IndustryPerformance> result = persistence.getTopPerformers(5, PerformancePeriod.DAILY);
 
         assertThat(result, is(empty()));
     }
 
     @Test
-    void getTopPerformers_shouldReturnTopPerformersByDaily() throws IOException {
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now()));
+    void getTopPerformers_shouldReturnTopPerformersByDaily() {
+        when(repository.findLatestSnapshot())
+                .thenReturn(Optional.of(createTestSnapshot(LocalDate.now())));
 
         List<IndustryPerformance> result = persistence.getTopPerformers(2, PerformancePeriod.DAILY);
 
@@ -134,8 +131,9 @@ class SectorPerformancePersistenceTest {
     }
 
     @Test
-    void getTopPerformers_shouldReturnTopPerformersByWeekly() throws IOException {
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now()));
+    void getTopPerformers_shouldReturnTopPerformersByWeekly() {
+        when(repository.findLatestSnapshot())
+                .thenReturn(Optional.of(createTestSnapshot(LocalDate.now())));
 
         List<IndustryPerformance> result =
                 persistence.getTopPerformers(2, PerformancePeriod.WEEKLY);
@@ -148,6 +146,8 @@ class SectorPerformancePersistenceTest {
 
     @Test
     void getBottomPerformers_shouldReturnEmptyListWhenNoData() {
+        when(repository.findLatestSnapshot()).thenReturn(Optional.empty());
+
         List<IndustryPerformance> result =
                 persistence.getBottomPerformers(5, PerformancePeriod.DAILY);
 
@@ -155,8 +155,9 @@ class SectorPerformancePersistenceTest {
     }
 
     @Test
-    void getBottomPerformers_shouldReturnBottomPerformersByDaily() throws IOException {
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now()));
+    void getBottomPerformers_shouldReturnBottomPerformersByDaily() {
+        when(repository.findLatestSnapshot())
+                .thenReturn(Optional.of(createTestSnapshot(LocalDate.now())));
 
         List<IndustryPerformance> result =
                 persistence.getBottomPerformers(2, PerformancePeriod.DAILY);
@@ -166,8 +167,9 @@ class SectorPerformancePersistenceTest {
     }
 
     @Test
-    void getTopPerformers_shouldHandleMonthlyPeriod() throws IOException {
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now()));
+    void getTopPerformers_shouldHandleMonthlyPeriod() {
+        when(repository.findLatestSnapshot())
+                .thenReturn(Optional.of(createTestSnapshot(LocalDate.now())));
 
         List<IndustryPerformance> result =
                 persistence.getTopPerformers(1, PerformancePeriod.MONTHLY);
@@ -176,8 +178,9 @@ class SectorPerformancePersistenceTest {
     }
 
     @Test
-    void getTopPerformers_shouldHandleQuarterlyPeriod() throws IOException {
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now()));
+    void getTopPerformers_shouldHandleQuarterlyPeriod() {
+        when(repository.findLatestSnapshot())
+                .thenReturn(Optional.of(createTestSnapshot(LocalDate.now())));
 
         List<IndustryPerformance> result =
                 persistence.getTopPerformers(1, PerformancePeriod.QUARTERLY);
@@ -186,8 +189,9 @@ class SectorPerformancePersistenceTest {
     }
 
     @Test
-    void getTopPerformers_shouldHandleYearlyPeriod() throws IOException {
-        persistence.saveSnapshot(createTestSnapshot(LocalDate.now()));
+    void getTopPerformers_shouldHandleYearlyPeriod() {
+        when(repository.findLatestSnapshot())
+                .thenReturn(Optional.of(createTestSnapshot(LocalDate.now())));
 
         List<IndustryPerformance> result =
                 persistence.getTopPerformers(1, PerformancePeriod.YEARLY);
@@ -225,21 +229,6 @@ class SectorPerformancePersistenceTest {
                                 new BigDecimal("18.00"),
                                 new BigDecimal("4.00"),
                                 new BigDecimal("0.75")));
-        return new SectorPerformanceSnapshot(date, performances);
-    }
-
-    private SectorPerformanceSnapshot createTestSnapshotWithDifferentData(LocalDate date) {
-        List<IndustryPerformance> performances =
-                List.of(
-                        new IndustryPerformance(
-                                "Energy",
-                                new BigDecimal("8.00"),
-                                new BigDecimal("12.00"),
-                                new BigDecimal("18.00"),
-                                new BigDecimal("24.00"),
-                                new BigDecimal("30.00"),
-                                new BigDecimal("10.00"),
-                                new BigDecimal("4.00")));
         return new SectorPerformanceSnapshot(date, performances);
     }
 }

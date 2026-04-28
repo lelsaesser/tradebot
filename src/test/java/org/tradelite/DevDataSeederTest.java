@@ -33,6 +33,7 @@ import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.RelativeStrengthData;
 
@@ -63,6 +64,8 @@ class DevDataSeederTest {
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
+        SectorPerformanceRepository sectorPerformanceRepository =
+                mock(SectorPerformanceRepository.class);
 
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
 
@@ -90,6 +93,7 @@ class DevDataSeederTest {
                         symbolRegistry,
                         ohlcvRepository,
                         finnhubPriceEvaluator,
+                        sectorPerformanceRepository,
                         tempDir.resolve("rs-data.json"));
 
         seeder.reseed();
@@ -116,6 +120,8 @@ class DevDataSeederTest {
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
+        SectorPerformanceRepository sectorPerformanceRepository =
+                mock(SectorPerformanceRepository.class);
 
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
@@ -133,6 +139,7 @@ class DevDataSeederTest {
                         symbolRegistry,
                         ohlcvRepository,
                         finnhubPriceEvaluator,
+                        sectorPerformanceRepository,
                         tempDir.resolve("rs-data.json"));
 
         assertThat(seeder.seedIfMissing(), is(false));
@@ -170,6 +177,8 @@ class DevDataSeederTest {
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
+        SectorPerformanceRepository sectorPerformanceRepository =
+                mock(SectorPerformanceRepository.class);
 
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
 
@@ -197,6 +206,7 @@ class DevDataSeederTest {
                         symbolRegistry,
                         ohlcvRepository,
                         finnhubPriceEvaluator,
+                        sectorPerformanceRepository,
                         tempDir.resolve("rs-fallback.json"));
 
         seeder.reseed();
@@ -220,6 +230,8 @@ class DevDataSeederTest {
         TargetPriceProvider targetPriceProvider = mock(TargetPriceProvider.class);
         SymbolRegistry symbolRegistry = mock(SymbolRegistry.class);
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
+        SectorPerformanceRepository sectorPerformanceRepository =
+                mock(SectorPerformanceRepository.class);
 
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
@@ -236,6 +248,7 @@ class DevDataSeederTest {
                 symbolRegistry,
                 ohlcvRepository,
                 finnhubPriceEvaluator,
+                sectorPerformanceRepository,
                 rsPath);
     }
 
@@ -285,6 +298,21 @@ class DevDataSeederTest {
                     close REAL,
                     volume INTEGER,
                     UNIQUE(symbol, date)
+                )
+                """);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS industry_performance (
+                    fetch_date TEXT NOT NULL,
+                    industry_name TEXT NOT NULL,
+                    daily_change REAL,
+                    weekly_perf REAL,
+                    monthly_perf REAL,
+                    quarterly_perf REAL,
+                    half_year_perf REAL,
+                    yearly_perf REAL,
+                    ytd_perf REAL,
+                    PRIMARY KEY (fetch_date, industry_name)
                 )
                 """);
         return jdbcTemplate;
