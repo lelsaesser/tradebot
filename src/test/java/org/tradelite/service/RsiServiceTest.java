@@ -77,6 +77,21 @@ class RsiServiceTest {
         assertEquals(50, rsi);
     }
 
+    @Test
+    void calculateRsi_referenceDataset_matchesWilderStandard() {
+        // Standard 14-period RSI test data from StockCharts/Investopedia
+        List<Double> prices =
+                List.of(
+                        44.34, 44.09, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84,
+                        46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.00, 46.03,
+                        46.41, 46.22, 45.64, 46.21, 46.25, 45.71, 46.45, 45.78,
+                        45.35, 44.03, 44.18, 44.22, 44.57, 43.42, 42.66);
+
+        double rsi = rsiService.calculateRsi(prices);
+
+        assertEquals(33.57, rsi, 0.01);
+    }
+
     // --- getCurrentRsi tests ---
 
     @Test
