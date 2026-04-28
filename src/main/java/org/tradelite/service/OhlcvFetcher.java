@@ -87,8 +87,7 @@ public class OhlcvFetcher {
                         try {
                             checkForStockSplit(ticker, existingRecords, records);
                         } catch (Exception e) {
-                            log.warn(
-                                    "Split detection failed for {}: {}", ticker, e.getMessage());
+                            log.warn("Split detection failed for {}: {}", ticker, e.getMessage());
                         }
                     }
 
