@@ -21,7 +21,9 @@ public class OhlcvFetcher {
     static final int MIN_RECORDS_FOR_BACKFILL = 136;
     static final int BACKFILL_OUTPUT_SIZE = 400;
     static final int REFRESH_OUTPUT_SIZE = 5;
-    static final long DEFAULT_REQUEST_DELAY_MS = 8000;
+    static final long DEFAULT_REQUEST_DELAY_MS = 9000;
+    static final long RATE_LIMIT_WAIT_MS = 61_000;
+    static final int MAX_RETRIES = 1;
 
     private final TwelveDataClient twelveDataClient;
     private final OhlcvRepository ohlcvRepository;
@@ -29,6 +31,7 @@ public class OhlcvFetcher {
     private final TelegramGateway telegramGateway;
     private final StockSplitDetector stockSplitDetector;
     private long requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
+    private long rateLimitWaitMs = RATE_LIMIT_WAIT_MS;
 
     @Autowired
     public OhlcvFetcher(
@@ -46,6 +49,10 @@ public class OhlcvFetcher {
 
     void setRequestDelayMs(long requestDelayMs) {
         this.requestDelayMs = requestDelayMs;
+    }
+
+    void setRateLimitWaitMs(long rateLimitWaitMs) {
+        this.rateLimitWaitMs = rateLimitWaitMs;
     }
 
     public void fetchAndBackfillOhlcv() throws InterruptedException {
@@ -78,22 +85,37 @@ public class OhlcvFetcher {
 
             log.info("Fetching OHLCV for {} ({}/{}, {})", ticker, i + 1, symbols.size(), mode);
 
-            try {
-                List<OhlcvRecord> records = twelveDataClient.fetchDailyOhlcv(ticker, outputSize);
+            for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    List<OhlcvRecord> records =
+                            twelveDataClient.fetchDailyOhlcv(ticker, outputSize);
 
-                if (!needsBackfill && !records.isEmpty() && !existingRecords.isEmpty()) {
-                    try {
-                        checkForStockSplit(ticker, existingRecords, records);
-                    } catch (Exception e) {
-                        log.warn("Split detection failed for {}: {}", ticker, e.getMessage());
+                    if (!needsBackfill && !records.isEmpty() && !existingRecords.isEmpty()) {
+                        try {
+                            checkForStockSplit(ticker, existingRecords, records);
+                        } catch (Exception e) {
+                            log.warn(
+                                    "Split detection failed for {}: {}", ticker, e.getMessage());
+                        }
+                    }
+
+                    ohlcvRepository.saveAll(records);
+                    succeeded++;
+                    break;
+                } catch (Exception e) {
+                    if (isRateLimitError(e) && attempt < MAX_RETRIES) {
+                        log.warn(
+                                "Rate limit hit for {}, waiting {}ms before retry",
+                                ticker,
+                                rateLimitWaitMs);
+                        //noinspection BusyWait
+                        Thread.sleep(rateLimitWaitMs);
+                    } else {
+                        log.error("Failed to fetch OHLCV for {}: {}", ticker, e.getMessage());
+                        failedSymbols.add(ticker);
+                        break;
                     }
                 }
-
-                ohlcvRepository.saveAll(records);
-                succeeded++;
-            } catch (Exception e) {
-                log.error("Failed to fetch OHLCV for {}: {}", ticker, e.getMessage());
-                failedSymbols.add(ticker);
             }
         }
 
@@ -123,6 +145,14 @@ public class OhlcvFetcher {
         ohlcvRepository.saveAll(records);
         log.info("Backfill complete for {}: {} records saved", ticker, records.size());
         return records.size();
+    }
+
+    static boolean isRateLimitError(Exception e) {
+        String message = e.getMessage();
+        if (message == null) {
+            return false;
+        }
+        return message.contains("You have run out of API credits");
     }
 
     private void checkForStockSplit(
