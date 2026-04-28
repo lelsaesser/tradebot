@@ -41,3 +41,4 @@ run-dev.sh
 # SQLite database
 /data/
 *.db
+deploy-full.sh
