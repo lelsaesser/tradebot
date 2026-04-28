@@ -73,3 +73,20 @@ CREATE TABLE IF NOT EXISTS insider_transactions (
     count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (symbol, transaction_type)
 );
+
+-- industry_performance: FinViz sector/industry performance snapshots
+CREATE TABLE IF NOT EXISTS industry_performance (
+    fetch_date TEXT NOT NULL,
+    industry_name TEXT NOT NULL,
+    daily_change REAL,
+    weekly_perf REAL,
+    monthly_perf REAL,
+    quarterly_perf REAL,
+    half_year_perf REAL,
+    yearly_perf REAL,
+    ytd_perf REAL,
+    PRIMARY KEY (fetch_date, industry_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_industry_performance_fetch_date
+    ON industry_performance(fetch_date);
