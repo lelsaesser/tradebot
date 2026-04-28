@@ -2,6 +2,7 @@ package org.tradelite.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -30,8 +31,8 @@ public class OhlcvFetcher {
     private final SymbolRegistry symbolRegistry;
     private final TelegramGateway telegramGateway;
     private final StockSplitDetector stockSplitDetector;
-    private long requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
-    private long rateLimitWaitMs = RATE_LIMIT_WAIT_MS;
+    @Setter private long requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
+    @Setter private long rateLimitWaitMs = RATE_LIMIT_WAIT_MS;
 
     @Autowired
     public OhlcvFetcher(
@@ -45,14 +46,6 @@ public class OhlcvFetcher {
         this.symbolRegistry = symbolRegistry;
         this.telegramGateway = telegramGateway;
         this.stockSplitDetector = stockSplitDetector;
-    }
-
-    void setRequestDelayMs(long requestDelayMs) {
-        this.requestDelayMs = requestDelayMs;
-    }
-
-    void setRateLimitWaitMs(long rateLimitWaitMs) {
-        this.rateLimitWaitMs = rateLimitWaitMs;
     }
 
     public void fetchAndBackfillOhlcv() throws InterruptedException {
