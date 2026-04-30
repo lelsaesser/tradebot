@@ -31,7 +31,7 @@ class RelativeStrengthServiceTest {
 
     private RelativeStrengthService relativeStrengthService;
 
-    private static final int RS_LOOKBACK_DAYS = 80;
+    private static final int RS_LOOKBACK_DAYS = 400;
 
     @BeforeEach
     void setUp() {

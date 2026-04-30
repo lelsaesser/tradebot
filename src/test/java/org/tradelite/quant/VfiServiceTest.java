@@ -31,7 +31,7 @@ class VfiServiceTest {
     @Test
     void analyze_returnsEmptyWhenInsufficientData() {
         List<OhlcvRecord> records = generateRecords(100, 100.0, 0.5, 1_000_000L);
-        when(ohlcvRepository.findBySymbol("AAPL", 200)).thenReturn(records);
+        when(ohlcvRepository.findBySymbol("AAPL", 400)).thenReturn(records);
 
         Optional<VfiAnalysis> result = service.analyze("AAPL", "Apple");
 
@@ -41,7 +41,7 @@ class VfiServiceTest {
     @Test
     void analyze_returnsAnalysisWithSufficientData() {
         List<OhlcvRecord> records = generateRecords(136, 100.0, 0.5, 1_000_000L);
-        when(ohlcvRepository.findBySymbol("AAPL", 200)).thenReturn(records);
+        when(ohlcvRepository.findBySymbol("AAPL", 400)).thenReturn(records);
 
         Optional<VfiAnalysis> result = service.analyze("AAPL", "Apple");
 
@@ -142,6 +142,21 @@ class VfiServiceTest {
         assertThat(result.vfiValue()).isCloseTo(4.59, within(1.0));
         assertThat(result.signalLineValue()).isCloseTo(5.12, within(1.0));
         assertThat(result.isVfiPositive()).isTrue();
+    }
+
+    @Test
+    void calculateVfi_manyWindows_signalEmaStabilizes() {
+        // With 280 records, numWindows = max(280 - 130, 6) = 150 windows
+        // The signal EMA should stabilize and differ from the raw last VFI value
+        // Use sinusoidal volatility so VFI values vary across windows
+        List<OhlcvRecord> records = generateRecords(280, 100.0, 2.0, 1_000_000L);
+
+        VfiAnalysis result = service.calculateVfi("TEST", "Test", records);
+
+        // With many windows the signal EMA smooths the oscillating VFI series,
+        // so signal and raw VFI should differ
+        double difference = Math.abs(result.vfiValue() - result.signalLineValue());
+        assertThat(difference).isGreaterThan(0.01);
     }
 
     private List<OhlcvRecord> buildAaplGoldenData() {
