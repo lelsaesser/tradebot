@@ -67,7 +67,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **Facade Pattern**: `TelegramClient` simplifies Telegram Bot API interaction.
 -   **Data Source Fallback**: `DailyPriceProvider` tries OHLCV first, falls back to Finnhub.
 -   **Per-Reason TTL**: `IgnoreReason` enum carries `ttlSeconds` per value. `TargetPriceProvider.isSymbolIgnored()` uses `reason.getTtlSeconds()` instead of a global constant. Existing alerts use 12h, pullback uses 8h.
--   **Finnhub as Data Ingestion Layer**: `FinnhubPriceEvaluator` fetches live prices and populates `lastPriceCache`. All downstream indicators/trackers read from the cache or SQLite — never make their own Finnhub API calls.
+-   **Finnhub as Data Ingestion Layer**: `FinnhubPriceEvaluator` fetches live prices for ALL tracked symbols (stocks + ETFs via `symbolRegistry.getAll()`) and populates `lastPriceCache`. Loop 1 handles fetch/cache/persist/high-change-alerts for every symbol. Loop 2 evaluates target buy/sell prices from cache (no API calls). All downstream indicators/trackers read from the cache or SQLite — never make their own Finnhub API calls.
 -   **Phased Smoke Test**: `DevJobController.runAll()` executes 14 jobs in 4 dependency-ordered phases (seed → OHLCV fetch → parallel independents → VFI). Returns aggregate pass/fail with per-job results. `RootErrorHandler.runWithStatus()` provides boolean success/failure without propagating exceptions.
 
 ## Scheduled Tasks

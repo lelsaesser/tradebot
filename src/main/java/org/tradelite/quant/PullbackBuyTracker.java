@@ -70,7 +70,7 @@ public class PullbackBuyTracker {
 
             Double livePrice = priceCache.get(stock.getTicker());
             if (livePrice == null) {
-                log.info("Skipping {} — no cached price", stock.getTicker());
+                log.warn("Skipping {} — no cached price", stock.getTicker());
                 continue;
             }
 
