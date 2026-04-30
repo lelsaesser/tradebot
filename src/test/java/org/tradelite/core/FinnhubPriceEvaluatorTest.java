@@ -49,28 +49,27 @@ class FinnhubPriceEvaluatorTest {
 
     @Test
     void evaluatePrice() throws InterruptedException {
+        StockSymbol avgo = new StockSymbol("AVGO", "Broadcom");
+        StockSymbol goog = new StockSymbol("GOOG", "Google");
+        when(symbolRegistry.getAll()).thenReturn(List.of(avgo, goog));
+
         List<TargetPrice> targetPrices =
-                List.of(
-                        new TargetPrice(
-                                new StockSymbol("AVGO", "Broadcom").getTicker(), 150.0, 160.0),
-                        new TargetPrice(new StockSymbol("GOOG", "Google").getTicker(), 130, 200));
+                List.of(new TargetPrice("AVGO", 150.0, 160.0), new TargetPrice("GOOG", 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(symbolRegistry.fromString("AVGO"))
-                .thenReturn(java.util.Optional.of(new StockSymbol("AVGO", "Broadcom")));
-        when(symbolRegistry.fromString("GOOG"))
-                .thenReturn(java.util.Optional.of(new StockSymbol("GOOG", "Google")));
+        when(symbolRegistry.fromString("AVGO")).thenReturn(java.util.Optional.of(avgo));
+        when(symbolRegistry.fromString("GOOG")).thenReturn(java.util.Optional.of(goog));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
-        priceQuoteResponse.setStockSymbol(new StockSymbol("AVGO", "Broadcom"));
+        priceQuoteResponse.setStockSymbol(avgo);
         priceQuoteResponse.setCurrentPrice(155.0);
         priceQuoteResponse.setChangePercent(3.0);
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(priceQuoteResponse);
 
         finnhubPriceEvaluator.evaluatePrice();
 
-        verify(targetPriceProvider, times(1)).getStockTargetPrices();
-        verify(finnhubClient, times(1)).getPriceQuote(new StockSymbol("AVGO", "Broadcom"));
-        verify(finnhubClient, times(1)).getPriceQuote(new StockSymbol("GOOG", "Google"));
+        verify(symbolRegistry, times(1)).getAll();
+        verify(finnhubClient, times(1)).getPriceQuote(avgo);
+        verify(finnhubClient, times(1)).getPriceQuote(goog);
         verify(telegramClient, never()).sendMessage(any());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
@@ -185,10 +184,10 @@ class FinnhubPriceEvaluatorTest {
 
         finnhubPriceEvaluator.lastPriceCache.put("TEST", lastPrice);
 
+        when(symbolRegistry.getAll()).thenReturn(List.of(testSymbol));
         List<TargetPrice> targetPrices =
                 List.of(new TargetPrice("TEST", lastPrice - 1000, lastPrice + 1000));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(symbolRegistry.fromString("TEST")).thenReturn(java.util.Optional.of(testSymbol));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
         priceQuoteResponse.setCurrentPrice(lastPrice);
@@ -198,7 +197,7 @@ class FinnhubPriceEvaluatorTest {
 
         int finDataSize = finnhubPriceEvaluator.evaluatePrice();
 
-        verify(targetPriceProvider, times(1)).getStockTargetPrices();
+        verify(symbolRegistry, times(1)).getAll();
         verify(finnhubClient, times(1)).getPriceQuote(any());
 
         assertThat(finnhubPriceEvaluator.lastPriceCache, aMapWithSize(1));
@@ -208,55 +207,53 @@ class FinnhubPriceEvaluatorTest {
     @Test
     void evaluatePrice_invalidTickerSymbolInTargetPrice_doesNotSendMessage()
             throws InterruptedException {
+        StockSymbol goog = new StockSymbol("GOOG", "Google");
+        when(symbolRegistry.getAll()).thenReturn(List.of(goog));
+
         List<TargetPrice> targetPrices =
                 List.of(
                         new TargetPrice("INVALID", 150.0, 160.0),
-                        new TargetPrice(new StockSymbol("GOOG", "Google").getTicker(), 130, 200));
+                        new TargetPrice("GOOG", 130, 200));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(symbolRegistry.fromString("INVALID")).thenReturn(java.util.Optional.empty());
-        when(symbolRegistry.fromString("GOOG"))
-                .thenReturn(java.util.Optional.of(new StockSymbol("GOOG", "Google")));
+        when(symbolRegistry.fromString("GOOG")).thenReturn(java.util.Optional.of(goog));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
-        priceQuoteResponse.setStockSymbol(new StockSymbol("GOOG", "Google"));
+        priceQuoteResponse.setStockSymbol(goog);
         priceQuoteResponse.setCurrentPrice(155.0);
         priceQuoteResponse.setChangePercent(3.0);
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(priceQuoteResponse);
 
         finnhubPriceEvaluator.evaluatePrice();
 
-        verify(targetPriceProvider, times(1)).getStockTargetPrices();
-        verify(finnhubClient, times(1)).getPriceQuote(new StockSymbol("GOOG", "Google"));
+        verify(symbolRegistry, times(1)).getAll();
+        verify(finnhubClient, times(1)).getPriceQuote(goog);
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
     void evaluatePrice_nullPriceQuote() throws InterruptedException {
-        List<TargetPrice> targetPrices =
-                List.of(
-                        new TargetPrice(
-                                new StockSymbol("AVGO", "Broadcom").getTicker(), 150.0, 160.0),
-                        new TargetPrice(new StockSymbol("GOOG", "Google").getTicker(), 130, 200));
-        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(symbolRegistry.fromString("AVGO"))
-                .thenReturn(java.util.Optional.of(new StockSymbol("AVGO", "Broadcom")));
-        when(symbolRegistry.fromString("GOOG"))
-                .thenReturn(java.util.Optional.of(new StockSymbol("GOOG", "Google")));
+        StockSymbol avgo = new StockSymbol("AVGO", "Broadcom");
+        StockSymbol goog = new StockSymbol("GOOG", "Google");
+        when(symbolRegistry.getAll()).thenReturn(List.of(avgo, goog));
 
-        when(finnhubClient.getPriceQuote(new StockSymbol("AVGO", "Broadcom"))).thenReturn(null);
+        List<TargetPrice> targetPrices =
+                List.of(new TargetPrice("AVGO", 150.0, 160.0), new TargetPrice("GOOG", 130, 200));
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+        when(symbolRegistry.fromString("GOOG")).thenReturn(java.util.Optional.of(goog));
+
+        when(finnhubClient.getPriceQuote(avgo)).thenReturn(null);
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
-        priceQuoteResponse.setStockSymbol(new StockSymbol("GOOG", "Google"));
+        priceQuoteResponse.setStockSymbol(goog);
         priceQuoteResponse.setCurrentPrice(155.0);
         priceQuoteResponse.setChangePercent(3.0);
-        when(finnhubClient.getPriceQuote(new StockSymbol("GOOG", "Google")))
-                .thenReturn(priceQuoteResponse);
+        when(finnhubClient.getPriceQuote(goog)).thenReturn(priceQuoteResponse);
 
         int finDataSize = finnhubPriceEvaluator.evaluatePrice();
 
-        verify(targetPriceProvider, times(1)).getStockTargetPrices();
-        verify(finnhubClient, times(1)).getPriceQuote(new StockSymbol("AVGO", "Broadcom"));
-        verify(finnhubClient, times(1)).getPriceQuote(new StockSymbol("GOOG", "Google"));
+        verify(symbolRegistry, times(1)).getAll();
+        verify(finnhubClient, times(1)).getPriceQuote(avgo);
+        verify(finnhubClient, times(1)).getPriceQuote(goog);
         assertThat(finDataSize, is(1));
     }
 
@@ -295,6 +292,7 @@ class FinnhubPriceEvaluatorTest {
     @Test
     void evaluatePrice_savesPriceQuoteToRepository_whenToggleEnabled() throws InterruptedException {
         StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
+        when(symbolRegistry.getAll()).thenReturn(List.of(testSymbol));
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
         when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
@@ -315,6 +313,7 @@ class FinnhubPriceEvaluatorTest {
     @Test
     void evaluatePrice_doesNotSavePriceQuote_whenToggleDisabled() throws InterruptedException {
         StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
+        when(symbolRegistry.getAll()).thenReturn(List.of(testSymbol));
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
         when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
@@ -337,9 +336,9 @@ class FinnhubPriceEvaluatorTest {
         StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
         finnhubPriceEvaluator.lastPriceCache.put("AAPL", 175.0);
 
+        when(symbolRegistry.getAll()).thenReturn(List.of(testSymbol));
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
-        when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
         priceQuoteResponse.setStockSymbol(testSymbol);
@@ -378,5 +377,36 @@ class FinnhubPriceEvaluatorTest {
         assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("bitcoin", 50000.0, 0.0));
         assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("ethereum", 3500.0, 0.0));
         assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.0, 0.0));
+    }
+
+    @Test
+    void evaluatePrice_cachesAllSymbolsNotJustTargetPriceStocks() throws InterruptedException {
+        StockSymbol aapl = new StockSymbol("AAPL", "Apple Inc.");
+        StockSymbol tsm = new StockSymbol("TSM", "Taiwan Semiconductor");
+        when(symbolRegistry.getAll()).thenReturn(List.of(aapl, tsm));
+
+        // Only AAPL has a target price, TSM does not
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(List.of(new TargetPrice("AAPL", 150.0, 200.0)));
+        when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(aapl));
+
+        PriceQuoteResponse aaplQuote = new PriceQuoteResponse();
+        aaplQuote.setStockSymbol(aapl);
+        aaplQuote.setCurrentPrice(175.0);
+        aaplQuote.setChangePercent(1.5);
+        when(finnhubClient.getPriceQuote(aapl)).thenReturn(aaplQuote);
+
+        PriceQuoteResponse tsmQuote = new PriceQuoteResponse();
+        tsmQuote.setStockSymbol(tsm);
+        tsmQuote.setCurrentPrice(403.0);
+        tsmQuote.setChangePercent(2.0);
+        when(finnhubClient.getPriceQuote(tsm)).thenReturn(tsmQuote);
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        // Both symbols should be cached, even though TSM has no target price
+        assertThat(finnhubPriceEvaluator.lastPriceCache, aMapWithSize(2));
+        assertThat(finnhubPriceEvaluator.lastPriceCache.get("AAPL"), is(175.0));
+        assertThat(finnhubPriceEvaluator.lastPriceCache.get("TSM"), is(403.0));
     }
 }

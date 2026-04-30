@@ -1,6 +1,31 @@
 # Progress Tracking
 
-## Latest Milestone: JdbcTemplate Migration (#314) — COMPLETE
+## Latest Milestone: EMA Warm-up Fix + Price Cache Decoupling (#345, #332, #331) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (April 30, 2026)
+
+#### Purpose
+Fix RS and VFI value discrepancies vs TradingView (insufficient EMA warm-up data) and decouple the Finnhub price cache from target price configuration so all tracked symbols get live price data.
+
+#### Key Changes
+- **#345**: RS lookback 80→400 days, VFI lookback 200→400 days, VFI numWindows dynamic (`Math.max(lastWindowEnd - LENGTH, SIGNAL_LENGTH + 1)`)
+- **#332**: `FinnhubPriceEvaluator.evaluatePrice()` refactored — Loop 1 fetches/caches ALL symbols via `symbolRegistry.getAll()`, Loop 2 evaluates target prices from cache only
+- **#331**: Verbose PullbackBuyTracker "no pullback pattern" log changed to DEBUG
+
+#### Behavioral Changes
+- All symbols (stocks + ETFs) get Finnhub prices cached every 5 min
+- All symbols get persisted to SQLite (when `FINNHUB_PRICE_COLLECTION` enabled)
+- High price change alerts (5%+) now fire for all symbols, not just target-price stocks
+- PullbackBuyTracker can now analyze all stocks (no more "no cached price" skips)
+- RS EMA now has ~230 recursive steps (vs 6), VFI signal EMA has ~150 windows (vs 1)
+
+#### Tests: 932 total, all passing
+
+---
+
+## Previous Milestone: JdbcTemplate Migration (#314) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -217,7 +242,7 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: ~915
+- Total Tests: ~932
 
 ## Future Enhancements
 
