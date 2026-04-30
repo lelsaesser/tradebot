@@ -3,19 +3,13 @@ package org.tradelite.service;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,27 +17,27 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
+import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.service.model.DailyPrice;
+import org.tradelite.service.model.RelativeStrengthData;
 
-@SuppressWarnings({"SameParameterValue", "ResultOfMethodCallIgnored"})
+@SuppressWarnings("SameParameterValue")
 @ExtendWith(MockitoExtension.class)
 class RelativeStrengthServiceTest {
 
     @Mock private DailyPriceProvider dailyPriceProvider;
 
-    private final ObjectMapper objectMapper =
-            new ObjectMapper().registerModule(new JavaTimeModule());
+    @Mock private RsCrossoverStateRepository rsCrossoverStateRepository;
 
     private RelativeStrengthService relativeStrengthService;
-
-    private final String rsDataFile = "config/rs-data.json";
 
     private static final int RS_LOOKBACK_DAYS = 80;
 
     @BeforeEach
-    void setUp() throws IOException {
-        new File(rsDataFile).delete();
-        relativeStrengthService = new RelativeStrengthService(objectMapper, dailyPriceProvider);
+    void setUp() {
+        when(rsCrossoverStateRepository.findAll()).thenReturn(new HashMap<>());
+        relativeStrengthService =
+                new RelativeStrengthService(rsCrossoverStateRepository, dailyPriceProvider);
     }
 
     @Test
@@ -143,6 +137,16 @@ class RelativeStrengthServiceTest {
     }
 
     @Test
+    void testCalculateRelativeStrength_persistsState() {
+        stubDailyPrices("SPY", constantPrices(60, 500.0));
+        stubDailyPrices("NVDA", constantPrices(60, 600.0));
+
+        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+
+        verify(rsCrossoverStateRepository).save(eq("NVDA"), any(RelativeStrengthData.class));
+    }
+
+    @Test
     void testCalculateRelativeStrength_crossoverUp() {
         // First calculation to initialize
         stubDailyPrices("SPY", constantPrices(60, 500.0));
@@ -192,16 +196,23 @@ class RelativeStrengthServiceTest {
     }
 
     @Test
-    void testSaveRsHistory() throws IOException {
-        stubDailyPrices("SPY", constantPrices(60, 500.0));
-        stubDailyPrices("NVDA", constantPrices(60, 600.0));
-        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
+    void testConstructor_loadsStateFromRepository() {
+        Map<String, RelativeStrengthData> existingState = new HashMap<>();
+        RelativeStrengthData data = new RelativeStrengthData();
+        data.setPreviousRs(1.2);
+        data.setPreviousEma(1.15);
+        data.setInitialized(true);
+        existingState.put("NVDA", data);
 
-        relativeStrengthService.saveRsHistory();
+        when(rsCrossoverStateRepository.findAll()).thenReturn(existingState);
 
-        File rsFile = new File(rsDataFile);
-        assertThat(rsFile.exists(), is(true));
-        rsFile.delete();
+        RelativeStrengthService service =
+                new RelativeStrengthService(rsCrossoverStateRepository, dailyPriceProvider);
+
+        assertThat(service.getRsHistory().containsKey("NVDA"), is(true));
+        assertThat(service.getRsHistory().get("NVDA").isInitialized(), is(true));
+        assertThat(service.getRsHistory().get("NVDA").getPreviousRs(), is(closeTo(1.2, 0.001)));
+        assertThat(service.getRsHistory().get("NVDA").getPreviousEma(), is(closeTo(1.15, 0.001)));
     }
 
     @Test
@@ -229,64 +240,6 @@ class RelativeStrengthServiceTest {
     @Test
     void testBenchmarkSymbol() {
         assertEquals("SPY", RelativeStrengthService.BENCHMARK_SYMBOL);
-    }
-
-    @Test
-    void testLoadRsHistory_existingFile() throws IOException {
-        stubDailyPrices("SPY", constantPrices(60, 500.0));
-        stubDailyPrices("NVDA", constantPrices(60, 600.0));
-        relativeStrengthService.calculateRelativeStrength("NVDA", "Nvidia");
-        relativeStrengthService.saveRsHistory();
-
-        File rsFile = new File(rsDataFile);
-        assertThat(rsFile.exists(), is(true));
-
-        RelativeStrengthService newService =
-                new RelativeStrengthService(objectMapper, dailyPriceProvider);
-
-        assertThat(newService.getRsHistory().containsKey("NVDA"), is(true));
-        assertThat(newService.getRsHistory().get("NVDA").isInitialized(), is(true));
-        rsFile.delete();
-    }
-
-    @Test
-    void testLoadRsHistory_missingFile_isNoOp() throws IOException {
-        new File(rsDataFile).delete();
-
-        relativeStrengthService.loadRsHistory();
-
-        assertThat(relativeStrengthService.getRsHistory().isEmpty(), is(true));
-    }
-
-    @Test
-    void testLoadRsHistory_invalidFile_throws() throws Exception {
-        File rsFile = new File(rsDataFile);
-        rsFile.getParentFile().mkdirs();
-        rsFile.createNewFile();
-
-        ObjectMapper failingMapper = org.mockito.Mockito.spy(new ObjectMapper());
-        doThrow(new IOException("bad rs data"))
-                .when(failingMapper)
-                .readValue(any(File.class), any(com.fasterxml.jackson.databind.JavaType.class));
-
-        assertThrows(
-                IOException.class,
-                () -> new RelativeStrengthService(failingMapper, dailyPriceProvider));
-
-        rsFile.delete();
-    }
-
-    @Test
-    void testSaveRsHistory_writeFailure_throws() throws Exception {
-        ObjectMapper failingMapper = org.mockito.Mockito.spy(new ObjectMapper());
-        doThrow(new IOException("write failed"))
-                .when(failingMapper)
-                .writeValue(any(File.class), any());
-
-        RelativeStrengthService service =
-                new RelativeStrengthService(failingMapper, dailyPriceProvider);
-
-        assertThrows(IOException.class, service::saveRsHistory);
     }
 
     @Test
