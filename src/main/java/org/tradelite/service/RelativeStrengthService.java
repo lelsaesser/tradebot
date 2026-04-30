@@ -1,8 +1,5 @@
 package org.tradelite.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 import lombok.Getter;
@@ -11,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
+import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RelativeStrengthData;
 
@@ -52,20 +50,18 @@ public class RelativeStrengthService {
         }
     }
 
-    /** File to persist RS data */
-    private static final String RS_DATA_FILE = "config/rs-data.json";
-
-    private final ObjectMapper objectMapper;
+    private final RsCrossoverStateRepository rsCrossoverStateRepository;
     private final DailyPriceProvider dailyPriceProvider;
 
-    @Getter private Map<String, RelativeStrengthData> rsHistory = new HashMap<>();
+    @Getter private final Map<String, RelativeStrengthData> rsHistory;
 
     @Autowired
-    public RelativeStrengthService(ObjectMapper objectMapper, DailyPriceProvider dailyPriceProvider)
-            throws IOException {
-        this.objectMapper = objectMapper;
+    public RelativeStrengthService(
+            RsCrossoverStateRepository rsCrossoverStateRepository,
+            DailyPriceProvider dailyPriceProvider) {
+        this.rsCrossoverStateRepository = rsCrossoverStateRepository;
         this.dailyPriceProvider = dailyPriceProvider;
-        loadRsHistory();
+        this.rsHistory = new HashMap<>(rsCrossoverStateRepository.findAll());
     }
 
     /**
@@ -140,6 +136,9 @@ public class RelativeStrengthService {
         rsData.setPreviousRs(currentRs);
         rsData.setPreviousEma(currentEma);
         rsData.setInitialized(true);
+
+        // Persist crossover state
+        rsCrossoverStateRepository.save(symbol, rsData);
 
         return signal;
     }
@@ -288,36 +287,5 @@ public class RelativeStrengthService {
         boolean isComplete = rsValues.size() >= EMA_PERIOD;
 
         return Optional.of(new RsResult(currentRs, currentEma, rsValues.size(), isComplete));
-    }
-
-    /** Persists RS history to file. */
-    public void saveRsHistory() throws IOException {
-        try {
-            objectMapper.writeValue(new File(RS_DATA_FILE), rsHistory);
-        } catch (IOException e) {
-            log.error("Error saving RS data", e);
-            throw e;
-        }
-    }
-
-    /** Loads RS history from file. */
-    protected void loadRsHistory() throws IOException {
-        try {
-            File file = new File(RS_DATA_FILE);
-            if (file.exists()) {
-                rsHistory =
-                        objectMapper.readValue(
-                                file,
-                                objectMapper
-                                        .getTypeFactory()
-                                        .constructMapType(
-                                                HashMap.class,
-                                                String.class,
-                                                RelativeStrengthData.class));
-            }
-        } catch (IOException e) {
-            log.error("Error loading RS data", e);
-            throw e;
-        }
     }
 }

@@ -1,6 +1,5 @@
 package org.tradelite.core;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +35,7 @@ public class RelativeStrengthTracker {
      *
      * <p>Should be called daily after market close (after RSI price data is collected).
      */
-    public void analyzeAndSendAlerts() throws IOException {
+    public void analyzeAndSendAlerts() {
         log.info("Starting relative strength analysis for all tracked stocks");
 
         List<RelativeStrengthSignal> outperformingSignals = new ArrayList<>();
@@ -83,8 +82,6 @@ public class RelativeStrengthTracker {
             log.info("No RS crossovers detected");
         }
 
-        // Persist RS data
-        relativeStrengthService.saveRsHistory();
         log.info("Relative strength analysis completed");
     }
 
