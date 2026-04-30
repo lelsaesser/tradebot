@@ -4,7 +4,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +41,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_noSignals() throws IOException {
+    void testAnalyzeAndSendAlerts_noSignals() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 150.0, 200.0)));
         when(symbolRegistry.fromString("AAPL"))
@@ -54,11 +53,10 @@ class RelativeStrengthTrackerTest {
 
         // No signals = no message sent
         verify(telegramClient, never()).sendMessage(any());
-        verify(relativeStrengthService).saveRsHistory();
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_withOutperformingSignal() throws IOException {
+    void testAnalyzeAndSendAlerts_withOutperformingSignal() {
         TargetPrice targetPrice = new TargetPrice("NVDA", 100.0, 150.0);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(targetPrice));
         when(symbolRegistry.fromString("NVDA"))
@@ -90,7 +88,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_withUnderperformingSignal() throws IOException {
+    void testAnalyzeAndSendAlerts_withUnderperformingSignal() {
         TargetPrice targetPrice = new TargetPrice("INTC", 30.0, 50.0);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(targetPrice));
         when(symbolRegistry.fromString("INTC"))
@@ -119,7 +117,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_multipleSignals() throws IOException {
+    void testAnalyzeAndSendAlerts_multipleSignals() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(
                         List.of(
@@ -165,7 +163,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_skipsBenchmark() throws IOException {
+    void testAnalyzeAndSendAlerts_skipsBenchmark() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("SPY", 400.0, 500.0)));
 
@@ -177,7 +175,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_usesSymbolAsDisplayNameWhenNotFound() throws IOException {
+    void testAnalyzeAndSendAlerts_usesSymbolAsDisplayNameWhenNotFound() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("UNKNOWN", 100.0, 150.0)));
         when(symbolRegistry.fromString("UNKNOWN")).thenReturn(Optional.empty());
@@ -191,7 +189,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_handlesExceptionGracefully() throws IOException {
+    void testAnalyzeAndSendAlerts_handlesExceptionGracefully() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(
                         List.of(

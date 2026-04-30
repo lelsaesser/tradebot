@@ -4,6 +4,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -45,6 +46,7 @@ class OhlcvFetcherTest {
                         telegramGateway,
                         stockSplitDetector);
         ohlcvFetcher.setRequestDelayMs(0);
+        ohlcvFetcher.setRateLimitWaitMs(0);
         // Default: return all ETFs + benchmark (no extra stocks)
         lenient().when(symbolRegistry.getAll()).thenReturn(defaultEtfSymbols());
         // Default: all symbols need backfill
@@ -198,6 +200,7 @@ class OhlcvFetcherTest {
                         telegramGateway,
                         throwingDetector);
         fetcherWithThrowingDetector.setRequestDelayMs(0);
+        fetcherWithThrowingDetector.setRateLimitWaitMs(0);
 
         when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
 
@@ -243,6 +246,70 @@ class OhlcvFetcherTest {
 
         assertThat(count, is(400));
         verify(ohlcvRepository).saveAll(records);
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_rateLimitHit_retriesAfterWait() throws InterruptedException {
+        ohlcvFetcher.setRequestDelayMs(0);
+        ohlcvFetcher.setRateLimitWaitMs(0);
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("IREN", "Iris Energy")));
+        when(ohlcvRepository.findBySymbol("IREN", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(List.of());
+
+        List<OhlcvRecord> records = generateRecords("IREN", 400, 10.0);
+        when(twelveDataClient.fetchDailyOhlcv("IREN", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenThrow(
+                        new IllegalStateException(
+                                "Twelve Data API error for IREN: You have run out of API credits"
+                                        + " for the current minute. 9 API credits were used, with"
+                                        + " the current limit being 8."))
+                .thenReturn(records);
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        verify(twelveDataClient, times(2))
+                .fetchDailyOhlcv("IREN", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        verify(ohlcvRepository).saveAll(records);
+        verify(telegramGateway, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_rateLimitHitTwice_failsAfterRetry() throws InterruptedException {
+        ohlcvFetcher.setRequestDelayMs(0);
+        ohlcvFetcher.setRateLimitWaitMs(0);
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("IREN", "Iris Energy")));
+        when(ohlcvRepository.findBySymbol("IREN", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(List.of());
+
+        when(twelveDataClient.fetchDailyOhlcv("IREN", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenThrow(
+                        new IllegalStateException(
+                                "Twelve Data API error for IREN: You have run out of API credits"
+                                        + " for the current minute."));
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        verify(twelveDataClient, times(2))
+                .fetchDailyOhlcv("IREN", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        verify(ohlcvRepository, never()).saveAll(anyList());
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramGateway).sendMessage(messageCaptor.capture());
+        assertThat(messageCaptor.getValue(), containsString("IREN"));
+    }
+
+    @Test
+    void isRateLimitError_detectsRateLimitMessage() {
+        Exception rateLimitError =
+                new IllegalStateException(
+                        "Twelve Data API error: You have run out of API credits for the current"
+                                + " minute.");
+        Exception otherError = new IllegalStateException("Connection timed out");
+        Exception nullMessage = new IllegalStateException((String) null);
+
+        assertThat(OhlcvFetcher.isRateLimitError(rateLimitError), is(true));
+        assertThat(OhlcvFetcher.isRateLimitError(otherError), is(false));
+        assertThat(OhlcvFetcher.isRateLimitError(nullMessage), is(false));
     }
 
     private List<OhlcvRecord> generateRecords(String symbol, int count) {

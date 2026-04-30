@@ -1,6 +1,5 @@
 package org.tradelite.core;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -42,10 +41,8 @@ public class SectorRelativeStrengthTracker {
      *
      * <p>This method is called during market hours as part of the stock monitoring cycle. It
      * detects when a sector ETF's RS crosses above or below its 50-period EMA.
-     *
-     * @throws IOException if RS data persistence fails
      */
-    public void analyzeAndSendAlerts() throws IOException {
+    public void analyzeAndSendAlerts() {
         log.info("Analyzing sector ETF relative strength for crossovers");
 
         List<RelativeStrengthSignal> outperformingSignals = new ArrayList<>();
@@ -84,9 +81,6 @@ public class SectorRelativeStrengthTracker {
         } else {
             log.info("No sector ETF RS crossovers detected");
         }
-
-        // Persist RS data
-        relativeStrengthService.saveRsHistory();
     }
 
     /**

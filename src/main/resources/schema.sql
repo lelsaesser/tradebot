@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS momentum_roc_state (
     updated_at INTEGER NOT NULL
 );
 
+-- rs_crossover_state: Relative strength crossover detection state
+CREATE TABLE IF NOT EXISTS rs_crossover_state (
+    symbol TEXT PRIMARY KEY,
+    previous_rs REAL NOT NULL,
+    previous_ema REAL NOT NULL,
+    initialized INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+);
+
 -- ignored_symbols: Per-symbol alert suppression with reason and TTL
 CREATE TABLE IF NOT EXISTS ignored_symbols (
     symbol          TEXT    NOT NULL,
