@@ -42,3 +42,7 @@ run-dev.sh
 /data/
 *.db
 deploy-full.sh
+
+# Log scan reports
+log-reports/
+/scripts/scan-logs.sh
