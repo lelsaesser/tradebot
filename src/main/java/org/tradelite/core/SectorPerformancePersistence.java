@@ -1,10 +1,5 @@
 package org.tradelite.core;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -18,40 +13,11 @@ import org.tradelite.repository.SectorPerformanceRepository;
 public class SectorPerformancePersistence {
 
     static final int MAX_HISTORY_DAYS = 365;
-    private static final String JSON_FILE_PATH = "config/sector-performance.json";
 
     private final SectorPerformanceRepository repository;
-    private final ObjectMapper objectMapper;
 
-    public SectorPerformancePersistence(
-            SectorPerformanceRepository repository, ObjectMapper objectMapper) {
+    public SectorPerformancePersistence(SectorPerformanceRepository repository) {
         this.repository = repository;
-        this.objectMapper = objectMapper;
-    }
-
-    @PostConstruct
-    void migrateJsonDataIfNeeded() {
-        File jsonFile = new File(JSON_FILE_PATH);
-        if (!jsonFile.exists()) {
-            return;
-        }
-
-        Optional<SectorPerformanceSnapshot> existing = repository.findLatestSnapshot();
-        if (existing.isPresent()) {
-            return;
-        }
-
-        try {
-            List<SectorPerformanceSnapshot> history =
-                    objectMapper.readValue(jsonFile, new TypeReference<>() {});
-            for (SectorPerformanceSnapshot snapshot : history) {
-                repository.saveSnapshot(snapshot);
-            }
-            log.info(
-                    "Migrated {} sector performance snapshots from JSON to SQLite", history.size());
-        } catch (IOException e) {
-            log.warn("Failed to migrate sector performance JSON data: {}", e.getMessage());
-        }
     }
 
     public void saveSnapshot(SectorPerformanceSnapshot snapshot) {

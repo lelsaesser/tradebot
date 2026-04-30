@@ -2,6 +2,9 @@
 
 ## Current Work Focus
 
+### Sector Performance JSON Cleanup (#329) (April 30, 2026) — COMPLETE
+Removed one-time JSON-to-SQLite migration code from `SectorPerformancePersistence` after confirming #324 deployed successfully (8,352 rows in `industry_performance` table). Removed `@PostConstruct migrateJsonDataIfNeeded()`, `ObjectMapper` dependency, `JSON_FILE_PATH` constant, and related imports. The `config/sector-performance.json` file was already absent. 930 tests pass.
+
 ### JdbcTemplate Migration (#314) (April 26, 2026) — COMPLETE
 Migrated all 4 SQLite repository implementations and DevDataSeeder from raw JDBC to Spring's JdbcTemplate. Evaluated ORM options in #305 — concluded that Hibernate/JPA and lighter ORMs (jOOQ, MyBatis, JDBI, Spring Data JDBC) are all poor fits for this project (no entity relationships, SQLite-specific SQL, only 4 tables). JdbcTemplate is the right middle ground.
 

@@ -1,6 +1,31 @@
 # Progress Tracking
 
-## Latest Milestone: JdbcTemplate Migration (#314) — COMPLETE
+## Latest Milestone: Sector Performance JSON Cleanup (#329) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (April 30, 2026)
+
+#### Purpose
+Remove one-time JSON-to-SQLite migration code from `SectorPerformancePersistence` after confirming #324 deployed successfully. The `industry_performance` table has 8,352 rows — migration confirmed successful.
+
+#### Key Changes
+- Removed `@PostConstruct migrateJsonDataIfNeeded()` method
+- Removed `ObjectMapper` constructor dependency
+- Removed `JSON_FILE_PATH` constant and Jackson/PostConstruct imports
+- Updated test class to match new constructor signature
+- Updated `techContext.md` to remove `config/sector-performance.json` reference
+- `config/sector-performance.json` was already absent from disk
+
+#### Tests: 930 total, all passing
+
+#### Related Issues
+- #324: Sector performance SQLite migration (parent, merged and deployed)
+- #329: Cleanup task (this scope)
+
+---
+
+## Previous Milestone: JdbcTemplate Migration (#314) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
