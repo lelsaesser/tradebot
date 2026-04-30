@@ -15,7 +15,7 @@ public class DateUtil {
         if (date == null) {
             date = LocalDate.now();
         }
-        LocalDate twoMonthsAgo = date.minusMonths(2).withDayOfMonth(date.getDayOfMonth());
+        LocalDate twoMonthsAgo = date.minusMonths(2);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         return twoMonthsAgo.format(formatter);
     }
