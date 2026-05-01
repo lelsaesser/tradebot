@@ -129,8 +129,8 @@ public class PullbackBuyTracker {
 
     static String buildAlertMessage(StockSymbol stock, double price) {
         return String.format(
-                "Potential buy for %s (%s) at $%.2f."
-                        + " 21 EMA pullback while volume and relative strength stay bullish",
+                "Potential buy for *%s (%s)* at $%.2f\n"
+                        + "_21 EMA pullback while volume and relative strength stay bullish_",
                 stock.getCompanyName(), stock.getTicker(), price);
     }
 }
