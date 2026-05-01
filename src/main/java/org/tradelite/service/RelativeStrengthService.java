@@ -33,7 +33,7 @@ public class RelativeStrengthService {
     private static final int MIN_HISTORY_SIZE = 10;
 
     /** Number of calendar days to fetch for RS calculation (with buffer for weekends/holidays) */
-    private static final int RS_LOOKBACK_DAYS = 80;
+    private static final int RS_LOOKBACK_DAYS = 400;
 
     /**
      * Dead zone around the EMA (percentage-based) to filter noise. RS must deviate more than
