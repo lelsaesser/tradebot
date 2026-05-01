@@ -225,6 +225,7 @@ class SchedulerTest {
         // Setup: Mock API request counts
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(150);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(75);
+        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(30);
         when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-09");
 
         scheduler.monthlyApiUsageReport();
@@ -238,6 +239,7 @@ class SchedulerTest {
         // Verify that counts were retrieved
         verify(apiRequestMeteringService, times(1)).getFinnhubRequestCount();
         verify(apiRequestMeteringService, times(1)).getCoingeckoRequestCount();
+        verify(apiRequestMeteringService, times(1)).getTwelveDataRequestCount();
         verify(apiRequestMeteringService, times(1)).getPreviousMonth();
 
         // Verify Telegram message was sent
@@ -248,7 +250,8 @@ class SchedulerTest {
         assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-09*"));
         assertTrue(sentMessage.contains("🔹 *Finnhub API*: 150 requests"));
         assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 75 requests"));
-        assertTrue(sentMessage.contains("🔹 *Total*: 225 requests"));
+        assertTrue(sentMessage.contains("🔹 *Twelve Data API*: 30 requests"));
+        assertTrue(sentMessage.contains("🔹 *Total*: 255 requests"));
 
         // Verify counters were reset
         verify(apiRequestMeteringService, times(1)).resetCounters();
@@ -259,6 +262,7 @@ class SchedulerTest {
         // Setup: Mock zero API request counts
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
+        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(0);
 
         scheduler.monthlyApiUsageReport();
 
@@ -271,6 +275,7 @@ class SchedulerTest {
         // Verify that counts were retrieved
         verify(apiRequestMeteringService, times(1)).getFinnhubRequestCount();
         verify(apiRequestMeteringService, times(1)).getCoingeckoRequestCount();
+        verify(apiRequestMeteringService, times(1)).getTwelveDataRequestCount();
 
         // Verify NO Telegram message was sent (since no requests)
         verify(telegramClient, never()).sendMessage(anyString());
@@ -285,6 +290,7 @@ class SchedulerTest {
         // Setup: Mock only Finnhub requests
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(100);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
+        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(0);
         when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-08");
 
         scheduler.monthlyApiUsageReport();
@@ -303,6 +309,7 @@ class SchedulerTest {
         assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-08*"));
         assertTrue(sentMessage.contains("🔹 *Finnhub API*: 100 requests"));
         assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 0 requests"));
+        assertTrue(sentMessage.contains("🔹 *Twelve Data API*: 0 requests"));
         assertTrue(sentMessage.contains("🔹 *Total*: 100 requests"));
 
         verify(apiRequestMeteringService, times(1)).resetCounters();
@@ -313,6 +320,7 @@ class SchedulerTest {
         // Setup: Mock only CoinGecko requests
         when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
         when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(50);
+        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(0);
         when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-07");
 
         scheduler.monthlyApiUsageReport();
@@ -331,6 +339,7 @@ class SchedulerTest {
         assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-07*"));
         assertTrue(sentMessage.contains("🔹 *Finnhub API*: 0 requests"));
         assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 50 requests"));
+        assertTrue(sentMessage.contains("🔹 *Twelve Data API*: 0 requests"));
         assertTrue(sentMessage.contains("🔹 *Total*: 50 requests"));
 
         verify(apiRequestMeteringService, times(1)).resetCounters();
