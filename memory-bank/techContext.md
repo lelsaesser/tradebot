@@ -64,7 +64,6 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 | `config/stock-symbols.json` | JSON | Dynamic stock symbol registry |
 | `config/target-prices-stocks.json` | JSON | Stock buy/sell targets |
 | `config/target-prices-coins.json` | JSON | Crypto buy/sell targets |
-| `config/sector-performance.json` | JSON | Sector performance history |
 | `config/insider-transactions.json` | JSON | Insider trading data |
 | `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT) |
 | `config/finnhub-monthly-requests.txt` | Text | Finnhub API metering |

@@ -4,7 +4,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -28,7 +27,7 @@ class SectorPerformancePersistenceTest {
 
     @BeforeEach
     void setUp() {
-        persistence = new SectorPerformancePersistence(repository, new ObjectMapper());
+        persistence = new SectorPerformancePersistence(repository);
     }
 
     @Test
