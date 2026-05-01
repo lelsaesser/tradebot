@@ -150,7 +150,7 @@ class SchedulerTest {
     }
 
     @Test
-    void hourlySignalMonitoring_marketClosed_shouldNotRun() throws Exception {
+    void hourlySignalMonitoring_marketClosed_shouldNotRun() {
         // Saturday 11:00 AM NY time = market closed (weekend)
         scheduler.marketDateTime =
                 ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, ZoneId.of("America/New_York"));
@@ -424,7 +424,7 @@ class SchedulerTest {
     }
 
     @Test
-    void manualRelativeStrengthMonitoring_shouldRunAndReturnTrue() throws Exception {
+    void manualRelativeStrengthMonitoring_shouldRunAndReturnTrue() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualRelativeStrengthMonitoring();
