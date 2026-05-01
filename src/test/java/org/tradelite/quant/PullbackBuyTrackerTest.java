@@ -89,7 +89,7 @@ class PullbackBuyTrackerTest {
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(captor.capture());
-        assertThat(captor.getValue(), containsString("Potential buy for Apple Inc (AAPL)"));
+        assertThat(captor.getValue(), containsString("Potential buy for *Apple Inc (AAPL)*"));
         assertThat(captor.getValue(), containsString("$178.50"));
         assertThat(
                 captor.getValue(),
@@ -318,8 +318,9 @@ class PullbackBuyTrackerTest {
         assertThat(
                 message,
                 is(
-                        "Potential buy for Apple Inc (AAPL) at $178.50."
-                                + " 21 EMA pullback while volume and relative strength stay bullish"));
+                        "Potential buy for *Apple Inc (AAPL)* at $178.50\n"
+                                + "_21 EMA pullback while volume and relative strength stay"
+                                + " bullish_"));
     }
 
     private void mockEma(
