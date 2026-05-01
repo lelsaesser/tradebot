@@ -19,7 +19,7 @@ public class VfiService {
     static final double VCOEF = 2.5;
     static final int SIGNAL_LENGTH = 5;
     static final int VOLATILITY_PERIOD = 30;
-    private static final int LOOKBACK_CALENDAR_DAYS = 200;
+    private static final int LOOKBACK_CALENDAR_DAYS = 400;
 
     private final OhlcvRepository ohlcvRepository;
 
@@ -79,8 +79,8 @@ public class VfiService {
         }
 
         // Compute rolling VFI values for signal line
-        // We need SIGNAL_LENGTH + 1 VFI values for a proper EMA(SIGNAL_LENGTH)
-        int numWindows = SIGNAL_LENGTH + 1;
+        // Use all available windows so the signal EMA has enough data to stabilize
+        int numWindows = Math.max(lastWindowEnd - LENGTH, SIGNAL_LENGTH + 1);
         // exclusive
         int firstWindowStart = lastWindowEnd - LENGTH - (numWindows - 1);
 

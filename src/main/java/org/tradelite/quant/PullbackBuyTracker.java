@@ -70,12 +70,12 @@ public class PullbackBuyTracker {
 
             Double livePrice = priceCache.get(stock.getTicker());
             if (livePrice == null) {
-                log.info("Skipping {} — no cached price", stock.getTicker());
+                log.warn("Skipping {} — no cached price", stock.getTicker());
                 continue;
             }
 
             if (!isPullbackPattern(livePrice, ema)) {
-                log.info(
+                log.debug(
                         "Skipping {} — no pullback pattern (price={}, ema9={}, ema21={}, ema50={},"
                                 + " ema100={}, ema200={})",
                         stock.getTicker(),
