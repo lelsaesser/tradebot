@@ -204,7 +204,7 @@ public class SymbolRegistry {
                 .map(entry -> new StockSymbol(entry.getTicker(), entry.getDisplayName()));
     }
 
-    /** Adds a user stock symbol. Cannot add ETFs (they are hardcoded). */
+    /** Adds a stock symbol to the registry. */
     public boolean addSymbol(String ticker, String displayName) {
         if (ticker == null || ticker.isEmpty() || displayName == null || displayName.isEmpty()) {
             return false;
@@ -224,7 +224,7 @@ public class SymbolRegistry {
         return true;
     }
 
-    /** Removes a user stock symbol. Cannot remove ETFs (they are hardcoded). */
+    /** Removes a stock symbol from the registry. */
     public boolean removeSymbol(String ticker) {
         if (ticker == null || ticker.isEmpty()) {
             return false;
