@@ -99,3 +99,18 @@ CREATE TABLE IF NOT EXISTS industry_performance (
 
 CREATE INDEX IF NOT EXISTS idx_industry_performance_fetch_date
     ON industry_performance(fetch_date);
+
+-- target_prices: Buy/sell target prices for stocks and coins
+CREATE TABLE IF NOT EXISTS target_prices (
+    symbol TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    buy_target REAL,
+    sell_target REAL,
+    PRIMARY KEY (symbol, asset_type)
+);
+
+-- stock_symbols: All tracked stock symbols (stocks and ETFs)
+CREATE TABLE IF NOT EXISTS stock_symbols (
+    ticker TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL
+);

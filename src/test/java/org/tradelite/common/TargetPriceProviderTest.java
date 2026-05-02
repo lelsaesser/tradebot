@@ -3,11 +3,10 @@ package org.tradelite.common;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -17,13 +16,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository;
+import org.tradelite.repository.TargetPriceRepository;
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
 class TargetPriceProviderTest {
 
-    private static final String FILE_PATH = "config/target-prices-test.json";
-
     private TargetPriceProvider targetPriceProvider;
+    private TargetPriceRepository targetPriceRepository;
     private String testDbPath;
 
     @BeforeEach
@@ -42,28 +41,16 @@ class TargetPriceProviderTest {
                     PRIMARY KEY (symbol, reason)
                 )
                 """);
-        SqliteIgnoredSymbolRepository repository = new SqliteIgnoredSymbolRepository(jdbcTemplate);
-        targetPriceProvider = new TargetPriceProvider(new ObjectMapper(), repository);
+        SqliteIgnoredSymbolRepository ignoredSymbolRepository =
+                new SqliteIgnoredSymbolRepository(jdbcTemplate);
+        targetPriceRepository = mock(TargetPriceRepository.class);
+        targetPriceProvider =
+                new TargetPriceProvider(targetPriceRepository, ignoredSymbolRepository);
     }
 
     @AfterEach
     void tearDown() {
         new File(testDbPath).delete();
-    }
-
-    private boolean fileContainsSymbol(TickerSymbol symbol) {
-        List<TargetPrice> targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
-
-        boolean found = false;
-        for (TargetPrice targetPrice : targetPrices) {
-            if (targetPrice.getSymbol().equalsIgnoreCase(symbol.getName())) {
-                found = true;
-                assertThat(targetPrice.getBuyTarget(), greaterThanOrEqualTo(0.0));
-                assertThat(targetPrice.getSellTarget(), greaterThanOrEqualTo(0.0));
-                break;
-            }
-        }
-        return found;
     }
 
     @Test
@@ -216,158 +203,116 @@ class TargetPriceProviderTest {
 
     @Test
     void updateTargetPrice_ok() {
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 160.0, 200.0, FILE_PATH);
-        List<TargetPrice> targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
+        List<TargetPrice> prices = new ArrayList<>();
+        prices.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
+        when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(prices);
 
-        for (TargetPrice targetPrice : targetPrices) {
-            if (targetPrice.getSymbol().equals(CoinId.SOLANA.getName())) {
-                assertThat(targetPrice.getBuyTarget(), is(160.0));
-                assertThat(targetPrice.getSellTarget(), is(200.0));
-            }
-        }
+        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 160.0, 200.0, AssetType.COIN);
 
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 250.0, 1100.0, FILE_PATH);
-        targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
-
-        for (TargetPrice targetPrice : targetPrices) {
-            if (targetPrice.getSymbol().equals(CoinId.SOLANA.getName())) {
-                assertThat(targetPrice.getBuyTarget(), is(250.0));
-                assertThat(targetPrice.getSellTarget(), is(1100.0));
-            }
-        }
+        verify(targetPriceRepository)
+                .save(
+                        argThat(
+                                tp ->
+                                        tp.getSymbol().equals(CoinId.SOLANA.getName())
+                                                && tp.getBuyTarget() == 160.0
+                                                && tp.getSellTarget() == 200.0),
+                        eq(AssetType.COIN));
     }
 
     @Test
-    void updateTargetPrice_withNullValues() {
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 165.0, null, FILE_PATH);
-        List<TargetPrice> targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
+    void updateTargetPrice_withNullBuyTarget() {
+        List<TargetPrice> prices = new ArrayList<>();
+        prices.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
+        when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(prices);
 
-        for (TargetPrice targetPrice : targetPrices) {
-            if (targetPrice.getSymbol().equals(CoinId.SOLANA.getName())) {
-                assertThat(targetPrice.getBuyTarget(), is(165.0));
-                assertThat(targetPrice.getSellTarget(), greaterThan(0.0));
-            }
-        }
+        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, null, 1105.0, AssetType.COIN);
 
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, null, 1105.0, FILE_PATH);
-        targetPrices = targetPriceProvider.loadTargetPrices(FILE_PATH);
-
-        for (TargetPrice targetPrice : targetPrices) {
-            if (targetPrice.getSymbol().equals(CoinId.SOLANA.getName())) {
-                assertThat(targetPrice.getBuyTarget(), greaterThan(0.0));
-                assertThat(targetPrice.getSellTarget(), is(1105.0));
-            }
-        }
+        verify(targetPriceRepository)
+                .save(
+                        argThat(
+                                tp ->
+                                        tp.getSymbol().equals(CoinId.SOLANA.getName())
+                                                && tp.getBuyTarget() == 100.0
+                                                && tp.getSellTarget() == 1105.0),
+                        eq(AssetType.COIN));
     }
 
     @Test
-    void updateTargetPrice_exception() {
-        String invalidFilePath = "invalid/path/target-prices.json";
+    void updateTargetPrice_withNullSellTarget() {
+        List<TargetPrice> prices = new ArrayList<>();
+        prices.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
+        when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(prices);
 
-        assertThrows(
-                IllegalStateException.class,
-                () ->
-                        targetPriceProvider.updateTargetPrice(
-                                new StockSymbol("GOOG", "Google"), 160.0, 200.0, invalidFilePath));
+        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 165.0, null, AssetType.COIN);
 
-        boolean found = fileContainsSymbol(new StockSymbol("GOOG", "Google"));
-        assertThat(found, is(false));
+        verify(targetPriceRepository)
+                .save(
+                        argThat(
+                                tp ->
+                                        tp.getSymbol().equals(CoinId.SOLANA.getName())
+                                                && tp.getBuyTarget() == 165.0
+                                                && tp.getSellTarget() == 150.0),
+                        eq(AssetType.COIN));
+    }
+
+    @Test
+    void updateTargetPrice_symbolNotFound_nothingSaved() {
+        when(targetPriceRepository.findByAssetType(AssetType.STOCK)).thenReturn(new ArrayList<>());
+
+        targetPriceProvider.updateTargetPrice(
+                new StockSymbol("GOOG", "Google"), 160.0, 200.0, AssetType.STOCK);
+
+        verify(targetPriceRepository, never()).save(any(), any());
     }
 
     @Test
     void addTargetPrice_ok() {
-        String ticker = CoinId.DOGE.getName();
-        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
+        when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(new ArrayList<>());
 
-        boolean result = targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH);
+        TargetPrice targetPrice = new TargetPrice(CoinId.DOGE.getName(), 0.0, 0.0);
+        boolean result = targetPriceProvider.addTargetPrice(targetPrice, AssetType.COIN);
 
         assertThat(result, is(true));
-
-        boolean found = fileContainsSymbol(CoinId.DOGE);
-        assertThat(found, is(true));
-
-        // Cleanup
-        targetPriceProvider.removeSymbolFromTargetPrices(ticker, FILE_PATH);
-        found = fileContainsSymbol(CoinId.DOGE);
-        assertThat(found, is(false));
+        verify(targetPriceRepository).save(targetPrice, AssetType.COIN);
     }
 
     @Test
     void addTargetPrice_symbolAlreadyExists_nothingAdded() {
-        String ticker = CoinId.SOLANA.getName();
+        List<TargetPrice> existing = new ArrayList<>();
+        existing.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
+        when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(existing);
 
-        boolean found = fileContainsSymbol(CoinId.SOLANA);
-        assertThat(found, is(true));
-
-        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
-        boolean result = targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH);
-
-        assertThat(result, is(false));
-
-        found = fileContainsSymbol(CoinId.SOLANA);
-        assertThat(found, is(true));
-    }
-
-    @Test
-    void addTargetPrice_exception_nothingAdded() {
-        String ticker = new StockSymbol("AMZN", "Amazon").getTicker();
-
-        // Simulate an exception by providing an invalid file path
-        String invalidFilePath = "invalid/path/target-prices.json";
-        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
-        boolean result = targetPriceProvider.addTargetPrice(targetPrice, invalidFilePath);
+        TargetPrice targetPrice = new TargetPrice(CoinId.SOLANA.getName(), 0.0, 0.0);
+        boolean result = targetPriceProvider.addTargetPrice(targetPrice, AssetType.COIN);
 
         assertThat(result, is(false));
-
-        // Ensure the symbol was not added to the original file
-        boolean found = fileContainsSymbol(new StockSymbol("AMZN", "Amazon"));
-        assertThat(found, is(false));
+        verify(targetPriceRepository, never()).save(any(), any());
     }
 
     @Test
     void removeSymbolFromTargetPrices_symbolPresent_isRemoved() {
-        String ticker = CoinId.SOLANA.getName();
+        when(targetPriceRepository.deleteBySymbolAndType(CoinId.SOLANA.getName(), AssetType.COIN))
+                .thenReturn(true);
 
-        boolean found = fileContainsSymbol(CoinId.SOLANA);
-        assertThat(found, is(true));
+        boolean result =
+                targetPriceProvider.removeSymbolFromTargetPrices(
+                        CoinId.SOLANA.getName(), AssetType.COIN);
 
-        targetPriceProvider.removeSymbolFromTargetPrices(ticker, FILE_PATH);
-
-        found = fileContainsSymbol(CoinId.SOLANA);
-        assertThat(found, is(false));
-
-        // cleanup: add it back for other tests
-        TargetPrice targetPrice = new TargetPrice(ticker, 0.0, 0.0);
-        targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH);
+        assertThat(result, is(true));
+        verify(targetPriceRepository)
+                .deleteBySymbolAndType(CoinId.SOLANA.getName(), AssetType.COIN);
     }
 
     @Test
-    void removeSymbolFromTargetPrices_symbolNotPresent_nothingHappens() {
-        String ticker = CoinId.DOGE.getName();
+    void removeSymbolFromTargetPrices_symbolNotPresent_returnsFalse() {
+        when(targetPriceRepository.deleteBySymbolAndType(CoinId.DOGE.getName(), AssetType.COIN))
+                .thenReturn(false);
 
-        boolean found = fileContainsSymbol(CoinId.DOGE);
-        assertThat(found, is(false));
+        boolean result =
+                targetPriceProvider.removeSymbolFromTargetPrices(
+                        CoinId.DOGE.getName(), AssetType.COIN);
 
-        targetPriceProvider.removeSymbolFromTargetPrices(ticker, FILE_PATH);
-
-        found = fileContainsSymbol(CoinId.DOGE);
-        assertThat(found, is(false));
-    }
-
-    @Test
-    void removeSymbolFromTargetPrices_exception_nothingHappens() {
-        String ticker = CoinId.BITCOIN.getName();
-
-        // Simulate an exception by providing an invalid file path
-        String invalidFilePath = "invalid/path/target-prices.json";
-        boolean result = targetPriceProvider.removeSymbolFromTargetPrices(ticker, invalidFilePath);
-
-        // Method returns false on error (doesn't throw)
         assertThat(result, is(false));
-
-        // Ensure the symbol was not removed from the original file
-        boolean found = fileContainsSymbol(CoinId.BITCOIN);
-        assertThat(found, is(true));
     }
 
     @Test
@@ -386,15 +331,25 @@ class TargetPriceProviderTest {
 
     @Test
     void getStockTargetPrices_ok() {
+        List<TargetPrice> expected = List.of(new TargetPrice("AAPL", 150.0, 200.0));
+        when(targetPriceRepository.findByAssetType(AssetType.STOCK)).thenReturn(expected);
+
         List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
 
         assertThat(targetPrices, notNullValue());
+        assertThat(targetPrices, is(expected));
+        verify(targetPriceRepository).findByAssetType(AssetType.STOCK);
     }
 
     @Test
     void getCoinTargetPrices_ok() {
+        List<TargetPrice> expected = List.of(new TargetPrice("SOL", 100.0, 150.0));
+        when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(expected);
+
         List<TargetPrice> targetPrices = targetPriceProvider.getCoinTargetPrices();
 
         assertThat(targetPrices, notNullValue());
+        assertThat(targetPrices, is(expected));
+        verify(targetPriceRepository).findByAssetType(AssetType.COIN);
     }
 }

@@ -28,6 +28,8 @@ import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
+import org.tradelite.repository.StockSymbolRepository;
+import org.tradelite.repository.TargetPriceRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 
@@ -157,6 +159,16 @@ class ProfileWiringTest {
         @Bean
         SectorPerformanceRepository sectorPerformanceRepository() {
             return mock(SectorPerformanceRepository.class);
+        }
+
+        @Bean
+        StockSymbolRepository stockSymbolRepository() {
+            return mock(StockSymbolRepository.class);
+        }
+
+        @Bean
+        TargetPriceRepository targetPriceRepository() {
+            return mock(TargetPriceRepository.class);
         }
     }
 }
