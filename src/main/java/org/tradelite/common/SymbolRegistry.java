@@ -20,7 +20,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.tradelite.repository.StockSymbolRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
 
 /**
  * Central registry of all tracked symbols: ETFs (sector + thematic + benchmark) and individual
@@ -90,19 +90,19 @@ public class SymbolRegistry {
         ETF_SYMBOLS = Set.copyOf(allEtfSet);
     }
 
-    private final StockSymbolRepository stockSymbolRepository;
+    private final TrackedSymbolRepository trackedSymbolRepository;
     private List<StockSymbolEntry> stockSymbols;
 
     @Autowired
-    public SymbolRegistry(StockSymbolRepository stockSymbolRepository) {
-        this.stockSymbolRepository = stockSymbolRepository;
-        this.stockSymbols = new ArrayList<>(stockSymbolRepository.findAll());
+    public SymbolRegistry(TrackedSymbolRepository trackedSymbolRepository) {
+        this.trackedSymbolRepository = trackedSymbolRepository;
+        this.stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
         log.info("Loaded {} stock symbols from SQLite", stockSymbols.size());
     }
 
     @PostConstruct
     void migrateJsonIfNeeded() {
-        if (stockSymbolRepository.count() > 0) {
+        if (trackedSymbolRepository.count() > 0) {
             return;
         }
 
@@ -116,9 +116,10 @@ public class SymbolRegistry {
             List<StockSymbolEntry> entries =
                     objectMapper.readValue(inputStream, new TypeReference<>() {});
             for (StockSymbolEntry entry : entries) {
-                stockSymbolRepository.save(entry.getTicker(), entry.getDisplayName());
+                trackedSymbolRepository.save(
+                        entry.getTicker(), entry.getDisplayName(), AssetType.STOCK);
             }
-            stockSymbols = new ArrayList<>(stockSymbolRepository.findAll());
+            stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
             log.info(
                     "Migrated {} stock symbols from {} to SQLite",
                     entries.size(),
@@ -218,8 +219,8 @@ public class SymbolRegistry {
             return false;
         }
 
-        stockSymbolRepository.save(ticker.toUpperCase(), displayName);
-        stockSymbols = new ArrayList<>(stockSymbolRepository.findAll());
+        trackedSymbolRepository.save(ticker.toUpperCase(), displayName, AssetType.STOCK);
+        stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
         log.info("Added stock symbol: {} ({})", ticker, displayName);
         return true;
     }
@@ -230,10 +231,12 @@ public class SymbolRegistry {
             return false;
         }
 
-        boolean removed = stockSymbolRepository.deleteByTicker(ticker.toUpperCase());
+        boolean removed =
+                trackedSymbolRepository.deleteByTickerAndType(
+                        ticker.toUpperCase(), AssetType.STOCK);
 
         if (removed) {
-            stockSymbols = new ArrayList<>(stockSymbolRepository.findAll());
+            stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
             log.info("Removed stock symbol: {}", ticker);
         }
 

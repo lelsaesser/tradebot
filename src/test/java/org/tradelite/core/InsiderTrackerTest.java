@@ -22,7 +22,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.InsiderTransactionRepository;
 import org.tradelite.repository.InsiderTransactionRepository.InsiderTransactionRow;
-import org.tradelite.repository.StockSymbolRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
 
 @ExtendWith(MockitoExtension.class)
 class InsiderTrackerTest {
@@ -31,7 +31,7 @@ class InsiderTrackerTest {
     @Mock private TelegramGateway telegramClient;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private InsiderTransactionRepository insiderTransactionRepository;
-    @Mock private StockSymbolRepository stockSymbolRepository;
+    @Mock private TrackedSymbolRepository trackedSymbolRepository;
 
     private InsiderTracker insiderTracker;
 
@@ -47,7 +47,7 @@ class InsiderTrackerTest {
                         new SymbolRegistry.StockSymbolEntry("MSFT", "Microsoft"),
                         new SymbolRegistry.StockSymbolEntry("PLTR", "Palantir"),
                         new SymbolRegistry.StockSymbolEntry("HOOD", "Robinhood"));
-        when(stockSymbolRepository.findAll()).thenReturn(entries);
+        when(trackedSymbolRepository.findAll()).thenReturn(entries);
 
         insiderTracker =
                 new InsiderTracker(
@@ -55,7 +55,7 @@ class InsiderTrackerTest {
                         telegramClient,
                         targetPriceProvider,
                         insiderTransactionRepository,
-                        new SymbolRegistry(stockSymbolRepository));
+                        new SymbolRegistry(trackedSymbolRepository));
     }
 
     @Test

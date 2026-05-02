@@ -14,12 +14,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.repository.StockSymbolRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
 
 @ExtendWith(MockitoExtension.class)
 class SymbolRegistryTest {
 
-    @Mock private StockSymbolRepository stockSymbolRepository;
+    @Mock private TrackedSymbolRepository trackedSymbolRepository;
 
     private SymbolRegistry symbolRegistry;
 
@@ -35,8 +35,8 @@ class SymbolRegistryTest {
 
     @BeforeEach
     void setUp() {
-        when(stockSymbolRepository.findAll()).thenReturn(defaultEntries());
-        symbolRegistry = new SymbolRegistry(stockSymbolRepository);
+        when(trackedSymbolRepository.findAll()).thenReturn(defaultEntries());
+        symbolRegistry = new SymbolRegistry(trackedSymbolRepository);
     }
 
     @Test
@@ -99,12 +99,12 @@ class SymbolRegistryTest {
     void addSymbol_newSymbol_returnsTrue() {
         List<SymbolRegistry.StockSymbolEntry> updatedEntries = new ArrayList<>(defaultEntries());
         updatedEntries.add(new SymbolRegistry.StockSymbolEntry("TEST", "Test Company"));
-        when(stockSymbolRepository.findAll()).thenReturn(updatedEntries);
+        when(trackedSymbolRepository.findAll()).thenReturn(updatedEntries);
 
         boolean result = symbolRegistry.addSymbol("TEST", "Test Company");
 
         assertTrue(result);
-        verify(stockSymbolRepository).save("TEST", "Test Company");
+        verify(trackedSymbolRepository).save("TEST", "Test Company", AssetType.STOCK);
         Optional<StockSymbol> added = symbolRegistry.fromString("TEST");
         assertTrue(added.isPresent());
         assertThat(added.get().getTicker(), is("TEST"));
@@ -116,7 +116,8 @@ class SymbolRegistryTest {
         boolean result = symbolRegistry.addSymbol("AAPL", "Apple Inc");
 
         assertFalse(result);
-        verify(stockSymbolRepository, never()).save(anyString(), anyString());
+        verify(trackedSymbolRepository, never())
+                .save(anyString(), anyString(), any(AssetType.class));
     }
 
     @Test
@@ -125,28 +126,31 @@ class SymbolRegistryTest {
         assertFalse(symbolRegistry.addSymbol("", "Test"));
         assertFalse(symbolRegistry.addSymbol("TEST", null));
         assertFalse(symbolRegistry.addSymbol("TEST", ""));
-        verify(stockSymbolRepository, never()).save(anyString(), anyString());
+        verify(trackedSymbolRepository, never())
+                .save(anyString(), anyString(), any(AssetType.class));
     }
 
     @Test
     void removeSymbol_existingSymbol_returnsTrue() {
-        when(stockSymbolRepository.deleteByTicker("TEST")).thenReturn(true);
+        when(trackedSymbolRepository.deleteByTickerAndType("TEST", AssetType.STOCK))
+                .thenReturn(true);
         List<SymbolRegistry.StockSymbolEntry> entriesWithTest = new ArrayList<>(defaultEntries());
         entriesWithTest.add(new SymbolRegistry.StockSymbolEntry("TEST", "Test Company"));
-        when(stockSymbolRepository.findAll()).thenReturn(entriesWithTest);
-        symbolRegistry = new SymbolRegistry(stockSymbolRepository);
+        when(trackedSymbolRepository.findAll()).thenReturn(entriesWithTest);
+        symbolRegistry = new SymbolRegistry(trackedSymbolRepository);
 
-        when(stockSymbolRepository.findAll()).thenReturn(defaultEntries());
+        when(trackedSymbolRepository.findAll()).thenReturn(defaultEntries());
         boolean result = symbolRegistry.removeSymbol("TEST");
 
         assertTrue(result);
-        verify(stockSymbolRepository).deleteByTicker("TEST");
+        verify(trackedSymbolRepository).deleteByTickerAndType("TEST", AssetType.STOCK);
         assertTrue(symbolRegistry.fromString("TEST").isEmpty());
     }
 
     @Test
     void removeSymbol_nonExistingSymbol_returnsFalse() {
-        when(stockSymbolRepository.deleteByTicker("NONEXISTENT")).thenReturn(false);
+        when(trackedSymbolRepository.deleteByTickerAndType("NONEXISTENT", AssetType.STOCK))
+                .thenReturn(false);
 
         boolean result = symbolRegistry.removeSymbol("NONEXISTENT");
 
@@ -171,12 +175,12 @@ class SymbolRegistryTest {
     void addSymbol_convertsToUpperCase() {
         List<SymbolRegistry.StockSymbolEntry> updatedEntries = new ArrayList<>(defaultEntries());
         updatedEntries.add(new SymbolRegistry.StockSymbolEntry("TEST", "Test Company"));
-        when(stockSymbolRepository.findAll()).thenReturn(updatedEntries);
+        when(trackedSymbolRepository.findAll()).thenReturn(updatedEntries);
 
         boolean result = symbolRegistry.addSymbol("test", "Test Company");
 
         assertTrue(result);
-        verify(stockSymbolRepository).save("TEST", "Test Company");
+        verify(trackedSymbolRepository).save("TEST", "Test Company", AssetType.STOCK);
         Optional<StockSymbol> added = symbolRegistry.fromString("TEST");
         assertTrue(added.isPresent());
         assertThat(added.get().getTicker(), is("TEST"));
@@ -191,17 +195,18 @@ class SymbolRegistryTest {
 
     @Test
     void removeSymbol_caseInsensitive_returnsTrue() {
-        when(stockSymbolRepository.deleteByTicker("TEST")).thenReturn(true);
+        when(trackedSymbolRepository.deleteByTickerAndType("TEST", AssetType.STOCK))
+                .thenReturn(true);
         List<SymbolRegistry.StockSymbolEntry> entriesWithTest = new ArrayList<>(defaultEntries());
         entriesWithTest.add(new SymbolRegistry.StockSymbolEntry("TEST", "Test Company"));
-        when(stockSymbolRepository.findAll()).thenReturn(entriesWithTest);
-        symbolRegistry = new SymbolRegistry(stockSymbolRepository);
+        when(trackedSymbolRepository.findAll()).thenReturn(entriesWithTest);
+        symbolRegistry = new SymbolRegistry(trackedSymbolRepository);
 
-        when(stockSymbolRepository.findAll()).thenReturn(defaultEntries());
+        when(trackedSymbolRepository.findAll()).thenReturn(defaultEntries());
         boolean result = symbolRegistry.removeSymbol("test");
 
         assertTrue(result);
-        verify(stockSymbolRepository).deleteByTicker("TEST");
+        verify(trackedSymbolRepository).deleteByTickerAndType("TEST", AssetType.STOCK);
         assertTrue(symbolRegistry.fromString("TEST").isEmpty());
     }
 

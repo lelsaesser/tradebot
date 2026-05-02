@@ -10,25 +10,26 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.SymbolRegistry.StockSymbolEntry;
 
 @JdbcTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Sql("classpath:schema.sql")
-class SqliteStockSymbolRepositoryTest {
+class SqliteTrackedSymbolRepositoryTest {
 
     @Autowired private JdbcTemplate jdbcTemplate;
 
-    private SqliteStockSymbolRepository repository;
+    private SqliteTrackedSymbolRepository repository;
 
     @BeforeEach
     void setUp() {
-        repository = new SqliteStockSymbolRepository(jdbcTemplate);
+        repository = new SqliteTrackedSymbolRepository(jdbcTemplate);
     }
 
     @Test
     void save_insertsNewSymbol() {
-        repository.save("AAPL", "Apple");
+        repository.save("AAPL", "Apple", AssetType.STOCK);
 
         List<StockSymbolEntry> results = repository.findAll();
         assertEquals(1, results.size());
@@ -38,8 +39,8 @@ class SqliteStockSymbolRepositoryTest {
 
     @Test
     void save_replacesExistingSymbol() {
-        repository.save("AAPL", "Apple");
-        repository.save("AAPL", "Apple Inc");
+        repository.save("AAPL", "Apple", AssetType.STOCK);
+        repository.save("AAPL", "Apple Inc", AssetType.STOCK);
 
         List<StockSymbolEntry> results = repository.findAll();
         assertEquals(1, results.size());
@@ -48,9 +49,9 @@ class SqliteStockSymbolRepositoryTest {
 
     @Test
     void findAll_returnsAllSymbolsOrderedByTicker() {
-        repository.save("MSFT", "Microsoft");
-        repository.save("AAPL", "Apple");
-        repository.save("GOOG", "Google");
+        repository.save("MSFT", "Microsoft", AssetType.STOCK);
+        repository.save("AAPL", "Apple", AssetType.STOCK);
+        repository.save("GOOG", "Google", AssetType.STOCK);
 
         List<StockSymbolEntry> results = repository.findAll();
         assertEquals(3, results.size());
@@ -66,27 +67,51 @@ class SqliteStockSymbolRepositoryTest {
     }
 
     @Test
-    void deleteByTicker_existingEntry_returnsTrue() {
-        repository.save("AAPL", "Apple");
+    void findByAssetType_returnsOnlyMatchingType() {
+        repository.save("AAPL", "Apple", AssetType.STOCK);
+        repository.save("BITCOIN", "Bitcoin", AssetType.COIN);
 
-        boolean deleted = repository.deleteByTicker("AAPL");
+        List<StockSymbolEntry> stocks = repository.findByAssetType(AssetType.STOCK);
+        List<StockSymbolEntry> coins = repository.findByAssetType(AssetType.COIN);
+
+        assertEquals(1, stocks.size());
+        assertEquals("AAPL", stocks.getFirst().getTicker());
+        assertEquals(1, coins.size());
+        assertEquals("BITCOIN", coins.getFirst().getTicker());
+    }
+
+    @Test
+    void deleteByTickerAndType_existingEntry_returnsTrue() {
+        repository.save("AAPL", "Apple", AssetType.STOCK);
+
+        boolean deleted = repository.deleteByTickerAndType("AAPL", AssetType.STOCK);
 
         assertTrue(deleted);
         assertTrue(repository.findAll().isEmpty());
     }
 
     @Test
-    void deleteByTicker_nonExistingEntry_returnsFalse() {
-        boolean deleted = repository.deleteByTicker("AAPL");
+    void deleteByTickerAndType_nonExistingEntry_returnsFalse() {
+        boolean deleted = repository.deleteByTickerAndType("AAPL", AssetType.STOCK);
         assertFalse(deleted);
+    }
+
+    @Test
+    void deleteByTickerAndType_wrongType_returnsFalse() {
+        repository.save("AAPL", "Apple", AssetType.STOCK);
+
+        boolean deleted = repository.deleteByTickerAndType("AAPL", AssetType.COIN);
+
+        assertFalse(deleted);
+        assertEquals(1, repository.findAll().size());
     }
 
     @Test
     void count_returnsTotal() {
         assertEquals(0, repository.count());
 
-        repository.save("AAPL", "Apple");
-        repository.save("MSFT", "Microsoft");
+        repository.save("AAPL", "Apple", AssetType.STOCK);
+        repository.save("BITCOIN", "Bitcoin", AssetType.COIN);
 
         assertEquals(2, repository.count());
     }

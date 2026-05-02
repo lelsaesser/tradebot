@@ -109,8 +109,10 @@ CREATE TABLE IF NOT EXISTS target_prices (
     PRIMARY KEY (symbol, asset_type)
 );
 
--- stock_symbols: All tracked stock symbols (stocks and ETFs)
-CREATE TABLE IF NOT EXISTS stock_symbols (
-    ticker TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL
+-- tracked_symbols: All tracked symbols (stocks, ETFs, and coins)
+CREATE TABLE IF NOT EXISTS tracked_symbols (
+    ticker TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    PRIMARY KEY (ticker, asset_type)
 );

@@ -35,8 +35,8 @@ import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
-import org.tradelite.repository.StockSymbolRepository;
 import org.tradelite.repository.TargetPriceRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
@@ -74,7 +74,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final OhlcvRepository ohlcvRepository;
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final SectorPerformanceRepository sectorPerformanceRepository;
-    private final StockSymbolRepository stockSymbolRepository;
+    private final TrackedSymbolRepository trackedSymbolRepository;
     private final TargetPriceRepository targetPriceRepository;
     private final Path rsDataFilePath;
 
@@ -90,7 +90,7 @@ public class DevDataSeeder implements ApplicationRunner {
             OhlcvRepository ohlcvRepository,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             SectorPerformanceRepository sectorPerformanceRepository,
-            StockSymbolRepository stockSymbolRepository,
+            TrackedSymbolRepository trackedSymbolRepository,
             TargetPriceRepository targetPriceRepository) {
         this(
                 jdbcTemplate,
@@ -103,7 +103,7 @@ public class DevDataSeeder implements ApplicationRunner {
                 ohlcvRepository,
                 finnhubPriceEvaluator,
                 sectorPerformanceRepository,
-                stockSymbolRepository,
+                trackedSymbolRepository,
                 targetPriceRepository,
                 Path.of("config/rs-data.json"));
     }
@@ -119,7 +119,7 @@ public class DevDataSeeder implements ApplicationRunner {
             OhlcvRepository ohlcvRepository,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             SectorPerformanceRepository sectorPerformanceRepository,
-            StockSymbolRepository stockSymbolRepository,
+            TrackedSymbolRepository trackedSymbolRepository,
             TargetPriceRepository targetPriceRepository,
             Path rsDataFilePath) {
         this.jdbcTemplate = jdbcTemplate;
@@ -132,7 +132,7 @@ public class DevDataSeeder implements ApplicationRunner {
         this.ohlcvRepository = ohlcvRepository;
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.sectorPerformanceRepository = sectorPerformanceRepository;
-        this.stockSymbolRepository = stockSymbolRepository;
+        this.trackedSymbolRepository = trackedSymbolRepository;
         this.targetPriceRepository = targetPriceRepository;
         this.rsDataFilePath = rsDataFilePath;
     }
@@ -196,7 +196,7 @@ public class DevDataSeeder implements ApplicationRunner {
         jdbcTemplate.update("DELETE FROM twelvedata_daily_ohlcv");
         jdbcTemplate.update("DELETE FROM industry_performance");
         jdbcTemplate.update("DELETE FROM target_prices");
-        jdbcTemplate.update("DELETE FROM stock_symbols");
+        jdbcTemplate.update("DELETE FROM tracked_symbols");
 
         try {
             Files.deleteIfExists(rsDataFilePath);
@@ -216,7 +216,7 @@ public class DevDataSeeder implements ApplicationRunner {
                         new String[] {"NVDA", "Nvidia"});
 
         for (String[] stock : sampleStocks) {
-            stockSymbolRepository.save(stock[0], stock[1]);
+            trackedSymbolRepository.save(stock[0], stock[1], AssetType.STOCK);
             targetPriceRepository.save(new TargetPrice(stock[0], 150.0, 250.0), AssetType.STOCK);
         }
 

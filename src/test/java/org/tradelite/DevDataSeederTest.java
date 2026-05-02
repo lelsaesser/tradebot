@@ -34,8 +34,8 @@ import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
-import org.tradelite.repository.StockSymbolRepository;
 import org.tradelite.repository.TargetPriceRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.RelativeStrengthData;
 
@@ -68,7 +68,7 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
-        StockSymbolRepository stockSymbolRepository = mock(StockSymbolRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
         TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
@@ -98,7 +98,7 @@ class DevDataSeederTest {
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
-                        stockSymbolRepository,
+                        trackedSymbolRepository,
                         targetPriceRepository,
                         tempDir.resolve("rs-data.json"));
 
@@ -128,7 +128,7 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
-        StockSymbolRepository stockSymbolRepository = mock(StockSymbolRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
         TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
@@ -148,7 +148,7 @@ class DevDataSeederTest {
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
-                        stockSymbolRepository,
+                        trackedSymbolRepository,
                         targetPriceRepository,
                         tempDir.resolve("rs-data.json"));
 
@@ -189,7 +189,7 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
-        StockSymbolRepository stockSymbolRepository = mock(StockSymbolRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
         TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
@@ -219,7 +219,7 @@ class DevDataSeederTest {
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
-                        stockSymbolRepository,
+                        trackedSymbolRepository,
                         targetPriceRepository,
                         tempDir.resolve("rs-fallback.json"));
 
@@ -246,7 +246,7 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
-        StockSymbolRepository stockSymbolRepository = mock(StockSymbolRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
         TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
@@ -265,7 +265,7 @@ class DevDataSeederTest {
                 ohlcvRepository,
                 finnhubPriceEvaluator,
                 sectorPerformanceRepository,
-                stockSymbolRepository,
+                trackedSymbolRepository,
                 targetPriceRepository,
                 rsPath);
     }
@@ -345,9 +345,11 @@ class DevDataSeederTest {
                 """);
         jdbcTemplate.execute(
                 """
-                CREATE TABLE IF NOT EXISTS stock_symbols (
-                    ticker TEXT PRIMARY KEY,
-                    display_name TEXT NOT NULL
+                CREATE TABLE IF NOT EXISTS tracked_symbols (
+                    ticker TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    asset_type TEXT NOT NULL,
+                    PRIMARY KEY (ticker, asset_type)
                 )
                 """);
         return jdbcTemplate;
