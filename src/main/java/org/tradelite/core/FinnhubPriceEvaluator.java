@@ -16,6 +16,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
+import org.tradelite.service.MarketStatusService;
 
 @Slf4j
 @Component
@@ -27,6 +28,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final SymbolRegistry symbolRegistry;
     private final PriceQuoteRepository priceQuoteRepository;
     private final FeatureToggleService featureToggleService;
+    private final MarketStatusService marketStatusService;
 
     @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
 
@@ -37,7 +39,8 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             TelegramGateway telegramClient,
             SymbolRegistry symbolRegistry,
             PriceQuoteRepository priceQuoteRepository,
-            FeatureToggleService featureToggleService) {
+            FeatureToggleService featureToggleService,
+            MarketStatusService marketStatusService) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
@@ -45,6 +48,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         this.symbolRegistry = symbolRegistry;
         this.priceQuoteRepository = priceQuoteRepository;
         this.featureToggleService = featureToggleService;
+        this.marketStatusService = marketStatusService;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
@@ -67,10 +71,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
             // Persist price quote to SQLite for historical data collection (if enabled)
             if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)
-                    && !isPotentialMarketHoliday(
-                            symbol.getTicker(),
-                            priceQuote.getCurrentPrice(),
-                            priceQuote.getPreviousClose())) {
+                    && marketStatusService.isMarketOpen(null)) {
                 priceQuoteRepository.save(priceQuote);
             }
 
@@ -96,20 +97,6 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         }
 
         return updatedCount;
-    }
-
-    public boolean isPotentialMarketHoliday(
-            String symbol, double currentPrice, double previousClose) {
-        if (Math.abs(currentPrice - previousClose) < 0.0001) {
-            log.info(
-                    "Potential market holiday detected for {}: current price {} == previous close {}, skipping SQLite persistence",
-                    symbol,
-                    currentPrice,
-                    previousClose);
-            return true;
-        }
-
-        return false;
     }
 
     public void evaluateHighPriceChange(PriceQuoteResponse priceQuote) {

@@ -2,18 +2,15 @@
 
 ## Current Work Focus
 
-### Migrate target-prices + stock-symbols to SQLite (#326) (May 3, 2026) — COMPLETE
-Final PR in the #320 JSON-to-SQLite migration series. Replaced the two highest-risk, user-facing JSON files with SQLite tables.
+### Fix market holiday detection false positives (#333) (May 3, 2026) — COMPLETE
+Replaced the per-symbol `isPotentialMarketHoliday()` heuristic (which caused false positives for illiquid ETFs) with an authoritative Finnhub-based holiday calendar.
 
 **Key Changes:**
-- New `AssetType` enum (`STOCK`, `COIN`) replaces file-path-based discrimination
-- New `target_prices` table (symbol, asset_type, buy_target, sell_target) with `TargetPriceRepository` interface + `SqliteTargetPriceRepository`
-- New `stock_symbols` table (ticker, display_name) with `StockSymbolRepository` interface + `SqliteStockSymbolRepository`
-- `TargetPriceProvider`: replaced ObjectMapper with TargetPriceRepository, mutation methods take `AssetType` instead of `String filePath`
-- `SymbolRegistry`: replaced ObjectMapper/FileInputStream with StockSymbolRepository, in-memory cache reloads from DB on add/remove
-- Telegram command processors updated for `AssetType` param
-- `@PostConstruct` one-time migration in both classes (reads JSON if table empty + file exists)
-- DevDataSeeder seeds both new tables
-- JSON files kept on disk for now; cleanup tracked in #359
+- New `MarketHolidayService`: fetches `/stock/market-holiday?exchange=US` at startup, caches ~5 years of holidays in memory
+- Handles full closures AND early-close days (e.g., day after Thanksgiving 09:30-13:00)
+- Retry every 5 min if fetch fails; falls back to weekday+hours while cache empty
+- `Scheduler`: replaced `DateUtil.isStockMarketOpen()` with `marketHolidayService.isMarketOpen()`
+- `FinnhubPriceEvaluator`: removed `isPotentialMarketHoliday()`, persistence guarded by `marketHolidayService.isMarketOpen(null)` (defense in depth)
+- `FinnhubClient`: added `getMarketHolidays()` method + `MarketHolidayResponse` DTO
 
-**Build:** 945 tests pass, spotless clean.
+**Build:** 951 tests pass, spotless clean.
