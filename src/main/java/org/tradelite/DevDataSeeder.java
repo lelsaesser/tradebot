@@ -22,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.client.finviz.dto.IndustryPerformance;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -34,6 +35,8 @@ import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
+import org.tradelite.repository.TargetPriceRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
@@ -71,6 +74,8 @@ public class DevDataSeeder implements ApplicationRunner {
     private final OhlcvRepository ohlcvRepository;
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final SectorPerformanceRepository sectorPerformanceRepository;
+    private final TrackedSymbolRepository trackedSymbolRepository;
+    private final TargetPriceRepository targetPriceRepository;
     private final Path rsDataFilePath;
 
     @Autowired
@@ -84,7 +89,9 @@ public class DevDataSeeder implements ApplicationRunner {
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
-            SectorPerformanceRepository sectorPerformanceRepository) {
+            SectorPerformanceRepository sectorPerformanceRepository,
+            TrackedSymbolRepository trackedSymbolRepository,
+            TargetPriceRepository targetPriceRepository) {
         this(
                 jdbcTemplate,
                 objectMapper,
@@ -96,6 +103,8 @@ public class DevDataSeeder implements ApplicationRunner {
                 ohlcvRepository,
                 finnhubPriceEvaluator,
                 sectorPerformanceRepository,
+                trackedSymbolRepository,
+                targetPriceRepository,
                 Path.of("config/rs-data.json"));
     }
 
@@ -110,6 +119,8 @@ public class DevDataSeeder implements ApplicationRunner {
             OhlcvRepository ohlcvRepository,
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             SectorPerformanceRepository sectorPerformanceRepository,
+            TrackedSymbolRepository trackedSymbolRepository,
+            TargetPriceRepository targetPriceRepository,
             Path rsDataFilePath) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
@@ -121,6 +132,8 @@ public class DevDataSeeder implements ApplicationRunner {
         this.ohlcvRepository = ohlcvRepository;
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.sectorPerformanceRepository = sectorPerformanceRepository;
+        this.trackedSymbolRepository = trackedSymbolRepository;
+        this.targetPriceRepository = targetPriceRepository;
         this.rsDataFilePath = rsDataFilePath;
     }
 
@@ -141,9 +154,10 @@ public class DevDataSeeder implements ApplicationRunner {
 
     public void reseed() {
         log.info("Seeding dev analytics data");
+        clearExistingData();
+        seedStockSymbolsAndTargetPrices();
         SeedBundle bundle = buildSeedBundle();
         try {
-            clearExistingData();
             insertPriceHistory(bundle.priceSeriesBySymbol());
             seedRelativeStrengthHistory(bundle);
             seedMomentumState(bundle);
@@ -176,14 +190,43 @@ public class DevDataSeeder implements ApplicationRunner {
         }
     }
 
-    private void clearExistingData() throws IOException {
+    private void clearExistingData() {
         jdbcTemplate.update("DELETE FROM finnhub_price_quotes");
         jdbcTemplate.update("DELETE FROM momentum_roc_state");
         jdbcTemplate.update("DELETE FROM twelvedata_daily_ohlcv");
         jdbcTemplate.update("DELETE FROM industry_performance");
+        jdbcTemplate.update("DELETE FROM target_prices");
+        jdbcTemplate.update("DELETE FROM tracked_symbols");
 
-        Files.deleteIfExists(rsDataFilePath);
+        try {
+            Files.deleteIfExists(rsDataFilePath);
+        } catch (IOException e) {
+            log.warn("Failed to delete RS data file: {}", rsDataFilePath, e);
+        }
         relativeStrengthService.getRsHistory().clear();
+    }
+
+    private void seedStockSymbolsAndTargetPrices() {
+        List<String[]> sampleStocks =
+                List.of(
+                        new String[] {"AAPL", "Apple"},
+                        new String[] {"MSFT", "Microsoft"},
+                        new String[] {"GOOG", "Google"},
+                        new String[] {"AMZN", "Amazon"},
+                        new String[] {"NVDA", "Nvidia"});
+
+        for (String[] stock : sampleStocks) {
+            trackedSymbolRepository.save(stock[0], stock[1], AssetType.STOCK);
+            targetPriceRepository.save(new TargetPrice(stock[0], 150.0, 250.0), AssetType.STOCK);
+        }
+
+        targetPriceRepository.save(new TargetPrice("BITCOIN", 100000.0, 0.0), AssetType.COIN);
+        targetPriceRepository.save(new TargetPrice("ETHEREUM", 2000.0, 0.0), AssetType.COIN);
+
+        log.info(
+                "Seeded {} stock symbols and {} target prices",
+                sampleStocks.size(),
+                sampleStocks.size() + 2);
     }
 
     private SeedBundle buildSeedBundle() {

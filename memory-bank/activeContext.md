@@ -2,22 +2,18 @@
 
 ## Current Work Focus
 
-### Fix RS/VFI EMA Warm-up + Decouple Price Cache (#345, #332, #331) (April 30, 2026) — COMPLETE
+### Migrate target-prices + stock-symbols to SQLite (#326) (May 3, 2026) — COMPLETE
+Final PR in the #320 JSON-to-SQLite migration series. Replaced the two highest-risk, user-facing JSON files with SQLite tables.
 
-**#345 — Fix RS vs SPY and VFI calculation discrepancies (EMA warm-up):**
-- RS: `RS_LOOKBACK_DAYS` 80 → 400 (~230 recursive EMA steps vs 6)
-- VFI: `LOOKBACK_CALENDAR_DAYS` 200 → 400, `numWindows` changed from `SIGNAL_LENGTH + 1` to `Math.max(lastWindowEnd - LENGTH, SIGNAL_LENGTH + 1)` (~150 VFI windows for signal EMA)
-- Aligns with TradingView Pine Script per-bar VFI computation
-- Tests updated + new test with 280 records proving signal EMA stabilization
+**Key Changes:**
+- New `AssetType` enum (`STOCK`, `COIN`) replaces file-path-based discrimination
+- New `target_prices` table (symbol, asset_type, buy_target, sell_target) with `TargetPriceRepository` interface + `SqliteTargetPriceRepository`
+- New `stock_symbols` table (ticker, display_name) with `StockSymbolRepository` interface + `SqliteStockSymbolRepository`
+- `TargetPriceProvider`: replaced ObjectMapper with TargetPriceRepository, mutation methods take `AssetType` instead of `String filePath`
+- `SymbolRegistry`: replaced ObjectMapper/FileInputStream with StockSymbolRepository, in-memory cache reloads from DB on add/remove
+- Telegram command processors updated for `AssetType` param
+- `@PostConstruct` one-time migration in both classes (reads JSON if table empty + file exists)
+- DevDataSeeder seeds both new tables
+- JSON files kept on disk for now; cleanup tracked in #359
 
-**#332 — Decouple price cache from TargetPriceProvider:**
-- `FinnhubPriceEvaluator.evaluatePrice()` refactored into two loops:
-  - Loop 1: Fetch & cache prices for ALL symbols (stocks + ETFs) via `symbolRegistry.getAll()`
-  - Loop 2: Evaluate target prices using cached data (no API calls)
-- All symbols now get Finnhub prices cached, persisted to SQLite, and high price change alerts
-- `PullbackBuyTracker` "no cached price" log changed to `warn` (canary)
-
-**#331 — Remove verbose PullbackBuyTracker INFO log:**
-- "Skipping X — no pullback pattern" changed from `log.info` to `log.debug`
-
-**Build:** 932 tests pass, spotless clean.
+**Build:** 945 tests pass, spotless clean.

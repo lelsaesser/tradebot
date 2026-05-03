@@ -34,6 +34,8 @@ import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
+import org.tradelite.repository.TargetPriceRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.RelativeStrengthData;
 
@@ -66,6 +68,8 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
+        TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
 
@@ -94,6 +98,8 @@ class DevDataSeederTest {
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
+                        trackedSymbolRepository,
+                        targetPriceRepository,
                         tempDir.resolve("rs-data.json"));
 
         seeder.reseed();
@@ -122,6 +128,8 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
+        TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
@@ -140,6 +148,8 @@ class DevDataSeederTest {
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
+                        trackedSymbolRepository,
+                        targetPriceRepository,
                         tempDir.resolve("rs-data.json"));
 
         assertThat(seeder.seedIfMissing(), is(false));
@@ -179,6 +189,8 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
+        TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         var rsHistory = new java.util.HashMap<String, RelativeStrengthData>();
 
@@ -207,6 +219,8 @@ class DevDataSeederTest {
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
+                        trackedSymbolRepository,
+                        targetPriceRepository,
                         tempDir.resolve("rs-fallback.json"));
 
         seeder.reseed();
@@ -232,6 +246,8 @@ class DevDataSeederTest {
         OhlcvRepository ohlcvRepository = mock(OhlcvRepository.class);
         SectorPerformanceRepository sectorPerformanceRepository =
                 mock(SectorPerformanceRepository.class);
+        TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
+        TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
@@ -249,6 +265,8 @@ class DevDataSeederTest {
                 ohlcvRepository,
                 finnhubPriceEvaluator,
                 sectorPerformanceRepository,
+                trackedSymbolRepository,
+                targetPriceRepository,
                 rsPath);
     }
 
@@ -313,6 +331,25 @@ class DevDataSeederTest {
                     yearly_perf REAL,
                     ytd_perf REAL,
                     PRIMARY KEY (fetch_date, industry_name)
+                )
+                """);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS target_prices (
+                    symbol TEXT NOT NULL,
+                    asset_type TEXT NOT NULL,
+                    buy_target REAL,
+                    sell_target REAL,
+                    PRIMARY KEY (symbol, asset_type)
+                )
+                """);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tracked_symbols (
+                    ticker TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    asset_type TEXT NOT NULL,
+                    PRIMARY KEY (ticker, asset_type)
                 )
                 """);
         return jdbcTemplate;

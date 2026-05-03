@@ -54,6 +54,12 @@ This document covers the technologies used, development setup, technical constra
 | `momentum_roc_state` | `SqliteMomentumRocRepository` | Momentum ROC state |
 | `twelvedata_daily_ohlcv` | `SqliteOhlcvRepository` | Twelve Data daily OHLCV (400 data points) |
 | `ignored_symbols` | `SqliteIgnoredSymbolRepository` | Per-symbol alert suppression with reason and TTL |
+| `rs_crossover_state` | `SqliteRsCrossoverStateRepository` | Relative strength crossover detection state |
+| `sector_rs_streaks` | `SqliteSectorRsStreakRepository` | Consecutive days of outperformance/underperformance |
+| `insider_transactions` | `SqliteInsiderTransactionRepository` | Weekly insider transaction counts |
+| `industry_performance` | `SqliteSectorPerformanceRepository` | FinViz sector/industry performance snapshots |
+| `target_prices` | `SqliteTargetPriceRepository` | Buy/sell target prices (stocks + coins, merged with asset_type) |
+| `stock_symbols` | `SqliteStockSymbolRepository` | All tracked stock symbols |
 
 All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centralized in `src/main/resources/schema.sql` and auto-initialized via `spring.sql.init.mode=always`. DataSource is auto-configured via `application.yaml` (`spring.datasource.*`) with HikariCP connection pool (max pool size 1 for SQLite single-writer). `DatabaseDirectoryInitializer` ensures the DB parent directory exists at startup.
 
@@ -61,9 +67,9 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `config/stock-symbols.json` | JSON | Dynamic stock symbol registry |
-| `config/target-prices-stocks.json` | JSON | Stock buy/sell targets |
-| `config/target-prices-coins.json` | JSON | Crypto buy/sell targets |
+| `config/stock-symbols.json` | JSON | Dynamic stock symbol registry (migrated to SQLite #326, pending removal #359) |
+| `config/target-prices-stocks.json` | JSON | Stock buy/sell targets (migrated to SQLite #326, pending removal #359) |
+| `config/target-prices-coins.json` | JSON | Crypto buy/sell targets (migrated to SQLite #326, pending removal #359) |
 | `config/insider-transactions.json` | JSON | Insider trading data |
 | `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT) |
 | `config/finnhub-monthly-requests.txt` | Text | Finnhub API metering |
@@ -211,7 +217,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~915
+- **Total Tests:** ~945
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes

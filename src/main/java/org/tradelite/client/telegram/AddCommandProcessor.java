@@ -1,7 +1,5 @@
 package org.tradelite.client.telegram;
 
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
-
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -9,6 +7,7 @@ import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -96,7 +95,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
                         command.getBuyTargetPrice(),
                         command.getSellTargetPrice());
 
-        return targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH_STOCKS);
+        return targetPriceProvider.addTargetPrice(targetPrice, AssetType.STOCK);
     }
 
     /**

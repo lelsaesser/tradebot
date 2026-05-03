@@ -2,6 +2,7 @@ package org.tradelite.common;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -19,13 +20,14 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.tradelite.repository.TrackedSymbolRepository;
 
 /**
  * Central registry of all tracked symbols: ETFs (sector + thematic + benchmark) and individual
  * stocks.
  *
- * <p>ETF definitions are hardcoded constants. Stocks are loaded from {@code
- * config/stock-symbols.json} and can be added/removed at runtime via Telegram commands.
+ * <p>ETF definitions are hardcoded constants. Stocks are loaded from SQLite and can be
+ * added/removed at runtime via Telegram commands.
  */
 @Slf4j
 @Service
@@ -73,7 +75,7 @@ public class SymbolRegistry {
                     Map.entry("BOTZ", "Robotics"),
                     Map.entry("STCE", "Crypto"));
 
-    private static final String STOCK_SYMBOLS_FILE = "config/stock-symbols.json";
+    private static final String JSON_PATH_STOCK_SYMBOLS = "config/stock-symbols.json";
 
     private static final Set<String> SECTOR_ETF_SYMBOLS;
     private static final Set<String> ETF_SYMBOLS;
@@ -88,13 +90,43 @@ public class SymbolRegistry {
         ETF_SYMBOLS = Set.copyOf(allEtfSet);
     }
 
-    private final ObjectMapper objectMapper;
+    private final TrackedSymbolRepository trackedSymbolRepository;
     private List<StockSymbolEntry> stockSymbols;
 
     @Autowired
-    public SymbolRegistry(ObjectMapper objectMapper) throws IOException {
-        this.objectMapper = objectMapper;
-        loadStockSymbols();
+    public SymbolRegistry(TrackedSymbolRepository trackedSymbolRepository) {
+        this.trackedSymbolRepository = trackedSymbolRepository;
+        this.stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+        log.info("Loaded {} stock symbols from SQLite", stockSymbols.size());
+    }
+
+    @PostConstruct
+    void migrateJsonIfNeeded() {
+        if (trackedSymbolRepository.count() > 0) {
+            return;
+        }
+
+        File file = new File(JSON_PATH_STOCK_SYMBOLS);
+        if (!file.exists()) {
+            return;
+        }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        try (InputStream inputStream = new FileInputStream(file)) {
+            List<StockSymbolEntry> entries =
+                    objectMapper.readValue(inputStream, new TypeReference<>() {});
+            for (StockSymbolEntry entry : entries) {
+                trackedSymbolRepository.save(
+                        entry.getTicker(), entry.getDisplayName(), AssetType.STOCK);
+            }
+            stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+            log.info(
+                    "Migrated {} stock symbols from {} to SQLite",
+                    entries.size(),
+                    JSON_PATH_STOCK_SYMBOLS);
+        } catch (IOException e) {
+            log.error("Failed to migrate stock symbols from {}", JSON_PATH_STOCK_SYMBOLS, e);
+        }
     }
 
     /** Returns all tracked symbols: ETFs (with benchmark) + non-ETF stocks, deduplicated. */
@@ -173,8 +205,8 @@ public class SymbolRegistry {
                 .map(entry -> new StockSymbol(entry.getTicker(), entry.getDisplayName()));
     }
 
-    /** Adds a user stock symbol. Cannot add ETFs (they are hardcoded). */
-    public synchronized boolean addSymbol(String ticker, String displayName) {
+    /** Adds a stock symbol to the registry. */
+    public boolean addSymbol(String ticker, String displayName) {
         if (ticker == null || ticker.isEmpty() || displayName == null || displayName.isEmpty()) {
             return false;
         }
@@ -187,58 +219,28 @@ public class SymbolRegistry {
             return false;
         }
 
-        StockSymbolEntry newEntry = new StockSymbolEntry(ticker.toUpperCase(), displayName);
-        stockSymbols.add(newEntry);
-
-        try {
-            saveStockSymbols();
-            log.info("Added stock symbol: {} ({})", ticker, displayName);
-            return true;
-        } catch (IOException e) {
-            log.error("Failed to save stock symbol: {}", ticker, e);
-            stockSymbols.remove(newEntry);
-            return false;
-        }
+        trackedSymbolRepository.save(ticker.toUpperCase(), displayName, AssetType.STOCK);
+        stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+        log.info("Added stock symbol: {} ({})", ticker, displayName);
+        return true;
     }
 
-    /** Removes a user stock symbol. Cannot remove ETFs (they are hardcoded). */
-    public synchronized boolean removeSymbol(String ticker) {
+    /** Removes a stock symbol from the registry. */
+    public boolean removeSymbol(String ticker) {
         if (ticker == null || ticker.isEmpty()) {
             return false;
         }
 
         boolean removed =
-                stockSymbols.removeIf(entry -> entry.getTicker().equalsIgnoreCase(ticker));
+                trackedSymbolRepository.deleteByTickerAndType(
+                        ticker.toUpperCase(), AssetType.STOCK);
 
         if (removed) {
-            try {
-                saveStockSymbols();
-                log.info("Removed stock symbol: {}", ticker);
-                return true;
-            } catch (IOException e) {
-                log.error("Failed to save after removing stock symbol: {}", ticker, e);
-                return false;
-            }
+            stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+            log.info("Removed stock symbol: {}", ticker);
         }
 
-        return false;
-    }
-
-    protected void loadStockSymbols() throws IOException {
-        File file = new File(STOCK_SYMBOLS_FILE);
-        try (InputStream inputStream = new FileInputStream(file)) {
-            stockSymbols = objectMapper.readValue(inputStream, new TypeReference<>() {});
-            log.info("Loaded {} stock symbols from {}", stockSymbols.size(), STOCK_SYMBOLS_FILE);
-        } catch (IOException e) {
-            log.error("Failed to load stock symbols from {}", STOCK_SYMBOLS_FILE, e);
-            stockSymbols = new ArrayList<>();
-            throw e;
-        }
-    }
-
-    protected void saveStockSymbols() throws IOException {
-        File file = new File(STOCK_SYMBOLS_FILE);
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, stockSymbols);
+        return removed;
     }
 
     @Setter

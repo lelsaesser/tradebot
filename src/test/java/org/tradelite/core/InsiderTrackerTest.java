@@ -17,10 +17,12 @@ import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.InsiderTransactionRepository;
 import org.tradelite.repository.InsiderTransactionRepository.InsiderTransactionRow;
+import org.tradelite.repository.TrackedSymbolRepository;
 
 @ExtendWith(MockitoExtension.class)
 class InsiderTrackerTest {
@@ -29,19 +31,31 @@ class InsiderTrackerTest {
     @Mock private TelegramGateway telegramClient;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private InsiderTransactionRepository insiderTransactionRepository;
+    @Mock private TrackedSymbolRepository trackedSymbolRepository;
 
     private InsiderTracker insiderTracker;
 
     @BeforeEach
-    void setUp() throws java.io.IOException {
+    void setUp() {
+        List<SymbolRegistry.StockSymbolEntry> entries =
+                List.of(
+                        new SymbolRegistry.StockSymbolEntry("AAPL", "Apple"),
+                        new SymbolRegistry.StockSymbolEntry("GOOG", "Google"),
+                        new SymbolRegistry.StockSymbolEntry("META", "Meta Platforms"),
+                        new SymbolRegistry.StockSymbolEntry("AMZN", "Amazon"),
+                        new SymbolRegistry.StockSymbolEntry("NVDA", "Nvidia"),
+                        new SymbolRegistry.StockSymbolEntry("MSFT", "Microsoft"),
+                        new SymbolRegistry.StockSymbolEntry("PLTR", "Palantir"),
+                        new SymbolRegistry.StockSymbolEntry("HOOD", "Robinhood"));
+        when(trackedSymbolRepository.findAll()).thenReturn(entries);
+
         insiderTracker =
                 new InsiderTracker(
                         finnhubClient,
                         telegramClient,
                         targetPriceProvider,
                         insiderTransactionRepository,
-                        new org.tradelite.common.SymbolRegistry(
-                                new org.tradelite.config.BeanConfig().objectMapper()));
+                        new SymbolRegistry(trackedSymbolRepository));
     }
 
     @Test

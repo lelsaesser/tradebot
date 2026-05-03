@@ -17,6 +17,7 @@ import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
@@ -71,14 +72,14 @@ class AddCommandProcessorTest {
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
-        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
+        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
                 .thenReturn(true);
 
         addCommandProcessor.processCommand(command);
 
         verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
         verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
-        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), anyString());
+        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), any(AssetType.class));
         verify(telegramClient)
                 .sendMessage(
                         "All set!\nAdded Coherent Corp (COHR) with buy target 0.0 and sell target 0.0.");
@@ -130,7 +131,7 @@ class AddCommandProcessorTest {
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
-        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
+        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
                 .thenReturn(false);
 
         addCommandProcessor.processCommand(command);
@@ -154,7 +155,7 @@ class AddCommandProcessorTest {
         when(coinGeckoClient.getCoinPriceData(any())).thenReturn(mockCoinData);
 
         when(symbolRegistry.addSymbol("bitcoin", "Bitcoin")).thenReturn(true);
-        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
+        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
                 .thenReturn(true);
 
         addCommandProcessor.processCommand(command);
@@ -162,7 +163,7 @@ class AddCommandProcessorTest {
         verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
         verify(coinGeckoClient).getCoinPriceData(any());
         verify(symbolRegistry).addSymbol("bitcoin", "Bitcoin");
-        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), anyString());
+        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), any(AssetType.class));
         verify(telegramClient)
                 .sendMessage(
                         "All set!\nAdded Bitcoin (bitcoin) with buy target 0.0 and sell target 0.0.");

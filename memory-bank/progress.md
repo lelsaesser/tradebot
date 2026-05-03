@@ -1,6 +1,28 @@
 # Progress Tracking
 
-## Latest Milestone: EMA Warm-up Fix + Price Cache Decoupling (#345, #332, #331) — COMPLETE
+## Latest Milestone: Target Prices + Stock Symbols SQLite Migration (#326) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (May 3, 2026)
+
+#### Purpose
+Final PR in #320 JSON-to-SQLite migration. Migrate `config/target-prices-stocks.json`, `config/target-prices-coins.json`, and `config/stock-symbols.json` to SQLite tables. Eliminates synchronized file I/O and ObjectMapper usage from the core alerting and symbol registry systems.
+
+#### Key Changes
+- New `AssetType` enum, `TargetPriceRepository` + `StockSymbolRepository` (interface + JdbcTemplate impl)
+- `TargetPriceProvider`: repository-backed, mutation API takes `AssetType` instead of file path
+- `SymbolRegistry`: repository-backed with in-memory cache, reload from DB on mutation
+- Telegram command processors (`Add`, `Remove`, `Set`) updated for `AssetType`
+- `@PostConstruct` one-time migration from JSON (guard: table empty + file exists)
+- DevDataSeeder seeds both new tables
+- Follow-up cleanup: #359 (remove JSON files + migration code after deployment)
+
+#### Tests: 945 total, all passing
+
+---
+
+## Previous Milestone: EMA Warm-up Fix + Price Cache Decoupling (#345, #332, #331) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -242,7 +264,7 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: ~932
+- Total Tests: ~945
 
 ## Future Enhancements
 
