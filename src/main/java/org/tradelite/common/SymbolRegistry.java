@@ -119,7 +119,7 @@ public class SymbolRegistry {
                 trackedSymbolRepository.save(
                         entry.getTicker(), entry.getDisplayName(), AssetType.STOCK);
             }
-            stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+            reload();
             log.info(
                     "Migrated {} stock symbols from {} to SQLite",
                     entries.size(),
@@ -220,9 +220,15 @@ public class SymbolRegistry {
         }
 
         trackedSymbolRepository.save(ticker.toUpperCase(), displayName, AssetType.STOCK);
-        stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+        reload();
         log.info("Added stock symbol: {} ({})", ticker, displayName);
         return true;
+    }
+
+    /** Reloads tracked symbols from the database. */
+    public void reload() {
+        this.stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+        log.info("Reloaded {} stock symbols from SQLite", stockSymbols.size());
     }
 
     /** Removes a stock symbol from the registry. */
@@ -236,7 +242,7 @@ public class SymbolRegistry {
                         ticker.toUpperCase(), AssetType.STOCK);
 
         if (removed) {
-            stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+            reload();
             log.info("Removed stock symbol: {}", ticker);
         }
 
