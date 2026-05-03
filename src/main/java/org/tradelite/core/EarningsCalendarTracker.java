@@ -87,7 +87,7 @@ public class EarningsCalendarTracker {
 
             for (EarningsEvent event : dayEvents) {
                 String displayName = resolveDisplayName(event.getSymbol());
-                sb.append(String.format("\u2022 %s (%s)%n", displayName, event.getSymbol()));
+                sb.append(String.format("• %s (%s)%n", displayName, event.getSymbol()));
             }
         }
 
