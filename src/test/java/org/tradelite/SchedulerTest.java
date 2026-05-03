@@ -33,6 +33,7 @@ import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.MarketHolidayService;
 import org.tradelite.service.OhlcvFetcher;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,6 +58,7 @@ class SchedulerTest {
     @Mock private OhlcvFetcher ohlcvFetcher;
     @Mock private VfiTracker vfiTracker;
     @Mock private PullbackBuyTracker pullbackBuyTracker;
+    @Mock private MarketHolidayService marketHolidayService;
 
     private Scheduler scheduler;
 
@@ -82,7 +84,8 @@ class SchedulerTest {
                         emaTracker,
                         ohlcvFetcher,
                         vfiTracker,
-                        pullbackBuyTracker);
+                        pullbackBuyTracker,
+                        marketHolidayService);
     }
 
     @Test
@@ -90,6 +93,7 @@ class SchedulerTest {
         // Monday 11:00 AM NY time = market open
         scheduler.marketDateTime =
                 ZonedDateTime.of(2026, 3, 30, 11, 0, 0, 0, ZoneId.of("America/New_York"));
+        when(marketHolidayService.isMarketOpen(scheduler.marketDateTime)).thenReturn(true);
 
         scheduler.stockMarketMonitoring();
 
@@ -118,6 +122,7 @@ class SchedulerTest {
         // Saturday 11:00 AM NY time = market closed (weekend)
         scheduler.marketDateTime =
                 ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, ZoneId.of("America/New_York"));
+        when(marketHolidayService.isMarketOpen(scheduler.marketDateTime)).thenReturn(false);
 
         scheduler.stockMarketMonitoring();
 
@@ -131,6 +136,7 @@ class SchedulerTest {
         // Monday 11:00 AM NY time = market open
         scheduler.marketDateTime =
                 ZonedDateTime.of(2026, 3, 30, 11, 0, 0, 0, ZoneId.of("America/New_York"));
+        when(marketHolidayService.isMarketOpen(scheduler.marketDateTime)).thenReturn(true);
 
         scheduler.hourlySignalMonitoring();
 
@@ -154,6 +160,7 @@ class SchedulerTest {
         // Saturday 11:00 AM NY time = market closed (weekend)
         scheduler.marketDateTime =
                 ZonedDateTime.of(2026, 3, 28, 11, 0, 0, 0, ZoneId.of("America/New_York"));
+        when(marketHolidayService.isMarketOpen(scheduler.marketDateTime)).thenReturn(false);
 
         scheduler.hourlySignalMonitoring();
 

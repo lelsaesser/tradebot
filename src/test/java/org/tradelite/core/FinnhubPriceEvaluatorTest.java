@@ -3,8 +3,6 @@ package org.tradelite.core;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.aMapWithSize;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
@@ -22,6 +20,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
+import org.tradelite.service.MarketHolidayService;
 
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
@@ -32,6 +31,7 @@ class FinnhubPriceEvaluatorTest {
     @Mock private org.tradelite.common.SymbolRegistry symbolRegistry;
     @Mock private PriceQuoteRepository priceQuoteRepository;
     @Mock private FeatureToggleService featureToggleService;
+    @Mock private MarketHolidayService marketHolidayService;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
@@ -44,7 +44,8 @@ class FinnhubPriceEvaluatorTest {
                         telegramClient,
                         symbolRegistry,
                         priceQuoteRepository,
-                        featureToggleService);
+                        featureToggleService,
+                        marketHolidayService);
     }
 
     @Test
@@ -298,6 +299,7 @@ class FinnhubPriceEvaluatorTest {
         when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
         when(featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION))
                 .thenReturn(true);
+        when(marketHolidayService.isMarketOpen(null)).thenReturn(true);
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
         priceQuoteResponse.setStockSymbol(testSymbol);
@@ -348,35 +350,6 @@ class FinnhubPriceEvaluatorTest {
         finnhubPriceEvaluator.evaluatePrice();
 
         verify(priceQuoteRepository, never()).save(any());
-    }
-
-    @Test
-    void isPotentialMarketHoliday_returnsTrueWhenCurrentPriceEqualsPreviousClose() {
-        assertTrue(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.0, 150.0));
-    }
-
-    @Test
-    void isPotentialMarketHoliday_returnsFalseWhenCurrentPriceDiffersFromPreviousClose() {
-        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 152.0, 150.0));
-    }
-
-    @Test
-    void isPotentialMarketHoliday_returnsTrueForNearlyEqualPrices() {
-        assertTrue(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.00005, 150.0));
-    }
-
-    @Test
-    void isPotentialMarketHoliday_returnsFalseForSmallButSignificantDifference() {
-        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.001, 150.0));
-    }
-
-    @Test
-    void isPotentialMarketHoliday_returnsFalseWhenPreviousCloseIsZero() {
-        // Crypto scenario: previousClose=0.0 should never trigger holiday detection
-        // regardless of the current price value
-        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("bitcoin", 50000.0, 0.0));
-        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("ethereum", 3500.0, 0.0));
-        assertFalse(finnhubPriceEvaluator.isPotentialMarketHoliday("AAPL", 150.0, 0.0));
     }
 
     @Test
