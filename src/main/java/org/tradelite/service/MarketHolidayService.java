@@ -5,8 +5,10 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -24,7 +26,8 @@ public class MarketHolidayService {
     private static final LocalTime MARKET_CLOSE = LocalTime.of(16, 0);
 
     private final FinnhubClient finnhubClient;
-    private final Map<LocalDate, MarketHoliday> holidayCache = new ConcurrentHashMap<>();
+    private final AtomicReference<Map<LocalDate, MarketHoliday>> holidayCache =
+            new AtomicReference<>(Collections.emptyMap());
     private volatile boolean loaded = false;
 
     public MarketHolidayService(FinnhubClient finnhubClient) {
@@ -39,7 +42,7 @@ public class MarketHolidayService {
     @Scheduled(fixedDelay = 300_000)
     void retryIfNeeded() {
         if (!loaded) {
-            log.info("Holiday cache is empty, retrying fetch...");
+            log.warn("Holiday cache is empty, retrying fetch...");
             fetchAndCacheHolidays();
         }
     }
@@ -51,13 +54,14 @@ public class MarketHolidayService {
             return;
         }
 
-        holidayCache.clear();
+        Map<LocalDate, MarketHoliday> newCache = new HashMap<>();
         for (MarketHoliday holiday : response.getData()) {
             LocalDate date = LocalDate.parse(holiday.getAtDate());
-            holidayCache.put(date, holiday);
+            newCache.put(date, holiday);
         }
+        holidayCache.set(Collections.unmodifiableMap(newCache));
         loaded = true;
-        log.info("Loaded {} market holidays from Finnhub", holidayCache.size());
+        log.info("Loaded {} market holidays from Finnhub", newCache.size());
     }
 
     public boolean isMarketOpen(ZonedDateTime dateTime) {
@@ -74,7 +78,7 @@ public class MarketHolidayService {
         LocalTime time = nyTime.toLocalTime();
 
         if (loaded) {
-            MarketHoliday holiday = holidayCache.get(today);
+            MarketHoliday holiday = holidayCache.get().get(today);
             if (holiday != null) {
                 String tradingHour = holiday.getTradingHour();
                 if (tradingHour == null || tradingHour.isEmpty()) {
