@@ -98,6 +98,11 @@ public class DevJobController {
         return runJob("pullback-buy-alert", scheduler::manualPullbackBuyAlert);
     }
 
+    @PostMapping("/earnings-calendar")
+    public ResponseEntity<Map<String, String>> earningsCalendar() {
+        return runJob("earnings-calendar", scheduler::manualEarningsCalendarCheck);
+    }
+
     @PostMapping("/run-all")
     public ResponseEntity<Map<String, Object>> runAll() {
         LinkedHashMap<String, String> results = new LinkedHashMap<>();
@@ -142,6 +147,8 @@ public class DevJobController {
         failures +=
                 runAndRecord(results, "monthly-api-usage", scheduler::manualMonthlyApiUsageReport);
         failures += runAndRecord(results, "pullback-buy-alert", scheduler::manualPullbackBuyAlert);
+        failures +=
+                runAndRecord(results, "earnings-calendar", scheduler::manualEarningsCalendarCheck);
 
         // Phase 4: VFI last (depends on OHLCV data)
         failures += runAndRecord(results, "vfi-report", scheduler::manualVfiReport);

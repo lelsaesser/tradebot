@@ -20,6 +20,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
+import org.tradelite.core.EarningsCalendarTracker;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
 import org.tradelite.core.RelativeStrengthTracker;
@@ -59,6 +60,7 @@ class SchedulerTest {
     @Mock private VfiTracker vfiTracker;
     @Mock private PullbackBuyTracker pullbackBuyTracker;
     @Mock private MarketStatusService marketStatusService;
+    @Mock private EarningsCalendarTracker earningsCalendarTracker;
 
     private Scheduler scheduler;
 
@@ -85,7 +87,8 @@ class SchedulerTest {
                         ohlcvFetcher,
                         vfiTracker,
                         pullbackBuyTracker,
-                        marketStatusService);
+                        marketStatusService,
+                        earningsCalendarTracker);
     }
 
     @Test

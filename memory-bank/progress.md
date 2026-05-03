@@ -1,6 +1,35 @@
 # Progress Tracking
 
-## Latest Milestone: Market Holiday Detection Fix (#333) — COMPLETE
+## Latest Milestone: Earnings Calendar Alerts (#363) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (May 3, 2026)
+
+#### Purpose
+Daily Telegram report listing upcoming earnings for tracked stocks in the next 7 calendar days, using Finnhub's `/calendar/earnings` endpoint.
+
+#### Key Changes
+- New `EarningsCalendarResponse` DTO (maps Finnhub response with earningsCalendar array)
+- New `EarningsCalendarTracker` — fetches 7-day window, filters against `symbolRegistry.getStocks()`, builds grouped-by-date message
+- `FinnhubClient` — added `getEarningsCalendar(from, to)` following `getMarketHolidays()` pattern
+- `Scheduler` — cron `0 15 8 * * MON-FRI` (CET) + `manualEarningsCalendarCheck()`
+- `FeatureToggle` — added `EARNINGS_CALENDAR_ALERT("earningsCalendarAlert")`
+- `DevJobController` — `/dev/jobs/earnings-calendar` endpoint + included in run-all (15 jobs total)
+- Bruno collection — added `earningsCalendar.yml`
+
+#### Design Decisions
+- Condensed format: `• DisplayName (TICKER)` per line, grouped by date
+- Stocks only (ETFs don't have earnings), silent when empty
+- Single batch API call per day (~22/month), no per-symbol lookups
+- No dedup table (daily report is idempotent — same events until they pass)
+- No `/earnings` Telegram command (cron is sufficient)
+
+#### Tests: 942+ total, all passing
+
+---
+
+## Previous Milestone: Market Holiday Detection Fix (#333) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -236,6 +265,7 @@ Follow-up issues (open):
 | **EMA Classification** | `EmaTracker` | Price vs 5 EMAs (green/yellow/red) | Daily 15:50 CET |
 | **VFI + RS Combined** | `VfiTracker` | Volume flow + RS confirmation | Daily 09:00 CET |
 | **EMA Pullback Buy** | `PullbackBuyTracker` | Pullback into 21-50 EMA zone + RS↑ + VFI↑ | Real-time (5 min) |
+| **Earnings Calendar** | `EarningsCalendarTracker` | Upcoming earnings in 7-day window | Daily 08:15 CET |
 
 ---
 
@@ -259,11 +289,12 @@ Follow-up issues (open):
 - **DailyPriceProvider** (OHLCV-first, Finnhub-fallback)
 - **Unified SymbolRegistry** (single source of truth for all symbols)
 - **EMA Pullback Buy Alerts** (real-time pullback detection with RS+VFI confirmation)
+- **Earnings Calendar Alerts** (daily 7-day look-ahead report via Finnhub)
 
 ### Dev Tooling & Smoke Test ✅
-- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 15 endpoint requests
-- DevJobController with 15 individual endpoints + phased `run-all` composite endpoint (14 jobs)
-- Pre-deployment smoke test script (`scripts/run-smoke-test.sh`) — validates all 13 jobs in 4 phases
+- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 16 endpoint requests
+- DevJobController with 16 individual endpoints + phased `run-all` composite endpoint (15 jobs)
+- Pre-deployment smoke test script (`scripts/run-smoke-test.sh`) — validates all jobs in 4 phases
 - DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
 
 ### Data Persistence ✅
@@ -272,7 +303,7 @@ Follow-up issues (open):
 - API metering: Finnhub, CoinGecko, Twelve Data
 
 ### External Data Sources ✅
-- Finnhub (stock prices, insider transactions)
+- Finnhub (stock prices, insider transactions, market holidays, earnings calendar)
 - CoinGecko (crypto prices)
 - Twelve Data (daily OHLCV — 400 data points, 8 req/min)
 - FinViz (sector performance web scraping)
@@ -284,7 +315,7 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: ~951
+- Total Tests: ~942+
 
 ## Future Enhancements
 

@@ -47,6 +47,7 @@ public class Scheduler {
     private final VfiTracker vfiTracker;
     private final PullbackBuyTracker pullbackBuyTracker;
     private final MarketStatusService marketStatusService;
+    private final EarningsCalendarTracker earningsCalendarTracker;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -71,7 +72,8 @@ public class Scheduler {
             OhlcvFetcher ohlcvFetcher,
             VfiTracker vfiTracker,
             PullbackBuyTracker pullbackBuyTracker,
-            MarketStatusService marketStatusService) {
+            MarketStatusService marketStatusService,
+            EarningsCalendarTracker earningsCalendarTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
@@ -92,6 +94,7 @@ public class Scheduler {
         this.vfiTracker = vfiTracker;
         this.pullbackBuyTracker = pullbackBuyTracker;
         this.marketStatusService = marketStatusService;
+        this.earningsCalendarTracker = earningsCalendarTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -149,6 +152,12 @@ public class Scheduler {
     protected void dailyVfiReport() {
         rootErrorHandler.run(vfiTracker::sendDailyReport);
         log.info("Daily VFI report completed.");
+    }
+
+    @Scheduled(cron = "0 15 8 * * MON-FRI", zone = "CET")
+    protected void dailyEarningsCalendarCheck() {
+        rootErrorHandler.run(earningsCalendarTracker::checkAndAlert);
+        log.info("Daily earnings calendar check completed.");
     }
 
     @Scheduled(fixedRate = 600000)
@@ -327,6 +336,12 @@ public class Scheduler {
     public boolean manualPullbackBuyAlert() {
         boolean success = rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
         log.info("Manual pullback buy alert scan completed.");
+        return success;
+    }
+
+    public boolean manualEarningsCalendarCheck() {
+        boolean success = rootErrorHandler.runWithStatus(earningsCalendarTracker::checkAndAlert);
+        log.info("Manual earnings calendar check completed.");
         return success;
     }
 }
