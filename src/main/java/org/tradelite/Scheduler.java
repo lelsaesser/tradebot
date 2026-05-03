@@ -20,7 +20,7 @@ import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
-import org.tradelite.service.MarketHolidayService;
+import org.tradelite.service.MarketStatusService;
 import org.tradelite.service.OhlcvFetcher;
 
 @Slf4j
@@ -46,7 +46,7 @@ public class Scheduler {
     private final OhlcvFetcher ohlcvFetcher;
     private final VfiTracker vfiTracker;
     private final PullbackBuyTracker pullbackBuyTracker;
-    private final MarketHolidayService marketHolidayService;
+    private final MarketStatusService marketStatusService;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -71,7 +71,7 @@ public class Scheduler {
             OhlcvFetcher ohlcvFetcher,
             VfiTracker vfiTracker,
             PullbackBuyTracker pullbackBuyTracker,
-            MarketHolidayService marketHolidayService) {
+            MarketStatusService marketStatusService) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
@@ -91,12 +91,12 @@ public class Scheduler {
         this.ohlcvFetcher = ohlcvFetcher;
         this.vfiTracker = vfiTracker;
         this.pullbackBuyTracker = pullbackBuyTracker;
-        this.marketHolidayService = marketHolidayService;
+        this.marketStatusService = marketStatusService;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     public void stockMarketMonitoring() {
-        if (marketHolidayService.isMarketOpen(marketDateTime)) {
+        if (marketStatusService.isMarketOpen(marketDateTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
             rootErrorHandler.run(pullbackBuyTracker::analyzeAndSendAlerts);
             // Analyze sector ETFs in real-time for rotation signals
@@ -110,7 +110,7 @@ public class Scheduler {
 
     @Scheduled(cron = "0 0 * * * MON-FRI", zone = "CET")
     protected void hourlySignalMonitoring() {
-        if (marketHolidayService.isMarketOpen(marketDateTime)) {
+        if (marketStatusService.isMarketOpen(marketDateTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(rsiTracker::analyzeAndSendReport);
             rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);

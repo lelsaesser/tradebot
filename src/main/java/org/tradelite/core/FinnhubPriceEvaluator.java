@@ -16,7 +16,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
-import org.tradelite.service.MarketHolidayService;
+import org.tradelite.service.MarketStatusService;
 
 @Slf4j
 @Component
@@ -28,7 +28,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final SymbolRegistry symbolRegistry;
     private final PriceQuoteRepository priceQuoteRepository;
     private final FeatureToggleService featureToggleService;
-    private final MarketHolidayService marketHolidayService;
+    private final MarketStatusService marketStatusService;
 
     @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
 
@@ -40,7 +40,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             SymbolRegistry symbolRegistry,
             PriceQuoteRepository priceQuoteRepository,
             FeatureToggleService featureToggleService,
-            MarketHolidayService marketHolidayService) {
+            MarketStatusService marketStatusService) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
@@ -48,7 +48,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         this.symbolRegistry = symbolRegistry;
         this.priceQuoteRepository = priceQuoteRepository;
         this.featureToggleService = featureToggleService;
-        this.marketHolidayService = marketHolidayService;
+        this.marketStatusService = marketStatusService;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
@@ -71,7 +71,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
             // Persist price quote to SQLite for historical data collection (if enabled)
             if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)
-                    && marketHolidayService.isMarketOpen(null)) {
+                    && marketStatusService.isMarketOpen(null)) {
                 priceQuoteRepository.save(priceQuote);
             }
 

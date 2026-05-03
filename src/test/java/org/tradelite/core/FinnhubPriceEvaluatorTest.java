@@ -20,7 +20,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
-import org.tradelite.service.MarketHolidayService;
+import org.tradelite.service.MarketStatusService;
 
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
@@ -31,7 +31,7 @@ class FinnhubPriceEvaluatorTest {
     @Mock private org.tradelite.common.SymbolRegistry symbolRegistry;
     @Mock private PriceQuoteRepository priceQuoteRepository;
     @Mock private FeatureToggleService featureToggleService;
-    @Mock private MarketHolidayService marketHolidayService;
+    @Mock private MarketStatusService marketStatusService;
 
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
@@ -45,7 +45,7 @@ class FinnhubPriceEvaluatorTest {
                         symbolRegistry,
                         priceQuoteRepository,
                         featureToggleService,
-                        marketHolidayService);
+                        marketStatusService);
     }
 
     @Test
@@ -299,7 +299,7 @@ class FinnhubPriceEvaluatorTest {
         when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(testSymbol));
         when(featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION))
                 .thenReturn(true);
-        when(marketHolidayService.isMarketOpen(null)).thenReturn(true);
+        when(marketStatusService.isMarketOpen(null)).thenReturn(true);
 
         PriceQuoteResponse priceQuoteResponse = new PriceQuoteResponse();
         priceQuoteResponse.setStockSymbol(testSymbol);
