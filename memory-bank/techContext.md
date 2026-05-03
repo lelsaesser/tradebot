@@ -217,7 +217,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~945
+- **Total Tests:** ~951
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes

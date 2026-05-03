@@ -1,6 +1,26 @@
 # Progress Tracking
 
-## Latest Milestone: Target Prices + Stock Symbols SQLite Migration (#326) — COMPLETE
+## Latest Milestone: Market Holiday Detection Fix (#333) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (May 3, 2026)
+
+#### Purpose
+Fix false positive "market holiday" detection that was skipping SQLite persistence for illiquid ETFs (e.g., REMX) where currentPrice == previousClose during normal trading.
+
+#### Key Changes
+- New `MarketHolidayService` — fetches Finnhub `/stock/market-holiday?exchange=US` at startup, caches holidays, retries on failure
+- Handles full closures + early-close days (respects shortened hours like 09:30-13:00)
+- `Scheduler` uses `marketHolidayService.isMarketOpen()` instead of `DateUtil.isStockMarketOpen()`
+- `FinnhubPriceEvaluator`: removed per-symbol `isPotentialMarketHoliday()` heuristic, persistence guarded by service
+- `DateUtil` unchanged (stays as simple static utility)
+
+#### Tests: 951 total, all passing
+
+---
+
+## Previous Milestone: Target Prices + Stock Symbols SQLite Migration (#326) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -264,7 +284,7 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: ~945
+- Total Tests: ~951
 
 ## Future Enhancements
 
