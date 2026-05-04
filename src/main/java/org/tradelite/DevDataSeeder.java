@@ -224,7 +224,7 @@ public class DevDataSeeder implements ApplicationRunner {
                         new String[] {"ASML", "ASML"},
                         new String[] {"TEM", "Tempus AI"},
                         new String[] {"TSM", "Taiwan Semiconductor Manufacturing"},
-                        new String[] {"MU", "Western Digital"},
+                        new String[] {"MU", "Micron Technology"},
                         new String[] {"ORCL", "Oracle"},
                         new String[] {"INTC", "Intel"},
                         new String[] {"DELL", "Dell"},
