@@ -154,7 +154,7 @@ public class Scheduler {
         log.info("Daily VFI report completed.");
     }
 
-    @Scheduled(cron = "0 15 8 * * MON-FRI", zone = "CET")
+    @Scheduled(cron = "0 15 8 * * *", zone = "CET")
     protected void dailyEarningsCalendarCheck() {
         rootErrorHandler.run(earningsCalendarTracker::checkAndAlert);
         log.info("Daily earnings calendar check completed.");
