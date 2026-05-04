@@ -1,12 +1,5 @@
 package org.tradelite.common;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -75,8 +68,6 @@ public class SymbolRegistry {
                     Map.entry("BOTZ", "Robotics"),
                     Map.entry("STCE", "Crypto"));
 
-    private static final String JSON_PATH_STOCK_SYMBOLS = "config/stock-symbols.json";
-
     private static final Set<String> SECTOR_ETF_SYMBOLS;
     private static final Set<String> ETF_SYMBOLS;
 
@@ -98,35 +89,6 @@ public class SymbolRegistry {
         this.trackedSymbolRepository = trackedSymbolRepository;
         this.stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
         log.info("Loaded {} stock symbols from SQLite", stockSymbols.size());
-    }
-
-    @PostConstruct
-    void migrateJsonIfNeeded() {
-        if (trackedSymbolRepository.count() > 0) {
-            return;
-        }
-
-        File file = new File(JSON_PATH_STOCK_SYMBOLS);
-        if (!file.exists()) {
-            return;
-        }
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        try (InputStream inputStream = new FileInputStream(file)) {
-            List<StockSymbolEntry> entries =
-                    objectMapper.readValue(inputStream, new TypeReference<>() {});
-            for (StockSymbolEntry entry : entries) {
-                trackedSymbolRepository.save(
-                        entry.getTicker(), entry.getDisplayName(), AssetType.STOCK);
-            }
-            reload();
-            log.info(
-                    "Migrated {} stock symbols from {} to SQLite",
-                    entries.size(),
-                    JSON_PATH_STOCK_SYMBOLS);
-        } catch (IOException e) {
-            log.error("Failed to migrate stock symbols from {}", JSON_PATH_STOCK_SYMBOLS, e);
-        }
     }
 
     /** Returns all tracked symbols: ETFs (with benchmark) + non-ETF stocks, deduplicated. */

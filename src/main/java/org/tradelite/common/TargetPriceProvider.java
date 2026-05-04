@@ -1,12 +1,5 @@
 package org.tradelite.common;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -25,9 +18,6 @@ public class TargetPriceProvider {
 
     public static final long IGNORE_DURATION_TTL_SECONDS = 3600L * 12; // 12 hours
 
-    private static final String JSON_PATH_STOCKS = "config/target-prices-stocks.json";
-    private static final String JSON_PATH_COINS = "config/target-prices-coins.json";
-
     private final TargetPriceRepository targetPriceRepository;
     private final SqliteIgnoredSymbolRepository ignoredSymbolRepository;
 
@@ -37,35 +27,6 @@ public class TargetPriceProvider {
             SqliteIgnoredSymbolRepository ignoredSymbolRepository) {
         this.targetPriceRepository = targetPriceRepository;
         this.ignoredSymbolRepository = ignoredSymbolRepository;
-    }
-
-    @PostConstruct
-    void migrateJsonIfNeeded() {
-        if (targetPriceRepository.count() > 0) {
-            return;
-        }
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        migrateFile(objectMapper, JSON_PATH_STOCKS, AssetType.STOCK);
-        migrateFile(objectMapper, JSON_PATH_COINS, AssetType.COIN);
-    }
-
-    private void migrateFile(ObjectMapper objectMapper, String jsonPath, AssetType type) {
-        File file = new File(jsonPath);
-        if (!file.exists()) {
-            return;
-        }
-
-        try (InputStream inputStream = new FileInputStream(file)) {
-            List<TargetPrice> prices =
-                    objectMapper.readValue(inputStream, new TypeReference<>() {});
-            for (TargetPrice tp : prices) {
-                targetPriceRepository.save(tp, type);
-            }
-            log.info("Migrated {} target prices from {} to SQLite", prices.size(), jsonPath);
-        } catch (IOException e) {
-            log.error("Failed to migrate target prices from {}", jsonPath, e);
-        }
     }
 
     public List<TargetPrice> getStockTargetPrices() {
