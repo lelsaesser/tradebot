@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.tradelite.client.finnhub.dto.EarningsCalendarResponse;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.finnhub.dto.MarketHolidayResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
@@ -141,6 +142,38 @@ public class FinnhubClient {
         MarketHolidayResponse body = response.getBody();
         if (body == null || !response.getStatusCode().is2xxSuccessful()) {
             log.error("Failed to fetch market holidays: {}", response.getStatusCode());
+            return null;
+        }
+        return body;
+    }
+
+    public EarningsCalendarResponse getEarningsCalendar(String from, String to) {
+        String url =
+                API_URL
+                        + "/calendar/earnings?from="
+                        + from
+                        + "&to="
+                        + to
+                        + "&token="
+                        + apiProperties.getFinnhubKey();
+
+        HttpEntity<MultiValueMap<String, Object>> requestEntity =
+                new HttpEntity<>(new LinkedMultiValueMap<>(), new HttpHeaders());
+
+        ResponseEntity<EarningsCalendarResponse> response;
+        try {
+            meteringService.incrementFinnhubRequests();
+            response =
+                    restTemplate.exchange(
+                            url, HttpMethod.GET, requestEntity, EarningsCalendarResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to fetch earnings calendar from Finnhub", e);
+            return null;
+        }
+
+        EarningsCalendarResponse body = response.getBody();
+        if (body == null || !response.getStatusCode().is2xxSuccessful()) {
+            log.error("Failed to fetch earnings calendar: {}", response.getStatusCode());
             return null;
         }
         return body;

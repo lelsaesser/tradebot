@@ -156,6 +156,7 @@ public class DevDataSeeder implements ApplicationRunner {
         log.info("Seeding dev analytics data");
         clearExistingData();
         seedStockSymbolsAndTargetPrices();
+        symbolRegistry.reload();
         SeedBundle bundle = buildSeedBundle();
         try {
             insertPriceHistory(bundle.priceSeriesBySymbol());
@@ -212,21 +213,107 @@ public class DevDataSeeder implements ApplicationRunner {
                         new String[] {"AAPL", "Apple"},
                         new String[] {"MSFT", "Microsoft"},
                         new String[] {"GOOG", "Google"},
-                        new String[] {"AMZN", "Amazon"},
-                        new String[] {"NVDA", "Nvidia"});
+                        new String[] {"TSLA", "Tesla"},
+                        new String[] {"META", "Meta"},
+                        new String[] {"NVDA", "Nvidia"},
+                        new String[] {"RKLB", "Rocket Lab"},
+                        new String[] {"PLTR", "Palantir"},
+                        new String[] {"AVGO", "Broadcom"},
+                        new String[] {"GLXY", "Galaxy Digital"},
+                        new String[] {"MP", "MP Materials"},
+                        new String[] {"ASML", "ASML"},
+                        new String[] {"TEM", "Tempus AI"},
+                        new String[] {"TSM", "Taiwan Semiconductor Manufacturing"},
+                        new String[] {"MU", "Micron Technology"},
+                        new String[] {"ORCL", "Oracle"},
+                        new String[] {"INTC", "Intel"},
+                        new String[] {"DELL", "Dell"},
+                        new String[] {"CRWV", "CoreWeave"},
+                        new String[] {"IREN", "Iris Energy"},
+                        new String[] {"NBIS", "Nebius Group"},
+                        new String[] {"COHR", "Coherent Corp"},
+                        new String[] {"CAT", "Caterpillar"},
+                        new String[] {"KLAC", "KLA Corp"},
+                        new String[] {"LITE", "Lumentum Holdings"},
+                        new String[] {"TER", "Teradyne"},
+                        new String[] {"AMAT", "Applied Materials"},
+                        new String[] {"LRCX", "Lam Research"},
+                        new String[] {"SNDK", "SanDisk"},
+                        new String[] {"WDC", "Western Digital"},
+                        new String[] {"AXTI", "AXT Inc"},
+                        new String[] {"SPY", "S&P 500 ETF"},
+                        new String[] {"SMH", "Semiconductor Sector ETF"},
+                        new String[] {"GEV", "GE Vernova"},
+                        new String[] {"XLK", "Technology Sector"},
+                        new String[] {"XLF", "Finance Sector"},
+                        new String[] {"XLE", "Energy Sector"},
+                        new String[] {"XLV", "Healthcare Sector"},
+                        new String[] {"XLY", "Consumer Discretionary Sector"},
+                        new String[] {"XLP", "Consumer Staples Sector"},
+                        new String[] {"XLI", "Industrial Sector"},
+                        new String[] {"XLC", "Communication Services Sector"},
+                        new String[] {"XLRE", "Real Estate Sector"},
+                        new String[] {"XLB", "Materials Sector"},
+                        new String[] {"XLU", "Utilities Sector"},
+                        new String[] {"BTSG", "BrightSpring Health Services"},
+                        new String[] {"PL", "Planet Labs"},
+                        new String[] {"FET", "Forum Energy Technologies"},
+                        new String[] {"FTI", "TechnipFMC"},
+                        new String[] {"EFXT", "Enerflex"},
+                        new String[] {"FIX", "Comfort Systems USA"},
+                        new String[] {"GLW", "Corning Incorporated"},
+                        new String[] {"CIEN", "Ciena Corporation"},
+                        new String[] {"MPWR", "Monolithic Power Systems"},
+                        new String[] {"NFLX", "Netflix"},
+                        new String[] {"HOOD", "Robinhood"},
+                        new String[] {"AES", "AES Corporation"},
+                        new String[] {"NEE", "NextEra Energy"},
+                        new String[] {"SIMO", "Silicon Motion Technology"},
+                        new String[] {"KEYS", "Keysight Technologies"},
+                        new String[] {"MKSI", "MKS Inc."},
+                        new String[] {"VPG", "Vishay Precision Group"},
+                        new String[] {"ITRN", "Ituran Location and Control"},
+                        new String[] {"SPHR", "Sphere Entertainment"},
+                        new String[] {"SPOT", "Spotify"},
+                        new String[] {"BE", "Bloom Energy"},
+                        new String[] {"SHLD", "Defense Tech ETF"},
+                        new String[] {"AAOI", "Applied Optoelectronics"},
+                        new String[] {"URA", "Uranium ETF"},
+                        new String[] {"LINC", "Lincoln Educational Services"},
+                        new String[] {"TSEM", "Tower Semiconductor"},
+                        new String[] {"IGV", "Software ETF"},
+                        new String[] {"XOP", "Oil & Gas Sector"},
+                        new String[] {"XHB", "Homebuilders ETF"},
+                        new String[] {"ITA", "Aerospace & Defence ETF"},
+                        new String[] {"XBI", "Biotech ETF"},
+                        new String[] {"UFO", "Procure Space ETF"},
+                        new String[] {"TAN", "Solar ETF"},
+                        new String[] {"XOM", "Exxon Mobil"},
+                        new String[] {"CVX", "Chevron"},
+                        new String[] {"PANW", "Palo Alto Networks"},
+                        new String[] {"REMX", "Rare Earths ETF"},
+                        new String[] {"QTUM", "Quantum ETF"},
+                        new String[] {"DTCR", "Data Centers ETF"},
+                        new String[] {"FINX", "FinTech ETF"},
+                        new String[] {"LIT", "Batteries ETF"},
+                        new String[] {"BOTZ", "Robotics ETF"},
+                        new String[] {"STCE", "Crypto ETF"},
+                        new String[] {"MRVL", "Marvell Technology"});
 
         for (String[] stock : sampleStocks) {
             trackedSymbolRepository.save(stock[0], stock[1], AssetType.STOCK);
-            targetPriceRepository.save(new TargetPrice(stock[0], 150.0, 250.0), AssetType.STOCK);
+        }
+
+        // Seed target prices for first 5 stocks only (for price alert testing)
+        for (int i = 0; i < 5; i++) {
+            targetPriceRepository.save(
+                    new TargetPrice(sampleStocks.get(i)[0], 150.0, 250.0), AssetType.STOCK);
         }
 
         targetPriceRepository.save(new TargetPrice("BITCOIN", 100000.0, 0.0), AssetType.COIN);
         targetPriceRepository.save(new TargetPrice("ETHEREUM", 2000.0, 0.0), AssetType.COIN);
 
-        log.info(
-                "Seeded {} stock symbols and {} target prices",
-                sampleStocks.size(),
-                sampleStocks.size() + 2);
+        log.info("Seeded {} stock symbols and {} target prices", sampleStocks.size(), 5 + 2);
     }
 
     private SeedBundle buildSeedBundle() {
