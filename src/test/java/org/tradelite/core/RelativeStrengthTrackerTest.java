@@ -79,8 +79,8 @@ class RelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertThat(message, containsString("RELATIVE STRENGTH ALERT"));
-        assertThat(message, containsString("OUTPERFORMING SPY"));
+        assertThat(message, containsString("Relative Strength Alert"));
+        assertThat(message, containsString("Outperforming SPY"));
         assertThat(message, containsString("NVDA"));
         assertThat(message, containsString("Nvidia"));
         assertThat(message, containsString("1.25"));
@@ -111,7 +111,7 @@ class RelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertThat(message, containsString("UNDERPERFORMING SPY"));
+        assertThat(message, containsString("Underperforming SPY"));
         assertThat(message, containsString("INTC"));
         assertThat(message, containsString("Intel"));
     }
@@ -156,8 +156,8 @@ class RelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertThat(message, containsString("OUTPERFORMING SPY"));
-        assertThat(message, containsString("UNDERPERFORMING SPY"));
+        assertThat(message, containsString("Outperforming SPY"));
+        assertThat(message, containsString("Underperforming SPY"));
         assertThat(message, containsString("NVDA"));
         assertThat(message, containsString("INTC"));
     }
@@ -225,10 +225,10 @@ class RelativeStrengthTrackerTest {
     void testFormatAlertMessage_emptyLists() {
         String message = tracker.formatAlertMessage(List.of(), List.of());
 
-        assertThat(message, containsString("RELATIVE STRENGTH ALERT"));
+        assertThat(message, containsString("Relative Strength Alert"));
         assertThat(message, containsString("50-period EMA crossover"));
-        assertThat(message, not(containsString("OUTPERFORMING SPY")));
-        assertThat(message, not(containsString("UNDERPERFORMING SPY")));
+        assertThat(message, not(containsString("Outperforming SPY")));
+        assertThat(message, not(containsString("Underperforming SPY")));
     }
 
     @Test
@@ -244,9 +244,9 @@ class RelativeStrengthTrackerTest {
 
         String message = tracker.formatAlertMessage(List.of(signal), List.of());
 
-        assertThat(message, containsString("OUTPERFORMING SPY"));
+        assertThat(message, containsString("Outperforming SPY"));
         assertThat(message, containsString("NVDA"));
-        assertThat(message, not(containsString("UNDERPERFORMING SPY")));
+        assertThat(message, not(containsString("Underperforming SPY")));
     }
 
     @Test
@@ -262,8 +262,8 @@ class RelativeStrengthTrackerTest {
 
         String message = tracker.formatAlertMessage(List.of(), List.of(signal));
 
-        assertThat(message, not(containsString("OUTPERFORMING SPY")));
-        assertThat(message, containsString("UNDERPERFORMING SPY"));
+        assertThat(message, not(containsString("Outperforming SPY")));
+        assertThat(message, containsString("Underperforming SPY"));
         assertThat(message, containsString("INTC"));
     }
 }
