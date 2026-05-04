@@ -1,10 +1,6 @@
 package org.tradelite;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -34,6 +30,7 @@ import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.repository.TargetPriceRepository;
 import org.tradelite.repository.TrackedSymbolRepository;
@@ -65,10 +62,10 @@ public class DevDataSeeder implements ApplicationRunner {
                     "Real Estate");
 
     private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
     private final MomentumRocRepository momentumRocRepository;
     private final PriceQuoteRepository priceQuoteRepository;
     private final RelativeStrengthService relativeStrengthService;
+    private final RsCrossoverStateRepository rsCrossoverStateRepository;
     private final TargetPriceProvider targetPriceProvider;
     private final SymbolRegistry symbolRegistry;
     private final OhlcvRepository ohlcvRepository;
@@ -76,15 +73,14 @@ public class DevDataSeeder implements ApplicationRunner {
     private final SectorPerformanceRepository sectorPerformanceRepository;
     private final TrackedSymbolRepository trackedSymbolRepository;
     private final TargetPriceRepository targetPriceRepository;
-    private final Path rsDataFilePath;
 
     @Autowired
     public DevDataSeeder(
             JdbcTemplate jdbcTemplate,
-            ObjectMapper objectMapper,
             MomentumRocRepository momentumRocRepository,
             PriceQuoteRepository priceQuoteRepository,
             RelativeStrengthService relativeStrengthService,
+            RsCrossoverStateRepository rsCrossoverStateRepository,
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
@@ -92,41 +88,11 @@ public class DevDataSeeder implements ApplicationRunner {
             SectorPerformanceRepository sectorPerformanceRepository,
             TrackedSymbolRepository trackedSymbolRepository,
             TargetPriceRepository targetPriceRepository) {
-        this(
-                jdbcTemplate,
-                objectMapper,
-                momentumRocRepository,
-                priceQuoteRepository,
-                relativeStrengthService,
-                targetPriceProvider,
-                symbolRegistry,
-                ohlcvRepository,
-                finnhubPriceEvaluator,
-                sectorPerformanceRepository,
-                trackedSymbolRepository,
-                targetPriceRepository,
-                Path.of("config/rs-data.json"));
-    }
-
-    DevDataSeeder(
-            JdbcTemplate jdbcTemplate,
-            ObjectMapper objectMapper,
-            MomentumRocRepository momentumRocRepository,
-            PriceQuoteRepository priceQuoteRepository,
-            RelativeStrengthService relativeStrengthService,
-            TargetPriceProvider targetPriceProvider,
-            SymbolRegistry symbolRegistry,
-            OhlcvRepository ohlcvRepository,
-            FinnhubPriceEvaluator finnhubPriceEvaluator,
-            SectorPerformanceRepository sectorPerformanceRepository,
-            TrackedSymbolRepository trackedSymbolRepository,
-            TargetPriceRepository targetPriceRepository,
-            Path rsDataFilePath) {
         this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
         this.momentumRocRepository = momentumRocRepository;
         this.priceQuoteRepository = priceQuoteRepository;
         this.relativeStrengthService = relativeStrengthService;
+        this.rsCrossoverStateRepository = rsCrossoverStateRepository;
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;
         this.ohlcvRepository = ohlcvRepository;
@@ -134,7 +100,6 @@ public class DevDataSeeder implements ApplicationRunner {
         this.sectorPerformanceRepository = sectorPerformanceRepository;
         this.trackedSymbolRepository = trackedSymbolRepository;
         this.targetPriceRepository = targetPriceRepository;
-        this.rsDataFilePath = rsDataFilePath;
     }
 
     @Override
@@ -158,23 +123,18 @@ public class DevDataSeeder implements ApplicationRunner {
         seedStockSymbolsAndTargetPrices();
         symbolRegistry.reload();
         SeedBundle bundle = buildSeedBundle();
-        try {
-            insertPriceHistory(bundle.priceSeriesBySymbol());
-            seedRelativeStrengthHistory(bundle);
-            seedMomentumState(bundle);
-            seedOhlcvData(bundle);
-            seedPriceCache(bundle);
-            seedSectorPerformance();
-            log.info(
-                    "Seeded dev analytics data for {} symbols",
-                    bundle.priceSeriesBySymbol().size());
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to seed dev analytics data", e);
-        }
+        insertPriceHistory(bundle.priceSeriesBySymbol());
+        seedRelativeStrengthHistory(bundle);
+        seedMomentumState(bundle);
+        seedOhlcvData(bundle);
+        seedPriceCache(bundle);
+        seedSectorPerformance();
+        log.info("Seeded dev analytics data for {} symbols", bundle.priceSeriesBySymbol().size());
     }
 
     private boolean hasSeedData() {
-        return Files.exists(rsDataFilePath) && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
+        return !rsCrossoverStateRepository.findAll().isEmpty()
+                && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
     }
 
     private boolean hasPersistedQuotes(String symbol) {
@@ -198,12 +158,8 @@ public class DevDataSeeder implements ApplicationRunner {
         jdbcTemplate.update("DELETE FROM industry_performance");
         jdbcTemplate.update("DELETE FROM target_prices");
         jdbcTemplate.update("DELETE FROM tracked_symbols");
+        jdbcTemplate.update("DELETE FROM rs_crossover_state");
 
-        try {
-            Files.deleteIfExists(rsDataFilePath);
-        } catch (IOException e) {
-            log.warn("Failed to delete RS data file: {}", rsDataFilePath, e);
-        }
         relativeStrengthService.getRsHistory().clear();
     }
 
@@ -427,7 +383,7 @@ public class DevDataSeeder implements ApplicationRunner {
         priceQuoteRepository.saveAll(allQuotes);
     }
 
-    private void seedRelativeStrengthHistory(SeedBundle bundle) throws IOException {
+    private void seedRelativeStrengthHistory(SeedBundle bundle) {
         Map<String, RelativeStrengthData> rsHistory = relativeStrengthService.getRsHistory();
         rsHistory.clear();
 
@@ -462,12 +418,8 @@ public class DevDataSeeder implements ApplicationRunner {
             rsData.setPreviousEma(StatisticsUtil.calculateEma(rsValues, emaPeriod));
             rsData.setInitialized(true);
             rsHistory.put(entry.getKey(), rsData);
+            rsCrossoverStateRepository.save(entry.getKey(), rsData);
         }
-
-        ensureParentDirectories(rsDataFilePath);
-        objectMapper
-                .writerWithDefaultPrettyPrinter()
-                .writeValue(rsDataFilePath.toFile(), rsHistory);
     }
 
     private void seedMomentumState(SeedBundle bundle) {
@@ -626,13 +578,6 @@ public class DevDataSeeder implements ApplicationRunner {
         }
 
         return records;
-    }
-
-    private void ensureParentDirectories(Path path) throws IOException {
-        Path parent = path.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
     }
 
     record SeedBundle(
