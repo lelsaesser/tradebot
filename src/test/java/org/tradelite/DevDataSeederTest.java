@@ -12,13 +12,11 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -33,6 +31,7 @@ import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.repository.TargetPriceRepository;
 import org.tradelite.repository.TrackedSymbolRepository;
@@ -43,16 +42,16 @@ class DevDataSeederTest {
 
     @TempDir Path tempDir;
 
-    private ObjectMapper objectMapper;
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private RsCrossoverStateRepository rsCrossoverStateRepository;
 
     @BeforeEach
-    void setUpObjectMapper() {
-        objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
+    void setUp() {
         finnhubPriceEvaluator = mock(FinnhubPriceEvaluator.class);
         when(finnhubPriceEvaluator.getLastPriceCache())
                 .thenReturn(new java.util.concurrent.ConcurrentHashMap<>());
+        rsCrossoverStateRepository = mock(RsCrossoverStateRepository.class);
+        when(rsCrossoverStateRepository.findAll()).thenReturn(Map.of());
     }
 
     @Test
@@ -89,37 +88,34 @@ class DevDataSeederTest {
         DevDataSeeder seeder =
                 new DevDataSeeder(
                         jdbcTemplate,
-                        objectMapper,
                         momentumRocRepository,
                         priceQuoteRepository,
                         relativeStrengthService,
+                        rsCrossoverStateRepository,
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
-                        targetPriceRepository,
-                        tempDir.resolve("rs-data.json"));
+                        targetPriceRepository);
 
         seeder.reseed();
 
-        assertThat(Files.exists(tempDir.resolve("rs-data.json")), is(true));
         assertThat(rsHistory, hasKey("AAPL"));
 
+        verify(rsCrossoverStateRepository, atLeastOnce()).save(any(), any());
         verify(momentumRocRepository, atLeastOnce()).save(any(), any());
         verify(ohlcvRepository, atLeastOnce()).saveAll(anyList());
         verify(priceQuoteRepository, atLeastOnce()).saveAll(anyList());
     }
 
     @Test
-    void seedIfMissing_skipsWhenFilesAndBenchmarkDataAlreadyExist() throws Exception {
+    void seedIfMissing_skipsWhenRsCrossoverStateAndBenchmarkDataAlreadyExist() throws Exception {
         SQLiteDataSource dataSource = createDataSource("preseeded.db");
         JdbcTemplate jdbcTemplate = createJdbcTemplateWithSchema(dataSource);
         preseedBenchmarkData(dataSource);
         PriceQuoteRepository priceQuoteRepository = mock(PriceQuoteRepository.class);
-
-        Files.writeString(tempDir.resolve("rs-data.json"), "{}");
 
         MomentumRocRepository momentumRocRepository = mock(MomentumRocRepository.class);
         RelativeStrengthService relativeStrengthService = mock(RelativeStrengthService.class);
@@ -131,6 +127,12 @@ class DevDataSeederTest {
         TrackedSymbolRepository trackedSymbolRepository = mock(TrackedSymbolRepository.class);
         TargetPriceRepository targetPriceRepository = mock(TargetPriceRepository.class);
 
+        // Simulate existing RS crossover state in DB
+        RsCrossoverStateRepository preseededRsRepo = mock(RsCrossoverStateRepository.class);
+        RelativeStrengthData existingData = new RelativeStrengthData();
+        existingData.setInitialized(true);
+        when(preseededRsRepo.findAll()).thenReturn(Map.of("AAPL", existingData));
+
         when(relativeStrengthService.getRsHistory()).thenReturn(new java.util.HashMap<>());
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
         when(symbolRegistry.getAllEtfs()).thenReturn(java.util.Map.of("SPY", "S&P 500"));
@@ -139,18 +141,17 @@ class DevDataSeederTest {
         DevDataSeeder seeder =
                 new DevDataSeeder(
                         jdbcTemplate,
-                        objectMapper,
                         momentumRocRepository,
                         priceQuoteRepository,
                         relativeStrengthService,
+                        preseededRsRepo,
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
-                        targetPriceRepository,
-                        tempDir.resolve("rs-data.json"));
+                        targetPriceRepository);
 
         assertThat(seeder.seedIfMissing(), is(false));
     }
@@ -166,14 +167,12 @@ class DevDataSeederTest {
     }
 
     @Test
-    void seedIfMissing_reseedsWhenFilesAreAbsent() {
-        Path rsPath = tempDir.resolve("seed-if-missing-rs.json");
-        DevDataSeeder seeder = createSeederWithEmptySources(rsPath);
+    void seedIfMissing_reseedsWhenRsCrossoverStateIsEmpty() {
+        DevDataSeeder seeder = createSeederWithEmptySources();
 
         boolean seeded = seeder.seedIfMissing();
 
         assertThat(seeded, is(true));
-        assertThat(Files.exists(rsPath), is(true));
     }
 
     @Test
@@ -210,18 +209,17 @@ class DevDataSeederTest {
         DevDataSeeder seeder =
                 new DevDataSeeder(
                         jdbcTemplate,
-                        objectMapper,
                         momentumRocRepository,
                         priceQuoteRepository,
                         relativeStrengthService,
+                        rsCrossoverStateRepository,
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
                         finnhubPriceEvaluator,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
-                        targetPriceRepository,
-                        tempDir.resolve("rs-fallback.json"));
+                        targetPriceRepository);
 
         seeder.reseed();
 
@@ -231,10 +229,6 @@ class DevDataSeederTest {
     }
 
     private DevDataSeeder createSeederWithEmptySources() {
-        return createSeederWithEmptySources(tempDir.resolve("generic-rs.json"));
-    }
-
-    private DevDataSeeder createSeederWithEmptySources(Path rsPath) {
         SQLiteDataSource dataSource = createDataSource("generic.db");
         JdbcTemplate jdbcTemplate = createJdbcTemplateWithSchema(dataSource);
         PriceQuoteRepository priceQuoteRepository = mock(PriceQuoteRepository.class);
@@ -256,18 +250,17 @@ class DevDataSeederTest {
 
         return new DevDataSeeder(
                 jdbcTemplate,
-                objectMapper,
                 momentumRocRepository,
                 priceQuoteRepository,
                 relativeStrengthService,
+                rsCrossoverStateRepository,
                 targetPriceProvider,
                 symbolRegistry,
                 ohlcvRepository,
                 finnhubPriceEvaluator,
                 sectorPerformanceRepository,
                 trackedSymbolRepository,
-                targetPriceRepository,
-                rsPath);
+                targetPriceRepository);
     }
 
     private SQLiteDataSource createDataSource(String dbName) {
@@ -350,6 +343,16 @@ class DevDataSeederTest {
                     display_name TEXT NOT NULL,
                     asset_type TEXT NOT NULL,
                     PRIMARY KEY (ticker, asset_type)
+                )
+                """);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rs_crossover_state (
+                    symbol TEXT PRIMARY KEY,
+                    previous_rs REAL NOT NULL,
+                    previous_ema REAL NOT NULL,
+                    initialized INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER NOT NULL
                 )
                 """);
         return jdbcTemplate;

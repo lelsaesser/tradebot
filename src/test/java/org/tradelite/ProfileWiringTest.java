@@ -3,7 +3,6 @@ package org.tradelite;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -27,6 +26,7 @@ import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.repository.TargetPriceRepository;
 import org.tradelite.repository.TrackedSymbolRepository;
@@ -112,11 +112,6 @@ class ProfileWiringTest {
         }
 
         @Bean
-        ObjectMapper objectMapper() {
-            return new ObjectMapper();
-        }
-
-        @Bean
         MomentumRocRepository momentumRocRepository() {
             return mock(MomentumRocRepository.class);
         }
@@ -129,6 +124,11 @@ class ProfileWiringTest {
         @Bean
         RsiService rsiService() {
             return mock(RsiService.class);
+        }
+
+        @Bean
+        RsCrossoverStateRepository rsCrossoverStateRepository() {
+            return mock(RsCrossoverStateRepository.class);
         }
 
         @Bean
