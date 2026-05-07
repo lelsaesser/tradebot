@@ -19,6 +19,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
+import org.tradelite.client.yahoo.YahooFetchException;
+import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -29,6 +31,7 @@ import org.tradelite.repository.OhlcvRepository;
 class OhlcvFetcherTest {
 
     @Mock private TwelveDataClient twelveDataClient;
+    @Mock private YahooFinanceClient yahooFinanceClient;
     @Mock private OhlcvRepository ohlcvRepository;
     @Mock private SymbolRegistry symbolRegistry;
     @Mock private TelegramGateway telegramGateway;
@@ -41,14 +44,19 @@ class OhlcvFetcherTest {
         ohlcvFetcher =
                 new OhlcvFetcher(
                         twelveDataClient,
+                        yahooFinanceClient,
                         ohlcvRepository,
                         symbolRegistry,
                         telegramGateway,
                         stockSplitDetector);
         ohlcvFetcher.setRequestDelayMs(0);
+        ohlcvFetcher.setYahooRequestDelayMs(0);
         ohlcvFetcher.setRateLimitWaitMs(0);
         // Default: return all ETFs + benchmark (no extra stocks)
         lenient().when(symbolRegistry.getAll()).thenReturn(defaultEtfSymbols());
+        // Default: no international symbols
+        lenient().when(symbolRegistry.getInternationalStocks()).thenReturn(List.of());
+        lenient().when(symbolRegistry.isInternationalSymbol(anyString())).thenReturn(false);
         // Default: all symbols need backfill
         lenient().when(ohlcvRepository.findBySymbol(anyString(), anyInt())).thenReturn(List.of());
         // Default: fetch returns empty
@@ -195,11 +203,13 @@ class OhlcvFetcherTest {
         OhlcvFetcher fetcherWithThrowingDetector =
                 new OhlcvFetcher(
                         twelveDataClient,
+                        yahooFinanceClient,
                         ohlcvRepository,
                         symbolRegistry,
                         telegramGateway,
                         throwingDetector);
         fetcherWithThrowingDetector.setRequestDelayMs(0);
+        fetcherWithThrowingDetector.setYahooRequestDelayMs(0);
         fetcherWithThrowingDetector.setRateLimitWaitMs(0);
 
         when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("NFLX", "Netflix")));
@@ -342,5 +352,110 @@ class OhlcvFetcherTest {
         SymbolRegistry.THEMATIC_ETFS.forEach(
                 (ticker, name) -> symbols.add(new StockSymbol(ticker, name)));
         return symbols;
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_internationalSymbol_usesYahooClient() throws InterruptedException {
+        when(symbolRegistry.getInternationalStocks())
+                .thenReturn(List.of(new StockSymbol("RHM.DE", "Rheinmetall")));
+        when(yahooFinanceClient.fetchDailyOhlcv("RHM.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(generateRecords("RHM.DE", 5));
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        verify(yahooFinanceClient).fetchDailyOhlcv("RHM.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        verify(twelveDataClient, never()).fetchDailyOhlcv(eq("RHM.DE"), anyInt());
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_yahooFailure_logsAndContinues() throws InterruptedException {
+        when(symbolRegistry.getInternationalStocks())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("RHM.DE", "Rheinmetall"),
+                                new StockSymbol("ENR.DE", "Siemens Energy")));
+        when(yahooFinanceClient.fetchDailyOhlcv("RHM.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenThrow(new YahooFetchException("RHM.DE", "curl exited with code 22"));
+        when(yahooFinanceClient.fetchDailyOhlcv("ENR.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(generateRecords("ENR.DE", 5));
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        // Second symbol still fetched despite first failure
+        verify(yahooFinanceClient).fetchDailyOhlcv("ENR.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        // No Telegram alert for Yahoo failures
+        verify(telegramGateway, never()).sendMessage(contains("Yahoo"));
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_domesticSymbol_usesTwelveDataClient() throws InterruptedException {
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        verify(twelveDataClient).fetchDailyOhlcv("SPY", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        verify(yahooFinanceClient, never()).fetchDailyOhlcv(eq("SPY"), anyInt());
+    }
+
+    @Test
+    void backfillSymbol_internationalSymbol_usesYahoo() {
+        when(symbolRegistry.isInternationalSymbol("RHM.DE")).thenReturn(true);
+        when(yahooFinanceClient.fetchDailyOhlcv("RHM.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(generateRecords("RHM.DE", 400));
+
+        int count = ohlcvFetcher.backfillSymbol("RHM.DE");
+
+        assertThat(count, is(400));
+        verify(yahooFinanceClient).fetchDailyOhlcv("RHM.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        verify(twelveDataClient, never()).fetchDailyOhlcv(eq("RHM.DE"), anyInt());
+    }
+
+    @Test
+    void backfillSymbol_domesticSymbol_usesTwelveData() {
+        when(symbolRegistry.isInternationalSymbol("AAPL")).thenReturn(false);
+        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(generateRecords("AAPL", 400));
+
+        int count = ohlcvFetcher.backfillSymbol("AAPL");
+
+        assertThat(count, is(400));
+        verify(twelveDataClient).fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        verify(yahooFinanceClient, never()).fetchDailyOhlcv(eq("AAPL"), anyInt());
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_internationalRefresh_usesSmallRange() throws InterruptedException {
+        List<OhlcvRecord> sufficientRecords = generateRecords("RHM.DE", 140);
+        when(symbolRegistry.getInternationalStocks())
+                .thenReturn(List.of(new StockSymbol("RHM.DE", "Rheinmetall")));
+        when(ohlcvRepository.findBySymbol("RHM.DE", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(sufficientRecords);
+        when(yahooFinanceClient.fetchDailyOhlcv("RHM.DE", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
+                .thenReturn(generateRecords("RHM.DE", 5, 1400.0));
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        verify(yahooFinanceClient).fetchDailyOhlcv("RHM.DE", OhlcvFetcher.REFRESH_OUTPUT_SIZE);
+    }
+
+    @Test
+    void fetchAndBackfillOhlcv_internationalStockSplitDetection_sendsAlert()
+            throws InterruptedException {
+        // Existing records at 100.0 close price
+        List<OhlcvRecord> existingRecords = generateRecords("RHM.DE", 140, 100.0);
+        // Fetched records at ~25.0 (simulating 4:1 forward split)
+        List<OhlcvRecord> fetchedRecords = generateRecords("RHM.DE", 5, 25.0);
+
+        when(symbolRegistry.getInternationalStocks())
+                .thenReturn(List.of(new StockSymbol("RHM.DE", "Rheinmetall")));
+        when(ohlcvRepository.findBySymbol("RHM.DE", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(existingRecords);
+        when(yahooFinanceClient.fetchDailyOhlcv("RHM.DE", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
+                .thenReturn(fetchedRecords);
+
+        ohlcvFetcher.fetchAndBackfillOhlcv();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramGateway).sendMessage(messageCaptor.capture());
+        assertThat(messageCaptor.getValue(), containsString("Stock Split Alert"));
+        assertThat(messageCaptor.getValue(), containsString("RHM.DE"));
     }
 }

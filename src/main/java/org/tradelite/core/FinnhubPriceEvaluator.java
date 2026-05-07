@@ -57,6 +57,9 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
         // Loop 1: Fetch & cache prices for ALL symbols (stocks + ETFs)
         for (StockSymbol symbol : symbolRegistry.getAll()) {
+            if (symbolRegistry.isInternationalSymbol(symbol.getTicker())) {
+                continue;
+            }
             PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(symbol);
             // Rate limit: Finnhub has 60 requests/minute limit, sleep after EVERY API call
             Thread.sleep(1100);

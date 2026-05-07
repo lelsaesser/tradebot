@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.twelvedata.TwelveDataClient;
+import org.tradelite.client.yahoo.YahooFetchException;
+import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -23,25 +25,30 @@ public class OhlcvFetcher {
     static final int BACKFILL_OUTPUT_SIZE = 400;
     static final int REFRESH_OUTPUT_SIZE = 5;
     static final long DEFAULT_REQUEST_DELAY_MS = 9000;
+    static final long DEFAULT_YAHOO_REQUEST_DELAY_MS = 3000;
     static final long RATE_LIMIT_WAIT_MS = 61_000;
     static final int MAX_RETRIES = 1;
 
     private final TwelveDataClient twelveDataClient;
+    private final YahooFinanceClient yahooFinanceClient;
     private final OhlcvRepository ohlcvRepository;
     private final SymbolRegistry symbolRegistry;
     private final TelegramGateway telegramGateway;
     private final StockSplitDetector stockSplitDetector;
     @Setter private long requestDelayMs = DEFAULT_REQUEST_DELAY_MS;
+    @Setter private long yahooRequestDelayMs = DEFAULT_YAHOO_REQUEST_DELAY_MS;
     @Setter private long rateLimitWaitMs = RATE_LIMIT_WAIT_MS;
 
     @Autowired
     public OhlcvFetcher(
             TwelveDataClient twelveDataClient,
+            YahooFinanceClient yahooFinanceClient,
             OhlcvRepository ohlcvRepository,
             SymbolRegistry symbolRegistry,
             TelegramGateway telegramGateway,
             StockSplitDetector stockSplitDetector) {
         this.twelveDataClient = twelveDataClient;
+        this.yahooFinanceClient = yahooFinanceClient;
         this.ohlcvRepository = ohlcvRepository;
         this.symbolRegistry = symbolRegistry;
         this.telegramGateway = telegramGateway;
@@ -54,13 +61,52 @@ public class OhlcvFetcher {
 
     public void fetchAndBackfillOhlcv(int maxSymbols) throws InterruptedException {
         List<String> allSymbols =
-                symbolRegistry.getAll().stream().map(StockSymbol::getTicker).toList();
-        List<String> symbols =
+                symbolRegistry.getAll().stream()
+                        .map(StockSymbol::getTicker)
+                        .filter(t -> !symbolRegistry.isInternationalSymbol(t))
+                        .toList();
+        List<String> domesticSymbols =
                 maxSymbols < allSymbols.size() ? allSymbols.subList(0, maxSymbols) : allSymbols;
 
-        log.info("Starting OHLCV fetch for {} symbols", symbols.size());
+        List<String> internationalSymbols =
+                symbolRegistry.getInternationalStocks().stream()
+                        .map(StockSymbol::getTicker)
+                        .toList();
 
+        log.info(
+                "Starting OHLCV fetch for {} domestic + {} international symbols",
+                domesticSymbols.size(),
+                internationalSymbols.size());
+
+        // Pass 1: Domestic symbols via Twelve Data
         List<String> failedSymbols = new ArrayList<>();
+        int succeeded = fetchDomesticSymbols(domesticSymbols, failedSymbols);
+
+        log.info(
+                "Domestic OHLCV fetch complete: {} succeeded, {} failed{}",
+                succeeded,
+                failedSymbols.size(),
+                failedSymbols.isEmpty() ? "" : " " + failedSymbols);
+
+        if (!failedSymbols.isEmpty()) {
+            telegramGateway.sendMessage(
+                    String.format(
+                            "*OHLCV Fetch Alert*%n%d/%d failed %s",
+                            failedSymbols.size(), domesticSymbols.size(), failedSymbols));
+        }
+
+        // Pass 2: International symbols via Yahoo Finance
+        if (!internationalSymbols.isEmpty()) {
+            int intlSucceeded = fetchInternationalSymbols(internationalSymbols);
+            log.info(
+                    "International OHLCV fetch complete: {}/{} succeeded",
+                    intlSucceeded,
+                    internationalSymbols.size());
+        }
+    }
+
+    private int fetchDomesticSymbols(List<String> symbols, List<String> failedSymbols)
+            throws InterruptedException {
         int succeeded = 0;
 
         for (int i = 0; i < symbols.size(); i++) {
@@ -111,18 +157,51 @@ public class OhlcvFetcher {
             }
         }
 
-        log.info(
-                "OHLCV fetch complete: {} succeeded, {} failed{}",
-                succeeded,
-                failedSymbols.size(),
-                failedSymbols.isEmpty() ? "" : " " + failedSymbols);
+        return succeeded;
+    }
 
-        if (!failedSymbols.isEmpty()) {
-            telegramGateway.sendMessage(
-                    String.format(
-                            "*OHLCV Fetch Alert*%n%d/%d failed %s",
-                            failedSymbols.size(), symbols.size(), failedSymbols));
+    private int fetchInternationalSymbols(List<String> symbols) throws InterruptedException {
+        int succeeded = 0;
+
+        for (int i = 0; i < symbols.size(); i++) {
+            if (i > 0) {
+                //noinspection BusyWait
+                Thread.sleep(yahooRequestDelayMs);
+            }
+
+            String ticker = symbols.get(i);
+            List<OhlcvRecord> existingRecords =
+                    ohlcvRepository.findBySymbol(ticker, LOOKBACK_CALENDAR_DAYS);
+            boolean needsBackfill = existingRecords.size() < MIN_RECORDS_FOR_BACKFILL;
+            int days = needsBackfill ? BACKFILL_OUTPUT_SIZE : REFRESH_OUTPUT_SIZE;
+            String mode = needsBackfill ? "backfill" : "refresh";
+
+            log.info(
+                    "Fetching international OHLCV for {} ({}/{}, {})",
+                    ticker,
+                    i + 1,
+                    symbols.size(),
+                    mode);
+
+            try {
+                List<OhlcvRecord> records = yahooFinanceClient.fetchDailyOhlcv(ticker, days);
+
+                if (!needsBackfill && !records.isEmpty() && !existingRecords.isEmpty()) {
+                    try {
+                        checkForStockSplit(ticker, existingRecords, records);
+                    } catch (Exception e) {
+                        log.warn("Split detection failed for {}: {}", ticker, e.getMessage());
+                    }
+                }
+
+                ohlcvRepository.saveAll(records);
+                succeeded++;
+            } catch (YahooFetchException e) {
+                log.error("Yahoo fetch failed for {}: {}", ticker, e.getMessage());
+            }
         }
+
+        return succeeded;
     }
 
     /**
@@ -133,7 +212,12 @@ public class OhlcvFetcher {
      */
     public int backfillSymbol(String ticker) {
         log.info("Backfilling OHLCV for {}", ticker);
-        List<OhlcvRecord> records = twelveDataClient.fetchDailyOhlcv(ticker, BACKFILL_OUTPUT_SIZE);
+        List<OhlcvRecord> records;
+        if (symbolRegistry.isInternationalSymbol(ticker)) {
+            records = yahooFinanceClient.fetchDailyOhlcv(ticker, BACKFILL_OUTPUT_SIZE);
+        } else {
+            records = twelveDataClient.fetchDailyOhlcv(ticker, BACKFILL_OUTPUT_SIZE);
+        }
         ohlcvRepository.saveAll(records);
         log.info("Backfill complete for {}: {} records saved", ticker, records.size());
         return records.size();
