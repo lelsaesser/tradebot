@@ -351,4 +351,58 @@ class SymbolRegistryTest {
         assertTrue(result.isPresent());
         assertThat(result.get().getTicker(), is("SMH"));
     }
+
+    @Test
+    void isInternationalSymbol_withDot_returnsTrue() {
+        assertTrue(symbolRegistry.isInternationalSymbol("RHM.DE"));
+        assertTrue(symbolRegistry.isInternationalSymbol("005930.KS"));
+        assertTrue(symbolRegistry.isInternationalSymbol("ENR.DE"));
+    }
+
+    @Test
+    void isInternationalSymbol_withoutDot_returnsFalse() {
+        assertFalse(symbolRegistry.isInternationalSymbol("AAPL"));
+        assertFalse(symbolRegistry.isInternationalSymbol("SPY"));
+        assertFalse(symbolRegistry.isInternationalSymbol("XLK"));
+    }
+
+    @Test
+    void isInternationalSymbol_null_returnsFalse() {
+        assertFalse(symbolRegistry.isInternationalSymbol(null));
+    }
+
+    @Test
+    void getInternationalStocks_filtersCorrectly() {
+        List<SymbolRegistry.StockSymbolEntry> entries = new ArrayList<>();
+        entries.add(new SymbolRegistry.StockSymbolEntry("AAPL", "Apple"));
+        entries.add(new SymbolRegistry.StockSymbolEntry("RHM.DE", "Rheinmetall"));
+        entries.add(new SymbolRegistry.StockSymbolEntry("005930.KS", "Samsung"));
+
+        when(trackedSymbolRepository.findAll()).thenReturn(entries);
+        symbolRegistry = new SymbolRegistry(trackedSymbolRepository);
+
+        List<StockSymbol> intl = symbolRegistry.getInternationalStocks();
+
+        assertThat(intl.size(), is(2));
+        assertTrue(intl.stream().anyMatch(s -> s.getTicker().equals("RHM.DE")));
+        assertTrue(intl.stream().anyMatch(s -> s.getTicker().equals("005930.KS")));
+    }
+
+    @Test
+    void getDomesticStocks_filtersCorrectly() {
+        List<SymbolRegistry.StockSymbolEntry> entries = new ArrayList<>();
+        entries.add(new SymbolRegistry.StockSymbolEntry("AAPL", "Apple"));
+        entries.add(new SymbolRegistry.StockSymbolEntry("RHM.DE", "Rheinmetall"));
+        entries.add(new SymbolRegistry.StockSymbolEntry("MSFT", "Microsoft"));
+
+        when(trackedSymbolRepository.findAll()).thenReturn(entries);
+        symbolRegistry = new SymbolRegistry(trackedSymbolRepository);
+
+        List<StockSymbol> domestic = symbolRegistry.getDomesticStocks();
+
+        assertThat(domestic.size(), is(2));
+        assertTrue(domestic.stream().anyMatch(s -> s.getTicker().equals("AAPL")));
+        assertTrue(domestic.stream().anyMatch(s -> s.getTicker().equals("MSFT")));
+        assertFalse(domestic.stream().anyMatch(s -> s.getTicker().equals("RHM.DE")));
+    }
 }

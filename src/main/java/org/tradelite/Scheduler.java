@@ -206,8 +206,9 @@ public class Scheduler {
         int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
         int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
         int twelveDataCount = apiRequestMeteringService.getTwelveDataRequestCount();
+        int yahooCount = apiRequestMeteringService.getYahooRequestCount();
 
-        if (finnhubCount > 0 || coingeckoCount > 0 || twelveDataCount > 0) {
+        if (finnhubCount > 0 || coingeckoCount > 0 || twelveDataCount > 0 || yahooCount > 0) {
             String previousMonth = apiRequestMeteringService.getPreviousMonth();
 
             String message =
@@ -217,20 +218,23 @@ public class Scheduler {
                             🔹 *Finnhub API*: %,d requests
                             🔹 *CoinGecko API*: %,d requests
                             🔹 *Twelve Data API*: %,d requests
+                            🔹 *Yahoo Finance*: %,d requests
                             🔹 *Total*: %,d requests""",
                             previousMonth,
                             finnhubCount,
                             coingeckoCount,
                             twelveDataCount,
-                            finnhubCount + coingeckoCount + twelveDataCount);
+                            yahooCount,
+                            finnhubCount + coingeckoCount + twelveDataCount + yahooCount);
 
             telegramClient.sendMessage(message);
             log.info(
-                    "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}, TwelveData={}",
+                    "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}, TwelveData={}, Yahoo={}",
                     previousMonth,
                     finnhubCount,
                     coingeckoCount,
-                    twelveDataCount);
+                    twelveDataCount,
+                    yahooCount);
         } else {
             log.info("No API requests recorded for the previous month, skipping report");
         }

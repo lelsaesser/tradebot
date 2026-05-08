@@ -26,6 +26,7 @@ class ApiRequestMeteringServiceTest {
         Files.deleteIfExists(configDir.resolve("finnhub-monthly-requests.txt"));
         Files.deleteIfExists(configDir.resolve("coingecko-monthly-requests.txt"));
         Files.deleteIfExists(configDir.resolve("twelvedata-monthly-requests.txt"));
+        Files.deleteIfExists(configDir.resolve("yahoo-monthly-requests.txt"));
     }
 
     @BeforeEach
@@ -412,5 +413,37 @@ class ApiRequestMeteringServiceTest {
         String currentMonth = meteringService.getCurrentMonth();
         String expectedMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         assertEquals(expectedMonth, currentMonth);
+    }
+
+    @Test
+    void testIncrementYahooRequests() {
+        assertEquals(0, meteringService.getYahooRequestCount());
+
+        meteringService.incrementYahooRequests();
+        assertEquals(1, meteringService.getYahooRequestCount());
+
+        meteringService.incrementYahooRequests();
+        assertEquals(2, meteringService.getYahooRequestCount());
+    }
+
+    @Test
+    void testYahooCounterIndependent() {
+        meteringService.incrementFinnhubRequests();
+        meteringService.incrementYahooRequests();
+        meteringService.incrementYahooRequests();
+        meteringService.incrementYahooRequests();
+
+        assertEquals(1, meteringService.getFinnhubRequestCount());
+        assertEquals(3, meteringService.getYahooRequestCount());
+    }
+
+    @Test
+    void testGetRequestCountSummary_includesYahoo() {
+        meteringService.incrementYahooRequests();
+        meteringService.incrementYahooRequests();
+
+        String summary = meteringService.getRequestCountSummary();
+
+        assertTrue(summary.contains("Yahoo: 2"));
     }
 }
