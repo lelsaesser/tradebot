@@ -382,4 +382,25 @@ class FinnhubPriceEvaluatorTest {
         assertThat(finnhubPriceEvaluator.lastPriceCache.get("AAPL"), is(175.0));
         assertThat(finnhubPriceEvaluator.lastPriceCache.get("TSM"), is(403.0));
     }
+
+    @Test
+    void evaluatePrice_internationalSymbol_skipped() throws InterruptedException {
+        StockSymbol domestic = new StockSymbol("AAPL", "Apple");
+        StockSymbol international = new StockSymbol("RHM.DE", "Rheinmetall");
+        when(symbolRegistry.getAll()).thenReturn(List.of(domestic, international));
+        when(symbolRegistry.isInternationalSymbol("AAPL")).thenReturn(false);
+        when(symbolRegistry.isInternationalSymbol("RHM.DE")).thenReturn(true);
+
+        PriceQuoteResponse aaplQuote = new PriceQuoteResponse();
+        aaplQuote.setCurrentPrice(175.0);
+        aaplQuote.setStockSymbol(domestic);
+        when(finnhubClient.getPriceQuote(domestic)).thenReturn(aaplQuote);
+
+        lenient().when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        verify(finnhubClient).getPriceQuote(domestic);
+        verify(finnhubClient, never()).getPriceQuote(international);
+    }
 }

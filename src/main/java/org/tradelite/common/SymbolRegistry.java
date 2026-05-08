@@ -211,6 +211,21 @@ public class SymbolRegistry {
         return removed;
     }
 
+    /** Checks if a ticker represents an international (non-US) symbol. */
+    public boolean isInternationalSymbol(String ticker) {
+        return ticker != null && ticker.contains(".");
+    }
+
+    /** Returns only international (non-US) stocks. */
+    public List<StockSymbol> getInternationalStocks() {
+        return getStocks().stream().filter(s -> isInternationalSymbol(s.getTicker())).toList();
+    }
+
+    /** Returns only domestic (US) stocks. */
+    public List<StockSymbol> getDomesticStocks() {
+        return getStocks().stream().filter(s -> !isInternationalSymbol(s.getTicker())).toList();
+    }
+
     @Setter
     @Getter
     @NoArgsConstructor
