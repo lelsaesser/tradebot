@@ -48,6 +48,7 @@ public class Scheduler {
     private final PullbackBuyTracker pullbackBuyTracker;
     private final MarketStatusService marketStatusService;
     private final EarningsCalendarTracker earningsCalendarTracker;
+    private final AccumulationDetectionTracker accumulationDetectionTracker;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -73,7 +74,8 @@ public class Scheduler {
             VfiTracker vfiTracker,
             PullbackBuyTracker pullbackBuyTracker,
             MarketStatusService marketStatusService,
-            EarningsCalendarTracker earningsCalendarTracker) {
+            EarningsCalendarTracker earningsCalendarTracker,
+            AccumulationDetectionTracker accumulationDetectionTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
@@ -95,6 +97,7 @@ public class Scheduler {
         this.pullbackBuyTracker = pullbackBuyTracker;
         this.marketStatusService = marketStatusService;
         this.earningsCalendarTracker = earningsCalendarTracker;
+        this.accumulationDetectionTracker = accumulationDetectionTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -152,6 +155,12 @@ public class Scheduler {
     protected void dailyVfiReport() {
         rootErrorHandler.run(vfiTracker::sendDailyReport);
         log.info("Daily VFI report completed.");
+    }
+
+    @Scheduled(cron = "0 0 10 * * MON-FRI", zone = "CET")
+    protected void dailyAccumulationDetection() {
+        rootErrorHandler.run(accumulationDetectionTracker::analyzeAndSendAlerts);
+        log.info("Daily accumulation detection completed.");
     }
 
     @Scheduled(cron = "0 15 8 * * *", zone = "CET")
@@ -346,6 +355,13 @@ public class Scheduler {
     public boolean manualEarningsCalendarCheck() {
         boolean success = rootErrorHandler.runWithStatus(earningsCalendarTracker::checkAndAlert);
         log.info("Manual earnings calendar check completed.");
+        return success;
+    }
+
+    public boolean manualAccumulationDetection() {
+        boolean success =
+                rootErrorHandler.runWithStatus(accumulationDetectionTracker::analyzeAndSendAlerts);
+        log.info("Manual accumulation detection completed.");
         return success;
     }
 }

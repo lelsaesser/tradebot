@@ -1,33 +1,37 @@
 # Progress Tracking
 
-## Latest Milestone: International Stock Support (#372) — COMPLETE
+## Latest Milestone: Accumulation Detection Signal (#371) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
-### Implementation (May 7-9, 2026)
+### Implementation (May 9, 2026)
 
 #### Purpose
-Support German (XETRA) and Korean (KRX) stocks via Yahoo Finance ProcessBuilder + curl approach, bypassing TLS fingerprint blocking that prevents Java RestTemplate access.
+Detect institutional accumulation by identifying stocks where price is weak (EMA9 < EMA21) but volume flow is bullish and accelerating (VFI > 0 AND VFI > signal line). This catches pre-trend institutional positioning before breakouts.
+
+#### New Components
+- `TrendDirection` — enum (RISING, FLAT, FALLING) in `quant` package
+- `RsTrendResult` — record (rsValue, rsEma, rsTrend, rsEmaTrend) in `service` package
+- `AccumulationSignal` — record with all alert formatting data
+- `AccumulationDetectionService` — pure signal logic: evaluate(EmaAnalysis, VfiAnalysis, RsTrendResult)
+- `AccumulationDetectionTracker` — orchestration: iterates stocks, calls services, sends consolidated Telegram alert
 
 #### Key Changes
-- New `YahooFinanceClient` — shells out to curl via ProcessBuilder, parses Yahoo Finance chart API JSON
-- New `YahooFetchException` — caught silently in OhlcvFetcher (log only, no Telegram alert)
-- `SymbolRegistry` — `isInternationalSymbol()` (any-dot heuristic), `getInternationalStocks()`, `getDomesticStocks()`
-- `OhlcvFetcher` — two-pass loop: domestic (TwelveData, 9s) then international (Yahoo, 3s)
-- `FinnhubPriceEvaluator` — skips international symbols in live price loop
-- `ApiRequestMeteringService` — Yahoo counter added, included in monthly report
-- `DevDataSeeder` — pre-seeds RHM.DE, ENR.DE, 005930.KS, 000660.KS
+- `RelativeStrengthService` — added `getRsTrend(symbol)` with 5-day slope detection + ±0.5% dead zone
+- `Scheduler` — added `0 0 10 * * MON-FRI` CET cron + `manualAccumulationDetection()`
+- `PullbackBuyTracker` — added `log.warn()` when EMA/VFI analysis returns empty (for scan-logs.sh)
+- `DevJobController` — `/dev/jobs/accumulation-detection` endpoint + run-all integration
+- `FeatureToggle` — added `ACCUMULATION_DETECTION("accumulationDetection")`
+- Bruno collection — added `accumulationDetection.yml`
 
 #### Design Decisions
-- ProcessBuilder + curl with User-Agent header bypasses Yahoo TLS fingerprint detection
-- Local currency (EUR/KRW) — no FX conversion
-- SAP stays on NYSE ADR (existing infrastructure)
-- No Telegram alert on Yahoo failure — graceful degradation
-- No feature toggle — exception-based degradation sufficient
-- `@Generated` on `executeCurl` for JaCoCo (ProcessBuilder untestable in unit tests)
-- All indicators run on international symbols (accept minor FX noise in RS vs SPY)
+- No cooldown (fires daily for all qualifying stocks, add suppression if noisy)
+- RS is informational context only (not a gating condition)
+- Runs on all stocks (domestic + international)
+- Service/tracker separation: service holds pure logic (testable without mocking), tracker orchestrates
+- Warning logs surface persistent data gaps via scan-logs.sh
 
-#### Tests: 976+ total, all passing
+#### Tests: 1009 total, all passing
 
 ---
 
@@ -297,6 +301,7 @@ Follow-up issues (open):
 | **VFI + RS Combined** | `VfiTracker` | Volume flow + RS confirmation | Daily 09:00 CET |
 | **EMA Pullback Buy** | `PullbackBuyTracker` | Pullback into 21-50 EMA zone + RS↑ + VFI↑ | Real-time (5 min) |
 | **Earnings Calendar** | `EarningsCalendarTracker` | Upcoming earnings in 7-day window | Daily 08:15 CET |
+| **Accumulation Detection** | `AccumulationDetectionTracker` | EMA9 < EMA21 + VFI↑ (pre-breakout positioning) | Daily 10:00 CET |
 
 ---
 
@@ -323,8 +328,8 @@ Follow-up issues (open):
 - **Earnings Calendar Alerts** (daily 7-day look-ahead report via Finnhub)
 
 ### Dev Tooling & Smoke Test ✅
-- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 16 endpoint requests
-- DevJobController with 16 individual endpoints + phased `run-all` composite endpoint (15 jobs)
+- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 17 endpoint requests
+- DevJobController with 17 individual endpoints + phased `run-all` composite endpoint (16 jobs)
 - Pre-deployment smoke test script (`scripts/run-smoke-test.sh`) — validates all jobs in 4 phases
 - DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
 
@@ -347,7 +352,7 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: ~976+
+- Total Tests: ~1009
 
 ## Future Enhancements
 

@@ -103,6 +103,11 @@ public class DevJobController {
         return runJob("earnings-calendar", scheduler::manualEarningsCalendarCheck);
     }
 
+    @PostMapping("/accumulation-detection")
+    public ResponseEntity<Map<String, String>> accumulationDetection() {
+        return runJob("accumulation-detection", scheduler::manualAccumulationDetection);
+    }
+
     @PostMapping("/run-all")
     public ResponseEntity<Map<String, Object>> runAll() {
         LinkedHashMap<String, String> results = new LinkedHashMap<>();
@@ -149,6 +154,9 @@ public class DevJobController {
         failures += runAndRecord(results, "pullback-buy-alert", scheduler::manualPullbackBuyAlert);
         failures +=
                 runAndRecord(results, "earnings-calendar", scheduler::manualEarningsCalendarCheck);
+        failures +=
+                runAndRecord(
+                        results, "accumulation-detection", scheduler::manualAccumulationDetection);
 
         // Phase 4: VFI last (depends on OHLCV data)
         failures += runAndRecord(results, "vfi-report", scheduler::manualVfiReport);
