@@ -41,6 +41,7 @@ This document covers the technologies used, development setup, technical constra
 | CoinGecko | `CoinGeckoClient` | Cryptocurrency prices | No auth |
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
 | Twelve Data | `TwelveDataClient` | Daily OHLCV data (400 data points) | API Key |
+| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV (German/Korean) | No auth (ProcessBuilder + curl) |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |
@@ -75,6 +76,7 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 | `config/finnhub-monthly-requests.txt` | Text | Finnhub API metering |
 | `config/coingecko-monthly-requests.txt` | Text | CoinGecko API metering |
 | `config/twelvedata-monthly-requests.txt` | Text | Twelve Data API metering |
+| `config/yahoo-monthly-requests.txt` | Text | Yahoo Finance API metering |
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `data/tradebot.db` | SQLite | All SQLite tables |
 

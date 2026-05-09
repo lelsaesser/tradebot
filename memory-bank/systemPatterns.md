@@ -45,6 +45,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`CoinGeckoClient`:** Cryptocurrency prices. No auth.
 -   **`FinvizClient`:** Web scraper using JSoup for industry performance. No auth.
 -   **`TwelveDataClient`:** Fetches daily OHLCV data. API key required. 8 req/min rate limit. Metered via `ApiRequestMeteringService`.
+-   **`YahooFinanceClient`:** Fetches daily OHLCV for international stocks (German/Korean). No auth. Uses ProcessBuilder + curl to bypass TLS fingerprint blocking. 3s delay between calls. Metered via `ApiRequestMeteringService`. Failures throw `YahooFetchException` (caught silently in OhlcvFetcher — no Telegram alert).
 
 ## Data Persistence Components
 
@@ -69,6 +70,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **Per-Reason TTL**: `IgnoreReason` enum carries `ttlSeconds` per value. `TargetPriceProvider.isSymbolIgnored()` uses `reason.getTtlSeconds()` instead of a global constant. Existing alerts use 12h, pullback uses 8h.
 -   **Finnhub as Data Ingestion Layer**: `FinnhubPriceEvaluator` fetches live prices for ALL tracked symbols (stocks + ETFs via `symbolRegistry.getAll()`) and populates `lastPriceCache`. Loop 1 handles fetch/cache/persist/high-change-alerts for every symbol. Loop 2 evaluates target buy/sell prices from cache (no API calls). All downstream indicators/trackers read from the cache or SQLite — never make their own Finnhub API calls.
 -   **Phased Smoke Test**: `DevJobController.runAll()` executes 14 jobs in 4 dependency-ordered phases (seed → OHLCV fetch → parallel independents → VFI). Returns aggregate pass/fail with per-job results. `RootErrorHandler.runWithStatus()` provides boolean success/failure without propagating exceptions.
+-   **Two-Pass OHLCV Fetch**: `OhlcvFetcher.fetchAndBackfillOhlcv()` runs domestic symbols first (TwelveData, 9s delay, retry + Telegram alert on failure), then international symbols (Yahoo Finance, 3s delay, log-only on failure). International detection via any-dot heuristic (`ticker.contains(".")`).
+-   **ProcessBuilder Shell-Out Pattern**: `YahooFinanceClient.executeCurl()` uses Java ProcessBuilder to run curl with specific headers, bypassing Yahoo's TLS fingerprint blocking of Java HTTP clients. Includes `--connect-timeout 5 --max-time 10` curl flags + `waitFor(15s)` Java backstop + `destroyForcibly()` on timeout.
 
 ## Scheduled Tasks
 
