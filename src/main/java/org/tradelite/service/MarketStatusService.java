@@ -9,6 +9,7 @@ import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -105,6 +106,14 @@ public class MarketStatusService {
             return LocalTime.parse(parts[1]);
         }
         return MARKET_CLOSE;
+    }
+
+    public Optional<MarketHoliday> getTodayHoliday() {
+        if (!loaded) {
+            return Optional.empty();
+        }
+        LocalDate today = LocalDate.now(NY_ZONE);
+        return Optional.ofNullable(holidayCache.get().get(today));
     }
 
     boolean isLoaded() {

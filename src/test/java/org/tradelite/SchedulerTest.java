@@ -2,13 +2,16 @@ package org.tradelite;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Queue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.client.finnhub.dto.MarketHolidayResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.common.TargetPriceProvider;
@@ -624,5 +628,84 @@ class SchedulerTest {
                             runnable.run();
                             return remaining.isEmpty() || remaining.remove();
                         });
+    }
+
+    // --- Market holiday notification tests ---
+
+    @Test
+    void dailyMarketHolidayNotification_fullClose_sendsMessage() throws Exception {
+        MarketHolidayResponse.MarketHoliday holiday = new MarketHolidayResponse.MarketHoliday();
+        holiday.setEventName("Memorial Day");
+        holiday.setTradingHour("");
+        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
+
+        scheduler.dailyMarketHolidayNotification();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String msg = messageCaptor.getValue();
+        assertTrue(msg.contains("*Market Holiday*"));
+        assertTrue(msg.contains("Memorial Day"));
+        assertTrue(msg.contains("Markets are closed"));
+    }
+
+    @Test
+    void dailyMarketHolidayNotification_earlyClose_sendsMessage() throws Exception {
+        MarketHolidayResponse.MarketHoliday holiday = new MarketHolidayResponse.MarketHoliday();
+        holiday.setEventName("Day After Thanksgiving");
+        holiday.setTradingHour("09:30-13:00");
+        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
+
+        scheduler.dailyMarketHolidayNotification();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String msg = messageCaptor.getValue();
+        assertTrue(msg.contains("*Early Close*"));
+        assertTrue(msg.contains("Day After Thanksgiving"));
+        assertTrue(msg.contains("13:00 ET"));
+    }
+
+    @Test
+    void dailyMarketHolidayNotification_noHoliday_sendsNoMessage() throws Exception {
+        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.empty());
+
+        scheduler.dailyMarketHolidayNotification();
+
+        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(telegramClient, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void manualMarketHolidayNotification_fullClose_sendsMessageAndReturnsTrue() {
+        MarketHolidayResponse.MarketHoliday holiday = new MarketHolidayResponse.MarketHoliday();
+        holiday.setEventName("Independence Day");
+        holiday.setTradingHour(null);
+        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualMarketHolidayNotification();
+
+        assertTrue(success);
+        verify(telegramClient).sendMessage(contains("Independence Day"));
     }
 }
