@@ -7,6 +7,8 @@ import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.client.yahoo.YahooFetchException;
+import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.common.AssetType;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
@@ -23,6 +25,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     private final SymbolRegistry symbolRegistry;
     private final FinnhubClient finnhubClient;
     private final CoinGeckoClient coinGeckoClient;
+    private final YahooFinanceClient yahooFinanceClient;
 
     @Autowired
     public AddCommandProcessor(
@@ -30,12 +33,14 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
             TelegramGateway telegramClient,
             SymbolRegistry symbolRegistry,
             FinnhubClient finnhubClient,
-            CoinGeckoClient coinGeckoClient) {
+            CoinGeckoClient coinGeckoClient,
+            YahooFinanceClient yahooFinanceClient) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.symbolRegistry = symbolRegistry;
         this.finnhubClient = finnhubClient;
         this.coinGeckoClient = coinGeckoClient;
+        this.yahooFinanceClient = yahooFinanceClient;
     }
 
     @Override
@@ -47,10 +52,16 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     public void processCommand(AddCommand command) {
         // Validate ticker by checking if price data is available
         if (!isValidTicker(command.getTicker(), command.getDisplayName())) {
+            String source =
+                    symbolRegistry.isInternationalSymbol(command.getTicker())
+                            ? "Yahoo Finance"
+                            : "Finnhub or CoinGecko";
             telegramClient.sendMessage(
                     "Invalid ticker symbol: "
                             + command.getTicker()
-                            + ". Could not fetch price data from Finnhub or CoinGecko.");
+                            + ". Could not fetch price data from "
+                            + source
+                            + ".");
             return;
         }
 
@@ -99,14 +110,36 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     }
 
     /**
-     * Validates if a ticker is valid by attempting to fetch price data from Finnhub first (for
-     * stocks), then from CoinGecko (for crypto) if Finnhub fails.
+     * Validates if a ticker is valid by attempting to fetch price data. International tickers
+     * (containing ".") are validated via Yahoo Finance. Domestic tickers are validated via Finnhub
+     * first, then CoinGecko as fallback.
      *
      * @param ticker The ticker symbol to validate
      * @param displayName The display name for the ticker
-     * @return true if price data can be fetched from either source, false otherwise
+     * @return true if price data can be fetched, false otherwise
      */
     private boolean isValidTicker(String ticker, String displayName) {
+        if (symbolRegistry.isInternationalSymbol(ticker)) {
+            return isValidInternationalTicker(ticker);
+        }
+        return isValidDomesticTicker(ticker, displayName);
+    }
+
+    private boolean isValidInternationalTicker(String ticker) {
+        try {
+            var records = yahooFinanceClient.fetchDailyOhlcv(ticker, 5);
+            if (!records.isEmpty()) {
+                log.info("Ticker {} validated successfully via Yahoo Finance", ticker);
+                return true;
+            }
+        } catch (YahooFetchException e) {
+            log.info("Yahoo validation failed for ticker {}: {}", ticker, e.getMessage());
+        }
+        log.warn("Ticker {} could not be validated via Yahoo Finance", ticker);
+        return false;
+    }
+
+    private boolean isValidDomesticTicker(String ticker, String displayName) {
         // Try Finnhub first (for stocks)
         try {
             StockSymbol tempStockSymbol = new StockSymbol(ticker, displayName);
