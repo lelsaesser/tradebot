@@ -250,12 +250,9 @@ class AccumulationDetectionTrackerTest {
 
     @Test
     void trendArrow_mapsCorrectly() {
-        assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.RISING))
-                .isEqualTo("↑");
-        assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.FLAT))
-                .isEqualTo("→");
-        assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.FALLING))
-                .isEqualTo("↓");
+        assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.RISING)).isEqualTo("↑");
+        assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.FLAT)).isEqualTo("→");
+        assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.FALLING)).isEqualTo("↓");
     }
 
     @Test
