@@ -4,10 +4,12 @@ import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECON
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.tradelite.client.finnhub.dto.MarketHolidayResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
@@ -163,6 +165,12 @@ public class Scheduler {
         log.info("Daily accumulation detection completed.");
     }
 
+    @Scheduled(cron = "0 0 8 * * MON-FRI", zone = "CET")
+    protected void dailyMarketHolidayNotification() {
+        rootErrorHandler.run(this::doMarketHolidayNotification);
+        log.info("Daily market holiday notification check completed.");
+    }
+
     @Scheduled(cron = "0 15 8 * * *", zone = "CET")
     protected void dailyEarningsCalendarCheck() {
         rootErrorHandler.run(earningsCalendarTracker::checkAndAlert);
@@ -249,6 +257,34 @@ public class Scheduler {
         }
 
         apiRequestMeteringService.resetCounters();
+    }
+
+    private void doMarketHolidayNotification() {
+        Optional<MarketHolidayResponse.MarketHoliday> holiday =
+                marketStatusService.getTodayHoliday();
+        if (holiday.isEmpty()) {
+            return;
+        }
+
+        MarketHolidayResponse.MarketHoliday h = holiday.get();
+        String tradingHour = h.getTradingHour();
+
+        if (tradingHour == null || tradingHour.isEmpty()) {
+            String message =
+                    String.format(
+                            "*Market Holiday*\n"
+                                    + "It's a U.S. market holiday today (%s). Markets are closed."
+                                    + " Enjoy your day!",
+                            h.getEventName());
+            telegramClient.sendMessage(message);
+        } else {
+            String closeTime = tradingHour.split("-")[1];
+            String message =
+                    String.format(
+                            "*Early Close*%nEarly close today (%s). Markets close at %s ET.",
+                            h.getEventName(), closeTime);
+            telegramClient.sendMessage(message);
+        }
     }
 
     public boolean manualStockMarketMonitoring() {
@@ -362,6 +398,12 @@ public class Scheduler {
         boolean success =
                 rootErrorHandler.runWithStatus(accumulationDetectionTracker::analyzeAndSendAlerts);
         log.info("Manual accumulation detection completed.");
+        return success;
+    }
+
+    public boolean manualMarketHolidayNotification() {
+        boolean success = rootErrorHandler.runWithStatus(this::doMarketHolidayNotification);
+        log.info("Manual market holiday notification completed.");
         return success;
     }
 }

@@ -108,6 +108,11 @@ public class DevJobController {
         return runJob("accumulation-detection", scheduler::manualAccumulationDetection);
     }
 
+    @PostMapping("/market-holiday-notification")
+    public ResponseEntity<Map<String, String>> marketHolidayNotification() {
+        return runJob("market-holiday-notification", scheduler::manualMarketHolidayNotification);
+    }
+
     @PostMapping("/run-all")
     public ResponseEntity<Map<String, Object>> runAll() {
         LinkedHashMap<String, String> results = new LinkedHashMap<>();
@@ -157,6 +162,11 @@ public class DevJobController {
         failures +=
                 runAndRecord(
                         results, "accumulation-detection", scheduler::manualAccumulationDetection);
+        failures +=
+                runAndRecord(
+                        results,
+                        "market-holiday-notification",
+                        scheduler::manualMarketHolidayNotification);
 
         // Phase 4: VFI last (depends on OHLCV data)
         failures += runAndRecord(results, "vfi-report", scheduler::manualVfiReport);

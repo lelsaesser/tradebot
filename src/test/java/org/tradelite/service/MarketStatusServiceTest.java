@@ -1,5 +1,6 @@
 package org.tradelite.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -291,5 +292,49 @@ class MarketStatusServiceTest {
         MarketHolidayResponse response = buildResponse(holiday("Dummy", "2099-01-01", ""));
         when(finnhubClient.getMarketHolidays()).thenReturn(response);
         service.loadHolidays();
+    }
+
+    // --- getTodayHoliday tests ---
+
+    @Test
+    void getTodayHoliday_returnsEmptyWhenCacheNotLoaded() {
+        when(finnhubClient.getMarketHolidays()).thenReturn(null);
+        service.loadHolidays();
+
+        assertTrue(service.getTodayHoliday().isEmpty());
+    }
+
+    @Test
+    void getTodayHoliday_returnsEmptyWhenTodayIsNotAHoliday() {
+        // Load a holiday for a date far in the future — today won't match
+        MarketHolidayResponse response = buildResponse(holiday("Future Day", "2099-01-01", ""));
+        when(finnhubClient.getMarketHolidays()).thenReturn(response);
+        service.loadHolidays();
+
+        assertTrue(service.getTodayHoliday().isEmpty());
+    }
+
+    @Test
+    void getTodayHoliday_returnsHolidayWhenTodayMatches() {
+        String today = LocalDate.now(ZoneId.of("America/New_York")).toString();
+        MarketHolidayResponse response = buildResponse(holiday("Test Holiday", today, ""));
+        when(finnhubClient.getMarketHolidays()).thenReturn(response);
+        service.loadHolidays();
+
+        assertTrue(service.getTodayHoliday().isPresent());
+        assertEquals("Test Holiday", service.getTodayHoliday().get().getEventName());
+    }
+
+    @Test
+    void getTodayHoliday_returnsEarlyCloseHolidayWhenTodayMatches() {
+        String today = LocalDate.now(ZoneId.of("America/New_York")).toString();
+        MarketHolidayResponse response =
+                buildResponse(holiday("Early Close Day", today, "09:30-13:00"));
+        when(finnhubClient.getMarketHolidays()).thenReturn(response);
+        service.loadHolidays();
+
+        assertTrue(service.getTodayHoliday().isPresent());
+        assertEquals("Early Close Day", service.getTodayHoliday().get().getEventName());
+        assertEquals("09:30-13:00", service.getTodayHoliday().get().getTradingHour());
     }
 }
