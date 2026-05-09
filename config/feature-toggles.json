@@ -3,5 +3,6 @@
   "emaReport": true,
   "vfiReport": true,
   "pullbackBuyAlert": true,
-  "earningsCalendarAlert": true
+  "earningsCalendarAlert": true,
+  "accumulationDetection": true
 }

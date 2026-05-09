@@ -52,6 +52,7 @@ public class PullbackBuyTracker {
             Optional<EmaAnalysis> emaOpt =
                     emaService.analyze(stock.getTicker(), stock.getCompanyName());
             if (emaOpt.isEmpty()) {
+                log.warn("PullbackBuy skip: {} — EMA analysis returned empty", stock.getTicker());
                 continue;
             }
 
@@ -102,13 +103,16 @@ public class PullbackBuyTracker {
 
             Optional<VfiAnalysis> vfiOpt =
                     vfiService.analyze(stock.getTicker(), stock.getCompanyName());
-            if (vfiOpt.isEmpty() || !vfiOpt.get().isVfiPositive()) {
+            if (vfiOpt.isEmpty()) {
+                log.warn("PullbackBuy skip: {} — VFI analysis returned empty", stock.getTicker());
+                continue;
+            }
+            if (!vfiOpt.get().isVfiPositive()) {
                 log.info(
-                        "Skipping {} — VFI not positive (present={}, vfi={}, signal={})",
+                        "Skipping {} — VFI not positive (vfi={}, signal={})",
                         stock.getTicker(),
-                        vfiOpt.isPresent(),
-                        vfiOpt.map(VfiAnalysis::vfiValue).orElse(0.0),
-                        vfiOpt.map(VfiAnalysis::signalLineValue).orElse(0.0));
+                        vfiOpt.get().vfiValue(),
+                        vfiOpt.get().signalLineValue());
                 continue;
             }
 

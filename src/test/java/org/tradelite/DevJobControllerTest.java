@@ -281,6 +281,7 @@ class DevJobControllerTest {
         when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
         when(scheduler.manualPullbackBuyAlert()).thenReturn(true);
         when(scheduler.manualEarningsCalendarCheck()).thenReturn(true);
+        when(scheduler.manualAccumulationDetection()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
         ResponseEntity<Map<String, Object>> response = controller.runAll();
@@ -288,7 +289,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatus.OK));
         assertThat(response.getBody().get("status"), is("ok"));
         assertThat(response.getBody().get("failed"), is(0));
-        assertThat(response.getBody().get("total"), is(15));
+        assertThat(response.getBody().get("total"), is(16));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("vfi-report"), is("ok"));
@@ -314,6 +315,7 @@ class DevJobControllerTest {
         when(scheduler.manualMonthlyApiUsageReport()).thenReturn(true);
         when(scheduler.manualPullbackBuyAlert()).thenReturn(true);
         when(scheduler.manualEarningsCalendarCheck()).thenReturn(true);
+        when(scheduler.manualAccumulationDetection()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
         ResponseEntity<Map<String, Object>> response = controller.runAll();
@@ -321,7 +323,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatusCode.valueOf(207)));
         assertThat(response.getBody().get("status"), is("partial"));
         assertThat(response.getBody().get("failed"), is(1));
-        assertThat(response.getBody().get("passed"), is(14));
+        assertThat(response.getBody().get("passed"), is(15));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("crypto-monitoring"), is("error"));

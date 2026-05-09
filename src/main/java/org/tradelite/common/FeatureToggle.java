@@ -25,7 +25,10 @@ public enum FeatureToggle {
     PULLBACK_BUY_ALERT("pullbackBuyAlert"),
 
     /** Controls whether the daily earnings calendar report is sent via Telegram */
-    EARNINGS_CALENDAR_ALERT("earningsCalendarAlert");
+    EARNINGS_CALENDAR_ALERT("earningsCalendarAlert"),
+
+    /** Controls whether the daily accumulation detection alert is sent via Telegram */
+    ACCUMULATION_DETECTION("accumulationDetection");
 
     private final String key;
 }

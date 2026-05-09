@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.core.AccumulationDetectionTracker;
 import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.EarningsCalendarTracker;
 import org.tradelite.core.FinnhubPriceEvaluator;
@@ -61,6 +62,7 @@ class SchedulerTest {
     @Mock private PullbackBuyTracker pullbackBuyTracker;
     @Mock private MarketStatusService marketStatusService;
     @Mock private EarningsCalendarTracker earningsCalendarTracker;
+    @Mock private AccumulationDetectionTracker accumulationDetectionTracker;
 
     private Scheduler scheduler;
 
@@ -88,7 +90,8 @@ class SchedulerTest {
                         vfiTracker,
                         pullbackBuyTracker,
                         marketStatusService,
-                        earningsCalendarTracker);
+                        earningsCalendarTracker,
+                        accumulationDetectionTracker);
     }
 
     @Test
