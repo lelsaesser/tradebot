@@ -179,6 +179,9 @@ class AddCommandProcessorTest {
     void processCommand_internationalTicker_validViaYahoo_succeeds() {
         AddCommand command = new AddCommand("RHM.DE", "Rheinmetall", 400.0, 500.0);
 
+        // Mock international symbol detection
+        when(symbolRegistry.isInternationalSymbol("RHM.DE")).thenReturn(true);
+
         // Mock successful Yahoo validation
         OhlcvRecord ohlcvRecord =
                 new OhlcvRecord(
@@ -203,6 +206,9 @@ class AddCommandProcessorTest {
     @Test
     void processCommand_internationalTicker_yahooFails_sendsYahooErrorMessage() {
         AddCommand command = new AddCommand("INVALID.XY", "Fake Stock", 100.0, 200.0);
+
+        // Mock international symbol detection
+        when(symbolRegistry.isInternationalSymbol("INVALID.XY")).thenReturn(true);
 
         // Mock failed Yahoo validation
         when(yahooFinanceClient.fetchDailyOhlcv("INVALID.XY", 5))

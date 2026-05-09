@@ -53,7 +53,9 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
         // Validate ticker by checking if price data is available
         if (!isValidTicker(command.getTicker(), command.getDisplayName())) {
             String source =
-                    command.getTicker().contains(".") ? "Yahoo Finance" : "Finnhub or CoinGecko";
+                    symbolRegistry.isInternationalSymbol(command.getTicker())
+                            ? "Yahoo Finance"
+                            : "Finnhub or CoinGecko";
             telegramClient.sendMessage(
                     "Invalid ticker symbol: "
                             + command.getTicker()
@@ -117,7 +119,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
      * @return true if price data can be fetched, false otherwise
      */
     private boolean isValidTicker(String ticker, String displayName) {
-        if (ticker.contains(".")) {
+        if (symbolRegistry.isInternationalSymbol(ticker)) {
             return isValidInternationalTicker(ticker);
         }
         return isValidDomesticTicker(ticker, displayName);
