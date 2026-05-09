@@ -117,9 +117,9 @@ public class AccumulationDetectionTracker {
 
     static String trendArrow(TrendDirection direction) {
         return switch (direction) {
-            case RISING -> "\u2191";
-            case FLAT -> "\u2192";
-            case FALLING -> "\u2193";
+            case RISING -> "↑";
+            case FLAT -> "→";
+            case FALLING -> "↓";
         };
     }
 }

@@ -109,7 +109,7 @@ class AccumulationDetectionTrackerTest {
         assertThat(message).contains("EMA9:");
         assertThat(message).contains("VFI:");
         assertThat(message).contains("RS vs SPY:");
-        assertThat(message).contains("\u2191"); // rising arrow
+        assertThat(message).contains("↑"); // rising arrow
     }
 
     @Test
@@ -251,11 +251,11 @@ class AccumulationDetectionTrackerTest {
     @Test
     void trendArrow_mapsCorrectly() {
         assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.RISING))
-                .isEqualTo("\u2191");
+                .isEqualTo("↑");
         assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.FLAT))
-                .isEqualTo("\u2192");
+                .isEqualTo("→");
         assertThat(AccumulationDetectionTracker.trendArrow(TrendDirection.FALLING))
-                .isEqualTo("\u2193");
+                .isEqualTo("↓");
     }
 
     @Test
@@ -282,7 +282,7 @@ class AccumulationDetectionTrackerTest {
         assertThat(message).contains("Price: $112.40");
         assertThat(message).contains("EMA9: $111.80 < EMA21: $115.20");
         assertThat(message).contains("VFI: +3.42 | Signal: +2.18");
-        assertThat(message).contains("RS vs SPY: 1.0523 \u2191 | EMA: 1.0480 \u2191");
+        assertThat(message).contains("RS vs SPY: 1.0523 ↑ | EMA: 1.0480 ↑");
         assertThat(message).contains("_Based on EMA crossdown + positive rising VFI_");
     }
 
