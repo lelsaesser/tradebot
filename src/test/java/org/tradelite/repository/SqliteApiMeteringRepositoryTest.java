@@ -1,0 +1,103 @@
+package org.tradelite.repository;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
+
+@JdbcTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Sql("classpath:schema.sql")
+class SqliteApiMeteringRepositoryTest {
+
+    @Autowired private JdbcTemplate jdbcTemplate;
+
+    private SqliteApiMeteringRepository repository;
+
+    @BeforeEach
+    void setUp() {
+        repository = new SqliteApiMeteringRepository(jdbcTemplate);
+    }
+
+    @Test
+    void saveAll_insertsRecords() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
+        List<ApiMeteringRecord> records =
+                List.of(
+                        new ApiMeteringRecord("finnhub", "2026-05", 100, now),
+                        new ApiMeteringRecord("coingecko", "2026-05", 50, now));
+
+        repository.saveAll(records);
+
+        List<ApiMeteringRecord> result = repository.findAll();
+        assertEquals(2, result.size());
+    }
+
+    @Test
+    void saveAll_updatesExistingRecords() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
+        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 100, now)));
+
+        LocalDateTime later = LocalDateTime.of(2026, 5, 11, 10, 10, 0);
+        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 200, later)));
+
+        List<ApiMeteringRecord> result = repository.findAll();
+        assertEquals(1, result.size());
+        assertEquals(200, result.getFirst().count());
+        assertEquals(later, result.getFirst().lastUpdated());
+    }
+
+    @Test
+    void findAll_emptyTable_returnsEmptyList() {
+        List<ApiMeteringRecord> result = repository.findAll();
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findAll_returnsAllProviders() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
+        List<ApiMeteringRecord> records =
+                List.of(
+                        new ApiMeteringRecord("finnhub", "2026-05", 100, now),
+                        new ApiMeteringRecord("coingecko", "2026-05", 50, now),
+                        new ApiMeteringRecord("twelvedata", "2026-05", 75, now),
+                        new ApiMeteringRecord("yahoo", "2026-05", 30, now));
+
+        repository.saveAll(records);
+
+        List<ApiMeteringRecord> result = repository.findAll();
+        assertEquals(4, result.size());
+        assertEquals("finnhub", result.get(0).provider());
+        assertEquals(100, result.get(0).count());
+        assertEquals("2026-05", result.get(0).month());
+    }
+
+    @Test
+    void saveAll_emptyList_doesNothing() {
+        repository.saveAll(List.of());
+
+        List<ApiMeteringRecord> result = repository.findAll();
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void saveAll_overwritesMonthOnReset() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
+        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-04", 5000, now)));
+
+        LocalDateTime later = LocalDateTime.of(2026, 5, 1, 0, 0, 0);
+        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 0, later)));
+
+        List<ApiMeteringRecord> result = repository.findAll();
+        assertEquals(1, result.size());
+        assertEquals("2026-05", result.getFirst().month());
+        assertEquals(0, result.getFirst().count());
+    }
+}
