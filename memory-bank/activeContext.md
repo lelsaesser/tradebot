@@ -2,56 +2,42 @@
 
 ## Current Work Focus
 
-### Accumulation Detection Signal (#371) (May 9, 2026) — COMPLETE
-Added institutional accumulation detection: identifies stocks where price is weak but volume flow is bullish, signaling pre-trend institutional positioning.
+### API Request Metering SQLite Migration (#379) (May 11, 2026) — COMPLETE
+Migrated `ApiRequestMeteringService` from per-call file I/O to periodic SQLite persistence. Eliminates ~100+ file writes per 5-minute cycle.
 
-**Signal Logic (required conditions, AND):**
-- Price weak: EMA9 < EMA21 (no established uptrend)
-- Volume bullish: VFI > 0 AND VFI > signal line (net buying pressure accelerating)
-
-**Informational Context (displayed, not gating):**
-- RS vs SPY value + slope direction (↑/→/↓)
-- RS EMA value + slope direction (↑/→/↓)
-- Slope: 5-day lookback with ±0.5% dead zone
-
-**New Classes:**
-| Class | Package | Purpose |
-|-------|---------|---------|
-| `TrendDirection` | `org.tradelite.quant` | Enum: RISING, FLAT, FALLING |
-| `RsTrendResult` | `org.tradelite.service` | Record: rsValue, rsEma, rsTrend, rsEmaTrend |
-| `AccumulationSignal` | `org.tradelite.core` | Record: all data for alert formatting |
-| `AccumulationDetectionService` | `org.tradelite.core` | Pure logic: evaluate(EmaAnalysis, VfiAnalysis, RsTrendResult) → Optional |
-| `AccumulationDetectionTracker` | `org.tradelite.core` | Orchestration: iterates stocks, calls services, formats + sends Telegram alert |
-
-**Modified Classes:**
-- `RelativeStrengthService` — added `getRsTrend(String symbol)` with 5-day slope detection
-- `Scheduler` — added 10:00 CET MON-FRI cron + manual trigger
-- `PullbackBuyTracker` — added `log.warn()` when EMA/VFI analysis returns empty
-- `DevJobController` — added `/dev/jobs/accumulation-detection` endpoint + run-all integration
-- `FeatureToggle` — added `ACCUMULATION_DETECTION("accumulationDetection")`
-- `feature-toggles.json` — added `"accumulationDetection": true`
-
-**Alert Format:**
-```
-*Institutional accumulation detected*
-
-*Nvidia (NVDA)*
-  Price: $112.40 | EMA9: $111.80 < EMA21: $115.20
-  VFI: +3.42 | Signal: +2.18
-  RS vs SPY: 1.0523 ↑ | EMA: 1.0480 ↑
-
-Based on EMA crossdown + positive rising VFI
-```
+**Key Changes:**
+- Replaced 4 individual `AtomicInteger` fields with `ConcurrentHashMap<String, AtomicInteger>`
+- New `ApiMeteringRepository` interface + `SqliteApiMeteringRepository` (batch `INSERT OR REPLACE`)
+- New `ApiMeteringRecord` record class in `repository` package
+- Added `api_request_metering` table to `schema.sql`
+- `flushCounters()` persists all 4 counters in one batch call
+- Periodic flush via Scheduler's `periodicMaintenance()` (every 10 min, replaces old `cleanupIgnoreSymbols()`)
+- `@PreDestroy` shutdown hook flushes on graceful shutdown
+- `resetCounters()` includes immediate flush (prevents race with periodic flush)
+- Startup `initializeCounters()` detects stale month → resets to 0 + warns
+- Removed file I/O code, `metering.counter-dir` property, 4 `.gitignore` entries
 
 **Design Decisions:**
-- No cooldown — fires daily for all qualifying stocks; add suppression later if noisy
-- RS is informational only (not a gating condition)
-- Runs on all stocks (domestic + international)
-- Warning logs on data skip to surface persistent data gaps via scan-logs.sh
-- Pure service/tracker separation: service holds only signal logic (testable without mocking services), tracker handles orchestration
-- `TrendDirection` in `quant` package for reuse across indicators
+- 10-min flush interval (acceptable ~10 min data loss on hard crash for rate-limit awareness counters)
+- Scheduler orchestrates flush (not self-contained in service)
+- `provider TEXT PRIMARY KEY` — one row per provider, overwritten on reset
+- Monthly cron kept separate; reset does immediate flush to prevent race
+- String constants (not enum) for provider IDs
 
-**Build:** 1009 tests pass, spotless clean, coverage met.
+**Files Modified/Created:**
+- `src/main/resources/schema.sql` — added table
+- `src/main/java/org/tradelite/repository/ApiMeteringRecord.java` — NEW
+- `src/main/java/org/tradelite/repository/ApiMeteringRepository.java` — NEW
+- `src/main/java/org/tradelite/repository/SqliteApiMeteringRepository.java` — NEW
+- `src/main/java/org/tradelite/service/ApiRequestMeteringService.java` — major refactor
+- `src/main/java/org/tradelite/Scheduler.java` — renamed method + added flush
+- `.gitignore` — removed 4 counter file entries
+- `src/test/java/org/tradelite/service/ApiRequestMeteringServiceTest.java` — rewritten (mocked repo)
+- `src/test/java/org/tradelite/repository/SqliteApiMeteringRepositoryTest.java` — NEW
+- `src/test/java/org/tradelite/SchedulerTest.java` — updated test
+- `src/test/java/org/tradelite/ApplicationTest.java` — removed obsolete property
+
+**Build:** All tests pass, spotless clean.
 
 ---
 

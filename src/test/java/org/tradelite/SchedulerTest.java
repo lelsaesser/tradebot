@@ -196,18 +196,21 @@ class SchedulerTest {
     }
 
     @Test
-    void cleanupIgnoreSymbols_shouldRun() throws Exception {
-        scheduler.cleanupIgnoreSymbols();
+    void periodicMaintenance_shouldRunCleanupAndFlush() throws Exception {
+        scheduler.periodicMaintenance();
 
-        verify(rootErrorHandler, times(1)).run(argThat(Objects::nonNull));
+        verify(rootErrorHandler, times(2)).run(argThat(Objects::nonNull));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
+        verify(rootErrorHandler, times(2)).run(captor.capture());
 
-        captor.getValue().run();
+        for (ThrowingRunnable runnable : captor.getAllValues()) {
+            runnable.run();
+        }
 
         verify(targetPriceProvider, times(1))
                 .cleanupIgnoreSymbols(TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS);
+        verify(apiRequestMeteringService, times(1)).flushCounters();
     }
 
     @Test
