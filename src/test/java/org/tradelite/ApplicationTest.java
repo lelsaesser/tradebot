@@ -37,8 +37,7 @@ class ApplicationTest {
             "--spring.datasource.url=jdbc:sqlite:" + tempDir.resolve("application-test.db"),
             "--tradebot.api.finnhub-key=test-finnhub-key",
             "--tradebot.api.coingecko-key=test-coingecko-key",
-            "--tradebot.telegram.local-sink-file=" + tempDir.resolve("telegram.log"),
-            "--metering.counter-dir=" + tempDir.resolve("counters")
+            "--tradebot.telegram.local-sink-file=" + tempDir.resolve("telegram.log")
         };
 
         assertDoesNotThrow(() -> Application.main(args));

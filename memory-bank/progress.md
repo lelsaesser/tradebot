@@ -1,6 +1,38 @@
 # Progress Tracking
 
-## Latest Milestone: Accumulation Detection Signal (#371) — COMPLETE
+## Latest Milestone: API Request Metering SQLite Migration (#379) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (May 11, 2026)
+
+#### Purpose
+Migrate `ApiRequestMeteringService` from per-call file I/O persistence to periodic SQLite flush. Eliminates ~100+ unnecessary file writes per 5-minute monitoring cycle while maintaining crash recovery via periodic persistence.
+
+#### New Components
+- `ApiMeteringRecord` — record (provider, month, count, lastUpdated) in `repository` package
+- `ApiMeteringRepository` — interface with `saveAll(List)` + `findAll()`
+- `SqliteApiMeteringRepository` — batch `INSERT OR REPLACE` via `BatchPreparedStatementSetter`
+
+#### Key Changes
+- `ApiRequestMeteringService` — complete refactor: removed file I/O, `ConcurrentHashMap<String, AtomicInteger>`, `flushCounters()`, `@PreDestroy` shutdown hook, stale-month detection on startup
+- `Scheduler` — renamed `cleanupIgnoreSymbols()` → `periodicMaintenance()`, added `flushCounters()` call (every 10 min)
+- `schema.sql` — added `api_request_metering` table
+- `.gitignore` — removed 4 counter file entries
+- `ApplicationTest` — removed obsolete `metering.counter-dir` property
+
+#### Design Decisions
+- 10-min flush interval (acceptable data loss for rate-limit awareness counters)
+- Scheduler orchestrates flush (consolidates maintenance tasks)
+- `resetCounters()` includes immediate flush (prevents race with periodic flush)
+- Startup detects stale month → resets to 0 + warns (missed cron during downtime)
+- Single row per provider (overwritten on reset, history lives in Telegram reports)
+
+#### Tests: All passing, spotless clean
+
+---
+
+## Previous Milestone: Accumulation Detection Signal (#371) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -334,9 +366,9 @@ Follow-up issues (open):
 - DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
 
 ### Data Persistence ✅
-- SQLite via JdbcTemplate: Finnhub price quotes, Twelve Data daily OHLCV (400 data points), Yahoo Finance international OHLCV, momentum ROC state, ignored symbols. Schema centralized in `schema.sql`.
+- SQLite via JdbcTemplate: Finnhub price quotes, Twelve Data daily OHLCV (400 data points), Yahoo Finance international OHLCV, momentum ROC state, ignored symbols, API request metering (periodic flush). Schema centralized in `schema.sql`.
 - JSON: target prices, sector performance, insider transactions, RS streaks, RSI data, feature toggles, stock symbols
-- API metering: Finnhub, CoinGecko, Twelve Data, Yahoo Finance
+- API metering: Finnhub, CoinGecko, Twelve Data, Yahoo Finance (in-memory AtomicInteger counters, SQLite persistence every 10 min)
 
 ### External Data Sources ✅
 - Finnhub (stock prices, insider transactions, market holidays, earnings calendar)
