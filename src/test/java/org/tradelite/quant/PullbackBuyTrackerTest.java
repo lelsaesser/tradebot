@@ -59,14 +59,14 @@ class PullbackBuyTrackerTest {
                         featureToggleService);
         lenient()
                 .when(featureToggleService.isEnabled(FeatureToggle.PULLBACK_BUY_ALERT))
-                .thenReturn(Boolean.valueOf(true));
+                .thenReturn(Boolean.TRUE);
         lenient().when(symbolRegistry.getStocks()).thenReturn(List.of());
     }
 
     @Test
     void analyzeAndSendAlerts_featureToggleDisabled_skips() {
         when(featureToggleService.isEnabled(FeatureToggle.PULLBACK_BUY_ALERT))
-                .thenReturn(Boolean.valueOf(false));
+                .thenReturn(Boolean.FALSE);
 
         tracker.analyzeAndSendAlerts();
 
@@ -246,7 +246,7 @@ class PullbackBuyTrackerTest {
     void analyzeAndSendAlerts_symbolIgnored_skipsEntirely() {
         when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
         when(targetPriceProvider.isSymbolIgnored(AAPL, IgnoreReason.PULLBACK_BUY_ALERT))
-                .thenReturn(Boolean.valueOf(true));
+                .thenReturn(Boolean.TRUE);
 
         tracker.analyzeAndSendAlerts();
 
