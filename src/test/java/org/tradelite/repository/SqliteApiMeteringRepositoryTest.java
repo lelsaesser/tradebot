@@ -74,9 +74,9 @@ class SqliteApiMeteringRepositoryTest {
 
         List<ApiMeteringRecord> result = repository.findAll();
         assertEquals(4, result.size());
-        assertEquals("finnhub", result.get(0).provider());
-        assertEquals(100, result.get(0).count());
-        assertEquals("2026-05", result.get(0).month());
+        assertEquals("finnhub", result.getFirst().provider());
+        assertEquals(100, result.getFirst().count());
+        assertEquals("2026-05", result.getFirst().month());
     }
 
     @Test

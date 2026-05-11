@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -30,7 +31,8 @@ public class SqliteApiMeteringRepository implements ApiMeteringRepository {
                 sql,
                 new BatchPreparedStatementSetter() {
                     @Override
-                    public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    public void setValues(@NonNull PreparedStatement ps, int i)
+                            throws SQLException {
                         ApiMeteringRecord meteringRecord = records.get(i);
                         ps.setString(1, meteringRecord.provider());
                         ps.setString(2, meteringRecord.month());
