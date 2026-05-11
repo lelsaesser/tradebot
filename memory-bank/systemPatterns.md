@@ -53,9 +53,10 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SqliteMomentumRocRepository`:** Momentum ROC state via `JdbcTemplate` (previous ROC values for crossover detection).
 -   **`SqliteOhlcvRepository`:** Twelve Data daily OHLCV data via `JdbcTemplate` in `twelvedata_daily_ohlcv` table. Primary source for DailyPriceProvider and VfiService. Batch insert via `BatchPreparedStatementSetter`.
 -   **`SqliteIgnoredSymbolRepository`:** Per-symbol alert suppression via `JdbcTemplate` with reason codes and optional alert thresholds.
+-   **`SqliteApiMeteringRepository`:** API request counters per provider via batch `INSERT OR REPLACE`. Flushed periodically by Scheduler's `periodicMaintenance()` (every 10 min) and on shutdown (`@PreDestroy`). `AtomicInteger` map is the in-memory source of truth; SQLite is crash-recovery persistence.
 -   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence and caching.
 -   **`DatabaseDirectoryInitializer`:** `@PostConstruct` component that ensures the SQLite database parent directory exists at startup. Parses `spring.datasource.url` to extract the file path.
--   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (4 tables, 6 indexes). Auto-executed on startup via `spring.sql.init.mode=always`.
+-   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (10 tables). Auto-executed on startup via `spring.sql.init.mode=always`.
 
 ## Design Patterns
 
@@ -91,6 +92,7 @@ The application follows a modular, component-based architecture built on the Spr
 | `weeklyInsiderTradingReport` | Weekly Sat 12:00 | CET | Insider transactions |
 | `monthlyApiUsageReport` | Monthly 1st, 00:00 | UTC | API usage statistics |
 | `telegramMessagePolling` | Every 60 seconds | UTC | Process Telegram commands |
+| `periodicMaintenance` | Every 10 min | — | Cleanup ignored symbols + flush API metering counters |
 
 ## Component Relationships
 

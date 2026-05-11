@@ -178,11 +178,12 @@ public class Scheduler {
     }
 
     @Scheduled(fixedRate = 600000)
-    public void cleanupIgnoreSymbols() {
+    public void periodicMaintenance() {
         rootErrorHandler.run(
                 () -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
+        rootErrorHandler.run(apiRequestMeteringService::flushCounters);
 
-        log.info("Cleanup of ignored symbols completed.");
+        log.info("Periodic maintenance completed.");
     }
 
     @Scheduled(fixedRate = 60000)

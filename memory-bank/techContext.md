@@ -61,6 +61,7 @@ This document covers the technologies used, development setup, technical constra
 | `industry_performance` | `SqliteSectorPerformanceRepository` | FinViz sector/industry performance snapshots |
 | `target_prices` | `SqliteTargetPriceRepository` | Buy/sell target prices (stocks + coins, merged with asset_type) |
 | `stock_symbols` | `SqliteStockSymbolRepository` | All tracked stock symbols |
+| `api_request_metering` | `SqliteApiMeteringRepository` | Monthly API request counters per provider (periodic flush) |
 
 All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centralized in `src/main/resources/schema.sql` and auto-initialized via `spring.sql.init.mode=always`. DataSource is auto-configured via `application.yaml` (`spring.datasource.*`) with HikariCP connection pool (max pool size 1 for SQLite single-writer). `DatabaseDirectoryInitializer` ensures the DB parent directory exists at startup.
 
@@ -73,10 +74,6 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 | `config/target-prices-coins.json` | JSON | Crypto buy/sell targets (migrated to SQLite #326, pending removal #359) |
 | `config/insider-transactions.json` | JSON | Insider trading data |
 | `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT) |
-| `config/finnhub-monthly-requests.txt` | Text | Finnhub API metering |
-| `config/coingecko-monthly-requests.txt` | Text | CoinGecko API metering |
-| `config/twelvedata-monthly-requests.txt` | Text | Twelve Data API metering |
-| `config/yahoo-monthly-requests.txt` | Text | Yahoo Finance API metering |
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `data/tradebot.db` | SQLite | All SQLite tables |
 
