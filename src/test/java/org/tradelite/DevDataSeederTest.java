@@ -27,7 +27,6 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
@@ -35,6 +34,7 @@ import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.repository.TargetPriceRepository;
 import org.tradelite.repository.TrackedSymbolRepository;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.RelativeStrengthData;
 
@@ -42,14 +42,12 @@ class DevDataSeederTest {
 
     @TempDir Path tempDir;
 
-    private FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private LivePriceCache livePriceCache;
     private RsCrossoverStateRepository rsCrossoverStateRepository;
 
     @BeforeEach
     void setUp() {
-        finnhubPriceEvaluator = mock(FinnhubPriceEvaluator.class);
-        when(finnhubPriceEvaluator.getLastPriceCache())
-                .thenReturn(new java.util.concurrent.ConcurrentHashMap<>());
+        livePriceCache = new LivePriceCache();
         rsCrossoverStateRepository = mock(RsCrossoverStateRepository.class);
         when(rsCrossoverStateRepository.findAll()).thenReturn(Map.of());
     }
@@ -95,7 +93,7 @@ class DevDataSeederTest {
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
-                        finnhubPriceEvaluator,
+                        livePriceCache,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
                         targetPriceRepository);
@@ -148,7 +146,7 @@ class DevDataSeederTest {
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
-                        finnhubPriceEvaluator,
+                        livePriceCache,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
                         targetPriceRepository);
@@ -216,7 +214,7 @@ class DevDataSeederTest {
                         targetPriceProvider,
                         symbolRegistry,
                         ohlcvRepository,
-                        finnhubPriceEvaluator,
+                        livePriceCache,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
                         targetPriceRepository);
@@ -257,7 +255,7 @@ class DevDataSeederTest {
                 targetPriceProvider,
                 symbolRegistry,
                 ohlcvRepository,
-                finnhubPriceEvaluator,
+                livePriceCache,
                 sectorPerformanceRepository,
                 trackedSymbolRepository,
                 targetPriceRepository);

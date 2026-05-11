@@ -22,7 +22,6 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.config.TradebotTelegramProperties;
-import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
@@ -30,6 +29,7 @@ import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.repository.TargetPriceRepository;
 import org.tradelite.repository.TrackedSymbolRepository;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 
@@ -152,8 +152,8 @@ class ProfileWiringTest {
         }
 
         @Bean
-        FinnhubPriceEvaluator finnhubPriceEvaluator() {
-            return mock(FinnhubPriceEvaluator.class);
+        LivePriceCache livePriceCache() {
+            return new LivePriceCache();
         }
 
         @Bean

@@ -41,7 +41,7 @@ This document covers the technologies used, development setup, technical constra
 | CoinGecko | `CoinGeckoClient` | Cryptocurrency prices | No auth |
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
 | Twelve Data | `TwelveDataClient` | Daily OHLCV data (400 data points) | API Key |
-| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV (German/Korean) | No auth (ProcessBuilder + curl) |
+| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (ProcessBuilder + curl) |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |
@@ -113,7 +113,8 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/ohlcv-fetch` | OHLCV data fetch from Twelve Data |
 | `/dev/jobs/vfi-report` | VFI + RS combined report |
 | `/dev/jobs/pullback-buy-alert` | EMA pullback buy alert scan |
-| `/dev/jobs/run-all` | Phased smoke test (runs all 14 jobs) |
+| `/dev/jobs/yahoo-price-evaluation` | Yahoo intraday price evaluation (international) |
+| `/dev/jobs/run-all` | Phased smoke test (runs all 18 jobs) |
 
 ### Bruno API Collection
 
@@ -216,7 +217,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~951
+- **Total Tests:** ~1036
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes

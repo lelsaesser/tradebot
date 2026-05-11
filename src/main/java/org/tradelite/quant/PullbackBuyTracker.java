@@ -10,9 +10,9 @@ import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.service.FeatureToggleService;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -31,7 +31,7 @@ public class PullbackBuyTracker {
     private final EmaService emaService;
     private final RelativeStrengthService relativeStrengthService;
     private final VfiService vfiService;
-    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private final LivePriceCache livePriceCache;
     private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
     private final TargetPriceProvider targetPriceProvider;
@@ -42,7 +42,7 @@ public class PullbackBuyTracker {
             return;
         }
 
-        Map<String, Double> priceCache = finnhubPriceEvaluator.getLastPriceCache();
+        Map<String, Double> priceCache = livePriceCache.getAll();
 
         for (StockSymbol stock : symbolRegistry.getStocks()) {
             if (targetPriceProvider.isSymbolIgnored(stock, IgnoreReason.PULLBACK_BUY_ALERT)) {

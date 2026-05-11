@@ -44,6 +44,61 @@ public class YahooFinanceClient {
         return parseResponse(symbol, json);
     }
 
+    public YahooPriceQuote fetchCurrentPrice(String symbol) {
+        String url = BASE_URL + symbol + "?interval=1d&range=1d";
+
+        meteringService.incrementYahooRequests();
+        String json = executeCurl(symbol, url);
+        return parseQuoteFromMeta(symbol, json);
+    }
+
+    YahooPriceQuote parseQuoteFromMeta(String symbol, String json) {
+        try {
+            JsonNode root = objectMapper.readTree(json);
+
+            JsonNode error = root.path("chart").path("error");
+            if (!error.isNull() && !error.isMissingNode()) {
+                throw new YahooFetchException(
+                        symbol, "API error: " + error.path("description").asText("unknown"));
+            }
+
+            JsonNode result = root.path("chart").path("result");
+            if (!result.isArray() || result.isEmpty()) {
+                throw new YahooFetchException(symbol, "no result in response");
+            }
+
+            JsonNode meta = result.get(0).path("meta");
+            double currentPrice = meta.path("regularMarketPrice").asDouble(0);
+            double previousClose = meta.path("chartPreviousClose").asDouble(0);
+            double dailyHigh = meta.path("regularMarketDayHigh").asDouble(0);
+            double dailyLow = meta.path("regularMarketDayLow").asDouble(0);
+            long timestamp = meta.path("regularMarketTime").asLong(0);
+
+            if (currentPrice <= 0) {
+                throw new YahooFetchException(
+                        symbol, "invalid regularMarketPrice: " + currentPrice);
+            }
+
+            double changePercent = 0;
+            if (previousClose > 0) {
+                changePercent = ((currentPrice - previousClose) / previousClose) * 100;
+            }
+
+            return new YahooPriceQuote(
+                    symbol,
+                    currentPrice,
+                    previousClose,
+                    dailyHigh,
+                    dailyLow,
+                    changePercent,
+                    timestamp);
+        } catch (YahooFetchException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new YahooFetchException(symbol, "JSON parse error: " + e.getMessage());
+        }
+    }
+
     @Generated
     String executeCurl(String symbol, String url) {
         List<String> command =

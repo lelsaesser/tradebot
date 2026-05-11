@@ -2,6 +2,31 @@
 
 ## Current Work Focus
 
+### Intraday Price Quotes for International Stocks (#382) (May 11, 2026) — COMPLETE
+Added real-time price monitoring for international stocks (German XETRA, Korean KRX) via Yahoo Finance's `meta.regularMarketPrice` field. This enables target price alerts, pullback buy alerts, and high-change alerts for international symbols.
+
+**Key Changes:**
+- New `LivePriceCache` service — shared `ConcurrentHashMap<String, Double>` extracted from `FinnhubPriceEvaluator`, used by both Finnhub and Yahoo evaluators
+- New `YahooPriceQuote` record — DTO for Yahoo quote data (currentPrice, previousClose, dailyHigh, dailyLow, changePercent, timestamp)
+- New `YahooPriceEvaluator` — mirrors FinnhubPriceEvaluator: fetches current prices, populates LivePriceCache, evaluates target prices, high-change alerts, persists to SQLite
+- `YahooFinanceClient` — added `fetchCurrentPrice()` method extracting `meta.regularMarketPrice` from `/v8/finance/chart/` endpoint
+- `MarketStatusService` — added `isExchangeOpen(symbol)` for XETRA (09:00–17:30 Europe/Berlin) and KRX (09:00–15:30 Asia/Seoul)
+- `FinnhubPriceEvaluator` — refactored to use `LivePriceCache` (removed internal `lastPriceCache`)
+- `PullbackBuyTracker` — now injects `LivePriceCache` directly (no longer depends on FinnhubPriceEvaluator for cache access)
+- `Scheduler` — Yahoo evaluator runs every 5 min (handles its own exchange-hours gating, independent of US market hours)
+- `DevJobController` — added `/dev/jobs/yahoo-price-evaluation` endpoint (18 jobs total in run-all)
+- `DevDataSeeder` — uses `LivePriceCache` instead of `FinnhubPriceEvaluator`
+
+**Design Decisions:**
+- Yahoo quotes stored in existing `finnhub_price_quotes` table (no rename, no schema change)
+- Per-exchange market hours gating (no holiday detection for international exchanges)
+- 3s delay between Yahoo requests (matching existing rate limiting from OhlcvFetcher)
+- LivePriceCache is a simple @Service (no feature toggle needed — evaluator only fetches when exchange is open)
+
+**Build:** 1036 tests pass, spotless clean.
+
+---
+
 ### API Request Metering SQLite Migration (#379) (May 11, 2026) — COMPLETE
 Migrated `ApiRequestMeteringService` from per-call file I/O to periodic SQLite persistence. Eliminates ~100+ file writes per 5-minute cycle.
 

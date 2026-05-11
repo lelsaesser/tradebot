@@ -11,7 +11,8 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`Scheduler`:** The heart of the application, orchestrating all scheduled tasks. Includes separate schedulers for stock and crypto monitoring with independent polling intervals.
 -   **`SymbolRegistry`:** Unified `@Service` bean that owns all tracked symbols — ETFs (sector, thematic, benchmark as hardcoded constants) and individual stocks (JSON-loaded, dynamically add/remove via Telegram). Replaces the former split between `SectorEtfRegistry` (static) and `StockSymbolRegistry` (service). Methods: `getAll()`, `getAllEtfs()`, `getBroadSectorEtfs()`, `getThematicEtfs()`, `getStocks()`, `isEtf()`, `isSectorEtf()`, `fromString()`, `addSymbol()`, `removeSymbol()`.
 -   **`DailyPriceProvider`:** Unified data access layer for daily closing prices. Tries OHLCV (Twelve Data) first, falls back to Finnhub. Same `findDailyClosingPrices(symbol, days)` signature. Used by EmaService, BollingerBandService, RelativeStrengthService, MomentumRocService.
--   **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`) responsible for fetching and evaluating prices from different APIs.
+-   **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`, `YahooPriceEvaluator`) responsible for fetching and evaluating prices from different APIs. Finnhub and Yahoo evaluators write to the shared `LivePriceCache`.
+-   **`LivePriceCache`:** Shared `@Service` bean holding a `ConcurrentHashMap<String, Double>` of the latest known price per symbol. Both `FinnhubPriceEvaluator` (US stocks) and `YahooPriceEvaluator` (international stocks) write to it. Consumers (`PullbackBuyTracker`, `DailyPriceProvider`) read from it. Replaced the former `FinnhubPriceEvaluator.lastPriceCache` field.
 -   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays.
 -   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations.
 -   **`InsiderTracker`:** Tracks and reports insider trading activities.
@@ -30,7 +31,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`EmaTracker`:** Orchestrates daily EMA report across all tracked stocks via `SymbolRegistry.getAll()`.
 -   **`VfiService`:** Calculates Volume Flow Indicator from OHLCV data (130-day lookback, 5-period signal line EMA). Returns `Optional<VfiAnalysis>`.
 -   **`VfiTracker`:** Orchestrates daily RS+VFI combined report. Iterates `SymbolRegistry.getAll()`, classifies each symbol as GREEN (RS↑ + VFI↑), YELLOW (mixed), or RED (RS↓ + VFI↓) via `CombinedSignalType`. Sends via `TelegramGateway.sendMessage()` at 9:00 CET pre-market.
--   **`PullbackBuyTracker`:** Real-time EMA pullback buy alerts. Runs every 5 min during market hours (inside `stockMarketMonitoring`). Detects stocks below EMA 9/21 but above EMA 50/100/200, with positive RS and VFI. Reads live prices from `FinnhubPriceEvaluator.lastPriceCache` (no separate API calls). Per-stock Telegram alerts with 8-hour cooldown via `IgnoreReason.PULLBACK_BUY_ALERT`.
+-   **`PullbackBuyTracker`:** Real-time EMA pullback buy alerts. Runs every 5 min during market hours (inside `stockMarketMonitoring`). Detects stocks below EMA 9/21 but above EMA 50/100/200, with positive RS and VFI. Reads live prices from `LivePriceCache` (no separate API calls). Per-stock Telegram alerts with 8-hour cooldown via `IgnoreReason.PULLBACK_BUY_ALERT`.
 -   **`OhlcvFetcher`:** Fetches daily OHLCV data from Twelve Data for all tracked symbols (ETFs + stocks via `SymbolRegistry.getAll()`). Backfill: 400 data points. Refresh: 5 data points. 8-second delay between requests.
 -   **`TelegramClient` / `LocalTelegramGateway` / `TelegramMessageProcessor`:** Telegram integration is profile-aware. All sending components inject `TelegramGateway` interface.
 -   **`TelegramCommandDispatcher`:** Routes incoming commands to appropriate processors using the Command pattern.
@@ -45,7 +46,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`CoinGeckoClient`:** Cryptocurrency prices. No auth.
 -   **`FinvizClient`:** Web scraper using JSoup for industry performance. No auth.
 -   **`TwelveDataClient`:** Fetches daily OHLCV data. API key required. 8 req/min rate limit. Metered via `ApiRequestMeteringService`.
--   **`YahooFinanceClient`:** Fetches daily OHLCV for international stocks (German/Korean). No auth. Uses ProcessBuilder + curl to bypass TLS fingerprint blocking. 3s delay between calls. Metered via `ApiRequestMeteringService`. Failures throw `YahooFetchException` (caught silently in OhlcvFetcher — no Telegram alert).
+-   **`YahooFinanceClient`:** Fetches daily OHLCV for international stocks (German/Korean) AND intraday price quotes (via `meta.regularMarketPrice`). No auth. Uses ProcessBuilder + curl to bypass TLS fingerprint blocking. 3s delay between calls. Metered via `ApiRequestMeteringService`. Failures throw `YahooFetchException` (caught silently in OhlcvFetcher and YahooPriceEvaluator — no Telegram alert).
 
 ## Data Persistence Components
 
@@ -69,7 +70,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **Facade Pattern**: `TelegramClient` simplifies Telegram Bot API interaction.
 -   **Data Source Fallback**: `DailyPriceProvider` tries OHLCV first, falls back to Finnhub.
 -   **Per-Reason TTL**: `IgnoreReason` enum carries `ttlSeconds` per value. `TargetPriceProvider.isSymbolIgnored()` uses `reason.getTtlSeconds()` instead of a global constant. Existing alerts use 12h, pullback uses 8h.
--   **Finnhub as Data Ingestion Layer**: `FinnhubPriceEvaluator` fetches live prices for ALL tracked symbols (stocks + ETFs via `symbolRegistry.getAll()`) and populates `lastPriceCache`. Loop 1 handles fetch/cache/persist/high-change-alerts for every symbol. Loop 2 evaluates target buy/sell prices from cache (no API calls). All downstream indicators/trackers read from the cache or SQLite — never make their own Finnhub API calls.
+-   **Finnhub as Data Ingestion Layer**: `FinnhubPriceEvaluator` fetches live prices for ALL domestic tracked symbols (stocks + ETFs via `symbolRegistry.getAll()`, skipping international) and populates `LivePriceCache`. Loop 1 handles fetch/cache/persist/high-change-alerts for every symbol. Loop 2 evaluates target buy/sell prices from cache (no API calls). `YahooPriceEvaluator` does the same for international symbols. All downstream indicators/trackers read from `LivePriceCache` or SQLite — never make their own API calls.
 -   **Phased Smoke Test**: `DevJobController.runAll()` executes 14 jobs in 4 dependency-ordered phases (seed → OHLCV fetch → parallel independents → VFI). Returns aggregate pass/fail with per-job results. `RootErrorHandler.runWithStatus()` provides boolean success/failure without propagating exceptions.
 -   **Two-Pass OHLCV Fetch**: `OhlcvFetcher.fetchAndBackfillOhlcv()` runs domestic symbols first (TwelveData, 9s delay, retry + Telegram alert on failure), then international symbols (Yahoo Finance, 3s delay, log-only on failure). International detection via any-dot heuristic (`ticker.contains(".")`).
 -   **ProcessBuilder Shell-Out Pattern**: `YahooFinanceClient.executeCurl()` uses Java ProcessBuilder to run curl with specific headers, bypassing Yahoo's TLS fingerprint blocking of Java HTTP clients. Includes `--connect-timeout 5 --max-time 10` curl flags + `waitFor(15s)` Java backstop + `destroyForcibly()` on timeout.
@@ -99,6 +100,11 @@ The application follows a modular, component-based architecture built on the Spr
 ```
 Scheduler
 ├── FinnhubPriceEvaluator → FinnhubClient → Finnhub API
+│   ├── LivePriceCache (shared write)
+│   └── SqlitePriceQuoteRepository → SQLite DB
+├── YahooPriceEvaluator → YahooFinanceClient → Yahoo Finance API
+│   ├── LivePriceCache (shared write)
+│   ├── MarketStatusService.isExchangeOpen() (XETRA/KRX hours)
 │   └── SqlitePriceQuoteRepository → SQLite DB
 ├── CoinGeckoPriceEvaluator → CoinGeckoClient → CoinGecko API
 ├── RsiService → RsiPriceFetcher → Price APIs
@@ -110,6 +116,7 @@ Scheduler
 ├── DailyPriceProvider (OHLCV-first, Finnhub-fallback)
 │   ├── OhlcvRepository → SQLite (twelvedata_daily_ohlcv)
 │   └── PriceQuoteRepository → SQLite (finnhub_price_quotes)
+├── LivePriceCache (shared read by downstream consumers)
 ├── SectorRelativeStrengthTracker → RelativeStrengthService + SymbolRegistry
 ├── SectorMomentumRocTracker → MomentumRocService + SymbolRegistry
 ├── TailRiskTracker → TailRiskService + SymbolRegistry
@@ -117,14 +124,14 @@ Scheduler
 ├── EmaTracker → EmaService + SymbolRegistry
 ├── VfiTracker → VfiService + RelativeStrengthService + SymbolRegistry
 │   └── CombinedSignalType: GREEN/YELLOW/RED classification
-├── PullbackBuyTracker → EmaService + RelativeStrengthService + VfiService + FinnhubPriceEvaluator (cache) + SymbolRegistry
+├── PullbackBuyTracker → EmaService + RelativeStrengthService + VfiService + LivePriceCache + SymbolRegistry
 │   └── Per-stock alerts with 8h cooldown via IgnoreReason.PULLBACK_BUY_ALERT
-├── OhlcvFetcher → TwelveDataClient + SymbolRegistry
+├── OhlcvFetcher → TwelveDataClient + YahooFinanceClient + SymbolRegistry
 ├── StatisticsUtil (shared math: mean, stddev, EMA, ROC, zScore)
 ├── InsiderTracker → InsiderPersistence
 ├── SectorRotationTracker → FinvizClient + SectorRotationAnalyzer
 ├── RootErrorHandler (run + runWithStatus)
-├── DevDataSeeder (dev) → seeds SQLite + JSON + OHLCV
+├── DevDataSeeder (dev) → seeds SQLite + JSON + OHLCV + LivePriceCache
 ├── DevJobController (dev) → manual job endpoints
 └── TelegramMessageProcessor → TelegramGateway
     ├── TelegramClient (default / non-dev)

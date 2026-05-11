@@ -1,8 +1,6 @@
 package org.tradelite.core;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -16,6 +14,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.MarketStatusService;
 
 @Slf4j
@@ -29,8 +28,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final PriceQuoteRepository priceQuoteRepository;
     private final FeatureToggleService featureToggleService;
     private final MarketStatusService marketStatusService;
-
-    @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
+    private final LivePriceCache livePriceCache;
 
     @Autowired
     public FinnhubPriceEvaluator(
@@ -40,7 +38,8 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             SymbolRegistry symbolRegistry,
             PriceQuoteRepository priceQuoteRepository,
             FeatureToggleService featureToggleService,
-            MarketStatusService marketStatusService) {
+            MarketStatusService marketStatusService,
+            LivePriceCache livePriceCache) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
@@ -49,6 +48,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         this.priceQuoteRepository = priceQuoteRepository;
         this.featureToggleService = featureToggleService;
         this.marketStatusService = marketStatusService;
+        this.livePriceCache = livePriceCache;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
@@ -64,13 +64,13 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             // Rate limit: Finnhub has 60 requests/minute limit, sleep after EVERY API call
             Thread.sleep(1100);
 
-            Double lastPrice = lastPriceCache.get(symbol.getTicker());
+            Double lastPrice = livePriceCache.get(symbol.getTicker());
             if (priceQuote == null
                     || (lastPrice != null
                             && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
                 continue;
             }
-            lastPriceCache.put(symbol.getTicker(), priceQuote.getCurrentPrice());
+            livePriceCache.put(symbol.getTicker(), priceQuote.getCurrentPrice());
 
             // Persist price quote to SQLite for historical data collection (if enabled)
             if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)
@@ -84,7 +84,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
         // Loop 2: Evaluate target prices using cached data (no API calls)
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
-            Double price = lastPriceCache.get(targetPrice.getSymbol());
+            Double price = livePriceCache.get(targetPrice.getSymbol());
             if (price == null) {
                 continue;
             }

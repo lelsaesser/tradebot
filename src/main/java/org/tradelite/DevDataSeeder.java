@@ -24,7 +24,6 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.SectorPerformanceSnapshot;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
@@ -34,6 +33,7 @@ import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.repository.SectorPerformanceRepository;
 import org.tradelite.repository.TargetPriceRepository;
 import org.tradelite.repository.TrackedSymbolRepository;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
@@ -69,7 +69,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final TargetPriceProvider targetPriceProvider;
     private final SymbolRegistry symbolRegistry;
     private final OhlcvRepository ohlcvRepository;
-    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private final LivePriceCache livePriceCache;
     private final SectorPerformanceRepository sectorPerformanceRepository;
     private final TrackedSymbolRepository trackedSymbolRepository;
     private final TargetPriceRepository targetPriceRepository;
@@ -84,7 +84,7 @@ public class DevDataSeeder implements ApplicationRunner {
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
-            FinnhubPriceEvaluator finnhubPriceEvaluator,
+            LivePriceCache livePriceCache,
             SectorPerformanceRepository sectorPerformanceRepository,
             TrackedSymbolRepository trackedSymbolRepository,
             TargetPriceRepository targetPriceRepository) {
@@ -96,7 +96,7 @@ public class DevDataSeeder implements ApplicationRunner {
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;
         this.ohlcvRepository = ohlcvRepository;
-        this.finnhubPriceEvaluator = finnhubPriceEvaluator;
+        this.livePriceCache = livePriceCache;
         this.sectorPerformanceRepository = sectorPerformanceRepository;
         this.trackedSymbolRepository = trackedSymbolRepository;
         this.targetPriceRepository = targetPriceRepository;
@@ -453,22 +453,21 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private void seedPriceCache(SeedBundle bundle) {
-        Map<String, Double> cache = finnhubPriceEvaluator.getLastPriceCache();
         for (Map.Entry<String, List<DailyPrice>> entry : bundle.priceSeriesBySymbol().entrySet()) {
             List<DailyPrice> series = entry.getValue();
             if (!series.isEmpty()) {
-                cache.put(entry.getKey(), series.getLast().getPrice());
+                livePriceCache.put(entry.getKey(), series.getLast().getPrice());
             }
         }
 
         // Set one stock's cached price to a pullback level (below EMA 9/21, above EMA 50)
         // so the pullback buy alert can fire in dev mode
-        seedPullbackPrice(bundle, cache);
+        seedPullbackPrice(bundle);
 
-        log.info("Seeded price cache for {} symbols", cache.size());
+        log.info("Seeded price cache for {} symbols", livePriceCache.getAll().size());
     }
 
-    private void seedPullbackPrice(SeedBundle bundle, Map<String, Double> cache) {
+    private void seedPullbackPrice(SeedBundle bundle) {
         for (StockSymbol stock : symbolRegistry.getStocks()) {
             if (!bundle.displayNamesBySymbol().containsKey(stock.getTicker())) {
                 continue;
@@ -490,7 +489,7 @@ public class DevDataSeeder implements ApplicationRunner {
             if (ema50 < ema21 && ema100 < ema50 && ema200 < ema100) {
                 // Place price between EMA 21 and EMA 50 — below short-term, above long-term
                 double pullbackPrice = StatisticsUtil.roundTo2Decimals((ema21 + ema50) / 2.0);
-                cache.put(stock.getTicker(), pullbackPrice);
+                livePriceCache.put(stock.getTicker(), pullbackPrice);
                 log.info(
                         "Seeded pullback price for {}: ${} (ema9={}, ema21={}, ema50={}, ema100={},"
                                 + " ema200={})",

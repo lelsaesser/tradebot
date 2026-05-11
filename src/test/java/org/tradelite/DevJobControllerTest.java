@@ -283,6 +283,7 @@ class DevJobControllerTest {
         when(scheduler.manualEarningsCalendarCheck()).thenReturn(true);
         when(scheduler.manualAccumulationDetection()).thenReturn(true);
         when(scheduler.manualMarketHolidayNotification()).thenReturn(true);
+        when(scheduler.manualYahooPriceEvaluation()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
         ResponseEntity<Map<String, Object>> response = controller.runAll();
@@ -290,7 +291,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatus.OK));
         assertThat(response.getBody().get("status"), is("ok"));
         assertThat(response.getBody().get("failed"), is(0));
-        assertThat(response.getBody().get("total"), is(17));
+        assertThat(response.getBody().get("total"), is(18));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("vfi-report"), is("ok"));
@@ -318,6 +319,7 @@ class DevJobControllerTest {
         when(scheduler.manualEarningsCalendarCheck()).thenReturn(true);
         when(scheduler.manualAccumulationDetection()).thenReturn(true);
         when(scheduler.manualMarketHolidayNotification()).thenReturn(true);
+        when(scheduler.manualYahooPriceEvaluation()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
         ResponseEntity<Map<String, Object>> response = controller.runAll();
@@ -325,7 +327,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatusCode.valueOf(207)));
         assertThat(response.getBody().get("status"), is("partial"));
         assertThat(response.getBody().get("failed"), is(1));
-        assertThat(response.getBody().get("passed"), is(16));
+        assertThat(response.getBody().get("passed"), is(17));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("crypto-monitoring"), is("error"));
