@@ -106,10 +106,7 @@ public class ApiRequestMeteringService {
                         .map(
                                 entry ->
                                         new ApiMeteringRecord(
-                                                entry.getKey(),
-                                                month,
-                                                entry.getValue().get(),
-                                                now))
+                                                entry.getKey(), month, entry.getValue().get(), now))
                         .toList();
 
         try {
