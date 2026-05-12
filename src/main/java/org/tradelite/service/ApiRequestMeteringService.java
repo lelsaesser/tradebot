@@ -25,11 +25,9 @@ public class ApiRequestMeteringService {
 
     private final ApiMeteringRepository repository;
     private final Map<String, AtomicInteger> counters = new ConcurrentHashMap<>();
-    private final String currentMonth;
 
     ApiRequestMeteringService(ApiMeteringRepository repository) {
         this.repository = repository;
-        this.currentMonth = getCurrentMonth();
         counters.put(FINNHUB, new AtomicInteger(0));
         counters.put(COINGECKO, new AtomicInteger(0));
         counters.put(TWELVEDATA, new AtomicInteger(0));
@@ -39,22 +37,22 @@ public class ApiRequestMeteringService {
 
     public void incrementFinnhubRequests() {
         int newCount = counters.get(FINNHUB).incrementAndGet();
-        log.info("Finnhub API request count for {}: {}", currentMonth, newCount);
+        log.info("Finnhub API request count for {}: {}", getCurrentMonth(), newCount);
     }
 
     public void incrementCoingeckoRequests() {
         int newCount = counters.get(COINGECKO).incrementAndGet();
-        log.info("CoinGecko API request count for {}: {}", currentMonth, newCount);
+        log.info("CoinGecko API request count for {}: {}", getCurrentMonth(), newCount);
     }
 
     public void incrementTwelveDataRequests() {
         int newCount = counters.get(TWELVEDATA).incrementAndGet();
-        log.info("TwelveData API request count for {}: {}", currentMonth, newCount);
+        log.info("TwelveData API request count for {}: {}", getCurrentMonth(), newCount);
     }
 
     public void incrementYahooRequests() {
         int newCount = counters.get(YAHOO).incrementAndGet();
-        log.info("Yahoo Finance API request count for {}: {}", currentMonth, newCount);
+        log.info("Yahoo Finance API request count for {}: {}", getCurrentMonth(), newCount);
     }
 
     public int getFinnhubRequestCount() {
@@ -86,7 +84,7 @@ public class ApiRequestMeteringService {
     public String getRequestCountSummary() {
         return String.format(
                 "API Request Counts for %s - Finnhub: %d, CoinGecko: %d, TwelveData: %d, Yahoo: %d",
-                currentMonth,
+                getCurrentMonth(),
                 counters.get(FINNHUB).get(),
                 counters.get(COINGECKO).get(),
                 counters.get(TWELVEDATA).get(),
@@ -94,7 +92,7 @@ public class ApiRequestMeteringService {
     }
 
     public void resetCounters() {
-        log.info("Resetting counters for month: {}", currentMonth);
+        log.info("Resetting counters for month: {}", getCurrentMonth());
         counters.values().forEach(counter -> counter.set(0));
         flushCounters();
         log.info("Counters reset successfully");
@@ -102,19 +100,21 @@ public class ApiRequestMeteringService {
 
     public void flushCounters() {
         LocalDateTime now = LocalDateTime.now();
+        String month = getCurrentMonth();
         List<ApiMeteringRecord> records =
                 counters.entrySet().stream()
                         .map(
                                 entry ->
                                         new ApiMeteringRecord(
-                                                entry.getKey(),
-                                                currentMonth,
-                                                entry.getValue().get(),
-                                                now))
+                                                entry.getKey(), month, entry.getValue().get(), now))
                         .toList();
 
-        repository.saveAll(records);
-        log.debug("Flushed API metering counters to database");
+        try {
+            repository.saveAll(records);
+            log.debug("Flushed API metering counters to database");
+        } catch (Exception e) {
+            log.warn("Failed to flush API metering counters to database", e);
+        }
     }
 
     @PreDestroy
@@ -124,7 +124,8 @@ public class ApiRequestMeteringService {
     }
 
     private void initializeCounters() {
-        List<ApiMeteringRecord> records = repository.findAll();
+        String month = getCurrentMonth();
+        List<ApiMeteringRecord> records = repository.findByMonth(month);
 
         for (ApiMeteringRecord meteringRecord : records) {
             AtomicInteger counter = counters.get(meteringRecord.provider());
@@ -133,22 +134,12 @@ public class ApiRequestMeteringService {
                 continue;
             }
 
-            if (!meteringRecord.month().equals(currentMonth)) {
-                log.warn(
-                        "Stored month ({}) does not match current month ({}) for provider {}. "
-                                + "Resetting to 0 — monthly report may have been missed during downtime.",
-                        meteringRecord.month(),
-                        currentMonth,
-                        meteringRecord.provider());
-                counter.set(0);
-            } else {
-                counter.set(meteringRecord.count());
-                log.info(
-                        "Initialized {} counter for {}: {}",
-                        meteringRecord.provider(),
-                        currentMonth,
-                        meteringRecord.count());
-            }
+            counter.set(meteringRecord.count());
+            log.info(
+                    "Initialized {} counter for {}: {}",
+                    meteringRecord.provider(),
+                    month,
+                    meteringRecord.count());
         }
     }
 }

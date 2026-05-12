@@ -50,14 +50,15 @@ public class SqliteApiMeteringRepository implements ApiMeteringRepository {
     }
 
     @Override
-    public List<ApiMeteringRecord> findAll() {
+    public List<ApiMeteringRecord> findByMonth(String month) {
         String sql =
                 """
                 SELECT provider, month, count, last_updated
                 FROM api_request_metering
+                WHERE month = ?
                 """;
 
-        return jdbcTemplate.query(sql, this::mapRow);
+        return jdbcTemplate.query(sql, this::mapRow, month);
     }
 
     private ApiMeteringRecord mapRow(java.sql.ResultSet rs, int rowNum) throws SQLException {

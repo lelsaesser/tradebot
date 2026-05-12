@@ -119,8 +119,9 @@ CREATE TABLE IF NOT EXISTS tracked_symbols (
 
 -- api_request_metering: Monthly API request counters per provider
 CREATE TABLE IF NOT EXISTS api_request_metering (
-    provider TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
     month TEXT NOT NULL,
     count INTEGER NOT NULL DEFAULT 0,
-    last_updated TEXT NOT NULL
+    last_updated TEXT NOT NULL,
+    PRIMARY KEY (provider, month)
 );

@@ -1,7 +1,7 @@
 package org.tradelite.service;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
@@ -27,7 +27,7 @@ class ApiRequestMeteringServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(repository.findAll()).thenReturn(List.of());
+        when(repository.findByMonth(anyString())).thenReturn(List.of());
         meteringService = new ApiRequestMeteringService(repository);
     }
 
@@ -157,7 +157,7 @@ class ApiRequestMeteringServiceTest {
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
         LocalDateTime now = LocalDateTime.now();
 
-        when(repository.findAll())
+        when(repository.findByMonth(currentMonth))
                 .thenReturn(
                         List.of(
                                 new ApiMeteringRecord("finnhub", currentMonth, 42, now),
@@ -174,28 +174,11 @@ class ApiRequestMeteringServiceTest {
     }
 
     @Test
-    void testInitializationFromRepository_staleMonth_resetsToZero() {
-        String oldMonth = "2024-01";
-        LocalDateTime now = LocalDateTime.now();
-
-        when(repository.findAll())
-                .thenReturn(
-                        List.of(
-                                new ApiMeteringRecord("finnhub", oldMonth, 5000, now),
-                                new ApiMeteringRecord("coingecko", oldMonth, 3000, now)));
-
-        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
-
-        assertEquals(0, service.getFinnhubRequestCount());
-        assertEquals(0, service.getCoingeckoRequestCount());
-    }
-
-    @Test
     void testInitializationFromRepository_unknownProvider_ignored() {
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
         LocalDateTime now = LocalDateTime.now();
 
-        when(repository.findAll())
+        when(repository.findByMonth(currentMonth))
                 .thenReturn(
                         List.of(new ApiMeteringRecord("unknown_provider", currentMonth, 100, now)));
 
