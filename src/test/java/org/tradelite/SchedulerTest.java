@@ -217,14 +217,34 @@ class SchedulerTest {
     void pollTelegramUpdates_shouldProcessUpdates() throws Exception {
         scheduler.pollTelegramChatUpdates();
 
-        verify(telegramClient, times(1)).getChatUpdates();
         verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
         verify(rootErrorHandler, times(1)).run(captor.capture());
         captor.getValue().run();
 
+        verify(telegramClient, times(1)).getChatUpdates();
         verify(telegramMessageProcessor, times(1)).processUpdates(anyList());
+    }
+
+    @Test
+    void pollTelegramUpdates_whenGetChatUpdatesFails_exceptionStaysInsideHandler() {
+        when(telegramClient.getChatUpdates())
+                .thenThrow(
+                        new IllegalStateException(
+                                "Error while fetching chat updates: api.telegram.org"));
+
+        scheduler.pollTelegramChatUpdates();
+
+        // getChatUpdates is now inside the lambda — execute it and verify the exception is
+        // contained
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler).run(captor.capture());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalStateException.class, () -> captor.getValue().run());
+
+        verify(telegramMessageProcessor, never()).processUpdates(anyList());
     }
 
     @Test
