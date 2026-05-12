@@ -6,7 +6,5 @@ public interface ApiMeteringRepository {
 
     void saveAll(List<ApiMeteringRecord> records);
 
-    List<ApiMeteringRecord> findAll();
-
     List<ApiMeteringRecord> findByMonth(String month);
 }

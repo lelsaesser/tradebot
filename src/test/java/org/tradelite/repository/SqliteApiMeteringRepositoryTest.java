@@ -36,18 +36,18 @@ class SqliteApiMeteringRepositoryTest {
 
         repository.saveAll(records);
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertEquals(2, result.size());
     }
 
     @Test
-    void findAll_emptyTable_returnsEmptyList() {
-        List<ApiMeteringRecord> result = repository.findAll();
+    void findByMonth_emptyTable_returnsEmptyList() {
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void findAll_returnsAllProviders() {
+    void findByMonth_returnsAllProviders() {
         LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
         List<ApiMeteringRecord> records =
                 List.of(
@@ -58,7 +58,7 @@ class SqliteApiMeteringRepositoryTest {
 
         repository.saveAll(records);
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertEquals(4, result.size());
         assertEquals("finnhub", result.getFirst().provider());
         assertEquals(100, result.getFirst().count());
@@ -69,7 +69,7 @@ class SqliteApiMeteringRepositoryTest {
     void saveAll_emptyList_doesNothing() {
         repository.saveAll(List.of());
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertTrue(result.isEmpty());
     }
 
@@ -81,8 +81,12 @@ class SqliteApiMeteringRepositoryTest {
         LocalDateTime later = LocalDateTime.of(2026, 5, 1, 0, 0, 0);
         repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 0, later)));
 
-        List<ApiMeteringRecord> result = repository.findAll();
-        assertEquals(2, result.size());
+        List<ApiMeteringRecord> aprilRecords = repository.findByMonth("2026-04");
+        List<ApiMeteringRecord> mayRecords = repository.findByMonth("2026-05");
+        assertEquals(1, aprilRecords.size());
+        assertEquals(5000, aprilRecords.getFirst().count());
+        assertEquals(1, mayRecords.size());
+        assertEquals(0, mayRecords.getFirst().count());
     }
 
     @Test
@@ -93,7 +97,7 @@ class SqliteApiMeteringRepositoryTest {
         LocalDateTime later = LocalDateTime.of(2026, 5, 11, 10, 10, 0);
         repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 200, later)));
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertEquals(1, result.size());
         assertEquals(200, result.getFirst().count());
         assertEquals(later, result.getFirst().lastUpdated());
