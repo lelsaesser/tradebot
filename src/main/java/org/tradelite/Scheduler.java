@@ -193,10 +193,12 @@ public class Scheduler {
 
     @Scheduled(fixedRate = 60000)
     public void pollTelegramChatUpdates() {
-        List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
-        rootErrorHandler.run(() -> telegramMessageProcessor.processUpdates(chatUpdates));
-
-        log.info("Telegram chat updates processed.");
+        rootErrorHandler.run(
+                () -> {
+                    List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
+                    telegramMessageProcessor.processUpdates(chatUpdates);
+                    log.info("Telegram chat updates processed.");
+                });
     }
 
     @Scheduled(cron = "0 0 12 ? * SAT", zone = "CET")
