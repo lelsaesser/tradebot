@@ -6,16 +6,10 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.jdbc.Sql;
 import org.tradelite.repository.InsiderTransactionRepository.InsiderTransactionRow;
 
-@JdbcTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Sql("classpath:schema.sql")
-class SqliteInsiderTransactionRepositoryTest {
+class SqliteInsiderTransactionRepositoryTest extends AbstractSqliteRepositoryTest {
 
     @Autowired private JdbcTemplate jdbcTemplate;
 
