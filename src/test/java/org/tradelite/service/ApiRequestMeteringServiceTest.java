@@ -2,14 +2,19 @@ package org.tradelite.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,8 +32,9 @@ class ApiRequestMeteringServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(repository.findAll()).thenReturn(List.of());
+        when(repository.findByMonth(anyString())).thenReturn(List.of());
         meteringService = new ApiRequestMeteringService(repository);
+        meteringService.startup();
     }
 
     @Test
@@ -157,7 +163,7 @@ class ApiRequestMeteringServiceTest {
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
         LocalDateTime now = LocalDateTime.now();
 
-        when(repository.findAll())
+        when(repository.findByMonth(currentMonth))
                 .thenReturn(
                         List.of(
                                 new ApiMeteringRecord("finnhub", currentMonth, 42, now),
@@ -166,6 +172,7 @@ class ApiRequestMeteringServiceTest {
                                 new ApiMeteringRecord("yahoo", currentMonth, 5, now)));
 
         ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        service.startup();
 
         assertEquals(42, service.getFinnhubRequestCount());
         assertEquals(17, service.getCoingeckoRequestCount());
@@ -174,33 +181,17 @@ class ApiRequestMeteringServiceTest {
     }
 
     @Test
-    void testInitializationFromRepository_staleMonth_resetsToZero() {
-        String oldMonth = "2024-01";
-        LocalDateTime now = LocalDateTime.now();
-
-        when(repository.findAll())
-                .thenReturn(
-                        List.of(
-                                new ApiMeteringRecord("finnhub", oldMonth, 5000, now),
-                                new ApiMeteringRecord("coingecko", oldMonth, 3000, now)));
-
-        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
-
-        assertEquals(0, service.getFinnhubRequestCount());
-        assertEquals(0, service.getCoingeckoRequestCount());
-    }
-
-    @Test
     void testInitializationFromRepository_unknownProvider_ignored() {
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
         LocalDateTime now = LocalDateTime.now();
 
-        when(repository.findAll())
+        when(repository.findByMonth(currentMonth))
                 .thenReturn(
                         List.of(new ApiMeteringRecord("unknown_provider", currentMonth, 100, now)));
 
         // Should not throw
         ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        service.startup();
 
         assertEquals(0, service.getFinnhubRequestCount());
     }
@@ -265,5 +256,94 @@ class ApiRequestMeteringServiceTest {
         assertEquals(expectedPerProvider, meteringService.getCoingeckoRequestCount());
         assertEquals(expectedPerProvider, meteringService.getTwelveDataRequestCount());
         assertEquals(expectedPerProvider, meteringService.getYahooRequestCount());
+    }
+
+    @Test
+    void testParseLegacyFile_validCurrentMonth(@TempDir Path tempDir) throws IOException {
+        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        Path file = tempDir.resolve("finnhub-monthly-requests.txt");
+        Files.writeString(
+                file,
+                "Month: " + currentMonth + "\nCount: 1234\nLast Updated: 2026-05-11T14:30:00.123");
+
+        ApiMeteringRecord meteringRecord =
+                meteringService.parseLegacyFile(file.toFile(), "finnhub", currentMonth);
+
+        assertNotNull(meteringRecord);
+        assertEquals("finnhub", meteringRecord.provider());
+        assertEquals(currentMonth, meteringRecord.month());
+        assertEquals(1234, meteringRecord.count());
+        assertEquals(LocalDateTime.parse("2026-05-11T14:30:00.123"), meteringRecord.lastUpdated());
+    }
+
+    @Test
+    void testParseLegacyFile_staleMonth_returnsNull(@TempDir Path tempDir) throws IOException {
+        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        Path file = tempDir.resolve("finnhub-monthly-requests.txt");
+        Files.writeString(file, "Month: 2024-01\nCount: 5000\nLast Updated: 2024-01-15T10:00:00");
+
+        ApiMeteringRecord meteringRecord =
+                meteringService.parseLegacyFile(file.toFile(), "finnhub", currentMonth);
+
+        assertNull(meteringRecord);
+    }
+
+    @Test
+    void testParseLegacyFile_missingMonth_returnsNull(@TempDir Path tempDir) throws IOException {
+        Path file = tempDir.resolve("finnhub-monthly-requests.txt");
+        Files.writeString(file, "Count: 1234\nLast Updated: 2026-05-11T14:30:00");
+
+        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        ApiMeteringRecord meteringRecord =
+                meteringService.parseLegacyFile(file.toFile(), "finnhub", currentMonth);
+
+        assertNull(meteringRecord);
+    }
+
+    @Test
+    void testParseLegacyFile_malformedTimestamp_usesCurrentTime(@TempDir Path tempDir)
+            throws IOException {
+        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        Path file = tempDir.resolve("finnhub-monthly-requests.txt");
+        Files.writeString(file, "Month: " + currentMonth + "\nCount: 100\nLast Updated: INVALID");
+
+        ApiMeteringRecord meteringRecord =
+                meteringService.parseLegacyFile(file.toFile(), "finnhub", currentMonth);
+
+        assertNotNull(meteringRecord);
+        assertEquals(100, meteringRecord.count());
+        assertNotNull(meteringRecord.lastUpdated());
+    }
+
+    @Test
+    void testMigration_guardSkipsExistingProvider() {
+        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        LocalDateTime now = LocalDateTime.now();
+
+        when(repository.findByMonth(currentMonth))
+                .thenReturn(
+                        List.of(
+                                new ApiMeteringRecord("finnhub", currentMonth, 42, now),
+                                new ApiMeteringRecord("coingecko", currentMonth, 10, now),
+                                new ApiMeteringRecord("twelvedata", currentMonth, 5, now),
+                                new ApiMeteringRecord("yahoo", currentMonth, 3, now)));
+
+        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        service.migrateLegacyFilesIfNeeded();
+
+        // saveAll should not be called since all providers already have data
+        verify(repository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void testMigration_noLegacyFiles_noError() {
+        // findByMonth returns empty (no existing data), but files don't exist
+        when(repository.findByMonth(anyString())).thenReturn(List.of());
+
+        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        // Should not throw even though config/ files don't exist
+        assertDoesNotThrow(service::migrateLegacyFilesIfNeeded);
+
+        verify(repository, never()).saveAll(anyList());
     }
 }

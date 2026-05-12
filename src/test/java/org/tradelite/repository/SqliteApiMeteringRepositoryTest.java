@@ -7,15 +7,9 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.jdbc.Sql;
 
-@JdbcTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Sql("classpath:schema.sql")
-class SqliteApiMeteringRepositoryTest {
+class SqliteApiMeteringRepositoryTest extends AbstractSqliteRepositoryTest {
 
     @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -36,32 +30,18 @@ class SqliteApiMeteringRepositoryTest {
 
         repository.saveAll(records);
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertEquals(2, result.size());
     }
 
     @Test
-    void saveAll_updatesExistingRecords() {
-        LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
-        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 100, now)));
-
-        LocalDateTime later = LocalDateTime.of(2026, 5, 11, 10, 10, 0);
-        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 200, later)));
-
-        List<ApiMeteringRecord> result = repository.findAll();
-        assertEquals(1, result.size());
-        assertEquals(200, result.getFirst().count());
-        assertEquals(later, result.getFirst().lastUpdated());
-    }
-
-    @Test
-    void findAll_emptyTable_returnsEmptyList() {
-        List<ApiMeteringRecord> result = repository.findAll();
+    void findByMonth_emptyTable_returnsEmptyList() {
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void findAll_returnsAllProviders() {
+    void findByMonth_returnsAllProviders() {
         LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
         List<ApiMeteringRecord> records =
                 List.of(
@@ -72,7 +52,7 @@ class SqliteApiMeteringRepositoryTest {
 
         repository.saveAll(records);
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertEquals(4, result.size());
         assertEquals("finnhub", result.getFirst().provider());
         assertEquals(100, result.getFirst().count());
@@ -83,21 +63,57 @@ class SqliteApiMeteringRepositoryTest {
     void saveAll_emptyList_doesNothing() {
         repository.saveAll(List.of());
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void saveAll_overwritesMonthOnReset() {
+    void saveAll_differentMonths_preservesHistory() {
         LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
         repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-04", 5000, now)));
 
         LocalDateTime later = LocalDateTime.of(2026, 5, 1, 0, 0, 0);
         repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 0, later)));
 
-        List<ApiMeteringRecord> result = repository.findAll();
+        List<ApiMeteringRecord> aprilRecords = repository.findByMonth("2026-04");
+        List<ApiMeteringRecord> mayRecords = repository.findByMonth("2026-05");
+        assertEquals(1, aprilRecords.size());
+        assertEquals(5000, aprilRecords.getFirst().count());
+        assertEquals(1, mayRecords.size());
+        assertEquals(0, mayRecords.getFirst().count());
+    }
+
+    @Test
+    void saveAll_sameProviderAndMonth_updatesExistingRow() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
+        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 100, now)));
+
+        LocalDateTime later = LocalDateTime.of(2026, 5, 11, 10, 10, 0);
+        repository.saveAll(List.of(new ApiMeteringRecord("finnhub", "2026-05", 200, later)));
+
+        List<ApiMeteringRecord> result = repository.findByMonth("2026-05");
         assertEquals(1, result.size());
-        assertEquals("2026-05", result.getFirst().month());
-        assertEquals(0, result.getFirst().count());
+        assertEquals(200, result.getFirst().count());
+        assertEquals(later, result.getFirst().lastUpdated());
+    }
+
+    @Test
+    void findByMonth_returnsOnlyMatchingMonth() {
+        LocalDateTime now = LocalDateTime.of(2026, 5, 11, 10, 0, 0);
+        repository.saveAll(
+                List.of(
+                        new ApiMeteringRecord("finnhub", "2026-04", 5000, now),
+                        new ApiMeteringRecord("finnhub", "2026-05", 100, now),
+                        new ApiMeteringRecord("coingecko", "2026-05", 50, now)));
+
+        List<ApiMeteringRecord> mayRecords = repository.findByMonth("2026-05");
+        assertEquals(2, mayRecords.size());
+
+        List<ApiMeteringRecord> aprilRecords = repository.findByMonth("2026-04");
+        assertEquals(1, aprilRecords.size());
+        assertEquals("finnhub", aprilRecords.getFirst().provider());
+
+        List<ApiMeteringRecord> juneRecords = repository.findByMonth("2026-06");
+        assertTrue(juneRecords.isEmpty());
     }
 }
