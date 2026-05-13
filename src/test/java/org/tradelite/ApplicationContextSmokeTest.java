@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.api.parallel.Isolated;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
@@ -18,10 +17,10 @@ import org.springframework.test.context.DynamicPropertySource;
         properties = {
             "tradebot.api.finnhub-key=test-key",
             "tradebot.api.coingecko-key=test-key",
-            "tradebot.api.twelvedata-key=test-key"
+            "tradebot.api.twelvedata-key=test-key",
+            "spring.task.scheduling.enabled=false"
         })
 @ActiveProfiles("dev")
-@Isolated
 class ApplicationContextSmokeTest {
 
     @TempDir static Path tempDir;
