@@ -21,7 +21,7 @@ import org.springframework.test.context.DynamicPropertySource;
             "spring.task.scheduling.enabled=false"
         })
 @ActiveProfiles("dev")
-class ApplicationContextSmokeTest {
+class ApplicationContextSmokeIT {
 
     @TempDir static Path tempDir;
 
