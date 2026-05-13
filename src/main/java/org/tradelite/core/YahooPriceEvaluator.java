@@ -56,6 +56,10 @@ public class YahooPriceEvaluator extends BasePriceEvaluator {
     @Override
     @SuppressWarnings("java:S135")
     public int evaluatePrice() throws InterruptedException {
+        if (!featureToggleService.isEnabled(FeatureToggle.YAHOO_INTRADAY_PRICE_FETCH)) {
+            return 0;
+        }
+
         int updatedCount = 0;
 
         for (StockSymbol symbol : symbolRegistry.getInternationalStocks()) {

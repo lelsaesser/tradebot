@@ -56,6 +56,21 @@ class YahooPriceEvaluatorTest {
                         featureToggleService,
                         marketStatusService,
                         livePriceCache);
+        lenient()
+                .when(featureToggleService.isEnabled(FeatureToggle.YAHOO_INTRADAY_PRICE_FETCH))
+                .thenReturn(true);
+    }
+
+    @Test
+    void evaluatePrice_skipsWhenFeatureToggleDisabled() throws InterruptedException {
+        when(featureToggleService.isEnabled(FeatureToggle.YAHOO_INTRADAY_PRICE_FETCH))
+                .thenReturn(false);
+
+        int updated = evaluator.evaluatePrice();
+
+        assertThat(updated, is(0));
+        verify(yahooFinanceClient, never()).fetchCurrentPrice(anyString());
+        verify(symbolRegistry, never()).getInternationalStocks();
     }
 
     @Test
