@@ -1,6 +1,40 @@
 # Progress Tracking
 
-## Latest Milestone: API Request Metering SQLite Migration (#379) — COMPLETE
+## Latest Milestone: Intraday Price Quotes for International Stocks (#382) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (May 11, 2026)
+
+#### Purpose
+Enable real-time price monitoring for international stocks (German XETRA, Korean KRX) via Yahoo Finance's `meta.regularMarketPrice` field. Previously international stocks only had daily OHLCV data; now they get target price alerts, pullback buy alerts, and high-change (>5%) alerts.
+
+#### New Components
+- `LivePriceCache` — shared `@Service` bean (`ConcurrentHashMap<String, Double>`), replaces `FinnhubPriceEvaluator.lastPriceCache`
+- `YahooPriceQuote` — record DTO (symbol, currentPrice, previousClose, dailyHigh, dailyLow, changePercent, timestamp)
+- `YahooPriceEvaluator` — mirrors FinnhubPriceEvaluator: fetch, cache, persist, evaluate alerts for international symbols
+
+#### Key Changes
+- `YahooFinanceClient` — added `fetchCurrentPrice()` + `parseQuoteFromMeta()` (extracts `meta.regularMarketPrice` from chart endpoint)
+- `MarketStatusService` — added `isExchangeOpen(symbol)`: `.DE` → XETRA 09:00–17:30 Europe/Berlin, `.KS` → KRX 09:00–15:30 Asia/Seoul
+- `FinnhubPriceEvaluator` — refactored to use `LivePriceCache` (removed `lastPriceCache` field + `@Getter`)
+- `PullbackBuyTracker` — injects `LivePriceCache` directly (no longer depends on FinnhubPriceEvaluator)
+- `Scheduler` — `yahooPriceEvaluator.evaluatePrice()` runs every 5 min (outside US market-hours gate, handles its own exchange gating)
+- `DevJobController` — `/dev/jobs/yahoo-price-evaluation` endpoint (18 total in run-all)
+- `DevDataSeeder` — uses `LivePriceCache` instead of `FinnhubPriceEvaluator`
+
+#### Design Decisions
+- Yahoo quotes stored in existing `finnhub_price_quotes` table (no rename — avoids production migration)
+- Per-exchange market hours (no international holiday detection — keep simple)
+- `LivePriceCache` as `@Service` (not interface) — single concrete implementation, shared by all evaluators and consumers
+- 3s delay between Yahoo requests (matching OhlcvFetcher pattern)
+- Yahoo evaluator runs independently of US market hours
+
+#### Tests: 1036 total, all passing, spotless clean
+
+---
+
+## Previous Milestone: API Request Metering SQLite Migration (#379) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -332,6 +366,7 @@ Follow-up issues (open):
 | **EMA Classification** | `EmaTracker` | Price vs 5 EMAs (green/yellow/red) | Daily 15:50 CET |
 | **VFI + RS Combined** | `VfiTracker` | Volume flow + RS confirmation | Daily 09:00 CET |
 | **EMA Pullback Buy** | `PullbackBuyTracker` | Pullback into 21-50 EMA zone + RS↑ + VFI↑ | Real-time (5 min) |
+| **Yahoo Intraday Price** | `YahooPriceEvaluator` | Target price + high-change alerts for intl stocks | Real-time (5 min) |
 | **Earnings Calendar** | `EarningsCalendarTracker` | Upcoming earnings in 7-day window | Daily 08:15 CET |
 | **Accumulation Detection** | `AccumulationDetectionTracker` | EMA9 < EMA21 + VFI↑ (pre-breakout positioning) | Daily 10:00 CET |
 
@@ -358,10 +393,11 @@ Follow-up issues (open):
 - **Unified SymbolRegistry** (single source of truth for all symbols)
 - **EMA Pullback Buy Alerts** (real-time pullback detection with RS+VFI confirmation)
 - **Earnings Calendar Alerts** (daily 7-day look-ahead report via Finnhub)
+- **Intraday price monitoring for international stocks** (Yahoo Finance meta.regularMarketPrice, LivePriceCache)
 
 ### Dev Tooling & Smoke Test ✅
-- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 17 endpoint requests
-- DevJobController with 17 individual endpoints + phased `run-all` composite endpoint (16 jobs)
+- Bruno API collection (`TradeliteBrunoCollection/DevController/`) with 18 endpoint requests
+- DevJobController with 18 individual endpoints + phased `run-all` composite endpoint (18 jobs)
 - Pre-deployment smoke test script (`scripts/run-smoke-test.sh`) — validates all jobs in 4 phases
 - DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
 
@@ -374,7 +410,7 @@ Follow-up issues (open):
 - Finnhub (stock prices, insider transactions, market holidays, earnings calendar)
 - CoinGecko (crypto prices)
 - Twelve Data (daily OHLCV — 400 data points, 8 req/min)
-- Yahoo Finance (international stock OHLCV — German/Korean, via ProcessBuilder + curl)
+- Yahoo Finance (international stock OHLCV + intraday price quotes via ProcessBuilder + curl)
 - FinViz (sector performance web scraping)
 - Telegram (bot messaging)
 
@@ -384,13 +420,13 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: ~1009
+- Total Tests: ~1036
 
 ## Future Enhancements
 
 ### Statistical (Open Issues)
 - **#308**: Extend pullback buy alert with sector trend filtering (requires sector membership mapping)
-- **#258**: Intraday OHLCV + intraday VFI (would enable hourly VFI)
+- **#258**: Intraday OHLCV + intraday VFI (would enable hourly VFI — price quotes done via #382, full OHLCV bars remain)
 - **#265**: Twelve Data API key in production
 - **#257**: Bug: ETF symbols can be added to stock symbols list
 - MACD indicator (uses same EMA concepts)

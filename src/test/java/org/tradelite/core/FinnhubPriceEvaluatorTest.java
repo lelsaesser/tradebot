@@ -20,6 +20,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.MarketStatusService;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,10 +34,12 @@ class FinnhubPriceEvaluatorTest {
     @Mock private FeatureToggleService featureToggleService;
     @Mock private MarketStatusService marketStatusService;
 
+    private LivePriceCache livePriceCache;
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
 
     @BeforeEach
     void setUp() {
+        livePriceCache = new LivePriceCache();
         finnhubPriceEvaluator =
                 new FinnhubPriceEvaluator(
                         finnhubClient,
@@ -45,7 +48,8 @@ class FinnhubPriceEvaluatorTest {
                         symbolRegistry,
                         priceQuoteRepository,
                         featureToggleService,
-                        marketStatusService);
+                        marketStatusService,
+                        livePriceCache);
     }
 
     @Test
@@ -183,7 +187,7 @@ class FinnhubPriceEvaluatorTest {
         double lastPrice = 150.0;
         StockSymbol testSymbol = new StockSymbol("TEST", "Test Company");
 
-        finnhubPriceEvaluator.lastPriceCache.put("TEST", lastPrice);
+        livePriceCache.put("TEST", lastPrice);
 
         when(symbolRegistry.getAll()).thenReturn(List.of(testSymbol));
         List<TargetPrice> targetPrices =
@@ -201,7 +205,7 @@ class FinnhubPriceEvaluatorTest {
         verify(symbolRegistry, times(1)).getAll();
         verify(finnhubClient, times(1)).getPriceQuote(any());
 
-        assertThat(finnhubPriceEvaluator.lastPriceCache, aMapWithSize(1));
+        assertThat(livePriceCache.getAll(), aMapWithSize(1));
         assertThat(finDataSize, is(0));
     }
 
@@ -336,7 +340,7 @@ class FinnhubPriceEvaluatorTest {
     @Test
     void evaluatePrice_doesNotSavePriceQuoteWhenPriceUnchanged() throws InterruptedException {
         StockSymbol testSymbol = new StockSymbol("AAPL", "Apple Inc.");
-        finnhubPriceEvaluator.lastPriceCache.put("AAPL", 175.0);
+        livePriceCache.put("AAPL", 175.0);
 
         when(symbolRegistry.getAll()).thenReturn(List.of(testSymbol));
         List<TargetPrice> targetPrices = List.of(new TargetPrice("AAPL", 150.0, 200.0));
@@ -378,9 +382,37 @@ class FinnhubPriceEvaluatorTest {
         finnhubPriceEvaluator.evaluatePrice();
 
         // Both symbols should be cached, even though TSM has no target price
-        assertThat(finnhubPriceEvaluator.lastPriceCache, aMapWithSize(2));
-        assertThat(finnhubPriceEvaluator.lastPriceCache.get("AAPL"), is(175.0));
-        assertThat(finnhubPriceEvaluator.lastPriceCache.get("TSM"), is(403.0));
+        assertThat(livePriceCache.getAll(), aMapWithSize(2));
+        assertThat(livePriceCache.get("AAPL"), is(175.0));
+        assertThat(livePriceCache.get("TSM"), is(403.0));
+    }
+
+    @Test
+    void evaluatePrice_internationalTargetPrice_skippedInLoop2() throws InterruptedException {
+        StockSymbol domestic = new StockSymbol("AAPL", "Apple");
+        when(symbolRegistry.getAll()).thenReturn(List.of(domestic));
+
+        PriceQuoteResponse aaplQuote = new PriceQuoteResponse();
+        aaplQuote.setCurrentPrice(175.0);
+        aaplQuote.setStockSymbol(domestic);
+        when(finnhubClient.getPriceQuote(domestic)).thenReturn(aaplQuote);
+
+        // Target prices include both domestic and international symbols
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(
+                        List.of(
+                                new TargetPrice("AAPL", 150.0, 200.0),
+                                new TargetPrice("RHM.DE", 1400.0, 1500.0)));
+        when(symbolRegistry.isInternationalSymbol("AAPL")).thenReturn(false);
+        when(symbolRegistry.isInternationalSymbol("RHM.DE")).thenReturn(true);
+        when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(domestic));
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        // AAPL target price should be evaluated
+        verify(symbolRegistry).fromString("AAPL");
+        // RHM.DE should be skipped entirely — no fromString call
+        verify(symbolRegistry, never()).fromString("RHM.DE");
     }
 
     @Test

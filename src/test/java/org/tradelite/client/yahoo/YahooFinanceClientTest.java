@@ -345,6 +345,143 @@ class YahooFinanceClientTest {
         verify(meteringService).incrementYahooRequests();
     }
 
+    @Test
+    void parseQuoteFromMeta_validResponse_returnsPriceQuote() {
+        String json =
+                """
+                {
+                    "chart": {
+                        "result": [{
+                            "meta": {
+                                "regularMarketPrice": 150.5,
+                                "chartPreviousClose": 148.0,
+                                "regularMarketOpen": 149.0,
+                                "regularMarketDayHigh": 152.0,
+                                "regularMarketDayLow": 147.5,
+                                "regularMarketTime": 1715600000
+                            }
+                        }],
+                        "error": null
+                    }
+                }
+                """;
+
+        YahooPriceQuote quote = client.parseQuoteFromMeta("RHM.DE", json);
+
+        assertThat(quote.symbol(), is("RHM.DE"));
+        assertThat(quote.currentPrice(), is(closeTo(150.5, 0.01)));
+        assertThat(quote.previousClose(), is(closeTo(148.0, 0.01)));
+        assertThat(quote.dailyOpen(), is(closeTo(149.0, 0.01)));
+        assertThat(quote.dailyHigh(), is(closeTo(152.0, 0.01)));
+        assertThat(quote.dailyLow(), is(closeTo(147.5, 0.01)));
+        assertThat(quote.changePercent(), is(closeTo(1.689, 0.01)));
+        assertThat(quote.timestamp(), is(1715600000L));
+    }
+
+    @Test
+    void parseQuoteFromMeta_zeroPreviousClose_returnsZeroChangePercent() {
+        String json =
+                """
+                {
+                    "chart": {
+                        "result": [{
+                            "meta": {
+                                "regularMarketPrice": 150.5,
+                                "chartPreviousClose": 0,
+                                "regularMarketDayHigh": 152.0,
+                                "regularMarketDayLow": 147.5,
+                                "regularMarketTime": 1715600000
+                            }
+                        }],
+                        "error": null
+                    }
+                }
+                """;
+
+        YahooPriceQuote quote = client.parseQuoteFromMeta("RHM.DE", json);
+
+        assertThat(quote.changePercent(), is(closeTo(0.0, 0.001)));
+    }
+
+    @Test
+    void parseQuoteFromMeta_invalidPrice_throwsException() {
+        String json =
+                """
+                {
+                    "chart": {
+                        "result": [{
+                            "meta": {
+                                "regularMarketPrice": 0,
+                                "chartPreviousClose": 148.0,
+                                "regularMarketDayHigh": 152.0,
+                                "regularMarketDayLow": 147.5,
+                                "regularMarketTime": 1715600000
+                            }
+                        }],
+                        "error": null
+                    }
+                }
+                """;
+
+        YahooFetchException ex =
+                assertThrows(
+                        YahooFetchException.class, () -> client.parseQuoteFromMeta("RHM.DE", json));
+
+        assertThat(ex.getMessage(), containsString("invalid regularMarketPrice"));
+    }
+
+    @Test
+    void parseQuoteFromMeta_apiError_throwsException() {
+        String json =
+                """
+                {
+                    "chart": {
+                        "result": null,
+                        "error": {"code": "Not Found", "description": "No data found"}
+                    }
+                }
+                """;
+
+        YahooFetchException ex =
+                assertThrows(
+                        YahooFetchException.class,
+                        () -> client.parseQuoteFromMeta("INVALID", json));
+
+        assertThat(ex.getMessage(), containsString("API error"));
+    }
+
+    @Test
+    void parseQuoteFromMeta_emptyResult_throwsException() {
+        String json =
+                """
+                {
+                    "chart": {
+                        "result": [],
+                        "error": null
+                    }
+                }
+                """;
+
+        assertThrows(YahooFetchException.class, () -> client.parseQuoteFromMeta("RHM.DE", json));
+    }
+
+    @Test
+    void parseQuoteFromMeta_malformedJson_throwsException() {
+        YahooFetchException ex =
+                assertThrows(
+                        YahooFetchException.class,
+                        () -> client.parseQuoteFromMeta("RHM.DE", "not json"));
+
+        assertThat(ex.getMessage(), containsString("JSON parse error"));
+    }
+
+    @Test
+    void fetchCurrentPrice_incrementsMeter() {
+        assertThrows(YahooFetchException.class, () -> client.fetchCurrentPrice("INVALID.XX"));
+
+        verify(meteringService, times(1)).incrementYahooRequests();
+    }
+
     private String buildValidGermanResponse() {
         return """
                 {

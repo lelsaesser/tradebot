@@ -23,8 +23,14 @@ import org.tradelite.client.finnhub.dto.MarketHolidayResponse.MarketHoliday;
 public class MarketStatusService {
 
     static final ZoneId NY_ZONE = ZoneId.of("America/New_York");
+    static final ZoneId BERLIN_ZONE = ZoneId.of("Europe/Berlin");
+    static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalTime MARKET_OPEN = LocalTime.of(9, 30);
     private static final LocalTime MARKET_CLOSE = LocalTime.of(16, 0);
+    private static final LocalTime XETRA_OPEN = LocalTime.of(9, 0);
+    private static final LocalTime XETRA_CLOSE = LocalTime.of(17, 30);
+    private static final LocalTime KRX_OPEN = LocalTime.of(9, 0);
+    private static final LocalTime KRX_CLOSE = LocalTime.of(15, 30);
 
     private final FinnhubClient finnhubClient;
     private final AtomicReference<Map<LocalDate, MarketHoliday>> holidayCache =
@@ -114,6 +120,29 @@ public class MarketStatusService {
         }
         LocalDate today = LocalDate.now(NY_ZONE);
         return Optional.ofNullable(holidayCache.get().get(today));
+    }
+
+    public boolean isExchangeOpen(String symbol) {
+        if (symbol == null) {
+            return false;
+        }
+        if (symbol.endsWith(".DE")) {
+            return isWithinTradingHours(BERLIN_ZONE, XETRA_OPEN, XETRA_CLOSE);
+        }
+        if (symbol.endsWith(".KS")) {
+            return isWithinTradingHours(SEOUL_ZONE, KRX_OPEN, KRX_CLOSE);
+        }
+        log.warn("No exchange mapping found for symbol: {} — skipping price evaluation", symbol);
+        return false;
+    }
+
+    private boolean isWithinTradingHours(ZoneId zone, LocalTime open, LocalTime close) {
+        ZonedDateTime now = ZonedDateTime.now(zone);
+        if (!isWeekday(now.getDayOfWeek())) {
+            return false;
+        }
+        LocalTime time = now.toLocalTime();
+        return !time.isBefore(open) && time.isBefore(close);
     }
 
     boolean isLoaded() {

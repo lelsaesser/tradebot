@@ -1,12 +1,14 @@
 package org.tradelite.core;
 
-import java.util.*;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.client.yahoo.YahooFetchException;
+import org.tradelite.client.yahoo.YahooFinanceClient;
+import org.tradelite.client.yahoo.YahooPriceQuote;
 import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -19,9 +21,11 @@ import org.tradelite.service.MarketStatusService;
 
 @Slf4j
 @Component
-public class FinnhubPriceEvaluator extends BasePriceEvaluator {
+public class YahooPriceEvaluator extends BasePriceEvaluator {
 
-    private final FinnhubClient finnhubClient;
+    static final long REQUEST_DELAY_MS = 3000;
+
+    private final YahooFinanceClient yahooFinanceClient;
     private final TargetPriceProvider targetPriceProvider;
     private final SymbolRegistry symbolRegistry;
     private final PriceQuoteRepository priceQuoteRepository;
@@ -30,8 +34,8 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     private final LivePriceCache livePriceCache;
 
     @Autowired
-    public FinnhubPriceEvaluator(
-            FinnhubClient finnhubClient,
+    public YahooPriceEvaluator(
+            YahooFinanceClient yahooFinanceClient,
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
             SymbolRegistry symbolRegistry,
@@ -40,7 +44,7 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             MarketStatusService marketStatusService,
             LivePriceCache livePriceCache) {
         super(telegramClient, targetPriceProvider);
-        this.finnhubClient = finnhubClient;
+        this.yahooFinanceClient = yahooFinanceClient;
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;
         this.priceQuoteRepository = priceQuoteRepository;
@@ -49,42 +53,44 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         this.livePriceCache = livePriceCache;
     }
 
-    @SuppressWarnings("java:S135") // allow multiple continue in for-loop
+    @Override
+    @SuppressWarnings("java:S135")
     public int evaluatePrice() throws InterruptedException {
         int updatedCount = 0;
 
-        // Loop 1: Fetch & cache prices for ALL symbols (stocks + ETFs)
-        for (StockSymbol symbol : symbolRegistry.getAll()) {
-            if (symbolRegistry.isInternationalSymbol(symbol.getTicker())) {
+        for (StockSymbol symbol : symbolRegistry.getInternationalStocks()) {
+            if (!marketStatusService.isExchangeOpen(symbol.getTicker())) {
                 continue;
             }
-            PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(symbol);
-            // Rate limit: Finnhub has 60 requests/minute limit, sleep after EVERY API call
-            Thread.sleep(1100);
+
+            YahooPriceQuote quote;
+            try {
+                quote = yahooFinanceClient.fetchCurrentPrice(symbol.getTicker());
+            } catch (YahooFetchException e) {
+                log.error(
+                        "Yahoo price fetch failed for {}: {}", symbol.getTicker(), e.getMessage());
+                Thread.sleep(REQUEST_DELAY_MS);
+                continue;
+            }
+            Thread.sleep(REQUEST_DELAY_MS);
 
             Double lastPrice = livePriceCache.get(symbol.getTicker());
-            if (priceQuote == null
-                    || (lastPrice != null
-                            && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
+            if (lastPrice != null && Math.abs(lastPrice - quote.currentPrice()) < 0.0001) {
                 continue;
             }
-            livePriceCache.put(symbol.getTicker(), priceQuote.getCurrentPrice());
+            livePriceCache.put(symbol.getTicker(), quote.currentPrice());
 
-            // Persist price quote to SQLite for historical data collection (if enabled)
-            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)
-                    && marketStatusService.isMarketOpen(null)) {
-                priceQuoteRepository.save(priceQuote);
+            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)) {
+                persistQuote(symbol, quote);
             }
 
-            evaluateHighPriceChange(priceQuote);
+            evaluateHighPriceChange(symbol, quote);
             updatedCount++;
         }
 
-        // Loop 2: Evaluate target prices using cached data (no API calls)
-        // Only evaluate domestic (US) symbols — international symbols are handled by
-        // YahooPriceEvaluator
+        // Evaluate target prices for international symbols
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
-            if (symbolRegistry.isInternationalSymbol(targetPrice.getSymbol())) {
+            if (!symbolRegistry.isInternationalSymbol(targetPrice.getSymbol())) {
                 continue;
             }
             Double price = livePriceCache.get(targetPrice.getSymbol());
@@ -93,9 +99,6 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             }
             Optional<StockSymbol> ticker = symbolRegistry.fromString(targetPrice.getSymbol());
             if (ticker.isEmpty()) {
-                log.warn(
-                        "Target price symbol {} not found in stock symbol registry",
-                        targetPrice.getSymbol());
                 continue;
             }
             comparePrices(
@@ -105,7 +108,21 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         return updatedCount;
     }
 
-    public void evaluateHighPriceChange(PriceQuoteResponse priceQuote) {
-        evaluateHighPriceChange(priceQuote.getStockSymbol(), priceQuote.getChangePercent());
+    void evaluateHighPriceChange(StockSymbol symbol, YahooPriceQuote quote) {
+        evaluateHighPriceChange(symbol, quote.changePercent());
+    }
+
+    private void persistQuote(StockSymbol symbol, YahooPriceQuote quote) {
+        PriceQuoteResponse response = new PriceQuoteResponse();
+        response.setStockSymbol(symbol);
+        response.setTimestamp(quote.timestamp());
+        response.setCurrentPrice(quote.currentPrice());
+        response.setDailyOpen(quote.dailyOpen());
+        response.setDailyHigh(quote.dailyHigh());
+        response.setDailyLow(quote.dailyLow());
+        response.setChange(quote.currentPrice() - quote.previousClose());
+        response.setChangePercent(quote.changePercent());
+        response.setPreviousClose(quote.previousClose());
+        priceQuoteRepository.save(response);
     }
 }

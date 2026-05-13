@@ -113,6 +113,11 @@ public class DevJobController {
         return runJob("market-holiday-notification", scheduler::manualMarketHolidayNotification);
     }
 
+    @PostMapping("/yahoo-price-evaluation")
+    public ResponseEntity<Map<String, String>> yahooPriceEvaluation() {
+        return runJob("yahoo-price-evaluation", scheduler::manualYahooPriceEvaluation);
+    }
+
     @PostMapping("/run-all")
     public ResponseEntity<Map<String, Object>> runAll() {
         LinkedHashMap<String, String> results = new LinkedHashMap<>();
@@ -167,6 +172,9 @@ public class DevJobController {
                         results,
                         "market-holiday-notification",
                         scheduler::manualMarketHolidayNotification);
+        failures +=
+                runAndRecord(
+                        results, "yahoo-price-evaluation", scheduler::manualYahooPriceEvaluation);
 
         // Phase 4: VFI last (depends on OHLCV data)
         failures += runAndRecord(results, "vfi-report", scheduler::manualVfiReport);

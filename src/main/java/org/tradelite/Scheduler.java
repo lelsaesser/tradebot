@@ -31,6 +31,7 @@ public class Scheduler {
 
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+    private final YahooPriceEvaluator yahooPriceEvaluator;
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramGateway telegramClient;
     private final TelegramMessageProcessor telegramMessageProcessor;
@@ -58,6 +59,7 @@ public class Scheduler {
     Scheduler(
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
+            YahooPriceEvaluator yahooPriceEvaluator,
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
             TelegramMessageProcessor telegramMessageProcessor,
@@ -80,6 +82,7 @@ public class Scheduler {
             AccumulationDetectionTracker accumulationDetectionTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
+        this.yahooPriceEvaluator = yahooPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.telegramMessageProcessor = telegramMessageProcessor;
@@ -113,6 +116,13 @@ public class Scheduler {
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
+        // International stocks run unconditionally (24/7, including weekends).
+        // The evaluator gates per-symbol via isExchangeOpen() internally.
+        // We intentionally avoid a MON-FRI cron or timezone-based gate here because
+        // international exchanges span multiple time zones - a CET-based weekend filter
+        // could silently skip valid trading windows (e.g., adding ASX where Monday open
+        // in Sydney falls on Sunday CET).
+        rootErrorHandler.run(yahooPriceEvaluator::evaluatePrice);
         log.info("Stock market monitoring round completed.");
     }
 
@@ -293,6 +303,7 @@ public class Scheduler {
     public boolean manualStockMarketMonitoring() {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(finnhubPriceEvaluator::evaluatePrice);
+        success &= rootErrorHandler.runWithStatus(yahooPriceEvaluator::evaluatePrice);
         success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
         success &=
                 rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
@@ -407,6 +418,12 @@ public class Scheduler {
     public boolean manualMarketHolidayNotification() {
         boolean success = rootErrorHandler.runWithStatus(this::doMarketHolidayNotification);
         log.info("Manual market holiday notification completed.");
+        return success;
+    }
+
+    public boolean manualYahooPriceEvaluation() {
+        boolean success = rootErrorHandler.runWithStatus(yahooPriceEvaluator::evaluatePrice);
+        log.info("Manual Yahoo price evaluation completed.");
         return success;
     }
 }
