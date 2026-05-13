@@ -44,7 +44,7 @@ public abstract class BasePriceEvaluator {
             double targetPriceSell) {
         String displayName = ticker.getName();
         if (ticker.getSymbolType() == SymbolType.STOCK) {
-            displayName = ((StockSymbol) ticker).getDisplayName();
+            displayName = ticker.getDisplayName();
         }
 
         if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
