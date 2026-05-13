@@ -1,5 +1,6 @@
 package org.tradelite.common;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -20,13 +21,16 @@ public class TargetPriceProvider {
 
     private final TargetPriceRepository targetPriceRepository;
     private final SqliteIgnoredSymbolRepository ignoredSymbolRepository;
+    private final Clock clock;
 
     @Autowired
     public TargetPriceProvider(
             TargetPriceRepository targetPriceRepository,
-            SqliteIgnoredSymbolRepository ignoredSymbolRepository) {
+            SqliteIgnoredSymbolRepository ignoredSymbolRepository,
+            Clock clock) {
         this.targetPriceRepository = targetPriceRepository;
         this.ignoredSymbolRepository = ignoredSymbolRepository;
+        this.clock = clock;
     }
 
     public List<TargetPrice> getStockTargetPrices() {
@@ -41,7 +45,7 @@ public class TargetPriceProvider {
         ignoredSymbolRepository.save(
                 symbol.getName(),
                 reason.getReason(),
-                Instant.now().getEpochSecond(),
+                clock.instant().getEpochSecond(),
                 alertThreshold == 0 ? null : alertThreshold);
     }
 
@@ -63,7 +67,7 @@ public class TargetPriceProvider {
         }
 
         long elapsedSeconds =
-                Duration.between(Instant.ofEpochSecond(row.get().ignoredAt()), Instant.now())
+                Duration.between(Instant.ofEpochSecond(row.get().ignoredAt()), clock.instant())
                         .getSeconds();
         if (elapsedSeconds < reason.getTtlSeconds()) {
             log.info(
@@ -81,7 +85,7 @@ public class TargetPriceProvider {
     }
 
     public void cleanupIgnoreSymbols(long ttlSeconds) {
-        long cutoff = Instant.now().getEpochSecond() - ttlSeconds;
+        long cutoff = clock.instant().getEpochSecond() - ttlSeconds;
         ignoredSymbolRepository.deleteExpiredEntries(cutoff);
     }
 
