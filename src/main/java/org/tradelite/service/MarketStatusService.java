@@ -132,6 +132,7 @@ public class MarketStatusService {
         if (symbol.endsWith(".KS")) {
             return isWithinTradingHours(SEOUL_ZONE, KRX_OPEN, KRX_CLOSE);
         }
+        log.warn("No exchange mapping found for symbol: {} — skipping price evaluation", symbol);
         return false;
     }
 

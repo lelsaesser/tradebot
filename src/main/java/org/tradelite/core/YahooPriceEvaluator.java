@@ -27,7 +27,6 @@ public class YahooPriceEvaluator extends BasePriceEvaluator {
 
     private final YahooFinanceClient yahooFinanceClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
     private final PriceQuoteRepository priceQuoteRepository;
     private final FeatureToggleService featureToggleService;
@@ -47,7 +46,6 @@ public class YahooPriceEvaluator extends BasePriceEvaluator {
         super(telegramClient, targetPriceProvider);
         this.yahooFinanceClient = yahooFinanceClient;
         this.targetPriceProvider = targetPriceProvider;
-        this.telegramClient = telegramClient;
         this.symbolRegistry = symbolRegistry;
         this.priceQuoteRepository = priceQuoteRepository;
         this.featureToggleService = featureToggleService;
@@ -111,28 +109,7 @@ public class YahooPriceEvaluator extends BasePriceEvaluator {
     }
 
     void evaluateHighPriceChange(StockSymbol symbol, YahooPriceQuote quote) {
-        double absPercentChange = Math.abs(quote.changePercent());
-        if (absPercentChange < 5.0) {
-            return;
-        }
-
-        int alertThreshold = (int) (absPercentChange / 5.0) * 5;
-        if (alertThreshold > 0
-                && !targetPriceProvider.isSymbolIgnored(
-                        symbol, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
-            String displayName = symbol.getDisplayName();
-            log.info("High price change detected for {}: {}%", displayName, quote.changePercent());
-            String emoji = quote.changePercent() > 0 ? "\uD83D\uDCC8" : "\uD83D\uDCC9";
-            telegramClient.sendMessage(
-                    emoji
-                            + " "
-                            + displayName
-                            + ": "
-                            + String.format("%.2f", quote.changePercent())
-                            + "%");
-            targetPriceProvider.addIgnoredSymbol(
-                    symbol, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
-        }
+        evaluateHighPriceChange(symbol, quote.changePercent());
     }
 
     private void persistQuote(StockSymbol symbol, YahooPriceQuote quote) {
@@ -140,7 +117,7 @@ public class YahooPriceEvaluator extends BasePriceEvaluator {
         response.setStockSymbol(symbol);
         response.setTimestamp(quote.timestamp());
         response.setCurrentPrice(quote.currentPrice());
-        response.setDailyOpen(0);
+        response.setDailyOpen(quote.dailyOpen());
         response.setDailyHigh(quote.dailyHigh());
         response.setDailyLow(quote.dailyLow());
         response.setChange(quote.currentPrice() - quote.previousClose());

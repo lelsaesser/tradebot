@@ -23,7 +23,6 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
     private final FinnhubClient finnhubClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
     private final PriceQuoteRepository priceQuoteRepository;
     private final FeatureToggleService featureToggleService;
@@ -43,7 +42,6 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
-        this.telegramClient = telegramClient;
         this.symbolRegistry = symbolRegistry;
         this.priceQuoteRepository = priceQuoteRepository;
         this.featureToggleService = featureToggleService;
@@ -83,7 +81,12 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
         }
 
         // Loop 2: Evaluate target prices using cached data (no API calls)
+        // Only evaluate domestic (US) symbols — international symbols are handled by
+        // YahooPriceEvaluator
         for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
+            if (symbolRegistry.isInternationalSymbol(targetPrice.getSymbol())) {
+                continue;
+            }
             Double price = livePriceCache.get(targetPrice.getSymbol());
             if (price == null) {
                 continue;
@@ -103,27 +106,6 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
     }
 
     public void evaluateHighPriceChange(PriceQuoteResponse priceQuote) {
-        double percentChange = priceQuote.getChangePercent();
-        double absPercentChange = Math.abs(percentChange);
-
-        if (absPercentChange < 5.0) {
-            return;
-        }
-
-        int alertThreshold = (int) (absPercentChange / 5.0) * 5;
-
-        if (alertThreshold > 0
-                && !targetPriceProvider.isSymbolIgnored(
-                        priceQuote.getStockSymbol(),
-                        IgnoreReason.CHANGE_PERCENT_ALERT,
-                        alertThreshold)) {
-            String displayName = priceQuote.getStockSymbol().getDisplayName();
-            log.info("High price change detected for {}: {}%", displayName, percentChange);
-            String emoji = percentChange > 0 ? "📈" : "📉";
-            telegramClient.sendMessage(
-                    emoji + " " + displayName + ": " + String.format("%.2f", percentChange) + "%");
-            targetPriceProvider.addIgnoredSymbol(
-                    priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
-        }
+        evaluateHighPriceChange(priceQuote.getStockSymbol(), priceQuote.getChangePercent());
     }
 }

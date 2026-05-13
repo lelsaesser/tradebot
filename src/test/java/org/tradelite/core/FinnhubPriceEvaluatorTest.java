@@ -388,6 +388,34 @@ class FinnhubPriceEvaluatorTest {
     }
 
     @Test
+    void evaluatePrice_internationalTargetPrice_skippedInLoop2() throws InterruptedException {
+        StockSymbol domestic = new StockSymbol("AAPL", "Apple");
+        when(symbolRegistry.getAll()).thenReturn(List.of(domestic));
+
+        PriceQuoteResponse aaplQuote = new PriceQuoteResponse();
+        aaplQuote.setCurrentPrice(175.0);
+        aaplQuote.setStockSymbol(domestic);
+        when(finnhubClient.getPriceQuote(domestic)).thenReturn(aaplQuote);
+
+        // Target prices include both domestic and international symbols
+        when(targetPriceProvider.getStockTargetPrices())
+                .thenReturn(
+                        List.of(
+                                new TargetPrice("AAPL", 150.0, 200.0),
+                                new TargetPrice("RHM.DE", 1400.0, 1500.0)));
+        when(symbolRegistry.isInternationalSymbol("AAPL")).thenReturn(false);
+        when(symbolRegistry.isInternationalSymbol("RHM.DE")).thenReturn(true);
+        when(symbolRegistry.fromString("AAPL")).thenReturn(java.util.Optional.of(domestic));
+
+        finnhubPriceEvaluator.evaluatePrice();
+
+        // AAPL target price should be evaluated
+        verify(symbolRegistry).fromString("AAPL");
+        // RHM.DE should be skipped entirely — no fromString call
+        verify(symbolRegistry, never()).fromString("RHM.DE");
+    }
+
+    @Test
     void evaluatePrice_internationalSymbol_skipped() throws InterruptedException {
         StockSymbol domestic = new StockSymbol("AAPL", "Apple");
         StockSymbol international = new StockSymbol("RHM.DE", "Rheinmetall");

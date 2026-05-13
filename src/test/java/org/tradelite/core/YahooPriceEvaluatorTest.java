@@ -63,7 +63,9 @@ class YahooPriceEvaluatorTest {
         when(symbolRegistry.getInternationalStocks()).thenReturn(List.of(RHM));
         when(marketStatusService.isExchangeOpen("RHM.DE")).thenReturn(true);
         when(yahooFinanceClient.fetchCurrentPrice("RHM.DE"))
-                .thenReturn(new YahooPriceQuote("RHM.DE", 1200.0, 1180.0, 1220.0, 1170.0, 1.69, 0));
+                .thenReturn(
+                        new YahooPriceQuote(
+                                "RHM.DE", 1200.0, 1180.0, 1190.0, 1220.0, 1170.0, 1.69, 0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
 
         int updated = evaluator.evaluatePrice();
@@ -91,7 +93,9 @@ class YahooPriceEvaluatorTest {
         when(symbolRegistry.getInternationalStocks()).thenReturn(List.of(RHM));
         when(marketStatusService.isExchangeOpen("RHM.DE")).thenReturn(true);
         when(yahooFinanceClient.fetchCurrentPrice("RHM.DE"))
-                .thenReturn(new YahooPriceQuote("RHM.DE", 1200.0, 1180.0, 1220.0, 1170.0, 1.69, 0));
+                .thenReturn(
+                        new YahooPriceQuote(
+                                "RHM.DE", 1200.0, 1180.0, 1190.0, 1220.0, 1170.0, 1.69, 0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
 
         int updated = evaluator.evaluatePrice();
@@ -109,7 +113,14 @@ class YahooPriceEvaluatorTest {
         when(yahooFinanceClient.fetchCurrentPrice("005930.KS"))
                 .thenReturn(
                         new YahooPriceQuote(
-                                "005930.KS", 285000.0, 280000.0, 290000.0, 278000.0, 1.78, 0));
+                                "005930.KS",
+                                285000.0,
+                                280000.0,
+                                282000.0,
+                                290000.0,
+                                278000.0,
+                                1.78,
+                                0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
 
         int updated = evaluator.evaluatePrice();
@@ -124,7 +135,9 @@ class YahooPriceEvaluatorTest {
         when(symbolRegistry.getInternationalStocks()).thenReturn(List.of(RHM));
         when(marketStatusService.isExchangeOpen("RHM.DE")).thenReturn(true);
         when(yahooFinanceClient.fetchCurrentPrice("RHM.DE"))
-                .thenReturn(new YahooPriceQuote("RHM.DE", 1200.0, 1180.0, 1220.0, 1170.0, 1.69, 0));
+                .thenReturn(
+                        new YahooPriceQuote(
+                                "RHM.DE", 1200.0, 1180.0, 1190.0, 1220.0, 1170.0, 1.69, 0));
         when(featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION))
                 .thenReturn(true);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of());
@@ -152,7 +165,7 @@ class YahooPriceEvaluatorTest {
     @Test
     void evaluateHighPriceChange_sendsAlertAbove5Percent() {
         YahooPriceQuote quote =
-                new YahooPriceQuote("RHM.DE", 1200.0, 1100.0, 1220.0, 1170.0, 9.09, 0);
+                new YahooPriceQuote("RHM.DE", 1200.0, 1100.0, 1110.0, 1220.0, 1170.0, 9.09, 0);
 
         evaluator.evaluateHighPriceChange(RHM, quote);
 
@@ -164,7 +177,7 @@ class YahooPriceEvaluatorTest {
     @Test
     void evaluateHighPriceChange_skipsBelow5Percent() {
         YahooPriceQuote quote =
-                new YahooPriceQuote("RHM.DE", 1200.0, 1180.0, 1220.0, 1170.0, 1.69, 0);
+                new YahooPriceQuote("RHM.DE", 1200.0, 1180.0, 1190.0, 1220.0, 1170.0, 1.69, 0);
 
         evaluator.evaluateHighPriceChange(RHM, quote);
 

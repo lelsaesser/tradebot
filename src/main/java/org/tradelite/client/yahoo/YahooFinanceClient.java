@@ -70,6 +70,7 @@ public class YahooFinanceClient {
             JsonNode meta = result.get(0).path("meta");
             double currentPrice = meta.path("regularMarketPrice").asDouble(0);
             double previousClose = meta.path("chartPreviousClose").asDouble(0);
+            double dailyOpen = meta.path("regularMarketOpen").asDouble(0);
             double dailyHigh = meta.path("regularMarketDayHigh").asDouble(0);
             double dailyLow = meta.path("regularMarketDayLow").asDouble(0);
             long timestamp = meta.path("regularMarketTime").asLong(0);
@@ -88,6 +89,7 @@ public class YahooFinanceClient {
                     symbol,
                     currentPrice,
                     previousClose,
+                    dailyOpen,
                     dailyHigh,
                     dailyLow,
                     changePercent,

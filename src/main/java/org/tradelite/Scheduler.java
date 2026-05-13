@@ -116,7 +116,12 @@ public class Scheduler {
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
-        // International stocks — evaluator handles its own exchange-hours gating
+        // International stocks run unconditionally (24/7, including weekends).
+        // The evaluator gates per-symbol via isExchangeOpen() internally.
+        // We intentionally avoid a MON-FRI cron or timezone-based gate here because
+        // international exchanges span multiple time zones - a CET-based weekend filter
+        // could silently skip valid trading windows (e.g., adding ASX where Monday open
+        // in Sydney falls on Sunday CET).
         rootErrorHandler.run(yahooPriceEvaluator::evaluatePrice);
         log.info("Stock market monitoring round completed.");
     }

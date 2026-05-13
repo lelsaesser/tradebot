@@ -355,6 +355,7 @@ class YahooFinanceClientTest {
                             "meta": {
                                 "regularMarketPrice": 150.5,
                                 "chartPreviousClose": 148.0,
+                                "regularMarketOpen": 149.0,
                                 "regularMarketDayHigh": 152.0,
                                 "regularMarketDayLow": 147.5,
                                 "regularMarketTime": 1715600000
@@ -370,6 +371,7 @@ class YahooFinanceClientTest {
         assertThat(quote.symbol(), is("RHM.DE"));
         assertThat(quote.currentPrice(), is(closeTo(150.5, 0.01)));
         assertThat(quote.previousClose(), is(closeTo(148.0, 0.01)));
+        assertThat(quote.dailyOpen(), is(closeTo(149.0, 0.01)));
         assertThat(quote.dailyHigh(), is(closeTo(152.0, 0.01)));
         assertThat(quote.dailyLow(), is(closeTo(147.5, 0.01)));
         assertThat(quote.changePercent(), is(closeTo(1.689, 0.01)));
