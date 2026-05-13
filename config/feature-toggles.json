@@ -4,5 +4,6 @@
   "vfiReport": true,
   "pullbackBuyAlert": true,
   "earningsCalendarAlert": true,
-  "accumulationDetection": true
+  "accumulationDetection": true,
+  "yahooIntradayPriceFetch": true
 }

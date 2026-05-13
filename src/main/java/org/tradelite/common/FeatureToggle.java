@@ -28,7 +28,10 @@ public enum FeatureToggle {
     EARNINGS_CALENDAR_ALERT("earningsCalendarAlert"),
 
     /** Controls whether the daily accumulation detection alert is sent via Telegram */
-    ACCUMULATION_DETECTION("accumulationDetection");
+    ACCUMULATION_DETECTION("accumulationDetection"),
+
+    /** Controls whether Yahoo Finance intraday price fetching is active for international stocks */
+    YAHOO_INTRADAY_PRICE_FETCH("yahooIntradayPriceFetch");
 
     private final String key;
 }
