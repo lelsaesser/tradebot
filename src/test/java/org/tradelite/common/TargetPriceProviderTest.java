@@ -14,6 +14,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.core.IgnoreReason;
@@ -21,6 +23,7 @@ import org.tradelite.repository.SqliteIgnoredSymbolRepository;
 import org.tradelite.repository.TargetPriceRepository;
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
+@Execution(ExecutionMode.SAME_THREAD)
 class TargetPriceProviderTest {
 
     private TargetPriceProvider targetPriceProvider;
