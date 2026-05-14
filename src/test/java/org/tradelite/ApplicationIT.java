@@ -9,8 +9,11 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
-class ApplicationTest {
+@Execution(ExecutionMode.SAME_THREAD)
+class ApplicationIT {
 
     @Test
     void mainMethodSignature() throws NoSuchMethodException {
@@ -34,6 +37,7 @@ class ApplicationTest {
             "--spring.profiles.active=dev",
             "--spring.main.web-application-type=none",
             "--spring.main.register-shutdown-hook=false",
+            "--spring.task.scheduling.enabled=false",
             "--spring.datasource.url=jdbc:sqlite:" + tempDir.resolve("application-test.db"),
             "--tradebot.api.finnhub-key=test-finnhub-key",
             "--tradebot.api.coingecko-key=test-coingecko-key",

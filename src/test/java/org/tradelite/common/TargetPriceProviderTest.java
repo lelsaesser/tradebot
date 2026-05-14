@@ -6,12 +6,16 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.*;
 
 import java.io.File;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.sqlite.SQLiteDataSource;
 import org.tradelite.core.IgnoreReason;
@@ -19,10 +23,12 @@ import org.tradelite.repository.SqliteIgnoredSymbolRepository;
 import org.tradelite.repository.TargetPriceRepository;
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
+@Execution(ExecutionMode.SAME_THREAD)
 class TargetPriceProviderTest {
 
     private TargetPriceProvider targetPriceProvider;
     private TargetPriceRepository targetPriceRepository;
+    private Clock clock;
     private String testDbPath;
 
     @BeforeEach
@@ -44,8 +50,10 @@ class TargetPriceProviderTest {
         SqliteIgnoredSymbolRepository ignoredSymbolRepository =
                 new SqliteIgnoredSymbolRepository(jdbcTemplate);
         targetPriceRepository = mock(TargetPriceRepository.class);
+        clock = mock(Clock.class);
+        when(clock.instant()).thenReturn(Instant.ofEpochSecond(1_000_000));
         targetPriceProvider =
-                new TargetPriceProvider(targetPriceRepository, ignoredSymbolRepository);
+                new TargetPriceProvider(targetPriceRepository, ignoredSymbolRepository, clock);
     }
 
     @AfterEach
@@ -138,8 +146,9 @@ class TargetPriceProviderTest {
     }
 
     @Test
-    @SuppressWarnings("java:S2925") // Sleep is used to test the cleanup functionality
-    void cleanupIgnoreSymbols() throws InterruptedException {
+    void cleanupIgnoreSymbols() {
+        // T0: Add symbols
+        when(clock.instant()).thenReturn(Instant.ofEpochSecond(1_000_000));
         targetPriceProvider.addIgnoredSymbol(CoinId.SOLANA, IgnoreReason.BUY_ALERT);
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT);
@@ -152,7 +161,8 @@ class TargetPriceProviderTest {
                         new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT),
                 is(true));
 
-        Thread.sleep(3000);
+        // T0 + 3s: cleanup with 1s TTL should remove entries added at T0
+        when(clock.instant()).thenReturn(Instant.ofEpochSecond(1_000_003));
         targetPriceProvider.cleanupIgnoreSymbols(1L);
 
         assertThat(
@@ -163,15 +173,15 @@ class TargetPriceProviderTest {
                         new StockSymbol("AMZN", "Amazon"), IgnoreReason.SELL_ALERT),
                 is(false));
 
+        // T0 + 3s: Add more symbols
         targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.BUY_ALERT);
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("META", "Meta Platforms"), IgnoreReason.SELL_ALERT);
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("PLTR", "Palantir"), IgnoreReason.BUY_ALERT);
 
-        Thread.sleep(3500);
-
-        // Add fresh entries for BTC and META (different reasons)
+        // T0 + 6.5s: Add fresh entries for BTC and META (different reasons)
+        when(clock.instant()).thenReturn(Instant.ofEpochSecond(1_000_006));
         targetPriceProvider.addIgnoredSymbol(CoinId.BITCOIN, IgnoreReason.SELL_ALERT);
         targetPriceProvider.addIgnoredSymbol(
                 new StockSymbol("META", "Meta Platforms"), IgnoreReason.BUY_ALERT);

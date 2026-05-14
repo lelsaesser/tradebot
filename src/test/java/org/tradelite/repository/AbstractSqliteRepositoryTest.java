@@ -1,6 +1,8 @@
 package org.tradelite.repository;
 
 import java.util.UUID;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -15,6 +17,7 @@ import org.springframework.test.context.jdbc.Sql;
         classes = {DataSourceAutoConfiguration.class, JdbcTemplateAutoConfiguration.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Sql("classpath:schema.sql")
+@Execution(ExecutionMode.SAME_THREAD)
 abstract class AbstractSqliteRepositoryTest {
 
     @DynamicPropertySource

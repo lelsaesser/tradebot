@@ -17,10 +17,11 @@ import org.springframework.test.context.DynamicPropertySource;
         properties = {
             "tradebot.api.finnhub-key=test-key",
             "tradebot.api.coingecko-key=test-key",
-            "tradebot.api.twelvedata-key=test-key"
+            "tradebot.api.twelvedata-key=test-key",
+            "spring.task.scheduling.enabled=false"
         })
 @ActiveProfiles("dev")
-class ApplicationContextSmokeTest {
+class ApplicationContextSmokeIT {
 
     @TempDir static Path tempDir;
 

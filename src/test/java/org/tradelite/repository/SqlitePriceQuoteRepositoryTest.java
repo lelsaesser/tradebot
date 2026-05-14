@@ -3,6 +3,7 @@ package org.tradelite.repository;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -63,10 +64,10 @@ class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
     }
 
     @Test
-    void save_multipleQuotesForSameSymbol() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
+    void save_multipleQuotesForSameSymbol() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
 
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
         assertThat(results, hasSize(2));
@@ -90,10 +91,10 @@ class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
     }
 
     @Test
-    void findBySymbol_returnsResultsOrderedByTimestamp() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
+    void findBySymbol_returnsResultsOrderedByTimestamp() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
 
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
         assertThat(results, hasSize(2));
@@ -181,12 +182,11 @@ class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
     }
 
     @Test
-    void findDailyClosingPrices_groupsByDate() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.50));
+    void findDailyClosingPrices_groupsByDate() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
+        repository.save(createPriceQuote("AAPL", 176.50, base + 2));
 
         List<DailyPrice> results = repository.findDailyClosingPrices("AAPL", 30);
         assertThat(results, hasSize(1));
@@ -229,10 +229,10 @@ class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
     }
 
     @Test
-    void findLatestBySymbol_returnsLatestEntry() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
+    void findLatestBySymbol_returnsLatestEntry() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
 
         var result = repository.findLatestBySymbol("AAPL");
         assertThat(result.isPresent(), is(true));
@@ -266,6 +266,12 @@ class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
         priceQuote.setChange(1.0);
         priceQuote.setChangePercent(0.5);
         priceQuote.setPreviousClose(price - 1);
+        return priceQuote;
+    }
+
+    private PriceQuoteResponse createPriceQuote(String symbol, double price, long timestamp) {
+        PriceQuoteResponse priceQuote = createPriceQuote(symbol, price);
+        priceQuote.setTimestamp(timestamp);
         return priceQuote;
     }
 }
