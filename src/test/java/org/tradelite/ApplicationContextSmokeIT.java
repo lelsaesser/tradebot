@@ -18,7 +18,7 @@ import org.springframework.test.context.DynamicPropertySource;
             "tradebot.api.finnhub-key=test-key",
             "tradebot.api.coingecko-key=test-key",
             "tradebot.api.twelvedata-key=test-key",
-            "spring.task.scheduling.enabled=false"
+            "tradebot.scheduling.enabled=false"
         })
 @ActiveProfiles("dev")
 class ApplicationContextSmokeIT {
@@ -28,7 +28,8 @@ class ApplicationContextSmokeIT {
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add(
-                "spring.datasource.url", () -> "jdbc:sqlite:" + tempDir.resolve("smoke-test.db"));
+                "spring.datasource.url",
+                () -> "jdbc:sqlite:" + tempDir.resolve("smoke-test.db") + "?journal_mode=DELETE");
         registry.add(
                 "tradebot.telegram.local-sink-file",
                 () -> tempDir.resolve("telegram.log").toString());
