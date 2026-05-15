@@ -2,9 +2,6 @@ package org.tradelite.service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -27,13 +24,6 @@ public class ApiRequestMeteringService {
 
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    static final Map<String, String> LEGACY_FILES =
-            Map.of(
-                    FINNHUB, "config/finnhub-monthly-requests.txt",
-                    COINGECKO, "config/coingecko-monthly-requests.txt",
-                    TWELVEDATA, "config/twelvedata-monthly-requests.txt",
-                    YAHOO, "config/yahoo-monthly-requests.txt");
-
     private final ApiMeteringRepository repository;
     private final Map<String, AtomicInteger> counters = new ConcurrentHashMap<>();
 
@@ -47,7 +37,6 @@ public class ApiRequestMeteringService {
 
     @PostConstruct
     void startup() {
-        migrateLegacyFilesIfNeeded();
         initializeCounters();
     }
 
@@ -137,79 +126,6 @@ public class ApiRequestMeteringService {
     void shutdown() {
         log.info("Shutting down API metering service, flushing counters...");
         flushCounters();
-    }
-
-    void migrateLegacyFilesIfNeeded() {
-        String currentMonth = getCurrentMonth();
-        List<ApiMeteringRecord> existing = repository.findByMonth(currentMonth);
-
-        for (Map.Entry<String, String> entry : LEGACY_FILES.entrySet()) {
-            String provider = entry.getKey();
-            String filePath = entry.getValue();
-
-            if (existing.stream().anyMatch(r -> r.provider().equals(provider))) {
-                log.debug("Provider {} already has data, skipping migration", provider);
-                continue;
-            }
-
-            File file = new File(filePath);
-            if (!file.exists()) {
-                continue;
-            }
-
-            try {
-                ApiMeteringRecord meteringRecord = parseLegacyFile(file, provider, currentMonth);
-                if (meteringRecord != null) {
-                    repository.saveAll(List.of(meteringRecord));
-                    log.info(
-                            "Migrated legacy metering file for {}: count={}",
-                            provider,
-                            meteringRecord.count());
-                }
-            } catch (Exception e) {
-                log.warn("Failed to migrate legacy metering file: {}", filePath, e);
-            }
-        }
-    }
-
-    ApiMeteringRecord parseLegacyFile(File file, String provider, String currentMonth)
-            throws IOException {
-        List<String> lines = Files.readAllLines(file.toPath());
-
-        String month = null;
-        int count = 0;
-        LocalDateTime lastUpdated = LocalDateTime.now();
-
-        for (String line : lines) {
-            if (line.startsWith("Month:")) {
-                month = line.substring("Month:".length()).trim();
-            } else if (line.startsWith("Count:")) {
-                count = Integer.parseInt(line.substring("Count:".length()).trim());
-            } else if (line.startsWith("Last Updated:")) {
-                try {
-                    lastUpdated =
-                            LocalDateTime.parse(line.substring("Last Updated:".length()).trim());
-                } catch (Exception _) {
-                    log.debug("Could not parse Last Updated timestamp, using current time");
-                }
-            }
-        }
-
-        if (month == null) {
-            log.warn("No month found in legacy file for provider {}", provider);
-            return null;
-        }
-
-        if (!month.equals(currentMonth)) {
-            log.debug(
-                    "Skipping stale legacy file for {}: file month={}, current={}",
-                    provider,
-                    month,
-                    currentMonth);
-            return null;
-        }
-
-        return new ApiMeteringRecord(provider, month, count, lastUpdated);
     }
 
     private void initializeCounters() {
