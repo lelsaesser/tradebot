@@ -1,6 +1,54 @@
 # Progress Tracking
 
-## Latest Milestone: Intraday Price Quotes for International Stocks (#382) — COMPLETE
+## Latest Milestone: Accumulation Streak Counter (#404) — COMPLETE
+
+**Status**: ✅ **PRODUCTION READY**
+
+### Implementation (May 15, 2026)
+
+#### Purpose
+Add a streak counter to institutional accumulation detection alerts showing how many consecutive days the accumulation signal has been active for each stock.
+
+#### New Components
+- `AccumulationStreak` — record (symbol, streakDays, lastUpdated) in `core` package
+- `AccumulationStreakRepository` — interface with `save()`, `findBySymbol()`, `deleteAllExcept(Set<String>)`
+- `SqliteAccumulationStreakRepository` — JdbcTemplate implementation
+
+#### Key Changes
+- `schema.sql` — added `accumulation_streaks` table (symbol PK, streak_days, last_updated)
+- `AccumulationDetectionTracker` — streak update logic + message formatting with streak annotation
+- Alert format: `*Chevron (CVX) — 5 days*` for streak > 1; day-1 signals omit annotation
+
+#### Design Decisions
+- Same condition for detection and continuation (EMA9 < EMA21, VFI > 0, VFI > signal)
+- Repository injected directly into tracker (no separate persistence orchestrator)
+- `deleteAllExcept()` cleans ended streaks in one query
+- Idempotent via lastUpdated date check (no double-increment on same day)
+
+#### Tests: 1061 total (1057 unit + 4 integration), all passing, spotless clean
+
+---
+
+## Previous Milestone: Remove Legacy File Migration (#391) — COMPLETE
+
+**Status**: ✅ **CLEANUP COMPLETE**
+
+### Implementation (May 15, 2026)
+
+#### Purpose
+Remove dead one-time migration code from `ApiRequestMeteringService` after confirming production deployment of #385 was successful and metering is purely SQLite-based.
+
+#### Key Changes
+- Removed `LEGACY_FILES` constant, `migrateLegacyFilesIfNeeded()`, `parseLegacyFile()`
+- Removed dead imports: `java.io.File`, `java.io.IOException`, `java.nio.file.Files`
+- Simplified `startup()` to just call `initializeCounters()`
+- Removed 6 migration-specific tests + dead test imports
+
+#### Tests: 1049 total, all passing. Net: 177 lines deleted.
+
+---
+
+## Previous Milestone: Intraday Price Quotes for International Stocks (#382) — COMPLETE
 
 **Status**: ✅ **PRODUCTION READY**
 
@@ -368,7 +416,7 @@ Follow-up issues (open):
 | **EMA Pullback Buy** | `PullbackBuyTracker` | Pullback into 21-50 EMA zone + RS↑ + VFI↑ | Real-time (5 min) |
 | **Yahoo Intraday Price** | `YahooPriceEvaluator` | Target price + high-change alerts for intl stocks | Real-time (5 min) |
 | **Earnings Calendar** | `EarningsCalendarTracker` | Upcoming earnings in 7-day window | Daily 08:15 CET |
-| **Accumulation Detection** | `AccumulationDetectionTracker` | EMA9 < EMA21 + VFI↑ (pre-breakout positioning) | Daily 10:00 CET |
+| **Accumulation Detection** | `AccumulationDetectionTracker` | EMA9 < EMA21 + VFI↑ (pre-breakout positioning) + streak counter | Daily 10:00 CET |
 
 ---
 
@@ -402,7 +450,7 @@ Follow-up issues (open):
 - DevDataSeeder for synthetic dev data (400 days OHLCV, price quotes, RSI, RS, ROC)
 
 ### Data Persistence ✅
-- SQLite via JdbcTemplate: Finnhub price quotes, Twelve Data daily OHLCV (400 data points), Yahoo Finance international OHLCV, momentum ROC state, ignored symbols, API request metering (periodic flush). Schema centralized in `schema.sql`.
+- SQLite via JdbcTemplate: Finnhub price quotes, Twelve Data daily OHLCV (400 data points), Yahoo Finance international OHLCV, momentum ROC state, ignored symbols, API request metering (periodic flush), accumulation streaks. Schema centralized in `schema.sql`.
 - JSON: target prices, sector performance, insider transactions, RS streaks, RSI data, feature toggles, stock symbols
 - API metering: Finnhub, CoinGecko, Twelve Data, Yahoo Finance (in-memory AtomicInteger counters, SQLite persistence every 10 min)
 
@@ -420,7 +468,7 @@ Follow-up issues (open):
 ## Test Coverage Status
 - Target: 97% line coverage
 - Current: 97%
-- Total Tests: ~1036
+- Total Tests: ~1061
 
 ## Future Enhancements
 

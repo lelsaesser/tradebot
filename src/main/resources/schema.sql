@@ -125,3 +125,9 @@ CREATE TABLE IF NOT EXISTS api_request_metering (
     last_updated TEXT NOT NULL,
     PRIMARY KEY (provider, month)
 );
+
+CREATE TABLE IF NOT EXISTS accumulation_streaks (
+    symbol TEXT PRIMARY KEY,
+    streak_days INTEGER NOT NULL DEFAULT 1,
+    last_updated TEXT NOT NULL
+);

@@ -5,8 +5,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +26,7 @@ import org.tradelite.quant.EmaSignalType;
 import org.tradelite.quant.TrendDirection;
 import org.tradelite.quant.VfiAnalysis;
 import org.tradelite.quant.VfiService;
+import org.tradelite.repository.AccumulationStreakRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsTrendResult;
@@ -37,6 +41,7 @@ class AccumulationDetectionTrackerTest {
     @Mock private TelegramGateway telegramClient;
     @Mock private SymbolRegistry symbolRegistry;
     @Mock private FeatureToggleService featureToggleService;
+    @Mock private AccumulationStreakRepository accumulationStreakRepository;
 
     private AccumulationDetectionTracker tracker;
 
@@ -54,11 +59,15 @@ class AccumulationDetectionTrackerTest {
                         accumulationDetectionService,
                         telegramClient,
                         symbolRegistry,
-                        featureToggleService);
+                        featureToggleService,
+                        accumulationStreakRepository);
         lenient()
                 .when(featureToggleService.isEnabled(FeatureToggle.ACCUMULATION_DETECTION))
                 .thenReturn(true);
         lenient().when(symbolRegistry.getStocks()).thenReturn(List.of());
+        lenient()
+                .when(accumulationStreakRepository.findBySymbol(anyString()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -256,7 +265,7 @@ class AccumulationDetectionTrackerTest {
     }
 
     @Test
-    void buildAlertMessage_formatsCorrectly() {
+    void buildAlertMessage_dayOneStreak_omitsStreakAnnotation() {
         List<AccumulationSignal> signals =
                 List.of(
                         new AccumulationSignal(
@@ -272,15 +281,152 @@ class AccumulationDetectionTrackerTest {
                                 TrendDirection.RISING,
                                 TrendDirection.RISING));
 
-        String message = tracker.buildAlertMessage(signals);
+        String message = tracker.buildAlertMessage(signals, Map.of("AAPL", 1));
 
         assertThat(message).startsWith("*Institutional accumulation detected*");
         assertThat(message).contains("*Apple Inc (AAPL)*");
+        assertThat(message).doesNotContain("days");
         assertThat(message).contains("Price: $112.40");
         assertThat(message).contains("EMA9: $111.80 < EMA21: $115.20");
         assertThat(message).contains("VFI: +3.42 | Signal: +2.18");
         assertThat(message).contains("RS vs SPY: 1.0523 ↑ | EMA: 1.0480 ↑");
         assertThat(message).contains("_Based on EMA crossdown + positive rising VFI_");
+    }
+
+    @Test
+    void buildAlertMessage_multiDayStreak_showsStreakAnnotation() {
+        List<AccumulationSignal> signals =
+                List.of(
+                        new AccumulationSignal(
+                                "AAPL",
+                                "Apple Inc",
+                                112.40,
+                                111.80,
+                                115.20,
+                                3.42,
+                                2.18,
+                                1.0523,
+                                1.0480,
+                                TrendDirection.RISING,
+                                TrendDirection.RISING));
+
+        String message = tracker.buildAlertMessage(signals, Map.of("AAPL", 5));
+
+        assertThat(message).contains("*Apple Inc (AAPL) — 5 days*");
+    }
+
+    @Test
+    void updateStreaks_newSignal_createsStreakAtDayOne() {
+        AccumulationSignal signal =
+                new AccumulationSignal(
+                        "AAPL",
+                        "Apple Inc",
+                        100.0,
+                        98.0,
+                        102.0,
+                        3.5,
+                        2.0,
+                        1.05,
+                        1.03,
+                        TrendDirection.RISING,
+                        TrendDirection.RISING);
+
+        Map<String, Integer> result = tracker.updateStreaks(List.of(signal));
+
+        assertThat(result).containsEntry("AAPL", 1);
+        ArgumentCaptor<AccumulationStreak> captor =
+                ArgumentCaptor.forClass(AccumulationStreak.class);
+        verify(accumulationStreakRepository).save(captor.capture());
+        assertThat(captor.getValue().symbol()).isEqualTo("AAPL");
+        assertThat(captor.getValue().streakDays()).isEqualTo(1);
+        assertThat(captor.getValue().lastUpdated()).isEqualTo(LocalDate.now());
+    }
+
+    @Test
+    void updateStreaks_existingStreak_increments() {
+        when(accumulationStreakRepository.findBySymbol("AAPL"))
+                .thenReturn(
+                        Optional.of(
+                                new AccumulationStreak("AAPL", 3, LocalDate.now().minusDays(1))));
+
+        AccumulationSignal signal =
+                new AccumulationSignal(
+                        "AAPL",
+                        "Apple Inc",
+                        100.0,
+                        98.0,
+                        102.0,
+                        3.5,
+                        2.0,
+                        1.05,
+                        1.03,
+                        TrendDirection.RISING,
+                        TrendDirection.RISING);
+
+        Map<String, Integer> result = tracker.updateStreaks(List.of(signal));
+
+        assertThat(result).containsEntry("AAPL", 4);
+        ArgumentCaptor<AccumulationStreak> captor =
+                ArgumentCaptor.forClass(AccumulationStreak.class);
+        verify(accumulationStreakRepository).save(captor.capture());
+        assertThat(captor.getValue().streakDays()).isEqualTo(4);
+    }
+
+    @Test
+    void updateStreaks_alreadyUpdatedToday_idempotent() {
+        when(accumulationStreakRepository.findBySymbol("AAPL"))
+                .thenReturn(Optional.of(new AccumulationStreak("AAPL", 3, LocalDate.now())));
+
+        AccumulationSignal signal =
+                new AccumulationSignal(
+                        "AAPL",
+                        "Apple Inc",
+                        100.0,
+                        98.0,
+                        102.0,
+                        3.5,
+                        2.0,
+                        1.05,
+                        1.03,
+                        TrendDirection.RISING,
+                        TrendDirection.RISING);
+
+        Map<String, Integer> result = tracker.updateStreaks(List.of(signal));
+
+        assertThat(result).containsEntry("AAPL", 3);
+        verify(accumulationStreakRepository, never()).save(any());
+    }
+
+    @Test
+    void updateStreaks_noSignals_deletesAllStreaks() {
+        Map<String, Integer> result = tracker.updateStreaks(List.of());
+
+        assertThat(result).isEmpty();
+        verify(accumulationStreakRepository).deleteAllExcept(Set.of());
+    }
+
+    @Test
+    void updateStreaks_signalPresent_deletesNonSignalingStreaks() {
+        AccumulationSignal signal =
+                new AccumulationSignal(
+                        "AAPL",
+                        "Apple Inc",
+                        100.0,
+                        98.0,
+                        102.0,
+                        3.5,
+                        2.0,
+                        1.05,
+                        1.03,
+                        TrendDirection.RISING,
+                        TrendDirection.RISING);
+
+        tracker.updateStreaks(List.of(signal));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<String>> captor = ArgumentCaptor.forClass(Set.class);
+        verify(accumulationStreakRepository).deleteAllExcept(captor.capture());
+        assertThat(captor.getValue()).containsExactly("AAPL");
     }
 
     private EmaAnalysis createEma(

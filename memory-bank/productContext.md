@@ -3,143 +3,100 @@
 This document explains why this project exists, the problems it solves, how it should work, and the user experience goals.
 
 ## Problem
-Staying updated on financial markets requires constant monitoring of:
-- Stock and cryptocurrency prices against target levels
-- RSI (Relative Strength Index) indicators for technical analysis
-- Insider trading activities that may signal market moves
-- **Sector rotation patterns** that reveal institutional money flow **NEW**
 
-Manual monitoring is time-consuming and can miss critical opportunities. This bot automates the entire process and delivers timely, actionable alerts.
+Active investors need continuous monitoring of multiple market dimensions:
+- Price levels against buy/sell targets (stocks, crypto, international equities)
+- Technical indicators (RSI, EMA structure, Bollinger Bands, VFI)
+- Institutional activity signals (insider trades, volume-driven accumulation)
+- Sector rotation patterns revealing money flow between growth/defensive sectors
+- Momentum and relative strength shifts across sectors and individual stocks
+
+Manual monitoring is impractical — it requires watching dozens of symbols across multiple exchanges and timeframes. This bot automates comprehensive market surveillance and delivers actionable Telegram alerts.
 
 ## How it Works
-The application is a Spring Boot-based trading bot that operates continuously through scheduled tasks:
 
-### Automated Monitoring
-- **Stock Market Monitoring (Every 5 minutes):** Fetches prices from Finnhub API, compares against user-defined target prices, sends Telegram alerts when targets are reached
-- **Crypto Market Monitoring (Every 7 minutes):** Fetches prices from CoinGecko API, evaluates against target prices, sends alerts
-- **Daily RSI Data Collection:** Fetches historical closing prices daily for RSI calculations, detecting and skipping market holidays
-- **Weekly Insider Trading Reports:** Tracks insider transactions from Finnhub, generates comprehensive reports
-- **Daily Sector Performance Tracking (10:30 PM ET):** **NEW** Scrapes industry sector performance from FinViz, identifies top/bottom performers
+Spring Boot application running continuously via scheduled tasks. All data persisted in SQLite (11 tables). Feature toggles gate individual analysis modules.
 
-### Intelligent Analysis
-- **RSI Calculations:** Automatically calculates 14-period RSI for all monitored symbols
-- **Overbought/Oversold Alerts:** Sends notifications when RSI enters critical zones (≥70 overbought, ≤30 oversold)
-- **Trend Tracking:** Shows RSI change from previous calculation to indicate momentum
-- **Real-Time Data:** Uses cached current prices for accurate on-demand RSI queries
-- **Sector Rotation Detection:** **NEW** Identifies industry sectors gaining/losing momentum to spot rotation patterns
+### Real-Time Monitoring (Every 5 minutes, US market hours)
+- **Stock price evaluation** — Finnhub live prices for all domestic stocks/ETFs, target price alerts, high-change (>5%) alerts
+- **International price evaluation** — Yahoo Finance intraday quotes for German (XETRA) and Korean (KRX) stocks, per-exchange market hours gating
+- **Relative Strength crossovers** — sector ETF RS vs SPY, real-time crossover alerts
+- **Momentum ROC crossovers** — sector ETF ROC10/ROC20 zero-line detection
+- **EMA pullback buy alerts** — stocks below EMA 9/21 but above EMA 50/100/200 with positive RS + VFI, 8-hour cooldown
 
-### Telegram Integration
-Users interact with the bot through Telegram commands:
-- **`/rsi <symbol>`:** Get current RSI value instantly (e.g., `/rsi AAPL` or `/rsi bitcoin`)
-- **`/add <TICKER> <Display_Name>`:** Add a new stock symbol to monitor
-- **`/remove <TICKER>`:** Remove a symbol from watchlist
-- **`/show stocks/coins/all`:** Display current watchlist with targets
-- **`/set buy/sell <symbol> <price>`:** Configure buy/sell target prices
+### Hourly Reports (US market hours)
+- **Bollinger Band analysis** — band touch + squeeze detection for sectors and stocks (delete-before-send pattern)
+- **RSI monitoring** — batched overbought/oversold alerts
 
-### Automated Reports (No Command Needed)
-- **Daily Sector Performance Report:** Top 5 gainers and losers by daily/weekly performance
-- **Weekly Insider Trading Report:** Summary of insider transactions
+### Daily Reports
+- **VFI + RS combined** (09:00 CET) — traffic-light classification (GREEN/YELLOW/RED) per symbol
+- **Earnings calendar** (08:15 CET) — 7-day look-ahead via Finnhub
+- **Accumulation detection** (10:00 CET) — EMA9 < EMA21 + positive rising VFI, with streak counter showing consecutive signal days
+- **Tail risk** (13:00 CET) — kurtosis + skewness analysis for fat tail detection
+- **Bollinger Band summary** (15:40 CET) — daily BB report
+- **EMA classification** (15:50 CET) — price vs 5 EMAs (green/yellow/red)
+- **Sector RS summary** (16:00, 21:00 CET) — RS streak tracking, performance comparison
+- **OHLCV fetch** (23:00 CET) — Twelve Data backfill for all symbols (400 data points)
 
-### Data Management
-- **API Metering:** Tracks API usage to stay within rate limits
-- **JSON Persistence:** Stores RSI history, target prices, insider transactions, and sector performance in local config files
-- **Graceful Error Handling:** Continues operating even with invalid configuration data
-- **Historical Data:** Maintains sector performance history for trend analysis
-- **Local Development Mode:** Optional `dev` profile disables schedulers, keeps Telegram output local, and exposes manual job endpoints for safe local iteration
+### Weekly/Monthly
+- **Insider trading report** (Saturday 12:00 CET) — Finnhub insider transactions
+- **API usage report** (1st of month) — metering summary for all providers
+
+### Crypto Monitoring (24/7, every 7 minutes)
+- CoinGecko price monitoring against targets
+
+## Telegram Integration
+
+Users interact via commands:
+- `/set buy/sell <symbol> <price>` — configure target prices
+- `/show stocks/coins/all` — display watchlist with targets
+- `/rsi <symbol>` — get current RSI value
+- `/add <TICKER> <Name>` — add symbol to watchlist
+- `/remove <TICKER>` — remove symbol
+
+All alerts and reports delivered as Telegram messages (no user action required).
+
+## Data Architecture
+
+- **SQLite** (11 tables via JdbcTemplate): price quotes, OHLCV (400 days), momentum ROC state, RS crossover state, ignored symbols, sector RS streaks, insider transactions, industry performance, target prices, tracked symbols, API metering, accumulation streaks
+- **In-memory**: LivePriceCache (ConcurrentHashMap), AtomicInteger API counters (flushed every 10 min)
+- **Feature toggles**: JSON-persisted, runtime-toggleable per analysis module
+
+## External Data Sources
+
+| Provider | Data | Auth | Rate Limit |
+|----------|------|------|------------|
+| Finnhub | Live stock prices, insider trades, market holidays, earnings calendar | API key | — |
+| CoinGecko | Crypto prices | None | — |
+| Twelve Data | Daily OHLCV (400 data points) | API key | 8 req/min |
+| Yahoo Finance | International OHLCV + intraday quotes (via curl/ProcessBuilder) | None | 3s delay |
+| FinViz | Industry sector performance (web scraping) | None | — |
+
+## Tracked Symbols
+
+### Sector & Thematic ETFs (20 total)
+**Broad Sectors (11 SPDR):** XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLC, XLRE, XLB, XLU
+**Thematic (9):** SMH (Semiconductors), URA (Uranium), SHLD (Cybersecurity), IGV (Software), XOP (Oil & Gas), XHB (Homebuilders), ITA (Aerospace & Defense), XBI (Biotech), TAN (Solar)
+
+### International Stocks
+- German XETRA: RHM.DE (Rheinmetall), ENR.DE (Siemens Energy)
+- Korean KRX: 005930.KS (Samsung), 000660.KS (SK Hynix)
+
+### Individual Stocks
+Dynamically managed via Telegram `/add` and `/remove` commands. Stored in SQLite.
 
 ## User Experience Goals
-The primary goal is to provide a hands-off monitoring experience where users:
-1. **Set and forget:** Configure target prices and symbols once
-2. **Receive timely alerts:** Get notified immediately when conditions are met
-3. **Query on demand:** Check RSI values anytime via simple commands
-4. **Stay informed:** Receive weekly insider trading reports and daily sector updates
-5. **Maintain control:** Easily manage watchlist through Telegram commands
-6. **Spot market trends:** **NEW** Identify sector rotation patterns without manual research
 
-The bot runs continuously in the background, requiring no manual intervention while keeping users informed of important market developments through their preferred communication channel (Telegram).
+1. **Set and forget** — configure targets once, receive alerts indefinitely
+2. **Multi-dimensional awareness** — price, volume, momentum, sector context in one system
+3. **Signal persistence** — streak counters and historical context (not just point-in-time alerts)
+4. **Minimal noise** — feature toggles, cooldown periods, consolidation (one message per report, not per symbol)
+5. **International coverage** — German and Korean stocks monitored alongside US equities
+6. **Dev-friendly** — local dev profile with manual job triggers, synthetic data seeding, smoke tests
 
-## Feature Summary
+## Dev Tooling
 
-| Feature | Frequency | Source | Output |
-|---------|-----------|--------|--------|
-| Stock Price Alerts | Every 5 min | Finnhub | Telegram alert |
-| Crypto Price Alerts | Every 7 min | CoinGecko | Telegram alert |
-| RSI Monitoring | Daily | Finnhub/CoinGecko | Telegram alert |
-| Insider Trading | Weekly | Finnhub | Telegram report |
-| **Sector Rotation** | Daily | FinViz | Telegram report **NEW** |
-| **Sector ETF Tracking** | Real-time + Daily | Finnhub | Telegram alerts + daily summary |
-| **Bollinger Band Analysis** | Hourly + Daily | Finnhub (SQLite) | Telegram alerts + daily report |
-| **EMA Classification** | Daily | Finnhub (SQLite) | Telegram report (green/yellow/red) |
-| **Yahoo OHLCV Storage** | On demand | Yahoo Finance | SQLite (foundation for VFI) |
-
-## Tracked Sector & Thematic ETFs
-
-The system monitors 20 ETFs across two categories:
-
-### Broad Sectors (11 SPDR ETFs)
-XLK (Technology), XLF (Financials), XLE (Energy), XLV (Health Care), XLY (Consumer Disc.), XLP (Consumer Staples), XLI (Industrials), XLC (Communication), XLRE (Real Estate), XLB (Materials), XLU (Utilities)
-
-### Thematic / Industry ETFs (9)
-| Symbol | Name | Focus |
-|--------|------|-------|
-| SMH | Semiconductors | VanEck Semiconductor ETF |
-| URA | Uranium/Nuclear | Global X Uranium ETF |
-| SHLD | Cybersecurity | Global X Cybersecurity ETF |
-| IGV | Software | iShares Expanded Tech-Software ETF |
-| XOP | Oil & Gas E&P | SPDR S&P Oil & Gas Exploration ETF |
-| XHB | Homebuilders | SPDR S&P Homebuilders ETF |
-| ITA | Aerospace & Defense | iShares U.S. Aerospace & Defense ETF |
-| XBI | Biotech | SPDR S&P Biotech ETF |
-| TAN | Solar Energy | Invesco Solar ETF |
-
-All 20 ETFs are tracked by three analysis systems:
-- **Relative Strength vs SPY** — daily summary splits into "Sectors" and "Thematic / Industry" sections
-- **Momentum ROC** — zero-line crossover detection
-- **Tail Risk (Kurtosis + Skewness)** — fat tail and directional bias analysis
-
-Additionally, all tracked stocks are analyzed by:
-- **EMA Classification** — daily report comparing price vs available EMAs (9/21/50/100/200 day), calculating only those for which enough data exists. Classifies each stock as 🟢 GREEN (above all), 🟡 YELLOW (below some), or 🔴 RED (below all available)
-
-## Sector Rotation Feature (NEW)
-
-### Purpose
-Sector rotation is a key indicator of institutional money flow. When money moves from defensive sectors (utilities, consumer staples) to growth sectors (technology, consumer discretionary), it signals risk-on sentiment. The opposite signals risk-off behavior.
-
-### Data Collected
-From FinViz industry groups:
-- Daily performance change
-- Weekly performance
-- Monthly performance
-- Quarterly performance
-- Half-year performance
-- Yearly performance
-- Year-to-date (YTD) performance
-
-### Report Format
-```
-📊 *Daily Sector Performance Report*
-📅 2026-02-09
-
-📈 *Top 5 Daily Gainers:*
-1. Semiconductor: +5.25%
-2. Software - Application: +3.50%
-3. Internet Content: +2.80%
-4. Computer Hardware: +2.45%
-5. Biotechnology: +2.20%
-
-📉 *Bottom 5 Daily Losers:*
-1. Oil & Gas E&P: -4.20%
-2. Coal: -3.80%
-3. Utilities - Regulated: -2.50%
-4. Banks - Regional: -2.30%
-5. Insurance - Specialty: -1.90%
-
-📈 *Top 5 Weekly Gainers:*
-...
-```
-
-### Future Enhancements
-- Multi-week trend analysis
-- Sector rotation alerts (significant changes)
-- Historical comparison reports
-- Correlation with market indices
+- `DevJobController` — 18 manual trigger endpoints + phased `run-all` composite
+- `DevDataSeeder` — seeds SQLite with 400 days OHLCV, price quotes, sector data, price cache
+- Bruno API collection for local testing
+- `scripts/run-smoke-test.sh` for pre-deployment validation

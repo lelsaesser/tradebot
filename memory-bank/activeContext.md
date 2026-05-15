@@ -2,7 +2,39 @@
 
 ## Current Work Focus
 
-### Intraday Price Quotes for International Stocks (#382) (May 11, 2026) — COMPLETE
+### Accumulation Streak Counter (#404) (May 15, 2026) — COMPLETE
+Added a streak counter to institutional accumulation detection alerts showing how many consecutive days the accumulation signal has been active.
+
+**Key Changes:**
+- New `AccumulationStreak` record — `symbol`, `streakDays`, `lastUpdated` (LocalDate)
+- New `AccumulationStreakRepository` interface — `save()`, `findBySymbol()`, `deleteAllExcept(Set<String>)`
+- New `SqliteAccumulationStreakRepository` — JdbcTemplate implementation with `INSERT OR REPLACE` and bulk delete
+- New `accumulation_streaks` table in `schema.sql` (symbol PK, streak_days, last_updated)
+- `AccumulationDetectionTracker` — added streak update logic: increment existing, create new at day 1, delete ended streaks, idempotent (skip if already updated today)
+- Alert message format: `*Chevron (CVX) — 5 days*` for streak > 1; day-1 signals omit streak annotation
+
+**Design Decisions:**
+- Same condition for detection and continuation: EMA9 < EMA21 AND VFI > 0 AND VFI > signal
+- No separate persistence service (unlike SectorRsStreakPersistence) — repository injected directly into tracker
+- `deleteAllExcept(signalingSymbols)` cleans up ended streaks in one query
+- Idempotency via `lastUpdated` date check (prevents double-increment on manual re-trigger)
+
+**Build:** 1061 tests pass (1057 unit + 4 integration), spotless clean.
+
+---
+
+### Remove Legacy File Migration Code (#391) (May 15, 2026) — COMPLETE
+Removed dead migration code from `ApiRequestMeteringService` after confirming production deployment of #385 was successful.
+
+**Key Changes:**
+- Removed `LEGACY_FILES` constant, `migrateLegacyFilesIfNeeded()`, `parseLegacyFile()` methods
+- Removed dead imports: `java.io.File`, `java.io.IOException`, `java.nio.file.Files`
+- Simplified `startup()` to just call `initializeCounters()`
+- Removed 6 migration-specific tests + dead test imports
+
+**Build:** 1049 tests pass, spotless clean. Net: 177 lines deleted.
+
+---
 Added real-time price monitoring for international stocks (German XETRA, Korean KRX) via Yahoo Finance's `meta.regularMarketPrice` field. This enables target price alerts, pullback buy alerts, and high-change alerts for international symbols.
 
 **Key Changes:**
