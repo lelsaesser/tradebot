@@ -15,7 +15,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 @Execution(ExecutionMode.SAME_THREAD)
 class ApplicationIT {
 
-    // a
     @Test
     void mainMethodSignature() throws NoSuchMethodException {
         Method mainMethod = Application.class.getMethod("main", String[].class);
