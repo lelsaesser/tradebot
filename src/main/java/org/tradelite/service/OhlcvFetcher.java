@@ -124,7 +124,8 @@ public class OhlcvFetcher {
 
             log.info("Fetching OHLCV for {} ({}/{}, {})", ticker, i + 1, symbols.size(), mode);
 
-            for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            int attempt = 0;
+            while (true) {
                 try {
                     List<OhlcvRecord> records =
                             twelveDataClient.fetchDailyOhlcv(ticker, outputSize);
@@ -142,6 +143,7 @@ public class OhlcvFetcher {
                     break;
                 } catch (Exception e) {
                     if (isRateLimitError(e) && attempt < MAX_RETRIES) {
+                        attempt++;
                         log.warn(
                                 "Rate limit hit for {}, waiting {}ms before retry",
                                 ticker,
@@ -279,13 +281,15 @@ public class OhlcvFetcher {
         boolean needsBackfill = existingRecords.size() < MIN_RECORDS_FOR_BACKFILL;
         int outputSize = needsBackfill ? BACKFILL_OUTPUT_SIZE : REFRESH_OUTPUT_SIZE;
 
-        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        int attempt = 0;
+        while (true) {
             try {
                 List<OhlcvRecord> records = twelveDataClient.fetchDailyOhlcv(ticker, outputSize);
                 ohlcvRepository.saveAll(records);
                 return true;
             } catch (Exception e) {
                 if (isRateLimitError(e) && attempt < MAX_RETRIES) {
+                    attempt++;
                     log.warn(
                             "Rate limit hit for {}, waiting {}ms before retry",
                             ticker,
@@ -299,7 +303,6 @@ public class OhlcvFetcher {
                 }
             }
         }
-        return false;
     }
 
     private boolean fetchSingleInternational(String ticker) {
