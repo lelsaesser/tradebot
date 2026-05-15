@@ -41,6 +41,7 @@ import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.service.MarketStatusService;
+import org.tradelite.service.OhlcvBackfillService;
 import org.tradelite.service.OhlcvFetcher;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,6 +70,7 @@ class SchedulerTest {
     @Mock private MarketStatusService marketStatusService;
     @Mock private EarningsCalendarTracker earningsCalendarTracker;
     @Mock private AccumulationDetectionTracker accumulationDetectionTracker;
+    @Mock private OhlcvBackfillService ohlcvBackfillService;
 
     private Scheduler scheduler;
 
@@ -98,7 +100,8 @@ class SchedulerTest {
                         pullbackBuyTracker,
                         marketStatusService,
                         earningsCalendarTracker,
-                        accumulationDetectionTracker);
+                        accumulationDetectionTracker,
+                        ohlcvBackfillService);
     }
 
     @Test
@@ -204,10 +207,10 @@ class SchedulerTest {
     void periodicMaintenance_shouldRunCleanupAndFlush() throws Exception {
         scheduler.periodicMaintenance();
 
-        verify(rootErrorHandler, times(2)).run(argThat(Objects::nonNull));
+        verify(rootErrorHandler, times(4)).run(argThat(Objects::nonNull));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(2)).run(captor.capture());
+        verify(rootErrorHandler, times(4)).run(captor.capture());
 
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
@@ -216,6 +219,8 @@ class SchedulerTest {
         verify(targetPriceProvider, times(1))
                 .cleanupIgnoreSymbols(TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS);
         verify(apiRequestMeteringService, times(1)).flushCounters();
+        verify(ohlcvBackfillService, times(1)).backfillNewlyAddedSymbols();
+        verify(ohlcvBackfillService, times(1)).cleanupExpiredSymbols();
     }
 
     @Test

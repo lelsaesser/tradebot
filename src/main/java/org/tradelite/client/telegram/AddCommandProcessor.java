@@ -15,6 +15,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.NewlyAddedSymbolRepository;
 
 @Slf4j
 @Component
@@ -26,6 +27,7 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     private final FinnhubClient finnhubClient;
     private final CoinGeckoClient coinGeckoClient;
     private final YahooFinanceClient yahooFinanceClient;
+    private final NewlyAddedSymbolRepository newlyAddedSymbolRepository;
 
     @Autowired
     public AddCommandProcessor(
@@ -34,13 +36,15 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
             SymbolRegistry symbolRegistry,
             FinnhubClient finnhubClient,
             CoinGeckoClient coinGeckoClient,
-            YahooFinanceClient yahooFinanceClient) {
+            YahooFinanceClient yahooFinanceClient,
+            NewlyAddedSymbolRepository newlyAddedSymbolRepository) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.symbolRegistry = symbolRegistry;
         this.finnhubClient = finnhubClient;
         this.coinGeckoClient = coinGeckoClient;
         this.yahooFinanceClient = yahooFinanceClient;
+        this.newlyAddedSymbolRepository = newlyAddedSymbolRepository;
     }
 
     @Override
@@ -85,6 +89,9 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
                     "Failed to add symbol to target prices: " + command.getTicker());
             return;
         }
+
+        // Queue for OHLCV backfill
+        newlyAddedSymbolRepository.insert(command.getTicker(), System.currentTimeMillis() / 1000);
 
         telegramClient.sendMessage(
                 "All set!\n"

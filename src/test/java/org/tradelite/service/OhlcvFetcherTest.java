@@ -458,4 +458,88 @@ class OhlcvFetcherTest {
         assertThat(messageCaptor.getValue(), containsString("Stock Split Alert"));
         assertThat(messageCaptor.getValue(), containsString("RHM.DE"));
     }
+
+    @Test
+    void backfillSymbols_domesticSymbol_fetchesAndReturnsSuccess() throws InterruptedException {
+        when(symbolRegistry.isInternationalSymbol("NVDA")).thenReturn(false);
+        when(ohlcvRepository.findBySymbol("NVDA", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(List.of());
+        List<OhlcvRecord> records = generateRecords("NVDA", 400, 120.0);
+        when(twelveDataClient.fetchDailyOhlcv("NVDA", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(records);
+
+        List<String> result = ohlcvFetcher.backfillSymbols(List.of("NVDA"));
+
+        assertThat(result, hasItem("NVDA"));
+        verify(ohlcvRepository).saveAll(records);
+    }
+
+    @Test
+    void backfillSymbols_internationalSymbol_usesYahoo() throws InterruptedException {
+        when(symbolRegistry.isInternationalSymbol("RHM.DE")).thenReturn(true);
+        when(ohlcvRepository.findBySymbol("RHM.DE", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(List.of());
+        List<OhlcvRecord> records = generateRecords("RHM.DE", 400, 500.0);
+        when(yahooFinanceClient.fetchDailyOhlcv("RHM.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(records);
+
+        List<String> result = ohlcvFetcher.backfillSymbols(List.of("RHM.DE"));
+
+        assertThat(result, hasItem("RHM.DE"));
+        verify(yahooFinanceClient).fetchDailyOhlcv("RHM.DE", OhlcvFetcher.BACKFILL_OUTPUT_SIZE);
+        verify(twelveDataClient, never()).fetchDailyOhlcv(eq("RHM.DE"), anyInt());
+    }
+
+    @Test
+    void backfillSymbols_mixedSymbols_routesCorrectly() throws InterruptedException {
+        when(symbolRegistry.isInternationalSymbol("AAPL")).thenReturn(false);
+        when(symbolRegistry.isInternationalSymbol("ASML.AS")).thenReturn(true);
+        when(ohlcvRepository.findBySymbol(anyString(), anyInt())).thenReturn(List.of());
+        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(generateRecords("AAPL", 400));
+        when(yahooFinanceClient.fetchDailyOhlcv("ASML.AS", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(generateRecords("ASML.AS", 400));
+
+        List<String> result = ohlcvFetcher.backfillSymbols(List.of("AAPL", "ASML.AS"));
+
+        assertThat(result, containsInAnyOrder("AAPL", "ASML.AS"));
+    }
+
+    @Test
+    void backfillSymbols_oneFails_returnsOnlySucceeded() throws InterruptedException {
+        when(symbolRegistry.isInternationalSymbol("AAPL")).thenReturn(false);
+        when(symbolRegistry.isInternationalSymbol("BAD")).thenReturn(false);
+        when(ohlcvRepository.findBySymbol(anyString(), anyInt())).thenReturn(List.of());
+        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenReturn(generateRecords("AAPL", 400));
+        when(twelveDataClient.fetchDailyOhlcv("BAD", OhlcvFetcher.BACKFILL_OUTPUT_SIZE))
+                .thenThrow(new RuntimeException("API error"));
+
+        List<String> result = ohlcvFetcher.backfillSymbols(List.of("AAPL", "BAD"));
+
+        assertThat(result, hasItem("AAPL"));
+        assertThat(result, not(hasItem("BAD")));
+    }
+
+    @Test
+    void backfillSymbols_emptyList_returnsEmpty() throws InterruptedException {
+        List<String> result = ohlcvFetcher.backfillSymbols(List.of());
+
+        assertThat(result, is(empty()));
+    }
+
+    @Test
+    void backfillSymbols_sufficientData_usesRefreshMode() throws InterruptedException {
+        when(symbolRegistry.isInternationalSymbol("AAPL")).thenReturn(false);
+        List<OhlcvRecord> existingRecords = generateRecords("AAPL", 140);
+        when(ohlcvRepository.findBySymbol("AAPL", OhlcvFetcher.LOOKBACK_CALENDAR_DAYS))
+                .thenReturn(existingRecords);
+        when(twelveDataClient.fetchDailyOhlcv("AAPL", OhlcvFetcher.REFRESH_OUTPUT_SIZE))
+                .thenReturn(generateRecords("AAPL", 5));
+
+        List<String> result = ohlcvFetcher.backfillSymbols(List.of("AAPL"));
+
+        assertThat(result, hasItem("AAPL"));
+        verify(twelveDataClient).fetchDailyOhlcv("AAPL", OhlcvFetcher.REFRESH_OUTPUT_SIZE);
+    }
 }

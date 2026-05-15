@@ -223,6 +223,101 @@ public class OhlcvFetcher {
         return records.size();
     }
 
+    /**
+     * Fetches OHLCV data for a batch of newly added symbols. Uses the same backfill-vs-refresh
+     * logic as the daily job. Returns only the tickers that were successfully fetched.
+     *
+     * @param tickers list of ticker symbols to backfill
+     * @return list of tickers that were successfully fetched
+     */
+    public List<String> backfillSymbols(List<String> tickers) throws InterruptedException {
+        List<String> succeeded = new ArrayList<>();
+
+        List<String> domestic =
+                tickers.stream().filter(t -> !symbolRegistry.isInternationalSymbol(t)).toList();
+        List<String> international =
+                tickers.stream().filter(symbolRegistry::isInternationalSymbol).toList();
+
+        log.info(
+                "Backfilling {} newly added symbols ({} domestic, {} international)",
+                tickers.size(),
+                domestic.size(),
+                international.size());
+
+        for (int i = 0; i < domestic.size(); i++) {
+            if (i > 0) {
+                //noinspection BusyWait
+                Thread.sleep(requestDelayMs);
+            }
+            String ticker = domestic.get(i);
+            if (fetchSingleDomestic(ticker)) {
+                succeeded.add(ticker);
+            }
+        }
+
+        for (int i = 0; i < international.size(); i++) {
+            if (i > 0) {
+                //noinspection BusyWait
+                Thread.sleep(yahooRequestDelayMs);
+            }
+            String ticker = international.get(i);
+            if (fetchSingleInternational(ticker)) {
+                succeeded.add(ticker);
+            }
+        }
+
+        log.info(
+                "Backfill of newly added symbols complete: {}/{} succeeded",
+                succeeded.size(),
+                tickers.size());
+        return succeeded;
+    }
+
+    private boolean fetchSingleDomestic(String ticker) throws InterruptedException {
+        List<OhlcvRecord> existingRecords =
+                ohlcvRepository.findBySymbol(ticker, LOOKBACK_CALENDAR_DAYS);
+        boolean needsBackfill = existingRecords.size() < MIN_RECORDS_FOR_BACKFILL;
+        int outputSize = needsBackfill ? BACKFILL_OUTPUT_SIZE : REFRESH_OUTPUT_SIZE;
+
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                List<OhlcvRecord> records = twelveDataClient.fetchDailyOhlcv(ticker, outputSize);
+                ohlcvRepository.saveAll(records);
+                return true;
+            } catch (Exception e) {
+                if (isRateLimitError(e) && attempt < MAX_RETRIES) {
+                    log.warn(
+                            "Rate limit hit for {}, waiting {}ms before retry",
+                            ticker,
+                            rateLimitWaitMs);
+                    //noinspection BusyWait
+                    Thread.sleep(rateLimitWaitMs);
+                } else {
+                    log.error(
+                            "Failed to backfill newly added symbol {}: {}", ticker, e.getMessage());
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean fetchSingleInternational(String ticker) {
+        List<OhlcvRecord> existingRecords =
+                ohlcvRepository.findBySymbol(ticker, LOOKBACK_CALENDAR_DAYS);
+        boolean needsBackfill = existingRecords.size() < MIN_RECORDS_FOR_BACKFILL;
+        int days = needsBackfill ? BACKFILL_OUTPUT_SIZE : REFRESH_OUTPUT_SIZE;
+
+        try {
+            List<OhlcvRecord> records = yahooFinanceClient.fetchDailyOhlcv(ticker, days);
+            ohlcvRepository.saveAll(records);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to backfill newly added symbol {}: {}", ticker, e.getMessage());
+            return false;
+        }
+    }
+
     static boolean isRateLimitError(Exception e) {
         String message = e.getMessage();
         if (message == null) {
