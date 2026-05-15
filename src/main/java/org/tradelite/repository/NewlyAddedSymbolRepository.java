@@ -12,7 +12,5 @@ public interface NewlyAddedSymbolRepository {
 
     void deleteAll(List<String> tickers);
 
-    List<String> findExpired(long cutoffTimestamp);
-
-    void deleteExpired(long cutoffTimestamp);
+    List<String> deleteExpiredReturning(long cutoffTimestamp);
 }

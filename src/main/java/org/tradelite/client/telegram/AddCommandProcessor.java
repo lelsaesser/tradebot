@@ -91,7 +91,15 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
         }
 
         // Queue for OHLCV backfill
-        newlyAddedSymbolRepository.insert(command.getTicker(), System.currentTimeMillis() / 1000);
+        try {
+            newlyAddedSymbolRepository.insert(
+                    command.getTicker(), System.currentTimeMillis() / 1000);
+        } catch (Exception e) {
+            log.error(
+                    "Failed to queue {} for OHLCV backfill: {}",
+                    command.getTicker(),
+                    e.getMessage());
+        }
 
         telegramClient.sendMessage(
                 "All set!\n"

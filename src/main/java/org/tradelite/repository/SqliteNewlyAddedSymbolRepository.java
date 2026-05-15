@@ -14,7 +14,7 @@ public class SqliteNewlyAddedSymbolRepository implements NewlyAddedSymbolReposit
 
     @Override
     public void insert(String ticker, long addedAt) {
-        String sql = "INSERT OR IGNORE INTO newly_added_symbols (ticker, added_at) VALUES (?, ?)";
+        String sql = "INSERT OR REPLACE INTO newly_added_symbols (ticker, added_at) VALUES (?, ?)";
         jdbcTemplate.update(sql, ticker, addedAt);
     }
 
@@ -39,14 +39,8 @@ public class SqliteNewlyAddedSymbolRepository implements NewlyAddedSymbolReposit
     }
 
     @Override
-    public List<String> findExpired(long cutoffTimestamp) {
-        String sql = "SELECT ticker FROM newly_added_symbols WHERE added_at < ?";
+    public List<String> deleteExpiredReturning(long cutoffTimestamp) {
+        String sql = "DELETE FROM newly_added_symbols WHERE added_at < ? RETURNING ticker";
         return jdbcTemplate.queryForList(sql, String.class, cutoffTimestamp);
-    }
-
-    @Override
-    public void deleteExpired(long cutoffTimestamp) {
-        String sql = "DELETE FROM newly_added_symbols WHERE added_at < ?";
-        jdbcTemplate.update(sql, cutoffTimestamp);
     }
 }
