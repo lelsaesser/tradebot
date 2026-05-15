@@ -37,8 +37,10 @@ class ApplicationIT {
             "--spring.profiles.active=dev",
             "--spring.main.web-application-type=none",
             "--spring.main.register-shutdown-hook=false",
-            "--spring.task.scheduling.enabled=false",
-            "--spring.datasource.url=jdbc:sqlite:" + tempDir.resolve("application-test.db"),
+            "--tradebot.scheduling.enabled=false",
+            "--spring.datasource.url=jdbc:sqlite:"
+                    + tempDir.resolve("application-test.db")
+                    + "?journal_mode=DELETE",
             "--tradebot.api.finnhub-key=test-finnhub-key",
             "--tradebot.api.coingecko-key=test-coingecko-key",
             "--tradebot.telegram.local-sink-file=" + tempDir.resolve("telegram.log")
