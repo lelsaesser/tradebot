@@ -24,7 +24,8 @@ class OhlcvBackfillServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OhlcvBackfillService(newlyAddedSymbolRepository, ohlcvFetcher, symbolRegistry);
+        service =
+                new OhlcvBackfillService(newlyAddedSymbolRepository, ohlcvFetcher, symbolRegistry);
     }
 
     @Test
@@ -83,8 +84,7 @@ class OhlcvBackfillServiceTest {
         List<NewlyAddedSymbol> pending = List.of(new NewlyAddedSymbol("BAD", 1000L));
         when(newlyAddedSymbolRepository.findOldest(OhlcvBackfillService.BACKFILL_BATCH_SIZE))
                 .thenReturn(pending);
-        when(symbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("BAD", "Bad Inc")));
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("BAD", "Bad Inc")));
         when(ohlcvFetcher.backfillSymbols(List.of("BAD"))).thenReturn(List.of());
 
         service.backfillNewlyAddedSymbols();
@@ -98,8 +98,7 @@ class OhlcvBackfillServiceTest {
         List<NewlyAddedSymbol> pending = List.of(new NewlyAddedSymbol("REMOVED", 1000L));
         when(newlyAddedSymbolRepository.findOldest(OhlcvBackfillService.BACKFILL_BATCH_SIZE))
                 .thenReturn(pending);
-        when(symbolRegistry.getAll())
-                .thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
+        when(symbolRegistry.getAll()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
 
         service.backfillNewlyAddedSymbols();
 

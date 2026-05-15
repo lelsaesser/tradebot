@@ -43,8 +43,7 @@ public class OhlcvBackfillService {
                 newlyAddedSymbolRepository.deleteAll(removed);
             }
 
-            List<String> toBackfill =
-                    tickers.stream().filter(trackedTickers::contains).toList();
+            List<String> toBackfill = tickers.stream().filter(trackedTickers::contains).toList();
 
             if (!toBackfill.isEmpty()) {
                 List<String> succeeded = ohlcvFetcher.backfillSymbols(toBackfill);
