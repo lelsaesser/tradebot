@@ -62,6 +62,7 @@ This document covers the technologies used, development setup, technical constra
 | `target_prices` | `SqliteTargetPriceRepository` | Buy/sell target prices (stocks + coins, merged with asset_type) |
 | `stock_symbols` | `SqliteStockSymbolRepository` | All tracked stock symbols |
 | `api_request_metering` | `SqliteApiMeteringRepository` | Monthly API request counters per provider (periodic flush) |
+| `accumulation_streaks` | `SqliteAccumulationStreakRepository` | Consecutive days of accumulation signal per stock |
 
 All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centralized in `src/main/resources/schema.sql` and auto-initialized via `spring.sql.init.mode=always`. DataSource is auto-configured via `application.yaml` (`spring.datasource.*`) with HikariCP connection pool (max pool size 1 for SQLite single-writer). `DatabaseDirectoryInitializer` ensures the DB parent directory exists at startup.
 
@@ -73,7 +74,7 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 | `config/target-prices-stocks.json` | JSON | Stock buy/sell targets (migrated to SQLite #326, pending removal #359) |
 | `config/target-prices-coins.json` | JSON | Crypto buy/sell targets (migrated to SQLite #326, pending removal #359) |
 | `config/insider-transactions.json` | JSON | Insider trading data |
-| `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT) |
+| `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT, ACCUMULATION_DETECTION, EARNINGS_CALENDAR_ALERT) |
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `data/tradebot.db` | SQLite | All SQLite tables |
 
@@ -114,6 +115,8 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/vfi-report` | VFI + RS combined report |
 | `/dev/jobs/pullback-buy-alert` | EMA pullback buy alert scan |
 | `/dev/jobs/yahoo-price-evaluation` | Yahoo intraday price evaluation (international) |
+| `/dev/jobs/earnings-calendar` | Earnings calendar 7-day look-ahead |
+| `/dev/jobs/accumulation-detection` | Institutional accumulation detection |
 | `/dev/jobs/run-all` | Phased smoke test (runs all 18 jobs) |
 
 ### Bruno API Collection
@@ -217,7 +220,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~1036
+- **Total Tests:** ~1061
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes
