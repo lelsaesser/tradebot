@@ -46,7 +46,8 @@ class InsiderTrackerTest {
                         new SymbolRegistry.StockSymbolEntry("NVDA", "Nvidia"),
                         new SymbolRegistry.StockSymbolEntry("MSFT", "Microsoft"),
                         new SymbolRegistry.StockSymbolEntry("PLTR", "Palantir"),
-                        new SymbolRegistry.StockSymbolEntry("HOOD", "Robinhood"));
+                        new SymbolRegistry.StockSymbolEntry("HOOD", "Robinhood"),
+                        new SymbolRegistry.StockSymbolEntry("RHM.DE", "Rheinmetall"));
         when(trackedSymbolRepository.findAll()).thenReturn(entries);
 
         insiderTracker =
@@ -438,5 +439,36 @@ class InsiderTrackerTest {
         insiderTracker.sendInsiderTransactionReport(testData);
 
         verify(telegramClient).sendMessage(anyString());
+    }
+
+    @Test
+    void trackInsiderTransactions_shouldExcludeInternationalSymbols() {
+        List<TargetPrice> targetPrices =
+                List.of(
+                        new TargetPrice(new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0),
+                        new TargetPrice("RHM.DE", 500.0, 1000.0));
+        when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
+
+        InsiderTransactionResponse responseAAPL =
+                new InsiderTransactionResponse(
+                        List.of(
+                                new InsiderTransactionResponse.Transaction(
+                                        "Alice",
+                                        100,
+                                        5,
+                                        "2023-10-02",
+                                        "2023-10-01",
+                                        "S",
+                                        10200.0)));
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
+                .thenReturn(responseAAPL);
+        when(insiderTransactionRepository.findAll()).thenReturn(Collections.emptyList());
+
+        insiderTracker.trackInsiderTransactions();
+
+        // Should only fetch for AAPL, not RHM.DE
+        verify(finnhubClient, times(1)).getInsiderTransactions(any(StockSymbol.class));
+        verify(finnhubClient, never())
+                .getInsiderTransactions(new StockSymbol("RHM.DE", "Rheinmetall"));
     }
 }
