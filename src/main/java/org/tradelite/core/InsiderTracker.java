@@ -42,6 +42,7 @@ public class InsiderTracker {
                 targetPriceProvider.getStockTargetPrices().stream()
                         .map(TargetPrice::getSymbol)
                         .filter(symbol -> !symbolRegistry.isEtf(symbol))
+                        .filter(symbol -> !symbolRegistry.isInternationalSymbol(symbol))
                         .toList();
 
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new LinkedHashMap<>();
