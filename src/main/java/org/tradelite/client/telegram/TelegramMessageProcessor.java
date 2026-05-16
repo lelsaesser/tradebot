@@ -109,6 +109,12 @@ public class TelegramMessageProcessor {
                 log.info("Received data reset command: {}", dataResetCommand.get());
                 return Optional.of(dataResetCommand.get());
             }
+        } else if (messageText != null && messageText.toLowerCase().startsWith("/toggle")) {
+            Optional<ToggleCommand> toggleCommand = parseToggleCommand(messageText);
+            if (toggleCommand.isPresent()) {
+                log.info("Received toggle command: {}", toggleCommand.get());
+                return Optional.of(toggleCommand.get());
+            }
         }
         return Optional.empty();
     }
@@ -204,5 +210,23 @@ public class TelegramMessageProcessor {
         }
         String ticker = parts[2].toUpperCase();
         return Optional.of(new DataResetCommand(ticker));
+    }
+
+    protected Optional<ToggleCommand> parseToggleCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length == 1) {
+            return Optional.of(new ToggleCommand(null, null));
+        }
+        if (parts.length == 3) {
+            String featureName = parts[1];
+            String onOff = parts[2].toLowerCase();
+            if ("on".equals(onOff)) {
+                return Optional.of(new ToggleCommand(featureName, true));
+            } else if ("off".equals(onOff)) {
+                return Optional.of(new ToggleCommand(featureName, false));
+            }
+        }
+        telegramClient.sendMessage("Invalid command format. Use /toggle <feature_name> <on|off>");
+        return Optional.empty();
     }
 }
