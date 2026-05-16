@@ -447,4 +447,72 @@ class TelegramMessageProcessorTest {
         assertThat(command.isPresent(), is(false));
         verify(telegramClient, times(1)).sendMessage(anyString());
     }
+
+    @Test
+    void parseToggleCommand_noArgs_returnsShowAllCommand() {
+        Optional<ToggleCommand> command = messageProcessor.parseToggleCommand("/toggle");
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().getFeatureName(), is((String) null));
+        assertThat(command.get().getEnabled(), is((Boolean) null));
+    }
+
+    @Test
+    void parseToggleCommand_featureOn_returnsEnableCommand() {
+        Optional<ToggleCommand> command =
+                messageProcessor.parseToggleCommand("/toggle emaReport on");
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().getFeatureName(), is("emaReport"));
+        assertThat(command.get().getEnabled(), is(true));
+    }
+
+    @Test
+    void parseToggleCommand_featureOff_returnsDisableCommand() {
+        Optional<ToggleCommand> command =
+                messageProcessor.parseToggleCommand("/toggle vfiReport off");
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().getFeatureName(), is("vfiReport"));
+        assertThat(command.get().getEnabled(), is(false));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "/toggle emaReport",
+        "/toggle emaReport yes",
+        "/toggle emaReport on extra",
+    })
+    void parseToggleCommand_invalidFormats_returnsEmpty(String commandText) {
+        Optional<ToggleCommand> command = messageProcessor.parseToggleCommand(commandText);
+
+        assertThat(command.isPresent(), is(false));
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
+    @Test
+    void parseMessage_validToggleCommand_returnsToggleCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/toggle emaReport on");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(ToggleCommand.class)));
+    }
+
+    @Test
+    void parseMessage_toggleCommandNoArgs_returnsToggleCommand() {
+        TelegramMessage message = new TelegramMessage();
+        message.setText("/toggle");
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+
+        var command = messageProcessor.parseMessage(update);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get(), is(instanceOf(ToggleCommand.class)));
+    }
 }
