@@ -3,7 +3,9 @@ package org.tradelite.client.telegram;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,6 +28,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.NewlyAddedSymbolRepository;
 
 @ExtendWith(MockitoExtension.class)
 class AddCommandProcessorTest {
@@ -36,6 +39,7 @@ class AddCommandProcessorTest {
     @Mock private FinnhubClient finnhubClient;
     @Mock private CoinGeckoClient coinGeckoClient;
     @Mock private YahooFinanceClient yahooFinanceClient;
+    @Mock private NewlyAddedSymbolRepository newlyAddedSymbolRepository;
 
     private AddCommandProcessor addCommandProcessor;
 
@@ -48,7 +52,8 @@ class AddCommandProcessorTest {
                         symbolRegistry,
                         finnhubClient,
                         coinGeckoClient,
-                        yahooFinanceClient);
+                        yahooFinanceClient,
+                        newlyAddedSymbolRepository);
     }
 
     @Test
@@ -86,9 +91,22 @@ class AddCommandProcessorTest {
         verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
         verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
         verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), any(AssetType.class));
+        verify(newlyAddedSymbolRepository).insert(eq("COHR"), anyLong());
         verify(telegramClient)
                 .sendMessage(
                         "All set!\nAdded Coherent Corp (COHR) with buy target 0.0 and sell target 0.0.");
+    }
+
+    @Test
+    void processCommand_invalidTicker_doesNotInsertNewlyAdded() {
+        AddCommand command = new AddCommand("INVALID", "Invalid Ticker", 0.0, 0.0);
+
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
+                .thenThrow(new RuntimeException("Not found"));
+
+        addCommandProcessor.processCommand(command);
+
+        verify(newlyAddedSymbolRepository, never()).insert(anyString(), anyLong());
     }
 
     @Test
@@ -144,6 +162,7 @@ class AddCommandProcessorTest {
 
         verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
         verify(symbolRegistry).removeSymbol("COHR");
+        verify(newlyAddedSymbolRepository, never()).insert(anyString(), anyLong());
         verify(telegramClient).sendMessage("Failed to add symbol to target prices: COHR");
     }
 

@@ -23,6 +23,7 @@ import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
 import org.tradelite.service.MarketStatusService;
+import org.tradelite.service.OhlcvBackfillService;
 import org.tradelite.service.OhlcvFetcher;
 
 @Slf4j
@@ -52,6 +53,7 @@ public class Scheduler {
     private final MarketStatusService marketStatusService;
     private final EarningsCalendarTracker earningsCalendarTracker;
     private final AccumulationDetectionTracker accumulationDetectionTracker;
+    private final OhlcvBackfillService ohlcvBackfillService;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -79,7 +81,8 @@ public class Scheduler {
             PullbackBuyTracker pullbackBuyTracker,
             MarketStatusService marketStatusService,
             EarningsCalendarTracker earningsCalendarTracker,
-            AccumulationDetectionTracker accumulationDetectionTracker) {
+            AccumulationDetectionTracker accumulationDetectionTracker,
+            OhlcvBackfillService ohlcvBackfillService) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.yahooPriceEvaluator = yahooPriceEvaluator;
@@ -103,6 +106,7 @@ public class Scheduler {
         this.marketStatusService = marketStatusService;
         this.earningsCalendarTracker = earningsCalendarTracker;
         this.accumulationDetectionTracker = accumulationDetectionTracker;
+        this.ohlcvBackfillService = ohlcvBackfillService;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -192,6 +196,8 @@ public class Scheduler {
         rootErrorHandler.run(
                 () -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
         rootErrorHandler.run(apiRequestMeteringService::flushCounters);
+        rootErrorHandler.run(ohlcvBackfillService::backfillNewlyAddedSymbols);
+        rootErrorHandler.run(ohlcvBackfillService::cleanupExpiredSymbols);
 
         log.info("Periodic maintenance completed.");
     }

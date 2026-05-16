@@ -131,3 +131,9 @@ CREATE TABLE IF NOT EXISTS accumulation_streaks (
     streak_days INTEGER NOT NULL DEFAULT 1,
     last_updated TEXT NOT NULL
 );
+
+-- newly_added_symbols: Symbols awaiting OHLCV backfill after being added via /add command
+CREATE TABLE IF NOT EXISTS newly_added_symbols (
+    ticker TEXT PRIMARY KEY,
+    added_at INTEGER NOT NULL
+);
