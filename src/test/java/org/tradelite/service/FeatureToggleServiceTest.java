@@ -2,6 +2,7 @@ package org.tradelite.service;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
@@ -218,6 +219,45 @@ class FeatureToggleServiceTest {
         FeatureToggleService defaultService = new FeatureToggleService(objectMapper);
 
         assertThat(defaultService.isEnabled("nonExistent"), is(false));
+    }
+
+    @Test
+    void setToggle_createsParentDirectoriesIfNeeded() {
+        Path nestedPath = tempDir.resolve("nested/dir/feature-toggles.json");
+        FeatureToggleService nestedService =
+                new FeatureToggleService(objectMapper, nestedPath.toString());
+        nestedService.init();
+
+        nestedService.setToggle(FeatureToggle.EMA_REPORT, true);
+
+        assertThat(nestedPath.toFile().exists(), is(true));
+        assertThat(nestedService.isEnabled(FeatureToggle.EMA_REPORT), is(true));
+    }
+
+    @Test
+    void setToggle_throwsExceptionWhenWriteFails() throws IOException {
+        // Point to a directory instead of a file to cause write failure
+        Path dirPath = tempDir.resolve("a-directory");
+        Files.createDirectory(dirPath);
+        FeatureToggleService badService =
+                new FeatureToggleService(objectMapper, dirPath.toString());
+        badService.init();
+
+        assertThrows(
+                FeatureTogglePersistenceException.class,
+                () -> badService.setToggle(FeatureToggle.EMA_REPORT, true));
+    }
+
+    @Test
+    void setToggle_handlesCorruptedFileGracefully() throws IOException {
+        // Write invalid JSON to simulate a corrupted file
+        Files.writeString(toggleFilePath, "not valid json {{{");
+        service.init();
+
+        // setToggle should still work — readFromFile returns empty map on error
+        service.setToggle(FeatureToggle.EMA_REPORT, true);
+
+        assertThat(service.isEnabled(FeatureToggle.EMA_REPORT), is(true));
     }
 
     private void writeToggles(Map<String, Boolean> toggles) throws IOException {
