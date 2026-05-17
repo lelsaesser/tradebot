@@ -2,11 +2,11 @@ package org.tradelite.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,13 +18,11 @@ import org.tradelite.common.FeatureToggle;
 public class FeatureToggleService {
 
     public static final String DEFAULT_FILE_PATH = "config/feature-toggles.json";
-    public static final long CACHE_TTL_SECONDS = 180L;
 
     private final ObjectMapper objectMapper;
     private final String filePath;
 
     private Map<String, Boolean> cachedToggles;
-    private Instant cacheTimestamp;
 
     @Autowired
     public FeatureToggleService(ObjectMapper objectMapper) {
@@ -36,6 +34,11 @@ public class FeatureToggleService {
         this.filePath = filePath;
     }
 
+    @PostConstruct
+    protected void init() {
+        loadToggles();
+    }
+
     public boolean isEnabled(FeatureToggle feature) {
         return isEnabled(feature.getKey());
     }
@@ -45,47 +48,64 @@ public class FeatureToggleService {
         return toggles.getOrDefault(featureName, false);
     }
 
+    public synchronized void setToggle(FeatureToggle feature, boolean enabled) {
+        Map<String, Boolean> toggles = readFromFile();
+        toggles.put(feature.getKey(), enabled);
+        writeToFile(toggles);
+        cachedToggles = Collections.unmodifiableMap(toggles);
+        log.info("Feature toggle {} set to {}", feature.getKey(), enabled);
+    }
+
     protected Map<String, Boolean> getToggles() {
-        if (isCacheValid()) {
-            return cachedToggles;
+        if (cachedToggles == null) {
+            loadToggles();
         }
-        return refreshCache();
+        return cachedToggles;
     }
 
-    protected boolean isCacheValid() {
-        if (cachedToggles == null || cacheTimestamp == null) {
-            return false;
-        }
-        long elapsedSeconds = Duration.between(cacheTimestamp, Instant.now()).getSeconds();
-        return elapsedSeconds < CACHE_TTL_SECONDS;
-    }
-
-    protected synchronized Map<String, Boolean> refreshCache() {
-        if (isCacheValid()) {
-            return cachedToggles;
-        }
-
+    protected synchronized void loadToggles() {
         try {
             File file = new File(filePath);
             if (!file.exists()) {
                 log.warn("Feature toggles file not found: {}", filePath);
                 cachedToggles = Collections.emptyMap();
             } else {
-                cachedToggles = objectMapper.readValue(file, new TypeReference<>() {});
+                Map<String, Boolean> loaded =
+                        objectMapper.readValue(file, new TypeReference<>() {});
+                cachedToggles = Collections.unmodifiableMap(loaded);
             }
-            cacheTimestamp = Instant.now();
-            log.debug("Feature toggles cache refreshed: {}", cachedToggles);
+            log.debug("Feature toggles loaded: {}", cachedToggles);
         } catch (IOException e) {
             log.error("Failed to load feature toggles from {}", filePath, e);
             if (cachedToggles == null) {
                 cachedToggles = Collections.emptyMap();
             }
         }
-        return cachedToggles;
     }
 
-    protected void invalidateCache() {
-        cachedToggles = null;
-        cacheTimestamp = null;
+    private Map<String, Boolean> readFromFile() {
+        try {
+            File file = new File(filePath);
+            if (file.exists()) {
+                return objectMapper.readValue(file, new TypeReference<>() {});
+            }
+        } catch (IOException e) {
+            log.error("Failed to read feature toggles from {}", filePath, e);
+        }
+        return new HashMap<>();
+    }
+
+    private void writeToFile(Map<String, Boolean> toggles) {
+        try {
+            File file = new File(filePath);
+            File parentDir = file.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, toggles);
+        } catch (IOException e) {
+            log.error("Failed to write feature toggles to {}", filePath, e);
+            throw new FeatureTogglePersistenceException("Failed to persist feature toggle", e);
+        }
     }
 }

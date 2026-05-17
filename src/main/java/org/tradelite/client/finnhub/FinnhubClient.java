@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.tradelite.client.finnhub.dto.EarningsCalendarResponse;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
+import org.tradelite.client.finnhub.dto.MarketHolidayResponse;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.config.TradebotApiProperties;
@@ -115,6 +117,66 @@ public class FinnhubClient {
                                     + response.getStatusCode()));
         }
         return responseBody;
+    }
+
+    public MarketHolidayResponse getMarketHolidays() {
+        String url =
+                API_URL
+                        + "/stock/market-holiday?exchange=US&token="
+                        + apiProperties.getFinnhubKey();
+
+        HttpEntity<MultiValueMap<String, Object>> requestEntity =
+                new HttpEntity<>(new LinkedMultiValueMap<>(), new HttpHeaders());
+
+        ResponseEntity<MarketHolidayResponse> response;
+        try {
+            meteringService.incrementFinnhubRequests();
+            response =
+                    restTemplate.exchange(
+                            url, HttpMethod.GET, requestEntity, MarketHolidayResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to fetch market holidays from Finnhub", e);
+            return null;
+        }
+
+        MarketHolidayResponse body = response.getBody();
+        if (body == null || !response.getStatusCode().is2xxSuccessful()) {
+            log.error("Failed to fetch market holidays: {}", response.getStatusCode());
+            return null;
+        }
+        return body;
+    }
+
+    public EarningsCalendarResponse getEarningsCalendar(String from, String to) {
+        String url =
+                API_URL
+                        + "/calendar/earnings?from="
+                        + from
+                        + "&to="
+                        + to
+                        + "&token="
+                        + apiProperties.getFinnhubKey();
+
+        HttpEntity<MultiValueMap<String, Object>> requestEntity =
+                new HttpEntity<>(new LinkedMultiValueMap<>(), new HttpHeaders());
+
+        ResponseEntity<EarningsCalendarResponse> response;
+        try {
+            meteringService.incrementFinnhubRequests();
+            response =
+                    restTemplate.exchange(
+                            url, HttpMethod.GET, requestEntity, EarningsCalendarResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to fetch earnings calendar from Finnhub", e);
+            return null;
+        }
+
+        EarningsCalendarResponse body = response.getBody();
+        if (body == null || !response.getStatusCode().is2xxSuccessful()) {
+            log.error("Failed to fetch earnings calendar: {}", response.getStatusCode());
+            return null;
+        }
+        return body;
     }
 
     private RuntimeException quoteFailure(StockSymbol ticker, Exception cause) {

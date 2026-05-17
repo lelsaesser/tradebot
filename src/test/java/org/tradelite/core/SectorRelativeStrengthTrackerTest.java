@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,7 +56,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_noSignals_noMessageSent() throws Exception {
+    void analyzeAndSendAlerts_noSignals_noMessageSent() {
         // Given: No crossover signals
         when(relativeStrengthService.calculateRelativeStrength(anyString(), anyString()))
                 .thenReturn(Optional.empty());
@@ -67,11 +66,10 @@ class SectorRelativeStrengthTrackerTest {
 
         // Then
         verify(telegramClient, never()).sendMessage(anyString());
-        verify(relativeStrengthService).saveRsHistory();
     }
 
     @Test
-    void analyzeAndSendAlerts_outperformingSignal_sendsAlert() throws Exception {
+    void analyzeAndSendAlerts_outperformingSignal_sendsAlert() {
         // Given: One sector outperforming
         RelativeStrengthSignal signal =
                 new RelativeStrengthSignal(
@@ -98,7 +96,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_underperformingSignal_sendsAlert() throws Exception {
+    void analyzeAndSendAlerts_underperformingSignal_sendsAlert() {
         // Given: One sector underperforming
         RelativeStrengthSignal signal =
                 new RelativeStrengthSignal(
@@ -124,7 +122,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_mixedSignals_sendsGroupedAlert() throws Exception {
+    void analyzeAndSendAlerts_mixedSignals_sendsGroupedAlert() {
         // Given: Mixed signals
         RelativeStrengthSignal outperforming =
                 new RelativeStrengthSignal(
@@ -163,7 +161,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_exceptionInOneSector_continuesProcessing() throws Exception {
+    void analyzeAndSendAlerts_exceptionInOneSector_continuesProcessing() {
         // Given: One sector throws exception
         when(relativeStrengthService.calculateRelativeStrength("XLK", "Technology"))
                 .thenThrow(new RuntimeException("API Error"));
@@ -183,20 +181,6 @@ class SectorRelativeStrengthTrackerTest {
 
         // Then: Should still process other sectors
         verify(telegramClient).sendMessage(contains("Financials"));
-        verify(relativeStrengthService).saveRsHistory();
-    }
-
-    @Test
-    void analyzeAndSendAlerts_saveRsHistoryCalled() throws Exception {
-        // Given
-        when(relativeStrengthService.calculateRelativeStrength(anyString(), anyString()))
-                .thenReturn(Optional.empty());
-
-        // When
-        tracker.analyzeAndSendAlerts();
-
-        // Then
-        verify(relativeStrengthService).saveRsHistory();
     }
 
     @Test
@@ -256,7 +240,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_withMixedPerformance_sendsFormattedMessage() throws IOException {
+    void sendDailySectorRsSummary_withMixedPerformance_sendsFormattedMessage() {
         // Given: Some sectors outperforming, some underperforming
         // Lenient default in setUp returns Optional.empty() for all un-mocked ETFs
         when(relativeStrengthService.getCurrentRsResult("XLK"))
@@ -310,7 +294,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_allOutperforming_formatsCorrectly() throws IOException {
+    void sendDailySectorRsSummary_allOutperforming_formatsCorrectly() {
         // Given: All sectors outperforming
         // Lenient default in setUp returns Optional.empty() for all un-mocked ETFs
         when(relativeStrengthService.getCurrentRsResult("XLK"))
@@ -342,7 +326,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_allUnderperforming_formatsCorrectly() throws IOException {
+    void sendDailySectorRsSummary_allUnderperforming_formatsCorrectly() {
         // Given: All sectors underperforming
         // Lenient default in setUp returns Optional.empty() for all un-mocked ETFs
         when(relativeStrengthService.getCurrentRsResult("XLK"))
@@ -374,7 +358,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void collectSectorRsData_sortsDescendingByPercentageDiff() throws IOException {
+    void collectSectorRsData_sortsDescendingByPercentageDiff() {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.03, 1.00, 50, true))); // +3%
@@ -415,7 +399,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void formatSummaryMessage_containsFooterExplanation() throws IOException {
+    void formatSummaryMessage_containsFooterExplanation() {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.02, 1.00, 50, true)));
@@ -452,7 +436,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void collectSectorRsData_handlesExceptionGracefully() throws IOException {
+    void collectSectorRsData_handlesExceptionGracefully() {
         // Given: One sector throws exception
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenThrow(new RuntimeException("Test error"));
@@ -485,7 +469,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void formatSummaryMessage_displaysStreakDays() throws IOException {
+    void formatSummaryMessage_displaysStreakDays() {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.02, 1.00, 50, true)));
@@ -520,7 +504,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_incompleteData_showsDaysCount() throws IOException {
+    void sendDailySectorRsSummary_incompleteData_showsDaysCount() {
         // Given: Sector with incomplete data (less than 50 data points)
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(
@@ -557,7 +541,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sendDailySectorRsSummary_mixedCompleteAndIncomplete_formatsCorrectly() throws IOException {
+    void sendDailySectorRsSummary_mixedCompleteAndIncomplete_formatsCorrectly() {
         // Given: One complete and one incomplete sector
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true))); // Complete
@@ -614,7 +598,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void formatSummaryMessage_withZeroPercentage_showsPlusSign() throws IOException {
+    void formatSummaryMessage_withZeroPercentage_showsPlusSign() {
         // Given: Sector with exactly 0% difference
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.00, 1.00, 50, true))); // RS = EMA, 0%
@@ -649,7 +633,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void formatSummaryMessage_allSectors_includesAllSectorNames() throws IOException {
+    void formatSummaryMessage_allSectors_includesAllSectorNames() {
         // Given: All 11 sectors have data
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true)));
@@ -708,7 +692,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void sectorRsData_recordFieldsIncludeStreakDays() throws IOException {
+    void sectorRsData_recordFieldsIncludeStreakDays() {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.02, 45, false)));
@@ -749,7 +733,7 @@ class SectorRelativeStrengthTrackerTest {
     }
 
     @Test
-    void collectSectorRsData_updatesStreakPersistence() throws IOException {
+    void collectSectorRsData_updatesStreakPersistence() {
         // Given
         when(relativeStrengthService.getCurrentRsResult("XLK"))
                 .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true)));

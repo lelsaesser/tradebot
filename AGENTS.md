@@ -19,34 +19,19 @@ The Memory Bank consists of core files and optional context files, all in Markdo
    - How it should work
    - User experience goals
 
-3. `activeContext.md`
-   - Current work focus
-   - Recent changes
-   - Next steps
-   - Active decisions and considerations
-   - Important patterns and preferences
-   - Learnings and project insights
-
-4. `systemPatterns.md`
+3. `systemPatterns.md`
    - System architecture
    - Key technical decisions
    - Design patterns in use
    - Component relationships
    - Critical implementation paths
 
-5. `techContext.md`
+4. `techContext.md`
    - Technologies used
    - Development setup
    - Technical constraints
    - Dependencies
    - Tool usage patterns
-
-6. `progress.md`
-   - What works
-   - What is left to build
-   - Current status
-   - Known issues
-   - Evolution of project decisions
 
 ### Additional Context
 Create additional files/folders within `memory-bank/` when they help organize:

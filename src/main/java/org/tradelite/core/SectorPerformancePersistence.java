@@ -1,41 +1,27 @@
 package org.tradelite.core;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finviz.dto.IndustryPerformance;
+import org.tradelite.repository.SectorPerformanceRepository;
 
 @Slf4j
 @Component
 public class SectorPerformancePersistence {
 
-    private static final String FILE_PATH = "config/sector-performance.json";
-    private static final int MAX_HISTORY_DAYS = 60;
+    static final int MAX_HISTORY_DAYS = 365;
 
-    private final ObjectMapper objectMapper;
+    private final SectorPerformanceRepository repository;
 
-    public SectorPerformancePersistence(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public SectorPerformancePersistence(SectorPerformanceRepository repository) {
+        this.repository = repository;
     }
 
-    public void saveSnapshot(SectorPerformanceSnapshot snapshot) throws IOException {
-        List<SectorPerformanceSnapshot> history = loadHistory();
-
-        history.removeIf(s -> s.fetchDate().equals(snapshot.fetchDate()));
-        history.add(snapshot);
-
-        while (history.size() > MAX_HISTORY_DAYS) {
-            history.removeFirst();
-        }
-
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(FILE_PATH), history);
+    public void saveSnapshot(SectorPerformanceSnapshot snapshot) {
+        repository.saveSnapshot(snapshot);
         log.info(
                 "Saved sector performance snapshot for {} with {} industries",
                 snapshot.fetchDate(),
@@ -43,28 +29,15 @@ public class SectorPerformancePersistence {
     }
 
     public List<SectorPerformanceSnapshot> loadHistory() {
-        File file = new File(FILE_PATH);
-        if (!file.exists()) {
-            return new ArrayList<>();
-        }
-        try {
-            return objectMapper.readValue(file, new TypeReference<>() {});
-        } catch (IOException e) {
-            log.warn("Failed to load sector performance history: {}", e.getMessage());
-            return new ArrayList<>();
-        }
+        return repository.findSnapshotsSince(LocalDate.now().minusDays(MAX_HISTORY_DAYS));
     }
 
     public Optional<SectorPerformanceSnapshot> getLatestSnapshot() {
-        List<SectorPerformanceSnapshot> history = loadHistory();
-        if (history.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(history.getLast());
+        return repository.findLatestSnapshot();
     }
 
     public Optional<SectorPerformanceSnapshot> getSnapshotForDate(LocalDate date) {
-        return loadHistory().stream().filter(s -> s.fetchDate().equals(date)).findFirst();
+        return repository.findByDate(date);
     }
 
     public List<IndustryPerformance> getTopPerformers(int n, PerformancePeriod period) {

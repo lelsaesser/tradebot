@@ -1,0 +1,15 @@
+info:
+  name: accumulationDetection
+  type: http
+  seq: 18
+
+http:
+  method: POST
+  url: http://localhost:9090/dev/jobs/accumulation-detection
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

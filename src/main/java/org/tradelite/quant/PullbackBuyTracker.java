@@ -10,9 +10,9 @@ import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.service.FeatureToggleService;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -31,7 +31,7 @@ public class PullbackBuyTracker {
     private final EmaService emaService;
     private final RelativeStrengthService relativeStrengthService;
     private final VfiService vfiService;
-    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
+    private final LivePriceCache livePriceCache;
     private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
     private final TargetPriceProvider targetPriceProvider;
@@ -42,7 +42,7 @@ public class PullbackBuyTracker {
             return;
         }
 
-        Map<String, Double> priceCache = finnhubPriceEvaluator.getLastPriceCache();
+        Map<String, Double> priceCache = livePriceCache.getAll();
 
         for (StockSymbol stock : symbolRegistry.getStocks()) {
             if (targetPriceProvider.isSymbolIgnored(stock, IgnoreReason.PULLBACK_BUY_ALERT)) {
@@ -52,6 +52,7 @@ public class PullbackBuyTracker {
             Optional<EmaAnalysis> emaOpt =
                     emaService.analyze(stock.getTicker(), stock.getCompanyName());
             if (emaOpt.isEmpty()) {
+                log.warn("PullbackBuy skip: {} — EMA analysis returned empty", stock.getTicker());
                 continue;
             }
 
@@ -70,12 +71,12 @@ public class PullbackBuyTracker {
 
             Double livePrice = priceCache.get(stock.getTicker());
             if (livePrice == null) {
-                log.info("Skipping {} — no cached price", stock.getTicker());
+                log.warn("Skipping {} — no cached price", stock.getTicker());
                 continue;
             }
 
             if (!isPullbackPattern(livePrice, ema)) {
-                log.info(
+                log.debug(
                         "Skipping {} — no pullback pattern (price={}, ema9={}, ema21={}, ema50={},"
                                 + " ema100={}, ema200={})",
                         stock.getTicker(),
@@ -102,13 +103,16 @@ public class PullbackBuyTracker {
 
             Optional<VfiAnalysis> vfiOpt =
                     vfiService.analyze(stock.getTicker(), stock.getCompanyName());
-            if (vfiOpt.isEmpty() || !vfiOpt.get().isVfiPositive()) {
+            if (vfiOpt.isEmpty()) {
+                log.warn("PullbackBuy skip: {} — VFI analysis returned empty", stock.getTicker());
+                continue;
+            }
+            if (!vfiOpt.get().isVfiPositive()) {
                 log.info(
-                        "Skipping {} — VFI not positive (present={}, vfi={}, signal={})",
+                        "Skipping {} — VFI not positive (vfi={}, signal={})",
                         stock.getTicker(),
-                        vfiOpt.isPresent(),
-                        vfiOpt.map(VfiAnalysis::vfiValue).orElse(0.0),
-                        vfiOpt.map(VfiAnalysis::signalLineValue).orElse(0.0));
+                        vfiOpt.get().vfiValue(),
+                        vfiOpt.get().signalLineValue());
                 continue;
             }
 
@@ -129,8 +133,8 @@ public class PullbackBuyTracker {
 
     static String buildAlertMessage(StockSymbol stock, double price) {
         return String.format(
-                "Potential buy for %s (%s) at $%.2f."
-                        + " 21 EMA pullback while volume and relative strength stay bullish",
+                "Potential buy for *%s (%s)* at $%.2f\n"
+                        + "_21 EMA pullback while volume and relative strength stay bullish_",
                 stock.getCompanyName(), stock.getTicker(), price);
     }
 }

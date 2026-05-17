@@ -4,7 +4,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +41,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_noSignals() throws IOException {
+    void testAnalyzeAndSendAlerts_noSignals() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("AAPL", 150.0, 200.0)));
         when(symbolRegistry.fromString("AAPL"))
@@ -54,11 +53,10 @@ class RelativeStrengthTrackerTest {
 
         // No signals = no message sent
         verify(telegramClient, never()).sendMessage(any());
-        verify(relativeStrengthService).saveRsHistory();
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_withOutperformingSignal() throws IOException {
+    void testAnalyzeAndSendAlerts_withOutperformingSignal() {
         TargetPrice targetPrice = new TargetPrice("NVDA", 100.0, 150.0);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(targetPrice));
         when(symbolRegistry.fromString("NVDA"))
@@ -81,8 +79,8 @@ class RelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertThat(message, containsString("RELATIVE STRENGTH ALERT"));
-        assertThat(message, containsString("OUTPERFORMING SPY"));
+        assertThat(message, containsString("Relative Strength Alert"));
+        assertThat(message, containsString("Outperforming SPY"));
         assertThat(message, containsString("NVDA"));
         assertThat(message, containsString("Nvidia"));
         assertThat(message, containsString("1.25"));
@@ -90,7 +88,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_withUnderperformingSignal() throws IOException {
+    void testAnalyzeAndSendAlerts_withUnderperformingSignal() {
         TargetPrice targetPrice = new TargetPrice("INTC", 30.0, 50.0);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(targetPrice));
         when(symbolRegistry.fromString("INTC"))
@@ -113,13 +111,13 @@ class RelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertThat(message, containsString("UNDERPERFORMING SPY"));
+        assertThat(message, containsString("Underperforming SPY"));
         assertThat(message, containsString("INTC"));
         assertThat(message, containsString("Intel"));
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_multipleSignals() throws IOException {
+    void testAnalyzeAndSendAlerts_multipleSignals() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(
                         List.of(
@@ -158,14 +156,14 @@ class RelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertThat(message, containsString("OUTPERFORMING SPY"));
-        assertThat(message, containsString("UNDERPERFORMING SPY"));
+        assertThat(message, containsString("Outperforming SPY"));
+        assertThat(message, containsString("Underperforming SPY"));
         assertThat(message, containsString("NVDA"));
         assertThat(message, containsString("INTC"));
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_skipsBenchmark() throws IOException {
+    void testAnalyzeAndSendAlerts_skipsBenchmark() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("SPY", 400.0, 500.0)));
 
@@ -177,7 +175,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_usesSymbolAsDisplayNameWhenNotFound() throws IOException {
+    void testAnalyzeAndSendAlerts_usesSymbolAsDisplayNameWhenNotFound() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(List.of(new TargetPrice("UNKNOWN", 100.0, 150.0)));
         when(symbolRegistry.fromString("UNKNOWN")).thenReturn(Optional.empty());
@@ -191,7 +189,7 @@ class RelativeStrengthTrackerTest {
     }
 
     @Test
-    void testAnalyzeAndSendAlerts_handlesExceptionGracefully() throws IOException {
+    void testAnalyzeAndSendAlerts_handlesExceptionGracefully() {
         when(targetPriceProvider.getStockTargetPrices())
                 .thenReturn(
                         List.of(
@@ -227,10 +225,10 @@ class RelativeStrengthTrackerTest {
     void testFormatAlertMessage_emptyLists() {
         String message = tracker.formatAlertMessage(List.of(), List.of());
 
-        assertThat(message, containsString("RELATIVE STRENGTH ALERT"));
+        assertThat(message, containsString("Relative Strength Alert"));
         assertThat(message, containsString("50-period EMA crossover"));
-        assertThat(message, not(containsString("OUTPERFORMING SPY")));
-        assertThat(message, not(containsString("UNDERPERFORMING SPY")));
+        assertThat(message, not(containsString("Outperforming SPY")));
+        assertThat(message, not(containsString("Underperforming SPY")));
     }
 
     @Test
@@ -246,9 +244,9 @@ class RelativeStrengthTrackerTest {
 
         String message = tracker.formatAlertMessage(List.of(signal), List.of());
 
-        assertThat(message, containsString("OUTPERFORMING SPY"));
+        assertThat(message, containsString("Outperforming SPY"));
         assertThat(message, containsString("NVDA"));
-        assertThat(message, not(containsString("UNDERPERFORMING SPY")));
+        assertThat(message, not(containsString("Underperforming SPY")));
     }
 
     @Test
@@ -264,8 +262,8 @@ class RelativeStrengthTrackerTest {
 
         String message = tracker.formatAlertMessage(List.of(), List.of(signal));
 
-        assertThat(message, not(containsString("OUTPERFORMING SPY")));
-        assertThat(message, containsString("UNDERPERFORMING SPY"));
+        assertThat(message, not(containsString("Outperforming SPY")));
+        assertThat(message, containsString("Underperforming SPY"));
         assertThat(message, containsString("INTC"));
     }
 }

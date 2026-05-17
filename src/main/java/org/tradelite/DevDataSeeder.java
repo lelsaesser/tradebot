@@ -1,9 +1,6 @@
 package org.tradelite;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -20,16 +17,23 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.client.finviz.dto.IndustryPerformance;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
-import org.tradelite.core.FinnhubPriceEvaluator;
+import org.tradelite.core.SectorPerformanceSnapshot;
 import org.tradelite.quant.StatisticsUtil;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.RsCrossoverStateRepository;
+import org.tradelite.repository.SectorPerformanceRepository;
+import org.tradelite.repository.TargetPriceRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.MomentumRocData;
@@ -44,64 +48,58 @@ public class DevDataSeeder implements ApplicationRunner {
     private static final int LOOKBACK_DAYS = 90;
     private static final int OHLCV_LOOKBACK_DAYS = 400;
     private static final int SAMPLE_STOCK_LIMIT = 5;
+    private static final int SECTOR_PERF_SEED_DAYS = 30;
     private static final LocalTime SEEDED_CLOSE_TIME = LocalTime.of(20, 0);
+    private static final List<String> SEEDED_INDUSTRIES =
+            List.of(
+                    "Technology",
+                    "Healthcare",
+                    "Energy",
+                    "Financials",
+                    "Consumer Cyclical",
+                    "Industrials",
+                    "Utilities",
+                    "Real Estate");
 
     private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
     private final MomentumRocRepository momentumRocRepository;
     private final PriceQuoteRepository priceQuoteRepository;
     private final RelativeStrengthService relativeStrengthService;
+    private final RsCrossoverStateRepository rsCrossoverStateRepository;
     private final TargetPriceProvider targetPriceProvider;
     private final SymbolRegistry symbolRegistry;
     private final OhlcvRepository ohlcvRepository;
-    private final FinnhubPriceEvaluator finnhubPriceEvaluator;
-    private final Path rsDataFilePath;
+    private final LivePriceCache livePriceCache;
+    private final SectorPerformanceRepository sectorPerformanceRepository;
+    private final TrackedSymbolRepository trackedSymbolRepository;
+    private final TargetPriceRepository targetPriceRepository;
 
     @Autowired
     public DevDataSeeder(
             JdbcTemplate jdbcTemplate,
-            ObjectMapper objectMapper,
             MomentumRocRepository momentumRocRepository,
             PriceQuoteRepository priceQuoteRepository,
             RelativeStrengthService relativeStrengthService,
+            RsCrossoverStateRepository rsCrossoverStateRepository,
             TargetPriceProvider targetPriceProvider,
             SymbolRegistry symbolRegistry,
             OhlcvRepository ohlcvRepository,
-            FinnhubPriceEvaluator finnhubPriceEvaluator) {
-        this(
-                jdbcTemplate,
-                objectMapper,
-                momentumRocRepository,
-                priceQuoteRepository,
-                relativeStrengthService,
-                targetPriceProvider,
-                symbolRegistry,
-                ohlcvRepository,
-                finnhubPriceEvaluator,
-                Path.of("config/rs-data.json"));
-    }
-
-    DevDataSeeder(
-            JdbcTemplate jdbcTemplate,
-            ObjectMapper objectMapper,
-            MomentumRocRepository momentumRocRepository,
-            PriceQuoteRepository priceQuoteRepository,
-            RelativeStrengthService relativeStrengthService,
-            TargetPriceProvider targetPriceProvider,
-            SymbolRegistry symbolRegistry,
-            OhlcvRepository ohlcvRepository,
-            FinnhubPriceEvaluator finnhubPriceEvaluator,
-            Path rsDataFilePath) {
+            LivePriceCache livePriceCache,
+            SectorPerformanceRepository sectorPerformanceRepository,
+            TrackedSymbolRepository trackedSymbolRepository,
+            TargetPriceRepository targetPriceRepository) {
         this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
         this.momentumRocRepository = momentumRocRepository;
         this.priceQuoteRepository = priceQuoteRepository;
         this.relativeStrengthService = relativeStrengthService;
+        this.rsCrossoverStateRepository = rsCrossoverStateRepository;
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;
         this.ohlcvRepository = ohlcvRepository;
-        this.finnhubPriceEvaluator = finnhubPriceEvaluator;
-        this.rsDataFilePath = rsDataFilePath;
+        this.livePriceCache = livePriceCache;
+        this.sectorPerformanceRepository = sectorPerformanceRepository;
+        this.trackedSymbolRepository = trackedSymbolRepository;
+        this.targetPriceRepository = targetPriceRepository;
     }
 
     @Override
@@ -121,24 +119,22 @@ public class DevDataSeeder implements ApplicationRunner {
 
     public void reseed() {
         log.info("Seeding dev analytics data");
+        clearExistingData();
+        seedStockSymbolsAndTargetPrices();
+        symbolRegistry.reload();
         SeedBundle bundle = buildSeedBundle();
-        try {
-            clearExistingData();
-            insertPriceHistory(bundle.priceSeriesBySymbol());
-            seedRelativeStrengthHistory(bundle);
-            seedMomentumState(bundle);
-            seedOhlcvData(bundle);
-            seedPriceCache(bundle);
-            log.info(
-                    "Seeded dev analytics data for {} symbols",
-                    bundle.priceSeriesBySymbol().size());
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to seed dev analytics data", e);
-        }
+        insertPriceHistory(bundle.priceSeriesBySymbol());
+        seedRelativeStrengthHistory(bundle);
+        seedMomentumState(bundle);
+        seedOhlcvData(bundle);
+        seedPriceCache(bundle);
+        seedSectorPerformance();
+        log.info("Seeded dev analytics data for {} symbols", bundle.priceSeriesBySymbol().size());
     }
 
     private boolean hasSeedData() {
-        return Files.exists(rsDataFilePath) && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
+        return !rsCrossoverStateRepository.findAll().isEmpty()
+                && hasPersistedQuotes(SymbolRegistry.BENCHMARK_SYMBOL);
     }
 
     private boolean hasPersistedQuotes(String symbol) {
@@ -155,13 +151,129 @@ public class DevDataSeeder implements ApplicationRunner {
         }
     }
 
-    private void clearExistingData() throws IOException {
+    private void clearExistingData() {
         jdbcTemplate.update("DELETE FROM finnhub_price_quotes");
         jdbcTemplate.update("DELETE FROM momentum_roc_state");
         jdbcTemplate.update("DELETE FROM twelvedata_daily_ohlcv");
+        jdbcTemplate.update("DELETE FROM industry_performance");
+        jdbcTemplate.update("DELETE FROM target_prices");
+        jdbcTemplate.update("DELETE FROM tracked_symbols");
+        jdbcTemplate.update("DELETE FROM rs_crossover_state");
 
-        Files.deleteIfExists(rsDataFilePath);
         relativeStrengthService.getRsHistory().clear();
+    }
+
+    private void seedStockSymbolsAndTargetPrices() {
+        List<String[]> sampleStocks =
+                List.of(
+                        new String[] {"AAPL", "Apple"},
+                        new String[] {"MSFT", "Microsoft"},
+                        new String[] {"GOOG", "Google"},
+                        new String[] {"TSLA", "Tesla"},
+                        new String[] {"META", "Meta"},
+                        new String[] {"NVDA", "Nvidia"},
+                        new String[] {"RKLB", "Rocket Lab"},
+                        new String[] {"PLTR", "Palantir"},
+                        new String[] {"AVGO", "Broadcom"},
+                        new String[] {"GLXY", "Galaxy Digital"},
+                        new String[] {"MP", "MP Materials"},
+                        new String[] {"ASML", "ASML"},
+                        new String[] {"TEM", "Tempus AI"},
+                        new String[] {"TSM", "Taiwan Semiconductor Manufacturing"},
+                        new String[] {"MU", "Micron Technology"},
+                        new String[] {"ORCL", "Oracle"},
+                        new String[] {"INTC", "Intel"},
+                        new String[] {"DELL", "Dell"},
+                        new String[] {"CRWV", "CoreWeave"},
+                        new String[] {"IREN", "Iris Energy"},
+                        new String[] {"NBIS", "Nebius Group"},
+                        new String[] {"COHR", "Coherent Corp"},
+                        new String[] {"CAT", "Caterpillar"},
+                        new String[] {"KLAC", "KLA Corp"},
+                        new String[] {"LITE", "Lumentum Holdings"},
+                        new String[] {"TER", "Teradyne"},
+                        new String[] {"AMAT", "Applied Materials"},
+                        new String[] {"LRCX", "Lam Research"},
+                        new String[] {"SNDK", "SanDisk"},
+                        new String[] {"WDC", "Western Digital"},
+                        new String[] {"AXTI", "AXT Inc"},
+                        new String[] {"SPY", "S&P 500 ETF"},
+                        new String[] {"SMH", "Semiconductor Sector ETF"},
+                        new String[] {"GEV", "GE Vernova"},
+                        new String[] {"XLK", "Technology Sector"},
+                        new String[] {"XLF", "Finance Sector"},
+                        new String[] {"XLE", "Energy Sector"},
+                        new String[] {"XLV", "Healthcare Sector"},
+                        new String[] {"XLY", "Consumer Discretionary Sector"},
+                        new String[] {"XLP", "Consumer Staples Sector"},
+                        new String[] {"XLI", "Industrial Sector"},
+                        new String[] {"XLC", "Communication Services Sector"},
+                        new String[] {"XLRE", "Real Estate Sector"},
+                        new String[] {"XLB", "Materials Sector"},
+                        new String[] {"XLU", "Utilities Sector"},
+                        new String[] {"BTSG", "BrightSpring Health Services"},
+                        new String[] {"PL", "Planet Labs"},
+                        new String[] {"FET", "Forum Energy Technologies"},
+                        new String[] {"FTI", "TechnipFMC"},
+                        new String[] {"EFXT", "Enerflex"},
+                        new String[] {"FIX", "Comfort Systems USA"},
+                        new String[] {"GLW", "Corning Incorporated"},
+                        new String[] {"CIEN", "Ciena Corporation"},
+                        new String[] {"MPWR", "Monolithic Power Systems"},
+                        new String[] {"NFLX", "Netflix"},
+                        new String[] {"HOOD", "Robinhood"},
+                        new String[] {"AES", "AES Corporation"},
+                        new String[] {"NEE", "NextEra Energy"},
+                        new String[] {"SIMO", "Silicon Motion Technology"},
+                        new String[] {"KEYS", "Keysight Technologies"},
+                        new String[] {"MKSI", "MKS Inc."},
+                        new String[] {"VPG", "Vishay Precision Group"},
+                        new String[] {"ITRN", "Ituran Location and Control"},
+                        new String[] {"SPHR", "Sphere Entertainment"},
+                        new String[] {"SPOT", "Spotify"},
+                        new String[] {"BE", "Bloom Energy"},
+                        new String[] {"SHLD", "Defense Tech ETF"},
+                        new String[] {"AAOI", "Applied Optoelectronics"},
+                        new String[] {"URA", "Uranium ETF"},
+                        new String[] {"LINC", "Lincoln Educational Services"},
+                        new String[] {"TSEM", "Tower Semiconductor"},
+                        new String[] {"IGV", "Software ETF"},
+                        new String[] {"XOP", "Oil & Gas Sector"},
+                        new String[] {"XHB", "Homebuilders ETF"},
+                        new String[] {"ITA", "Aerospace & Defence ETF"},
+                        new String[] {"XBI", "Biotech ETF"},
+                        new String[] {"UFO", "Procure Space ETF"},
+                        new String[] {"TAN", "Solar ETF"},
+                        new String[] {"XOM", "Exxon Mobil"},
+                        new String[] {"CVX", "Chevron"},
+                        new String[] {"PANW", "Palo Alto Networks"},
+                        new String[] {"REMX", "Rare Earths ETF"},
+                        new String[] {"QTUM", "Quantum ETF"},
+                        new String[] {"DTCR", "Data Centers ETF"},
+                        new String[] {"FINX", "FinTech ETF"},
+                        new String[] {"LIT", "Batteries ETF"},
+                        new String[] {"BOTZ", "Robotics ETF"},
+                        new String[] {"STCE", "Crypto ETF"},
+                        new String[] {"MRVL", "Marvell Technology"},
+                        new String[] {"RHM.DE", "Rheinmetall"},
+                        new String[] {"ENR.DE", "Siemens Energy"},
+                        new String[] {"005930.KS", "Samsung Electronics"},
+                        new String[] {"000660.KS", "SK Hynix"});
+
+        for (String[] stock : sampleStocks) {
+            trackedSymbolRepository.save(stock[0], stock[1], AssetType.STOCK);
+        }
+
+        // Seed target prices for first 5 stocks only (for price alert testing)
+        for (int i = 0; i < 5; i++) {
+            targetPriceRepository.save(
+                    new TargetPrice(sampleStocks.get(i)[0], 150.0, 250.0), AssetType.STOCK);
+        }
+
+        targetPriceRepository.save(new TargetPrice("BITCOIN", 100000.0, 0.0), AssetType.COIN);
+        targetPriceRepository.save(new TargetPrice("ETHEREUM", 2000.0, 0.0), AssetType.COIN);
+
+        log.info("Seeded {} stock symbols and {} target prices", sampleStocks.size(), 5 + 2);
     }
 
     private SeedBundle buildSeedBundle() {
@@ -275,7 +387,7 @@ public class DevDataSeeder implements ApplicationRunner {
         priceQuoteRepository.saveAll(allQuotes);
     }
 
-    private void seedRelativeStrengthHistory(SeedBundle bundle) throws IOException {
+    private void seedRelativeStrengthHistory(SeedBundle bundle) {
         Map<String, RelativeStrengthData> rsHistory = relativeStrengthService.getRsHistory();
         rsHistory.clear();
 
@@ -310,12 +422,8 @@ public class DevDataSeeder implements ApplicationRunner {
             rsData.setPreviousEma(StatisticsUtil.calculateEma(rsValues, emaPeriod));
             rsData.setInitialized(true);
             rsHistory.put(entry.getKey(), rsData);
+            rsCrossoverStateRepository.save(entry.getKey(), rsData);
         }
-
-        ensureParentDirectories(rsDataFilePath);
-        objectMapper
-                .writerWithDefaultPrettyPrinter()
-                .writeValue(rsDataFilePath.toFile(), rsHistory);
     }
 
     private void seedMomentumState(SeedBundle bundle) {
@@ -345,22 +453,21 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     private void seedPriceCache(SeedBundle bundle) {
-        Map<String, Double> cache = finnhubPriceEvaluator.getLastPriceCache();
         for (Map.Entry<String, List<DailyPrice>> entry : bundle.priceSeriesBySymbol().entrySet()) {
             List<DailyPrice> series = entry.getValue();
             if (!series.isEmpty()) {
-                cache.put(entry.getKey(), series.getLast().getPrice());
+                livePriceCache.put(entry.getKey(), series.getLast().getPrice());
             }
         }
 
         // Set one stock's cached price to a pullback level (below EMA 9/21, above EMA 50)
         // so the pullback buy alert can fire in dev mode
-        seedPullbackPrice(bundle, cache);
+        seedPullbackPrice(bundle);
 
-        log.info("Seeded price cache for {} symbols", cache.size());
+        log.info("Seeded price cache for {} symbols", livePriceCache.getAll().size());
     }
 
-    private void seedPullbackPrice(SeedBundle bundle, Map<String, Double> cache) {
+    private void seedPullbackPrice(SeedBundle bundle) {
         for (StockSymbol stock : symbolRegistry.getStocks()) {
             if (!bundle.displayNamesBySymbol().containsKey(stock.getTicker())) {
                 continue;
@@ -382,7 +489,7 @@ public class DevDataSeeder implements ApplicationRunner {
             if (ema50 < ema21 && ema100 < ema50 && ema200 < ema100) {
                 // Place price between EMA 21 and EMA 50 — below short-term, above long-term
                 double pullbackPrice = StatisticsUtil.roundTo2Decimals((ema21 + ema50) / 2.0);
-                cache.put(stock.getTicker(), pullbackPrice);
+                livePriceCache.put(stock.getTicker(), pullbackPrice);
                 log.info(
                         "Seeded pullback price for {}: ${} (ema9={}, ema21={}, ema50={}, ema100={},"
                                 + " ema200={})",
@@ -397,6 +504,47 @@ public class DevDataSeeder implements ApplicationRunner {
             }
         }
         log.info("No stock with a valid pullback pattern found for seeding");
+    }
+
+    private void seedSectorPerformance() {
+        for (int day = SECTOR_PERF_SEED_DAYS - 1; day >= 0; day--) {
+            int dayOffset = day;
+            LocalDate date = LocalDate.now().minusDays(day);
+            List<IndustryPerformance> performances =
+                    SEEDED_INDUSTRIES.stream()
+                            .map(name -> buildIndustryPerformance(name, dayOffset))
+                            .toList();
+            sectorPerformanceRepository.saveSnapshot(
+                    new SectorPerformanceSnapshot(date, performances));
+        }
+        log.info(
+                "Seeded sector performance data: {} days, {} industries",
+                SECTOR_PERF_SEED_DAYS,
+                SEEDED_INDUSTRIES.size());
+    }
+
+    private IndustryPerformance buildIndustryPerformance(String industryName, int dayOffset) {
+        int hash = Math.abs(industryName.hashCode());
+        double base = ((hash % 20) - 10) * 0.5;
+        double variation = Math.sin((dayOffset + hash % 13) / 4.0) * 3.0;
+
+        double daily = StatisticsUtil.roundTo2Decimals(base + variation);
+        double weekly = StatisticsUtil.roundTo2Decimals(daily * 2.5);
+        double monthly = StatisticsUtil.roundTo2Decimals(daily * 5.0);
+        double quarterly = StatisticsUtil.roundTo2Decimals(daily * 8.0);
+        double halfYear = StatisticsUtil.roundTo2Decimals(daily * 12.0);
+        double yearly = StatisticsUtil.roundTo2Decimals(daily * 18.0);
+        double ytd = StatisticsUtil.roundTo2Decimals(daily * 10.0);
+
+        return new IndustryPerformance(
+                industryName,
+                BigDecimal.valueOf(weekly),
+                BigDecimal.valueOf(monthly),
+                BigDecimal.valueOf(quarterly),
+                BigDecimal.valueOf(halfYear),
+                BigDecimal.valueOf(yearly),
+                BigDecimal.valueOf(ytd),
+                BigDecimal.valueOf(daily));
     }
 
     private List<OhlcvRecord> buildOhlcvSeries(String symbol) {
@@ -433,13 +581,6 @@ public class DevDataSeeder implements ApplicationRunner {
         }
 
         return records;
-    }
-
-    private void ensureParentDirectories(Path path) throws IOException {
-        Path parent = path.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
     }
 
     record SeedBundle(

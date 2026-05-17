@@ -17,8 +17,12 @@ import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.InsiderTransactionResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.InsiderTransactionRepository;
+import org.tradelite.repository.InsiderTransactionRepository.InsiderTransactionRow;
+import org.tradelite.repository.TrackedSymbolRepository;
 
 @ExtendWith(MockitoExtension.class)
 class InsiderTrackerTest {
@@ -26,20 +30,33 @@ class InsiderTrackerTest {
     @Mock private FinnhubClient finnhubClient;
     @Mock private TelegramGateway telegramClient;
     @Mock private TargetPriceProvider targetPriceProvider;
-    @Mock private InsiderPersistence insiderPersistence;
+    @Mock private InsiderTransactionRepository insiderTransactionRepository;
+    @Mock private TrackedSymbolRepository trackedSymbolRepository;
 
     private InsiderTracker insiderTracker;
 
     @BeforeEach
-    void setUp() throws java.io.IOException {
+    void setUp() {
+        List<SymbolRegistry.StockSymbolEntry> entries =
+                List.of(
+                        new SymbolRegistry.StockSymbolEntry("AAPL", "Apple"),
+                        new SymbolRegistry.StockSymbolEntry("GOOG", "Google"),
+                        new SymbolRegistry.StockSymbolEntry("META", "Meta Platforms"),
+                        new SymbolRegistry.StockSymbolEntry("AMZN", "Amazon"),
+                        new SymbolRegistry.StockSymbolEntry("NVDA", "Nvidia"),
+                        new SymbolRegistry.StockSymbolEntry("MSFT", "Microsoft"),
+                        new SymbolRegistry.StockSymbolEntry("PLTR", "Palantir"),
+                        new SymbolRegistry.StockSymbolEntry("HOOD", "Robinhood"),
+                        new SymbolRegistry.StockSymbolEntry("RHM.DE", "Rheinmetall"));
+        when(trackedSymbolRepository.findAll()).thenReturn(entries);
+
         insiderTracker =
                 new InsiderTracker(
                         finnhubClient,
                         telegramClient,
                         targetPriceProvider,
-                        insiderPersistence,
-                        new org.tradelite.common.SymbolRegistry(
-                                new org.tradelite.config.BeanConfig().objectMapper()));
+                        insiderTransactionRepository,
+                        new SymbolRegistry(trackedSymbolRepository));
     }
 
     @Test
@@ -133,21 +150,17 @@ class InsiderTrackerTest {
         when(finnhubClient.getInsiderTransactions(new StockSymbol("NVDA", "Nvidia")))
                 .thenReturn(responseNVDA);
 
-        Map<String, Integer> historicAAPL = Map.of("S", 42, "P", 10);
-        Map<String, Integer> historicGOOG = Map.of("S", 2, "P", 5);
-        Map<String, Integer> historicAMZN = Map.of("S", 2, "P", 2);
-        Map<String, Integer> historicNVDA = Map.of("S", 21, "P", 0);
-        List<InsiderTransactionHistoric> historicData =
+        List<InsiderTransactionRow> historicRows =
                 List.of(
-                        new InsiderTransactionHistoric(
-                                new StockSymbol("AAPL", "Apple"), historicAAPL),
-                        new InsiderTransactionHistoric(
-                                new StockSymbol("GOOG", "Google"), historicGOOG),
-                        new InsiderTransactionHistoric(
-                                new StockSymbol("AMZN", "Amazon"), historicAMZN),
-                        new InsiderTransactionHistoric(
-                                new StockSymbol("NVDA", "Nvidia"), historicNVDA));
-        when(insiderPersistence.readFromFile(anyString())).thenReturn(historicData);
+                        new InsiderTransactionRow("AAPL", "S", 42),
+                        new InsiderTransactionRow("AAPL", "P", 10),
+                        new InsiderTransactionRow("GOOG", "S", 2),
+                        new InsiderTransactionRow("GOOG", "P", 5),
+                        new InsiderTransactionRow("AMZN", "S", 2),
+                        new InsiderTransactionRow("AMZN", "P", 2),
+                        new InsiderTransactionRow("NVDA", "S", 21),
+                        new InsiderTransactionRow("NVDA", "P", 0));
+        when(insiderTransactionRepository.findAll()).thenReturn(historicRows);
 
         ArgumentCaptor<String> reportCaptor = ArgumentCaptor.forClass(String.class);
         insiderTracker.trackInsiderTransactions();
@@ -156,8 +169,8 @@ class InsiderTrackerTest {
 
         verify(telegramClient, times(1)).sendMessage(anyString());
         verify(finnhubClient, times(5)).getInsiderTransactions(any(StockSymbol.class));
-        verify(insiderPersistence, times(1)).readFromFile(anyString());
-        verify(insiderPersistence, times(1)).persistToFile(any(), anyString());
+        verify(insiderTransactionRepository, times(1)).findAll();
+        verify(insiderTransactionRepository, times(1)).saveAll(any());
 
         String expectedReport =
                 """
@@ -227,96 +240,49 @@ class InsiderTrackerTest {
 
     @Test
     void enrichWithHistoricData_withHistoricSymbolNotInCurrentTransactions_shouldSkipGracefully() {
-        // This test verifies that when historic data contains symbols that are no longer monitored
-        // (not in current transactions), the method handles it gracefully without NPE
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new HashMap<>();
 
         Map<String, Integer> aaplMap = new HashMap<>();
         aaplMap.put("S", 10);
         aaplMap.put("P", 5);
 
-        // Only AAPL is in current transactions
         insiderTransactions.put(new StockSymbol("AAPL", "Apple"), aaplMap);
 
-        // Historic data contains AAPL (still monitored) AND MSFT (no longer monitored)
-        List<InsiderTransactionHistoric> historicData = new ArrayList<>();
-        historicData.add(
-                new InsiderTransactionHistoric(
-                        new StockSymbol("AAPL", "Apple"), Map.of("S", 5, "P", 2)));
-        historicData.add(
-                new InsiderTransactionHistoric(
-                        new StockSymbol("MSFT", "Microsoft"),
-                        Map.of("S", 8, "P", 3))); // Not in current transactions
+        List<InsiderTransactionRow> historicRows =
+                List.of(
+                        new InsiderTransactionRow("AAPL", "S", 5),
+                        new InsiderTransactionRow("AAPL", "P", 2),
+                        new InsiderTransactionRow("MSFT", "S", 8),
+                        new InsiderTransactionRow("MSFT", "P", 3));
+        when(insiderTransactionRepository.findAll()).thenReturn(historicRows);
 
-        when(insiderPersistence.readFromFile(InsiderPersistence.PERSISTENCE_FILE_PATH))
-                .thenReturn(historicData);
-
-        // Should NOT throw NullPointerException
         Map<StockSymbol, Map<String, Integer>> enrichedData =
                 insiderTracker.enrichWithHistoricData(insiderTransactions);
 
-        // AAPL should be enriched with historic data
         assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("S_HISTORIC"), is(5));
         assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("P_HISTORIC"), is(2));
 
-        // MSFT should NOT be added to the result (it was skipped)
         assertThat(enrichedData.containsKey(new StockSymbol("MSFT", "Microsoft")), is(false));
     }
 
     @Test
-    void enrichWithHistoricData_withHistoricNullValues() {
+    void enrichWithHistoricData_withNoHistoricData() {
         Map<StockSymbol, Map<String, Integer>> insiderTransactions = new HashMap<>();
 
         Map<String, Integer> aaplMap = new HashMap<>();
         aaplMap.put("S", 10);
         aaplMap.put("P", 5);
 
-        Map<String, Integer> googMap = new HashMap<>();
-        googMap.put("S", 3);
-        googMap.put("P", 2);
-
-        Map<String, Integer> metaMap = new HashMap<>();
-        metaMap.put("S", 0);
-        metaMap.put("P", 0);
-
         insiderTransactions.put(new StockSymbol("AAPL", "Apple"), aaplMap);
-        insiderTransactions.put(new StockSymbol("GOOG", "Google"), googMap);
-        insiderTransactions.put(new StockSymbol("META", "Meta Platforms"), metaMap);
 
-        List<InsiderTransactionHistoric> historicData = new ArrayList<>();
-
-        Map<String, Integer> map1 = new HashMap<>();
-        map1.put("S", null);
-        map1.put("P", null);
-        historicData.add(new InsiderTransactionHistoric(new StockSymbol("AAPL", "Apple"), map1));
-
-        Map<String, Integer> map2 = new HashMap<>();
-        map2.put("S", null);
-        map2.put("P", null);
-        historicData.add(new InsiderTransactionHistoric(new StockSymbol("GOOG", "Google"), map2));
-
-        Map<String, Integer> map3 = new HashMap<>();
-        map3.put("S", null);
-        map3.put("P", null);
-        historicData.add(
-                new InsiderTransactionHistoric(new StockSymbol("META", "Meta Platforms"), map3));
-
-        when(insiderPersistence.readFromFile(InsiderPersistence.PERSISTENCE_FILE_PATH))
-                .thenReturn(historicData);
+        when(insiderTransactionRepository.findAll()).thenReturn(List.of());
 
         Map<StockSymbol, Map<String, Integer>> enrichedData =
                 insiderTracker.enrichWithHistoricData(insiderTransactions);
 
-        assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("S_HISTORIC"), is(0));
-        assertThat(enrichedData.get(new StockSymbol("AAPL", "Apple")).get("P_HISTORIC"), is(0));
-        assertThat(enrichedData.get(new StockSymbol("GOOG", "Google")).get("S_HISTORIC"), is(0));
-        assertThat(enrichedData.get(new StockSymbol("GOOG", "Google")).get("P_HISTORIC"), is(0));
         assertThat(
-                enrichedData.get(new StockSymbol("META", "Meta Platforms")).get("S_HISTORIC"),
-                is(0));
-        assertThat(
-                enrichedData.get(new StockSymbol("META", "Meta Platforms")).get("P_HISTORIC"),
-                is(0));
+                enrichedData.get(new StockSymbol("AAPL", "Apple")).containsKey("S_HISTORIC"),
+                is(false));
     }
 
     @Test
@@ -327,7 +293,7 @@ class InsiderTrackerTest {
 
         verify(finnhubClient, never()).getInsiderTransactions(any());
         verify(telegramClient, never()).sendMessage(anyString());
-        verify(insiderPersistence, never()).readFromFile(anyString());
+        verify(insiderTransactionRepository, never()).findAll();
     }
 
     @Test
@@ -339,12 +305,12 @@ class InsiderTrackerTest {
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
         when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
                 .thenReturn(new InsiderTransactionResponse(Collections.emptyList()));
-        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+        when(insiderTransactionRepository.findAll()).thenReturn(Collections.emptyList());
 
         insiderTracker.trackInsiderTransactions();
 
         verify(telegramClient).sendMessage(anyString());
-        verify(insiderPersistence).persistToFile(any(), anyString());
+        verify(insiderTransactionRepository).saveAll(any());
     }
 
     @Test
@@ -367,12 +333,12 @@ class InsiderTrackerTest {
                                         10200.0)));
         when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
                 .thenReturn(responseAAPL);
-        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+        when(insiderTransactionRepository.findAll()).thenReturn(Collections.emptyList());
 
         insiderTracker.trackInsiderTransactions();
 
         verify(telegramClient).sendMessage(anyString());
-        verify(insiderPersistence).persistToFile(any(), anyString());
+        verify(insiderTransactionRepository).saveAll(any());
     }
 
     @Test
@@ -380,11 +346,10 @@ class InsiderTrackerTest {
         List<TargetPrice> targetPrices =
                 List.of(
                         new TargetPrice(new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0),
-                        new TargetPrice("BLABLA", 915.0, 0.0), // Invalid symbol
+                        new TargetPrice("BLABLA", 915.0, 0.0),
                         new TargetPrice(
                                 new StockSymbol("GOOG", "Google").getTicker(), 200.0, 400.0),
-                        new TargetPrice("DUMMY", 84.0, 0.0) // Invalid symbol
-                        );
+                        new TargetPrice("DUMMY", 84.0, 0.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
         InsiderTransactionResponse responseAAPL =
@@ -408,19 +373,16 @@ class InsiderTrackerTest {
                 .thenReturn(responseAAPL);
         when(finnhubClient.getInsiderTransactions(new StockSymbol("GOOG", "Google")))
                 .thenReturn(responseGOOG);
-        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+        when(insiderTransactionRepository.findAll()).thenReturn(Collections.emptyList());
 
-        // This should not throw an exception despite invalid symbols
         insiderTracker.trackInsiderTransactions();
 
-        // Verify that only valid symbols were processed (AAPL and GOOG)
         verify(finnhubClient, times(1)).getInsiderTransactions(new StockSymbol("AAPL", "Apple"));
         verify(finnhubClient, times(1)).getInsiderTransactions(new StockSymbol("GOOG", "Google"));
         verify(finnhubClient, times(2)).getInsiderTransactions(any(StockSymbol.class));
 
-        // Should still send report and persist data for valid symbols
         verify(telegramClient).sendMessage(anyString());
-        verify(insiderPersistence).persistToFile(any(), anyString());
+        verify(insiderTransactionRepository).saveAll(any());
     }
 
     @Test
@@ -431,7 +393,6 @@ class InsiderTrackerTest {
                                 new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
-        // Create multiple transactions of each type to trigger the computeIfAbsent paths
         InsiderTransactionResponse responseAAPL =
                 new InsiderTransactionResponse(
                         List.of(
@@ -458,158 +419,56 @@ class InsiderTrackerTest {
 
         when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
                 .thenReturn(responseAAPL);
-        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+        when(insiderTransactionRepository.findAll()).thenReturn(Collections.emptyList());
 
         insiderTracker.trackInsiderTransactions();
 
         verify(telegramClient).sendMessage(anyString());
-        verify(insiderPersistence).persistToFile(any(), anyString());
+        verify(insiderTransactionRepository).saveAll(any());
     }
 
     @Test
     void orderMapByCodeCount_shouldHandleDuplicateEntriesAndTriggerMergeFunction() {
         Map<StockSymbol, Map<String, Integer>> testData = new LinkedHashMap<>();
 
-        // Add multiple entries with same count values to potentially trigger merge function
         testData.put(new StockSymbol("AAPL", "Apple"), Map.of("S", 10, "P", 5));
-        testData.put(
-                new StockSymbol("GOOG", "Google"),
-                Map.of("S", 10, "P", 3)); // Same sell count as AAPL
+        testData.put(new StockSymbol("GOOG", "Google"), Map.of("S", 10, "P", 3));
         testData.put(new StockSymbol("META", "Meta Platforms"), Map.of("S", 15, "P", 2));
         testData.put(new StockSymbol("AMZN", "Amazon"), Map.of("S", 5, "P", 8));
 
-        // Call the method through sendInsiderTransactionReport since orderMapByCodeCount is private
         insiderTracker.sendInsiderTransactionReport(testData);
 
         verify(telegramClient).sendMessage(anyString());
     }
 
     @Test
-    void trackInsiderTransactions_shouldTriggerComputeIfAbsentWhenMapsNotPreInitialized()
-            throws java.io.IOException {
-        // This test creates a scenario where the maps are not pre-initialized,
-        // forcing the computeIfAbsent lambdas to be executed
+    void trackInsiderTransactions_shouldExcludeInternationalSymbols() {
         List<TargetPrice> targetPrices =
                 List.of(
-                        new TargetPrice(
-                                new StockSymbol("TSLA", "Tesla").getTicker(), 150.0, 300.0));
+                        new TargetPrice(new StockSymbol("AAPL", "Apple").getTicker(), 150.0, 300.0),
+                        new TargetPrice("RHM.DE", 500.0, 1000.0));
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(targetPrices);
 
-        // Create a custom InsiderTracker to override the behavior
-        InsiderTracker customTracker =
-                new InsiderTracker(
-                        finnhubClient,
-                        telegramClient,
-                        targetPriceProvider,
-                        insiderPersistence,
-                        new org.tradelite.common.SymbolRegistry(
-                                new org.tradelite.config.BeanConfig().objectMapper())) {
-                    @Override
-                    public void trackInsiderTransactions() {
-                        List<String> monitoredSymbols =
-                                targetPriceProvider.getStockTargetPrices().stream()
-                                        .map(TargetPrice::getSymbol)
-                                        .toList();
-
-                        Map<StockSymbol, Map<String, Integer>> insiderTransactions =
-                                new LinkedHashMap<>();
-
-                        for (String symbolString : monitoredSymbols) {
-                            Optional<StockSymbol> stockSymbolOpt =
-                                    Optional.of(new StockSymbol(symbolString, "Test"));
-                            StockSymbol stockSymbol = stockSymbolOpt.get();
-
-                            InsiderTransactionResponse response =
-                                    finnhubClient.getInsiderTransactions(stockSymbol);
-
-                            // DON'T pre-initialize the maps - this will force computeIfAbsent to
-                            // execute
-                            for (InsiderTransactionResponse.Transaction insiderTransaction :
-                                    response.data()) {
-                                if (Objects.equals(
-                                        insiderTransaction.transactionCode(),
-                                        InsiderTransactionCodes.SELL.getCode())) {
-                                    insiderTransactions
-                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
-                                            .merge(
-                                                    InsiderTransactionCodes.SELL.getCode(),
-                                                    1,
-                                                    Integer::sum);
-                                }
-                                if (Objects.equals(
-                                        insiderTransaction.transactionCode(),
-                                        InsiderTransactionCodes.SELL_VOLUNTARY_REPORT.getCode())) {
-                                    insiderTransactions
-                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
-                                            .merge(
-                                                    InsiderTransactionCodes.SELL.getCode(),
-                                                    1,
-                                                    Integer::sum);
-                                }
-                                if (Objects.equals(
-                                        insiderTransaction.transactionCode(),
-                                        InsiderTransactionCodes.BUY.getCode())) {
-                                    insiderTransactions
-                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
-                                            .merge(
-                                                    InsiderTransactionCodes.BUY.getCode(),
-                                                    1,
-                                                    Integer::sum);
-                                }
-                                if (Objects.equals(
-                                        insiderTransaction.transactionCode(),
-                                        InsiderTransactionCodes.BUY_VOLUNTARY_REPORT.getCode())) {
-                                    insiderTransactions
-                                            .computeIfAbsent(stockSymbol, _ -> new HashMap<>())
-                                            .merge(
-                                                    InsiderTransactionCodes.BUY.getCode(),
-                                                    1,
-                                                    Integer::sum);
-                                }
-                            }
-                        }
-
-                        if (!insiderTransactions.isEmpty()) {
-                            sendInsiderTransactionReport(insiderTransactions);
-                        }
-
-                        insiderPersistence.persistToFile(
-                                insiderTransactions, InsiderPersistence.PERSISTENCE_FILE_PATH);
-                    }
-                };
-
-        // Create transactions that will trigger all the computeIfAbsent paths
-        InsiderTransactionResponse responseTSLA =
+        InsiderTransactionResponse responseAAPL =
                 new InsiderTransactionResponse(
                         List.of(
                                 new InsiderTransactionResponse.Transaction(
-                                        "Alice", 100, 5, "2023-10-02", "2023-10-01", "S", 10200.0),
-                                new InsiderTransactionResponse.Transaction(
-                                        "Bob", 100, 5, "2023-10-02", "2023-10-01", "S/V", 10200.0),
-                                new InsiderTransactionResponse.Transaction(
-                                        "Charlie",
+                                        "Alice",
                                         100,
                                         5,
                                         "2023-10-02",
                                         "2023-10-01",
-                                        "P",
-                                        10200.0),
-                                new InsiderTransactionResponse.Transaction(
-                                        "Dave",
-                                        100,
-                                        5,
-                                        "2023-10-02",
-                                        "2023-10-01",
-                                        "P/V",
+                                        "S",
                                         10200.0)));
+        when(finnhubClient.getInsiderTransactions(new StockSymbol("AAPL", "Apple")))
+                .thenReturn(responseAAPL);
+        when(insiderTransactionRepository.findAll()).thenReturn(Collections.emptyList());
 
-        when(finnhubClient.getInsiderTransactions(new StockSymbol("TSLA", "Tesla")))
-                .thenReturn(responseTSLA);
-        when(insiderPersistence.readFromFile(anyString())).thenReturn(Collections.emptyList());
+        insiderTracker.trackInsiderTransactions();
 
-        customTracker.trackInsiderTransactions();
-
-        verify(telegramClient).sendMessage(anyString());
-        verify(insiderPersistence).persistToFile(any(), anyString());
+        // Should only fetch for AAPL, not RHM.DE
+        verify(finnhubClient, times(1)).getInsiderTransactions(any(StockSymbol.class));
+        verify(finnhubClient, never())
+                .getInsiderTransactions(new StockSymbol("RHM.DE", "Rheinmetall"));
     }
 }

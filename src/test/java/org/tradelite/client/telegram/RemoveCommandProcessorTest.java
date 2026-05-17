@@ -2,7 +2,7 @@ package org.tradelite.client.telegram;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 
@@ -50,13 +51,13 @@ class RemoveCommandProcessorTest {
     void processCommand_validRemoveCommand_removesSymbol() {
         RemoveCommand command = new RemoveCommand("PLTR");
         when(symbolRegistry.removeSymbol("PLTR")).thenReturn(true);
-        when(targetPriceProvider.removeSymbolFromTargetPrices(eq("PLTR"), anyString()))
+        when(targetPriceProvider.removeSymbolFromTargetPrices(eq("PLTR"), any(AssetType.class)))
                 .thenReturn(true);
 
         removeCommandProcessor.processCommand(command);
 
         verify(symbolRegistry).removeSymbol("PLTR");
-        verify(targetPriceProvider).removeSymbolFromTargetPrices(eq("PLTR"), anyString());
+        verify(targetPriceProvider).removeSymbolFromTargetPrices(eq("PLTR"), any(AssetType.class));
         verify(telegramClient).sendMessage("Removed PLTR from monitoring.");
     }
 
@@ -64,7 +65,8 @@ class RemoveCommandProcessorTest {
     void processCommand_symbolNotFound_sendsErrorMessage() {
         RemoveCommand command = new RemoveCommand("NONEXISTENT");
         when(symbolRegistry.removeSymbol("NONEXISTENT")).thenReturn(false);
-        when(targetPriceProvider.removeSymbolFromTargetPrices(eq("NONEXISTENT"), anyString()))
+        when(targetPriceProvider.removeSymbolFromTargetPrices(
+                        eq("NONEXISTENT"), any(AssetType.class)))
                 .thenReturn(false);
 
         removeCommandProcessor.processCommand(command);
@@ -76,7 +78,7 @@ class RemoveCommandProcessorTest {
     void processCommand_onlyTargetPriceRemoved_sendsSuccessMessage() {
         RemoveCommand command = new RemoveCommand("TEST");
         when(symbolRegistry.removeSymbol("TEST")).thenReturn(false);
-        when(targetPriceProvider.removeSymbolFromTargetPrices(eq("TEST"), anyString()))
+        when(targetPriceProvider.removeSymbolFromTargetPrices(eq("TEST"), any(AssetType.class)))
                 .thenReturn(true);
 
         removeCommandProcessor.processCommand(command);
@@ -88,7 +90,7 @@ class RemoveCommandProcessorTest {
     void processCommand_onlySymbolRemoved_sendsSuccessMessage() {
         RemoveCommand command = new RemoveCommand("PLTR");
         when(symbolRegistry.removeSymbol("PLTR")).thenReturn(true);
-        when(targetPriceProvider.removeSymbolFromTargetPrices(eq("PLTR"), anyString()))
+        when(targetPriceProvider.removeSymbolFromTargetPrices(eq("PLTR"), any(AssetType.class)))
                 .thenReturn(false);
 
         removeCommandProcessor.processCommand(command);

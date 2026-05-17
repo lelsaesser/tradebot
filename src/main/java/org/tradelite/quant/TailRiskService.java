@@ -1,11 +1,13 @@
 package org.tradelite.quant;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.DailyPriceProvider;
+import org.tradelite.service.model.DailyPrice;
 
 /**
  * Service for calculating tail risk metrics using kurtosis and skewness.
@@ -24,10 +26,11 @@ import org.tradelite.repository.PriceQuoteRepository;
  * <p>Normal distribution has kurtosis = 3.0 (mesokurtic) and skewness = 0.0. Values above 3
  * indicate fat tails (leptokurtic), meaning extreme price moves are more likely than normal.
  *
- * <p><b>Stock split safety:</b> This service operates on daily change percents (via {@link
- * PriceQuoteRepository#findDailyChangePercents}), not absolute prices. Percentage changes are
- * invariant to stock splits — a 2% daily move is 2% regardless of pre- or post-split price levels.
- * Therefore, no data reset is needed for this service when a stock split occurs.
+ * <p><b>Stock split safety:</b> This service derives daily change percents from consecutive closing
+ * prices provided by {@link DailyPriceProvider}, which returns split-adjusted OHLCV data.
+ * Percentage changes computed from split-adjusted prices are invariant to stock splits — a 2% daily
+ * move is 2% regardless of pre- or post-split price levels. Therefore, no data reset is needed for
+ * this service when a stock split occurs.
  */
 @Slf4j
 @Service
@@ -40,7 +43,7 @@ public class TailRiskService {
     /** Number of calendar days to look back for price data. */
     private static final int LOOKBACK_DAYS = 35;
 
-    private final PriceQuoteRepository priceQuoteRepository;
+    private final DailyPriceProvider dailyPriceProvider;
 
     /**
      * Analyzes tail risk for a symbol based on historical price data.
@@ -50,7 +53,9 @@ public class TailRiskService {
      * @return Optional containing analysis results, empty if insufficient data
      */
     public Optional<TailRiskAnalysis> analyzeTailRisk(String symbol, String displayName) {
-        List<Double> returns = priceQuoteRepository.findDailyChangePercents(symbol, LOOKBACK_DAYS);
+        List<DailyPrice> dailyPrices =
+                dailyPriceProvider.findDailyClosingPrices(symbol, LOOKBACK_DAYS);
+        List<Double> returns = toDailyChangePercents(dailyPrices);
 
         if (returns.size() < MIN_DATA_POINTS) {
             return Optional.empty();
@@ -73,6 +78,18 @@ public class TailRiskService {
                         skewness,
                         skewnessLevel,
                         returns.size()));
+    }
+
+    protected List<Double> toDailyChangePercents(List<DailyPrice> prices) {
+        List<Double> changePercents = new ArrayList<>();
+        for (int i = 1; i < prices.size(); i++) {
+            double prevPrice = prices.get(i - 1).getPrice();
+            if (prevPrice != 0) {
+                double currPrice = prices.get(i).getPrice();
+                changePercents.add(((currPrice - prevPrice) / prevPrice) * 100);
+            }
+        }
+        return changePercents;
     }
 
     /**

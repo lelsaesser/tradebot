@@ -4,10 +4,12 @@ import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECON
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.tradelite.client.finnhub.dto.MarketHolidayResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
@@ -20,8 +22,9 @@ import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.MarketStatusService;
+import org.tradelite.service.OhlcvBackfillService;
 import org.tradelite.service.OhlcvFetcher;
-import org.tradelite.utils.DateUtil;
 
 @Slf4j
 @Component
@@ -29,6 +32,7 @@ public class Scheduler {
 
     private final FinnhubPriceEvaluator finnhubPriceEvaluator;
     private final CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
+    private final YahooPriceEvaluator yahooPriceEvaluator;
     private final TargetPriceProvider targetPriceProvider;
     private final TelegramGateway telegramClient;
     private final TelegramMessageProcessor telegramMessageProcessor;
@@ -46,6 +50,10 @@ public class Scheduler {
     private final OhlcvFetcher ohlcvFetcher;
     private final VfiTracker vfiTracker;
     private final PullbackBuyTracker pullbackBuyTracker;
+    private final MarketStatusService marketStatusService;
+    private final EarningsCalendarTracker earningsCalendarTracker;
+    private final AccumulationDetectionTracker accumulationDetectionTracker;
+    private final OhlcvBackfillService ohlcvBackfillService;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -53,6 +61,7 @@ public class Scheduler {
     Scheduler(
             FinnhubPriceEvaluator finnhubPriceEvaluator,
             CoinGeckoPriceEvaluator coinGeckoPriceEvaluator,
+            YahooPriceEvaluator yahooPriceEvaluator,
             TargetPriceProvider targetPriceProvider,
             TelegramGateway telegramClient,
             TelegramMessageProcessor telegramMessageProcessor,
@@ -69,9 +78,14 @@ public class Scheduler {
             EmaTracker emaTracker,
             OhlcvFetcher ohlcvFetcher,
             VfiTracker vfiTracker,
-            PullbackBuyTracker pullbackBuyTracker) {
+            PullbackBuyTracker pullbackBuyTracker,
+            MarketStatusService marketStatusService,
+            EarningsCalendarTracker earningsCalendarTracker,
+            AccumulationDetectionTracker accumulationDetectionTracker,
+            OhlcvBackfillService ohlcvBackfillService) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
+        this.yahooPriceEvaluator = yahooPriceEvaluator;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.telegramMessageProcessor = telegramMessageProcessor;
@@ -89,11 +103,15 @@ public class Scheduler {
         this.ohlcvFetcher = ohlcvFetcher;
         this.vfiTracker = vfiTracker;
         this.pullbackBuyTracker = pullbackBuyTracker;
+        this.marketStatusService = marketStatusService;
+        this.earningsCalendarTracker = earningsCalendarTracker;
+        this.accumulationDetectionTracker = accumulationDetectionTracker;
+        this.ohlcvBackfillService = ohlcvBackfillService;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
     public void stockMarketMonitoring() {
-        if (DateUtil.isStockMarketOpen(marketDateTime)) {
+        if (marketStatusService.isMarketOpen(marketDateTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
             rootErrorHandler.run(pullbackBuyTracker::analyzeAndSendAlerts);
             // Analyze sector ETFs in real-time for rotation signals
@@ -102,12 +120,19 @@ public class Scheduler {
         } else {
             log.info("Market is off-hours or it's a weekend. Skipping price evaluation.");
         }
+        // International stocks run unconditionally (24/7, including weekends).
+        // The evaluator gates per-symbol via isExchangeOpen() internally.
+        // We intentionally avoid a MON-FRI cron or timezone-based gate here because
+        // international exchanges span multiple time zones - a CET-based weekend filter
+        // could silently skip valid trading windows (e.g., adding ASX where Monday open
+        // in Sydney falls on Sunday CET).
+        rootErrorHandler.run(yahooPriceEvaluator::evaluatePrice);
         log.info("Stock market monitoring round completed.");
     }
 
     @Scheduled(cron = "0 0 * * * MON-FRI", zone = "CET")
     protected void hourlySignalMonitoring() {
-        if (DateUtil.isStockMarketOpen(marketDateTime)) {
+        if (marketStatusService.isMarketOpen(marketDateTime)) {
             rootErrorHandler.run(bollingerBandTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(rsiTracker::analyzeAndSendReport);
             rootErrorHandler.run(relativeStrengthTracker::analyzeAndSendAlerts);
@@ -148,20 +173,43 @@ public class Scheduler {
         log.info("Daily VFI report completed.");
     }
 
+    @Scheduled(cron = "0 0 10 * * MON-FRI", zone = "CET")
+    protected void dailyAccumulationDetection() {
+        rootErrorHandler.run(accumulationDetectionTracker::analyzeAndSendAlerts);
+        log.info("Daily accumulation detection completed.");
+    }
+
+    @Scheduled(cron = "0 0 8 * * MON-FRI", zone = "CET")
+    protected void dailyMarketHolidayNotification() {
+        rootErrorHandler.run(this::doMarketHolidayNotification);
+        log.info("Daily market holiday notification check completed.");
+    }
+
+    @Scheduled(cron = "0 15 8 * * *", zone = "CET")
+    protected void dailyEarningsCalendarCheck() {
+        rootErrorHandler.run(earningsCalendarTracker::checkAndAlert);
+        log.info("Daily earnings calendar check completed.");
+    }
+
     @Scheduled(fixedRate = 600000)
-    public void cleanupIgnoreSymbols() {
+    public void periodicMaintenance() {
         rootErrorHandler.run(
                 () -> targetPriceProvider.cleanupIgnoreSymbols(IGNORE_DURATION_TTL_SECONDS));
+        rootErrorHandler.run(apiRequestMeteringService::flushCounters);
+        rootErrorHandler.run(ohlcvBackfillService::backfillNewlyAddedSymbols);
+        rootErrorHandler.run(ohlcvBackfillService::cleanupExpiredSymbols);
 
-        log.info("Cleanup of ignored symbols completed.");
+        log.info("Periodic maintenance completed.");
     }
 
     @Scheduled(fixedRate = 60000)
     public void pollTelegramChatUpdates() {
-        List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
-        rootErrorHandler.run(() -> telegramMessageProcessor.processUpdates(chatUpdates));
-
-        log.info("Telegram chat updates processed.");
+        rootErrorHandler.run(
+                () -> {
+                    List<TelegramUpdateResponse> chatUpdates = telegramClient.getChatUpdates();
+                    telegramMessageProcessor.processUpdates(chatUpdates);
+                    log.info("Telegram chat updates processed.");
+                });
     }
 
     @Scheduled(cron = "0 0 12 ? * SAT", zone = "CET")
@@ -193,8 +241,10 @@ public class Scheduler {
     private void doMonthlyApiUsageReport() {
         int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
         int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
+        int twelveDataCount = apiRequestMeteringService.getTwelveDataRequestCount();
+        int yahooCount = apiRequestMeteringService.getYahooRequestCount();
 
-        if (finnhubCount > 0 || coingeckoCount > 0) {
+        if (finnhubCount > 0 || coingeckoCount > 0 || twelveDataCount > 0 || yahooCount > 0) {
             String previousMonth = apiRequestMeteringService.getPreviousMonth();
 
             String message =
@@ -203,18 +253,24 @@ public class Scheduler {
                             *Monthly API Usage Report - %s*
                             🔹 *Finnhub API*: %,d requests
                             🔹 *CoinGecko API*: %,d requests
+                            🔹 *Twelve Data API*: %,d requests
+                            🔹 *Yahoo Finance*: %,d requests
                             🔹 *Total*: %,d requests""",
                             previousMonth,
                             finnhubCount,
                             coingeckoCount,
-                            finnhubCount + coingeckoCount);
+                            twelveDataCount,
+                            yahooCount,
+                            finnhubCount + coingeckoCount + twelveDataCount + yahooCount);
 
             telegramClient.sendMessage(message);
             log.info(
-                    "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}",
+                    "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}, TwelveData={}, Yahoo={}",
                     previousMonth,
                     finnhubCount,
-                    coingeckoCount);
+                    coingeckoCount,
+                    twelveDataCount,
+                    yahooCount);
         } else {
             log.info("No API requests recorded for the previous month, skipping report");
         }
@@ -222,9 +278,38 @@ public class Scheduler {
         apiRequestMeteringService.resetCounters();
     }
 
+    private void doMarketHolidayNotification() {
+        Optional<MarketHolidayResponse.MarketHoliday> holiday =
+                marketStatusService.getTodayHoliday();
+        if (holiday.isEmpty()) {
+            return;
+        }
+
+        MarketHolidayResponse.MarketHoliday h = holiday.get();
+        String tradingHour = h.getTradingHour();
+
+        if (tradingHour == null || tradingHour.isEmpty()) {
+            String message =
+                    String.format(
+                            "*Market Holiday*\n"
+                                    + "It's a U.S. market holiday today (%s). Markets are closed."
+                                    + " Enjoy your day!",
+                            h.getEventName());
+            telegramClient.sendMessage(message);
+        } else {
+            String closeTime = tradingHour.split("-")[1];
+            String message =
+                    String.format(
+                            "*Early Close*%nEarly close today (%s). Markets close at %s ET.",
+                            h.getEventName(), closeTime);
+            telegramClient.sendMessage(message);
+        }
+    }
+
     public boolean manualStockMarketMonitoring() {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(finnhubPriceEvaluator::evaluatePrice);
+        success &= rootErrorHandler.runWithStatus(yahooPriceEvaluator::evaluatePrice);
         success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
         success &=
                 rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
@@ -320,6 +405,31 @@ public class Scheduler {
     public boolean manualPullbackBuyAlert() {
         boolean success = rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
         log.info("Manual pullback buy alert scan completed.");
+        return success;
+    }
+
+    public boolean manualEarningsCalendarCheck() {
+        boolean success = rootErrorHandler.runWithStatus(earningsCalendarTracker::checkAndAlert);
+        log.info("Manual earnings calendar check completed.");
+        return success;
+    }
+
+    public boolean manualAccumulationDetection() {
+        boolean success =
+                rootErrorHandler.runWithStatus(accumulationDetectionTracker::analyzeAndSendAlerts);
+        log.info("Manual accumulation detection completed.");
+        return success;
+    }
+
+    public boolean manualMarketHolidayNotification() {
+        boolean success = rootErrorHandler.runWithStatus(this::doMarketHolidayNotification);
+        log.info("Manual market holiday notification completed.");
+        return success;
+    }
+
+    public boolean manualYahooPriceEvaluation() {
+        boolean success = rootErrorHandler.runWithStatus(yahooPriceEvaluator::evaluatePrice);
+        log.info("Manual Yahoo price evaluation completed.");
         return success;
     }
 }

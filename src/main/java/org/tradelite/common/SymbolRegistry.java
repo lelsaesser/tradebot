@@ -1,11 +1,5 @@
 package org.tradelite.common;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -19,13 +13,14 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.tradelite.repository.TrackedSymbolRepository;
 
 /**
  * Central registry of all tracked symbols: ETFs (sector + thematic + benchmark) and individual
  * stocks.
  *
- * <p>ETF definitions are hardcoded constants. Stocks are loaded from {@code
- * config/stock-symbols.json} and can be added/removed at runtime via Telegram commands.
+ * <p>ETF definitions are hardcoded constants. Stocks are loaded from SQLite and can be
+ * added/removed at runtime via Telegram commands.
  */
 @Slf4j
 @Service
@@ -73,8 +68,6 @@ public class SymbolRegistry {
                     Map.entry("BOTZ", "Robotics"),
                     Map.entry("STCE", "Crypto"));
 
-    private static final String STOCK_SYMBOLS_FILE = "config/stock-symbols.json";
-
     private static final Set<String> SECTOR_ETF_SYMBOLS;
     private static final Set<String> ETF_SYMBOLS;
 
@@ -88,13 +81,14 @@ public class SymbolRegistry {
         ETF_SYMBOLS = Set.copyOf(allEtfSet);
     }
 
-    private final ObjectMapper objectMapper;
+    private final TrackedSymbolRepository trackedSymbolRepository;
     private List<StockSymbolEntry> stockSymbols;
 
     @Autowired
-    public SymbolRegistry(ObjectMapper objectMapper) throws IOException {
-        this.objectMapper = objectMapper;
-        loadStockSymbols();
+    public SymbolRegistry(TrackedSymbolRepository trackedSymbolRepository) {
+        this.trackedSymbolRepository = trackedSymbolRepository;
+        this.stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+        log.info("Loaded {} stock symbols from SQLite", stockSymbols.size());
     }
 
     /** Returns all tracked symbols: ETFs (with benchmark) + non-ETF stocks, deduplicated. */
@@ -173,8 +167,8 @@ public class SymbolRegistry {
                 .map(entry -> new StockSymbol(entry.getTicker(), entry.getDisplayName()));
     }
 
-    /** Adds a user stock symbol. Cannot add ETFs (they are hardcoded). */
-    public synchronized boolean addSymbol(String ticker, String displayName) {
+    /** Adds a stock symbol to the registry. */
+    public boolean addSymbol(String ticker, String displayName) {
         if (ticker == null || ticker.isEmpty() || displayName == null || displayName.isEmpty()) {
             return false;
         }
@@ -187,58 +181,49 @@ public class SymbolRegistry {
             return false;
         }
 
-        StockSymbolEntry newEntry = new StockSymbolEntry(ticker.toUpperCase(), displayName);
-        stockSymbols.add(newEntry);
-
-        try {
-            saveStockSymbols();
-            log.info("Added stock symbol: {} ({})", ticker, displayName);
-            return true;
-        } catch (IOException e) {
-            log.error("Failed to save stock symbol: {}", ticker, e);
-            stockSymbols.remove(newEntry);
-            return false;
-        }
+        trackedSymbolRepository.save(ticker.toUpperCase(), displayName, AssetType.STOCK);
+        reload();
+        log.info("Added stock symbol: {} ({})", ticker, displayName);
+        return true;
     }
 
-    /** Removes a user stock symbol. Cannot remove ETFs (they are hardcoded). */
-    public synchronized boolean removeSymbol(String ticker) {
+    /** Reloads tracked symbols from the database. */
+    public void reload() {
+        this.stockSymbols = new ArrayList<>(trackedSymbolRepository.findAll());
+        log.info("Reloaded {} stock symbols from SQLite", stockSymbols.size());
+    }
+
+    /** Removes a stock symbol from the registry. */
+    public boolean removeSymbol(String ticker) {
         if (ticker == null || ticker.isEmpty()) {
             return false;
         }
 
         boolean removed =
-                stockSymbols.removeIf(entry -> entry.getTicker().equalsIgnoreCase(ticker));
+                trackedSymbolRepository.deleteByTickerAndType(
+                        ticker.toUpperCase(), AssetType.STOCK);
 
         if (removed) {
-            try {
-                saveStockSymbols();
-                log.info("Removed stock symbol: {}", ticker);
-                return true;
-            } catch (IOException e) {
-                log.error("Failed to save after removing stock symbol: {}", ticker, e);
-                return false;
-            }
+            reload();
+            log.info("Removed stock symbol: {}", ticker);
         }
 
-        return false;
+        return removed;
     }
 
-    protected void loadStockSymbols() throws IOException {
-        File file = new File(STOCK_SYMBOLS_FILE);
-        try (InputStream inputStream = new FileInputStream(file)) {
-            stockSymbols = objectMapper.readValue(inputStream, new TypeReference<>() {});
-            log.info("Loaded {} stock symbols from {}", stockSymbols.size(), STOCK_SYMBOLS_FILE);
-        } catch (IOException e) {
-            log.error("Failed to load stock symbols from {}", STOCK_SYMBOLS_FILE, e);
-            stockSymbols = new ArrayList<>();
-            throw e;
-        }
+    /** Checks if a ticker represents an international (non-US) symbol. */
+    public boolean isInternationalSymbol(String ticker) {
+        return ticker != null && ticker.contains(".");
     }
 
-    protected void saveStockSymbols() throws IOException {
-        File file = new File(STOCK_SYMBOLS_FILE);
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, stockSymbols);
+    /** Returns only international (non-US) stocks. */
+    public List<StockSymbol> getInternationalStocks() {
+        return getStocks().stream().filter(s -> isInternationalSymbol(s.getTicker())).toList();
+    }
+
+    /** Returns only domestic (US) stocks. */
+    public List<StockSymbol> getDomesticStocks() {
+        return getStocks().stream().filter(s -> !isInternationalSymbol(s.getTicker())).toList();
     }
 
     @Setter

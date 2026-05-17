@@ -1,8 +1,6 @@
 package org.tradelite.core;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -16,6 +14,8 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
+import org.tradelite.service.LivePriceCache;
+import org.tradelite.service.MarketStatusService;
 
 @Slf4j
 @Component
@@ -23,12 +23,11 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
 
     private final FinnhubClient finnhubClient;
     private final TargetPriceProvider targetPriceProvider;
-    private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
     private final PriceQuoteRepository priceQuoteRepository;
     private final FeatureToggleService featureToggleService;
-
-    @Getter protected final Map<String, Double> lastPriceCache = new ConcurrentHashMap<>();
+    private final MarketStatusService marketStatusService;
+    private final LivePriceCache livePriceCache;
 
     @Autowired
     public FinnhubPriceEvaluator(
@@ -37,22 +36,61 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             TelegramGateway telegramClient,
             SymbolRegistry symbolRegistry,
             PriceQuoteRepository priceQuoteRepository,
-            FeatureToggleService featureToggleService) {
+            FeatureToggleService featureToggleService,
+            MarketStatusService marketStatusService,
+            LivePriceCache livePriceCache) {
         super(telegramClient, targetPriceProvider);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
-        this.telegramClient = telegramClient;
         this.symbolRegistry = symbolRegistry;
         this.priceQuoteRepository = priceQuoteRepository;
         this.featureToggleService = featureToggleService;
+        this.marketStatusService = marketStatusService;
+        this.livePriceCache = livePriceCache;
     }
 
     @SuppressWarnings("java:S135") // allow multiple continue in for-loop
     public int evaluatePrice() throws InterruptedException {
-        List<PriceQuoteResponse> finnhubData = new ArrayList<>();
-        List<TargetPrice> targetPrices = targetPriceProvider.getStockTargetPrices();
+        int updatedCount = 0;
 
-        for (TargetPrice targetPrice : targetPrices) {
+        // Loop 1: Fetch & cache prices for ALL symbols (stocks + ETFs)
+        for (StockSymbol symbol : symbolRegistry.getAll()) {
+            if (symbolRegistry.isInternationalSymbol(symbol.getTicker())) {
+                continue;
+            }
+            PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(symbol);
+            // Rate limit: Finnhub has 60 requests/minute limit, sleep after EVERY API call
+            Thread.sleep(1100);
+
+            Double lastPrice = livePriceCache.get(symbol.getTicker());
+            if (priceQuote == null
+                    || (lastPrice != null
+                            && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
+                continue;
+            }
+            livePriceCache.put(symbol.getTicker(), priceQuote.getCurrentPrice());
+
+            // Persist price quote to SQLite for historical data collection (if enabled)
+            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)
+                    && marketStatusService.isMarketOpen(null)) {
+                priceQuoteRepository.save(priceQuote);
+            }
+
+            evaluateHighPriceChange(priceQuote);
+            updatedCount++;
+        }
+
+        // Loop 2: Evaluate target prices using cached data (no API calls)
+        // Only evaluate domestic (US) symbols — international symbols are handled by
+        // YahooPriceEvaluator
+        for (TargetPrice targetPrice : targetPriceProvider.getStockTargetPrices()) {
+            if (symbolRegistry.isInternationalSymbol(targetPrice.getSymbol())) {
+                continue;
+            }
+            Double price = livePriceCache.get(targetPrice.getSymbol());
+            if (price == null) {
+                continue;
+            }
             Optional<StockSymbol> ticker = symbolRegistry.fromString(targetPrice.getSymbol());
             if (ticker.isEmpty()) {
                 log.warn(
@@ -60,83 +98,14 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
                         targetPrice.getSymbol());
                 continue;
             }
-
-            PriceQuoteResponse priceQuote = finnhubClient.getPriceQuote(ticker.get());
-            // Rate limit: Finnhub has 60 requests/minute limit, sleep after EVERY API call
-            Thread.sleep(1100);
-
-            Double lastPrice = lastPriceCache.get(ticker.get().getTicker());
-            if (priceQuote == null
-                    || (lastPrice != null
-                            && Math.abs(lastPrice - priceQuote.getCurrentPrice()) < 0.0001)) {
-                continue;
-            }
-            lastPriceCache.put(ticker.get().getTicker(), priceQuote.getCurrentPrice());
-
-            // Persist price quote to SQLite for historical data collection (if enabled)
-            if (featureToggleService.isEnabled(FeatureToggle.FINNHUB_PRICE_COLLECTION)
-                    && !isPotentialMarketHoliday(
-                            ticker.get().getTicker(),
-                            priceQuote.getCurrentPrice(),
-                            priceQuote.getPreviousClose())) {
-                priceQuoteRepository.save(priceQuote);
-            }
-
-            finnhubData.add(priceQuote);
+            comparePrices(
+                    ticker.get(), price, targetPrice.getBuyTarget(), targetPrice.getSellTarget());
         }
 
-        for (PriceQuoteResponse priceQuote : finnhubData) {
-            evaluateHighPriceChange(priceQuote);
-
-            for (TargetPrice targetPrice : targetPrices) {
-                if (priceQuote.getStockSymbol().getTicker().equals(targetPrice.getSymbol())) {
-                    comparePrices(
-                            priceQuote.getStockSymbol(),
-                            priceQuote.getCurrentPrice(),
-                            targetPrice.getBuyTarget(),
-                            targetPrice.getSellTarget());
-                }
-            }
-        }
-        return finnhubData.size();
-    }
-
-    public boolean isPotentialMarketHoliday(
-            String symbol, double currentPrice, double previousClose) {
-        if (Math.abs(currentPrice - previousClose) < 0.0001) {
-            log.info(
-                    "Potential market holiday detected for {}: current price {} == previous close {}, skipping SQLite persistence",
-                    symbol,
-                    currentPrice,
-                    previousClose);
-            return true;
-        }
-
-        return false;
+        return updatedCount;
     }
 
     public void evaluateHighPriceChange(PriceQuoteResponse priceQuote) {
-        double percentChange = priceQuote.getChangePercent();
-        double absPercentChange = Math.abs(percentChange);
-
-        if (absPercentChange < 5.0) {
-            return;
-        }
-
-        int alertThreshold = (int) (absPercentChange / 5.0) * 5;
-
-        if (alertThreshold > 0
-                && !targetPriceProvider.isSymbolIgnored(
-                        priceQuote.getStockSymbol(),
-                        IgnoreReason.CHANGE_PERCENT_ALERT,
-                        alertThreshold)) {
-            String displayName = priceQuote.getStockSymbol().getDisplayName();
-            log.info("High price change detected for {}: {}%", displayName, percentChange);
-            String emoji = percentChange > 0 ? "📈" : "📉";
-            telegramClient.sendMessage(
-                    emoji + " " + displayName + ": " + String.format("%.2f", percentChange) + "%");
-            targetPriceProvider.addIgnoredSymbol(
-                    priceQuote.getStockSymbol(), IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
-        }
+        evaluateHighPriceChange(priceQuote.getStockSymbol(), priceQuote.getChangePercent());
     }
 }

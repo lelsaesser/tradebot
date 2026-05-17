@@ -22,7 +22,16 @@ public enum FeatureToggle {
     VFI_REPORT("vfiReport"),
 
     /** Controls whether real-time EMA pullback buy alerts are sent via Telegram */
-    PULLBACK_BUY_ALERT("pullbackBuyAlert");
+    PULLBACK_BUY_ALERT("pullbackBuyAlert"),
+
+    /** Controls whether the daily earnings calendar report is sent via Telegram */
+    EARNINGS_CALENDAR_ALERT("earningsCalendarAlert"),
+
+    /** Controls whether the daily accumulation detection alert is sent via Telegram */
+    ACCUMULATION_DETECTION("accumulationDetection"),
+
+    /** Controls whether Yahoo Finance intraday price fetching is active for international stocks */
+    YAHOO_INTRADAY_PRICE_FETCH("yahooIntradayPriceFetch");
 
     private final String key;
 }

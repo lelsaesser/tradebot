@@ -1,7 +1,5 @@
 package org.tradelite.client.telegram;
 
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
-
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -9,11 +7,15 @@ import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.client.yahoo.YahooFetchException;
+import org.tradelite.client.yahoo.YahooFinanceClient;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.NewlyAddedSymbolRepository;
 
 @Slf4j
 @Component
@@ -24,6 +26,8 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     private final SymbolRegistry symbolRegistry;
     private final FinnhubClient finnhubClient;
     private final CoinGeckoClient coinGeckoClient;
+    private final YahooFinanceClient yahooFinanceClient;
+    private final NewlyAddedSymbolRepository newlyAddedSymbolRepository;
 
     @Autowired
     public AddCommandProcessor(
@@ -31,12 +35,16 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
             TelegramGateway telegramClient,
             SymbolRegistry symbolRegistry,
             FinnhubClient finnhubClient,
-            CoinGeckoClient coinGeckoClient) {
+            CoinGeckoClient coinGeckoClient,
+            YahooFinanceClient yahooFinanceClient,
+            NewlyAddedSymbolRepository newlyAddedSymbolRepository) {
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
         this.symbolRegistry = symbolRegistry;
         this.finnhubClient = finnhubClient;
         this.coinGeckoClient = coinGeckoClient;
+        this.yahooFinanceClient = yahooFinanceClient;
+        this.newlyAddedSymbolRepository = newlyAddedSymbolRepository;
     }
 
     @Override
@@ -48,10 +56,16 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     public void processCommand(AddCommand command) {
         // Validate ticker by checking if price data is available
         if (!isValidTicker(command.getTicker(), command.getDisplayName())) {
+            String source =
+                    symbolRegistry.isInternationalSymbol(command.getTicker())
+                            ? "Yahoo Finance"
+                            : "Finnhub or CoinGecko";
             telegramClient.sendMessage(
                     "Invalid ticker symbol: "
                             + command.getTicker()
-                            + ". Could not fetch price data from Finnhub or CoinGecko.");
+                            + ". Could not fetch price data from "
+                            + source
+                            + ".");
             return;
         }
 
@@ -76,6 +90,17 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
             return;
         }
 
+        // Queue for OHLCV backfill
+        try {
+            newlyAddedSymbolRepository.insert(
+                    command.getTicker(), System.currentTimeMillis() / 1000);
+        } catch (Exception e) {
+            log.error(
+                    "Failed to queue {} for OHLCV backfill: {}",
+                    command.getTicker(),
+                    e.getMessage());
+        }
+
         telegramClient.sendMessage(
                 "All set!\n"
                         + "Added "
@@ -96,18 +121,40 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
                         command.getBuyTargetPrice(),
                         command.getSellTargetPrice());
 
-        return targetPriceProvider.addTargetPrice(targetPrice, FILE_PATH_STOCKS);
+        return targetPriceProvider.addTargetPrice(targetPrice, AssetType.STOCK);
     }
 
     /**
-     * Validates if a ticker is valid by attempting to fetch price data from Finnhub first (for
-     * stocks), then from CoinGecko (for crypto) if Finnhub fails.
+     * Validates if a ticker is valid by attempting to fetch price data. International tickers
+     * (containing ".") are validated via Yahoo Finance. Domestic tickers are validated via Finnhub
+     * first, then CoinGecko as fallback.
      *
      * @param ticker The ticker symbol to validate
      * @param displayName The display name for the ticker
-     * @return true if price data can be fetched from either source, false otherwise
+     * @return true if price data can be fetched, false otherwise
      */
     private boolean isValidTicker(String ticker, String displayName) {
+        if (symbolRegistry.isInternationalSymbol(ticker)) {
+            return isValidInternationalTicker(ticker);
+        }
+        return isValidDomesticTicker(ticker, displayName);
+    }
+
+    private boolean isValidInternationalTicker(String ticker) {
+        try {
+            var records = yahooFinanceClient.fetchDailyOhlcv(ticker, 5);
+            if (!records.isEmpty()) {
+                log.info("Ticker {} validated successfully via Yahoo Finance", ticker);
+                return true;
+            }
+        } catch (YahooFetchException e) {
+            log.info("Yahoo validation failed for ticker {}: {}", ticker, e.getMessage());
+        }
+        log.warn("Ticker {} could not be validated via Yahoo Finance", ticker);
+        return false;
+    }
+
+    private boolean isValidDomesticTicker(String ticker, String displayName) {
         // Try Finnhub first (for stocks)
         try {
             StockSymbol tempStockSymbol = new StockSymbol(ticker, displayName);

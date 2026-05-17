@@ -1,46 +1,42 @@
 package org.tradelite.service;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import org.junit.jupiter.api.AfterAll;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.repository.ApiMeteringRecord;
+import org.tradelite.repository.ApiMeteringRepository;
 
+@ExtendWith(MockitoExtension.class)
 class ApiRequestMeteringServiceTest {
 
-    @TempDir Path tempDir;
+    @Mock private ApiMeteringRepository repository;
 
     private ApiRequestMeteringService meteringService;
-    private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    @AfterAll
-    static void cleanUp() throws IOException {
-        Path configDir = Paths.get("config");
-        Files.deleteIfExists(configDir.resolve("finnhub-monthly-requests.txt"));
-        Files.deleteIfExists(configDir.resolve("coingecko-monthly-requests.txt"));
-        Files.deleteIfExists(configDir.resolve("twelvedata-monthly-requests.txt"));
-    }
+    private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     @BeforeEach
     void setUp() {
-        // Use temp directory for testing
-        Path configDir = tempDir.resolve("config");
-        meteringService = new ApiRequestMeteringService(configDir.toString());
+        when(repository.findByMonth(anyString())).thenReturn(List.of());
+        meteringService = new ApiRequestMeteringService(repository);
+        meteringService.startup();
     }
 
     @Test
     void testIncrementFinnhubRequests() {
-        // Initially should be 0
         assertEquals(0, meteringService.getFinnhubRequestCount());
 
-        // Increment and verify
         meteringService.incrementFinnhubRequests();
         assertEquals(1, meteringService.getFinnhubRequestCount());
 
@@ -50,10 +46,8 @@ class ApiRequestMeteringServiceTest {
 
     @Test
     void testIncrementCoingeckoRequests() {
-        // Initially should be 0
         assertEquals(0, meteringService.getCoingeckoRequestCount());
 
-        // Increment and verify
         meteringService.incrementCoingeckoRequests();
         assertEquals(1, meteringService.getCoingeckoRequestCount());
 
@@ -73,59 +67,30 @@ class ApiRequestMeteringServiceTest {
     }
 
     @Test
-    void testBothCountersIndependent() {
-        // Increment Finnhub
-        meteringService.incrementFinnhubRequests();
-        meteringService.incrementFinnhubRequests();
+    void testIncrementYahooRequests() {
+        assertEquals(0, meteringService.getYahooRequestCount());
 
-        // Increment CoinGecko
-        meteringService.incrementCoingeckoRequests();
+        meteringService.incrementYahooRequests();
+        assertEquals(1, meteringService.getYahooRequestCount());
 
-        // Increment TwelveData
-        meteringService.incrementTwelveDataRequests();
-        meteringService.incrementTwelveDataRequests();
-        meteringService.incrementTwelveDataRequests();
-
-        // Verify they are independent
-        assertEquals(2, meteringService.getFinnhubRequestCount());
-        assertEquals(1, meteringService.getCoingeckoRequestCount());
-        assertEquals(3, meteringService.getTwelveDataRequestCount());
+        meteringService.incrementYahooRequests();
+        assertEquals(2, meteringService.getYahooRequestCount());
     }
 
     @Test
-    void testFilePersistence() throws IOException {
-        Path configDir = tempDir.resolve("config");
-        Files.createDirectories(configDir);
-
-        // Increment counters
+    void testCountersIndependent() {
+        meteringService.incrementFinnhubRequests();
         meteringService.incrementFinnhubRequests();
         meteringService.incrementCoingeckoRequests();
-        meteringService.incrementCoingeckoRequests();
         meteringService.incrementTwelveDataRequests();
         meteringService.incrementTwelveDataRequests();
         meteringService.incrementTwelveDataRequests();
+        meteringService.incrementYahooRequests();
 
-        // Check that files are created
-        Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
-        Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-        Path twelvedataFile = configDir.resolve("twelvedata-monthly-requests.txt");
-
-        assertTrue(Files.exists(finnhubFile));
-        assertTrue(Files.exists(coingeckoFile));
-        assertTrue(Files.exists(twelvedataFile));
-
-        // Check file contents
-        String finnhubContent = Files.readString(finnhubFile);
-        String coingeckoContent = Files.readString(coingeckoFile);
-        String twelvedataContent = Files.readString(twelvedataFile);
-
-        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
-        assertTrue(finnhubContent.contains("Month: " + currentMonth));
-        assertTrue(finnhubContent.contains("Count: 1"));
-        assertTrue(coingeckoContent.contains("Month: " + currentMonth));
-        assertTrue(coingeckoContent.contains("Count: 2"));
-        assertTrue(twelvedataContent.contains("Month: " + currentMonth));
-        assertTrue(twelvedataContent.contains("Count: 3"));
+        assertEquals(2, meteringService.getFinnhubRequestCount());
+        assertEquals(1, meteringService.getCoingeckoRequestCount());
+        assertEquals(3, meteringService.getTwelveDataRequestCount());
+        assertEquals(1, meteringService.getYahooRequestCount());
     }
 
     @Test
@@ -136,6 +101,7 @@ class ApiRequestMeteringServiceTest {
         meteringService.incrementTwelveDataRequests();
         meteringService.incrementTwelveDataRequests();
         meteringService.incrementTwelveDataRequests();
+        meteringService.incrementYahooRequests();
 
         String summary = meteringService.getRequestCountSummary();
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
@@ -144,143 +110,109 @@ class ApiRequestMeteringServiceTest {
         assertTrue(summary.contains("Finnhub: 2"));
         assertTrue(summary.contains("CoinGecko: 1"));
         assertTrue(summary.contains("TwelveData: 3"));
+        assertTrue(summary.contains("Yahoo: 1"));
     }
 
     @Test
-    void testInitializationFromExistingFiles() throws IOException {
-        Path configDir = tempDir.resolve("config");
-        Files.createDirectories(configDir);
+    void testFlushCounters_persistsAllCounters() {
+        meteringService.incrementFinnhubRequests();
+        meteringService.incrementCoingeckoRequests();
+        meteringService.incrementCoingeckoRequests();
+
+        meteringService.flushCounters();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ApiMeteringRecord>> captor = ArgumentCaptor.forClass(List.class);
+        verify(repository).saveAll(captor.capture());
+
+        List<ApiMeteringRecord> flushed = captor.getValue();
+        assertEquals(4, flushed.size());
 
         String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
-
-        // Create existing files with some counts
-        Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
-        Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-        Path twelvedataFile = configDir.resolve("twelvedata-monthly-requests.txt");
-
-        String finnhubContent =
-                String.format(
-                        "Month: %s%nCount: 5%nLast Updated: %s%n",
-                        currentMonth, LocalDateTime.now());
-        String coingeckoContent =
-                String.format(
-                        "Month: %s%nCount: 3%nLast Updated: %s%n",
-                        currentMonth, LocalDateTime.now());
-        String twelvedataContent =
-                String.format(
-                        "Month: %s%nCount: 7%nLast Updated: %s%n",
-                        currentMonth, LocalDateTime.now());
-
-        Files.writeString(finnhubFile, finnhubContent);
-        Files.writeString(coingeckoFile, coingeckoContent);
-        Files.writeString(twelvedataFile, twelvedataContent);
-
-        // Create new service instance (should read from files)
-        ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
-
-        // Verify it loaded the counts from files
-        assertEquals(5, newService.getFinnhubRequestCount());
-        assertEquals(3, newService.getCoingeckoRequestCount());
-        assertEquals(7, newService.getTwelveDataRequestCount());
-    }
-
-    @Test
-    void testInitializationFromOldMonthFiles() throws IOException {
-        Path configDir = tempDir.resolve("config");
-        Files.createDirectories(configDir);
-
-        String oldMonth = "2024-01"; // Old month
-
-        // Create files from previous month
-        Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
-        Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-
-        String finnhubContent =
-                String.format(
-                        "Month: %s%nCount: 100%nLast Updated: %s%n", oldMonth, LocalDateTime.now());
-        String coingeckoContent =
-                String.format(
-                        "Month: %s%nCount: 50%nLast Updated: %s%n", oldMonth, LocalDateTime.now());
-
-        Files.writeString(finnhubFile, finnhubContent);
-        Files.writeString(coingeckoFile, coingeckoContent);
-
-        // Create new service instance (should preserve old counts until cron job resets)
-        ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
-
-        // Verify it loaded the counts from files (even though they're from previous month)
-        assertEquals(100, newService.getFinnhubRequestCount());
-        assertEquals(50, newService.getCoingeckoRequestCount());
-    }
-
-    @Test
-    void testHandlesMissingConfigDirectory() {
-        // Delete config directory if it exists
-        Path configDir = tempDir.resolve("config");
-        if (Files.exists(configDir)) {
-            try {
-                Files.delete(configDir);
-            } catch (IOException _) {
-                // Ignore
-            }
+        for (ApiMeteringRecord meteringRecord : flushed) {
+            assertEquals(currentMonth, meteringRecord.month());
+            assertNotNull(meteringRecord.lastUpdated());
         }
-
-        // Service should create directory and work normally
-        ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
-        newService.incrementFinnhubRequests();
-
-        assertEquals(1, newService.getFinnhubRequestCount());
-        assertTrue(Files.exists(configDir));
     }
 
     @Test
-    void testHandlesCorruptedFiles() throws IOException {
-        Path configDir = tempDir.resolve("config");
-        Files.createDirectories(configDir);
+    void testResetCounters_zerosAndFlushes() {
+        meteringService.incrementFinnhubRequests();
+        meteringService.incrementFinnhubRequests();
+        meteringService.incrementCoingeckoRequests();
+        meteringService.incrementTwelveDataRequests();
+        meteringService.incrementYahooRequests();
 
-        // Create corrupted files
-        Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
-        Files.writeString(finnhubFile, "This is not a valid format");
+        meteringService.resetCounters();
 
-        // Service should handle gracefully and start with 0
-        ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
-        assertEquals(0, newService.getFinnhubRequestCount());
+        assertEquals(0, meteringService.getFinnhubRequestCount());
+        assertEquals(0, meteringService.getCoingeckoRequestCount());
+        assertEquals(0, meteringService.getTwelveDataRequestCount());
+        assertEquals(0, meteringService.getYahooRequestCount());
+
+        // Verify flush was called (saveAll invoked)
+        verify(repository).saveAll(anyList());
     }
 
     @Test
-    void testDefaultConstructor() throws IOException {
-        // Clean up any existing files first
-        Path configDir = Paths.get("config");
-        if (Files.exists(configDir)) {
-            Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
-            Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-            Path twelvedataFile = configDir.resolve("twelvedata-monthly-requests.txt");
-            Files.deleteIfExists(finnhubFile);
-            Files.deleteIfExists(coingeckoFile);
-            Files.deleteIfExists(twelvedataFile);
-        }
+    void testInitializationFromRepository_currentMonth() {
+        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        LocalDateTime now = LocalDateTime.now();
 
-        // Test with the default counter directory
-        ApiRequestMeteringService defaultService = new ApiRequestMeteringService("config");
+        when(repository.findByMonth(currentMonth))
+                .thenReturn(
+                        List.of(
+                                new ApiMeteringRecord("finnhub", currentMonth, 42, now),
+                                new ApiMeteringRecord("coingecko", currentMonth, 17, now),
+                                new ApiMeteringRecord("twelvedata", currentMonth, 99, now),
+                                new ApiMeteringRecord("yahoo", currentMonth, 5, now)));
 
-        // Should start with 0 counts
-        assertEquals(0, defaultService.getFinnhubRequestCount());
-        assertEquals(0, defaultService.getCoingeckoRequestCount());
-        assertEquals(0, defaultService.getTwelveDataRequestCount());
+        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        service.startup();
 
-        // Should be able to increment
-        defaultService.incrementFinnhubRequests();
-        defaultService.incrementCoingeckoRequests();
-        defaultService.incrementTwelveDataRequests();
+        assertEquals(42, service.getFinnhubRequestCount());
+        assertEquals(17, service.getCoingeckoRequestCount());
+        assertEquals(99, service.getTwelveDataRequestCount());
+        assertEquals(5, service.getYahooRequestCount());
+    }
 
-        assertEquals(1, defaultService.getFinnhubRequestCount());
-        assertEquals(1, defaultService.getCoingeckoRequestCount());
-        assertEquals(1, defaultService.getTwelveDataRequestCount());
+    @Test
+    void testInitializationFromRepository_unknownProvider_ignored() {
+        String currentMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        LocalDateTime now = LocalDateTime.now();
 
-        // Clean up after test
-        Files.deleteIfExists(configDir.resolve("finnhub-monthly-requests.txt"));
-        Files.deleteIfExists(configDir.resolve("coingecko-monthly-requests.txt"));
-        Files.deleteIfExists(configDir.resolve("twelvedata-monthly-requests.txt"));
+        when(repository.findByMonth(currentMonth))
+                .thenReturn(
+                        List.of(new ApiMeteringRecord("unknown_provider", currentMonth, 100, now)));
+
+        // Should not throw
+        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        service.startup();
+
+        assertEquals(0, service.getFinnhubRequestCount());
+    }
+
+    @Test
+    void testShutdown_flushesCounters() {
+        meteringService.incrementFinnhubRequests();
+
+        meteringService.shutdown();
+
+        verify(repository).saveAll(anyList());
+    }
+
+    @Test
+    void testGetCurrentMonth() {
+        String currentMonth = meteringService.getCurrentMonth();
+        String expectedMonth = LocalDateTime.now().format(MONTH_FORMATTER);
+        assertEquals(expectedMonth, currentMonth);
+    }
+
+    @Test
+    void testGetPreviousMonth() {
+        String previousMonth = meteringService.getPreviousMonth();
+        String expectedMonth = LocalDateTime.now().minusMonths(1).format(MONTH_FORMATTER);
+        assertEquals(expectedMonth, previousMonth);
     }
 
     @Test
@@ -289,128 +221,36 @@ class ApiRequestMeteringServiceTest {
         final int incrementsPerThread = 100;
         Thread[] threads = new Thread[numThreads];
 
-        // Create threads that increment counters concurrently
         for (int i = 0; i < numThreads; i++) {
             final int threadIndex = i;
             threads[i] =
                     new Thread(
                             () -> {
                                 for (int j = 0; j < incrementsPerThread; j++) {
-                                    if (threadIndex % 3 == 0) {
+                                    if (threadIndex % 4 == 0) {
                                         meteringService.incrementFinnhubRequests();
-                                    } else if (threadIndex % 3 == 1) {
+                                    } else if (threadIndex % 4 == 1) {
                                         meteringService.incrementCoingeckoRequests();
-                                    } else {
+                                    } else if (threadIndex % 4 == 2) {
                                         meteringService.incrementTwelveDataRequests();
+                                    } else {
+                                        meteringService.incrementYahooRequests();
                                     }
                                 }
                             });
         }
 
-        // Start all threads
         for (Thread thread : threads) {
             thread.start();
         }
-
-        // Wait for all threads to complete
         for (Thread thread : threads) {
             thread.join();
         }
 
-        // Verify final counts
-        int expectedFinnhubCount = (numThreads / 3) * incrementsPerThread;
-        int expectedCoingeckoCount = (numThreads / 3) * incrementsPerThread;
-        int expectedTwelveDataCount = (numThreads / 3) * incrementsPerThread;
-
-        assertEquals(expectedFinnhubCount, meteringService.getFinnhubRequestCount());
-        assertEquals(expectedCoingeckoCount, meteringService.getCoingeckoRequestCount());
-        assertEquals(expectedTwelveDataCount, meteringService.getTwelveDataRequestCount());
-    }
-
-    @Test
-    void testReadCounterFromFileWithInvalidFormat() throws IOException {
-        Path configDir = tempDir.resolve("config");
-        Files.createDirectories(configDir);
-
-        // Create file with invalid count format
-        Path finnhubFile = configDir.resolve("finnhub-monthly-requests.txt");
-        String currentMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-        String invalidContent =
-                String.format(
-                        "Month: %s%nCount: invalid_number%nLast Updated: %s%n",
-                        currentMonth, LocalDateTime.now());
-        Files.writeString(finnhubFile, invalidContent);
-
-        // Service should handle gracefully and start with 0
-        ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
-        assertEquals(0, newService.getFinnhubRequestCount());
-    }
-
-    @Test
-    void testReadCounterFromFileWithIncompleteContent() throws IOException {
-        Path configDir = tempDir.resolve("config");
-        Files.createDirectories(configDir);
-
-        // Create file with incomplete content (only one line)
-        Path coingeckoFile = configDir.resolve("coingecko-monthly-requests.txt");
-        Files.writeString(coingeckoFile, "Month: 2024-01\n");
-
-        // Service should handle gracefully and start with 0
-        ApiRequestMeteringService newService = new ApiRequestMeteringService(configDir.toString());
-        assertEquals(0, newService.getCoingeckoRequestCount());
-    }
-
-    @Test
-    void testPersistCounterIOException() throws IOException {
-        // Create a read-only directory to trigger IOException
-        Path configDir = tempDir.resolve("readonly-config");
-        Files.createDirectories(configDir);
-
-        // Make directory read-only (this might not work on all systems, but it's worth trying)
-        configDir.toFile().setReadOnly();
-
-        try {
-            ApiRequestMeteringService readOnlyService =
-                    new ApiRequestMeteringService(configDir.toString());
-
-            // This should not throw an exception, but should log an error
-            readOnlyService.incrementFinnhubRequests();
-
-            // Counter should still work in memory
-            assertEquals(1, readOnlyService.getFinnhubRequestCount());
-        } finally {
-            // Restore write permissions for cleanup
-            configDir.toFile().setWritable(true);
-        }
-    }
-
-    @Test
-    void testResetCounters() {
-        // Add some counts
-        meteringService.incrementFinnhubRequests();
-        meteringService.incrementFinnhubRequests();
-        meteringService.incrementCoingeckoRequests();
-        meteringService.incrementTwelveDataRequests();
-        meteringService.incrementTwelveDataRequests();
-        meteringService.incrementTwelveDataRequests();
-
-        assertEquals(2, meteringService.getFinnhubRequestCount());
-        assertEquals(1, meteringService.getCoingeckoRequestCount());
-        assertEquals(3, meteringService.getTwelveDataRequestCount());
-
-        // Reset counters
-        meteringService.resetCounters();
-
-        // Verify counters are reset
-        assertEquals(0, meteringService.getFinnhubRequestCount());
-        assertEquals(0, meteringService.getCoingeckoRequestCount());
-        assertEquals(0, meteringService.getTwelveDataRequestCount());
-    }
-
-    @Test
-    void testGetCurrentMonth() {
-        String currentMonth = meteringService.getCurrentMonth();
-        String expectedMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-        assertEquals(expectedMonth, currentMonth);
+        int expectedPerProvider = (numThreads / 4) * incrementsPerThread;
+        assertEquals(expectedPerProvider, meteringService.getFinnhubRequestCount());
+        assertEquals(expectedPerProvider, meteringService.getCoingeckoRequestCount());
+        assertEquals(expectedPerProvider, meteringService.getTwelveDataRequestCount());
+        assertEquals(expectedPerProvider, meteringService.getYahooRequestCount());
     }
 }

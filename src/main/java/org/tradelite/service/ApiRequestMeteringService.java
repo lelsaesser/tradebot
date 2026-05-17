@@ -1,67 +1,79 @@
 package org.tradelite.service;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.tradelite.repository.ApiMeteringRecord;
+import org.tradelite.repository.ApiMeteringRepository;
 
 @Slf4j
 @Service
 public class ApiRequestMeteringService {
 
-    private static final String DEFAULT_COUNTER_DIR = "config";
-    private static final String FINNHUB_COUNTER_FILE = "finnhub-monthly-requests.txt";
-    private static final String COINGECKO_COUNTER_FILE = "coingecko-monthly-requests.txt";
-    private static final String TWELVEDATA_COUNTER_FILE = "twelvedata-monthly-requests.txt";
+    static final String FINNHUB = "finnhub";
+    static final String COINGECKO = "coingecko";
+    static final String TWELVEDATA = "twelvedata";
+    static final String YAHOO = "yahoo";
+
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    private final AtomicInteger finnhubCounter = new AtomicInteger(0);
-    private final AtomicInteger coingeckoCounter = new AtomicInteger(0);
-    private final AtomicInteger twelveDataCounter = new AtomicInteger(0);
-    private final String currentMonth;
-    private final String counterDir;
+    private final ApiMeteringRepository repository;
+    private final Map<String, AtomicInteger> counters = new ConcurrentHashMap<>();
 
-    ApiRequestMeteringService(
-            @Value("${metering.counter-dir:" + DEFAULT_COUNTER_DIR + "}") String counterDir) {
-        this.counterDir = counterDir;
-        this.currentMonth = getCurrentMonth();
+    ApiRequestMeteringService(ApiMeteringRepository repository) {
+        this.repository = repository;
+        counters.put(FINNHUB, new AtomicInteger(0));
+        counters.put(COINGECKO, new AtomicInteger(0));
+        counters.put(TWELVEDATA, new AtomicInteger(0));
+        counters.put(YAHOO, new AtomicInteger(0));
+    }
+
+    @PostConstruct
+    void startup() {
         initializeCounters();
     }
 
     public void incrementFinnhubRequests() {
-        int newCount = finnhubCounter.incrementAndGet();
-        log.info("Finnhub API request count for {}: {}", currentMonth, newCount);
-        persistCounter(FINNHUB_COUNTER_FILE, newCount);
+        int newCount = counters.get(FINNHUB).incrementAndGet();
+        log.info("Finnhub API request count for {}: {}", getCurrentMonth(), newCount);
     }
 
     public void incrementCoingeckoRequests() {
-        int newCount = coingeckoCounter.incrementAndGet();
-        log.info("CoinGecko API request count for {}: {}", currentMonth, newCount);
-        persistCounter(COINGECKO_COUNTER_FILE, newCount);
+        int newCount = counters.get(COINGECKO).incrementAndGet();
+        log.info("CoinGecko API request count for {}: {}", getCurrentMonth(), newCount);
     }
 
     public void incrementTwelveDataRequests() {
-        int newCount = twelveDataCounter.incrementAndGet();
-        log.info("TwelveData API request count for {}: {}", currentMonth, newCount);
-        persistCounter(TWELVEDATA_COUNTER_FILE, newCount);
+        int newCount = counters.get(TWELVEDATA).incrementAndGet();
+        log.info("TwelveData API request count for {}: {}", getCurrentMonth(), newCount);
+    }
+
+    public void incrementYahooRequests() {
+        int newCount = counters.get(YAHOO).incrementAndGet();
+        log.info("Yahoo Finance API request count for {}: {}", getCurrentMonth(), newCount);
     }
 
     public int getFinnhubRequestCount() {
-        return finnhubCounter.get();
+        return counters.get(FINNHUB).get();
     }
 
     public int getCoingeckoRequestCount() {
-        return coingeckoCounter.get();
+        return counters.get(COINGECKO).get();
     }
 
     public int getTwelveDataRequestCount() {
-        return twelveDataCounter.get();
+        return counters.get(TWELVEDATA).get();
+    }
+
+    public int getYahooRequestCount() {
+        return counters.get(YAHOO).get();
     }
 
     /** Get the current month in YYYY-MM format */
@@ -76,100 +88,63 @@ public class ApiRequestMeteringService {
 
     public String getRequestCountSummary() {
         return String.format(
-                "API Request Counts for %s - Finnhub: %d, CoinGecko: %d, TwelveData: %d",
-                currentMonth,
-                finnhubCounter.get(),
-                coingeckoCounter.get(),
-                twelveDataCounter.get());
+                "API Request Counts for %s - Finnhub: %d, CoinGecko: %d, TwelveData: %d, Yahoo: %d",
+                getCurrentMonth(),
+                counters.get(FINNHUB).get(),
+                counters.get(COINGECKO).get(),
+                counters.get(TWELVEDATA).get(),
+                counters.get(YAHOO).get());
     }
 
     public void resetCounters() {
-        log.info("Resetting counters for month: {}", currentMonth);
-        finnhubCounter.set(0);
-        coingeckoCounter.set(0);
-        twelveDataCounter.set(0);
-        persistCounter(FINNHUB_COUNTER_FILE, 0);
-        persistCounter(COINGECKO_COUNTER_FILE, 0);
-        persistCounter(TWELVEDATA_COUNTER_FILE, 0);
+        log.info("Resetting counters for month: {}", getCurrentMonth());
+        counters.values().forEach(counter -> counter.set(0));
+        flushCounters();
         log.info("Counters reset successfully");
     }
 
+    public void flushCounters() {
+        LocalDateTime now = LocalDateTime.now();
+        String month = getCurrentMonth();
+        List<ApiMeteringRecord> records =
+                counters.entrySet().stream()
+                        .map(
+                                entry ->
+                                        new ApiMeteringRecord(
+                                                entry.getKey(), month, entry.getValue().get(), now))
+                        .toList();
+
+        try {
+            repository.saveAll(records);
+            log.debug("Flushed API metering counters to database");
+        } catch (Exception e) {
+            log.warn("Failed to flush API metering counters to database", e);
+        }
+    }
+
+    @PreDestroy
+    void shutdown() {
+        log.info("Shutting down API metering service, flushing counters...");
+        flushCounters();
+    }
+
     private void initializeCounters() {
-        try {
-            Path configDir = Paths.get(counterDir);
-            if (!Files.exists(configDir)) {
-                Files.createDirectories(configDir);
-                log.info("Created config directory: {}", configDir.toAbsolutePath());
+        String month = getCurrentMonth();
+        List<ApiMeteringRecord> records = repository.findByMonth(month);
+
+        for (ApiMeteringRecord meteringRecord : records) {
+            AtomicInteger counter = counters.get(meteringRecord.provider());
+            if (counter == null) {
+                log.warn("Unknown provider in database: {}", meteringRecord.provider());
+                continue;
             }
 
-            int finnhubCount = readCounterFromFile(FINNHUB_COUNTER_FILE);
-            finnhubCounter.set(finnhubCount);
-            log.info("Initialized Finnhub counter for {}: {}", currentMonth, finnhubCount);
-
-            int coingeckoCount = readCounterFromFile(COINGECKO_COUNTER_FILE);
-            coingeckoCounter.set(coingeckoCount);
-            log.info("Initialized CoinGecko counter for {}: {}", currentMonth, coingeckoCount);
-
-            int twelveDataCount = readCounterFromFile(TWELVEDATA_COUNTER_FILE);
-            twelveDataCounter.set(twelveDataCount);
-            log.info("Initialized TwelveData counter for {}: {}", currentMonth, twelveDataCount);
-
-        } catch (IOException e) {
-            log.error("Failed to initialize counters", e);
-        }
-    }
-
-    private int readCounterFromFile(String filename) throws IOException {
-        Path filePath = Paths.get(counterDir, filename);
-
-        if (!Files.exists(filePath)) {
-            // Create file with initial content if it doesn't exist
-            String initialContent =
-                    String.format(
-                            "Month: %s%nCount: 0%nLast Updated: %s%n",
-                            currentMonth, LocalDateTime.now());
-            Files.writeString(filePath, initialContent);
-            return 0;
-        }
-
-        String content = Files.readString(filePath);
-        String[] lines = content.split("\n");
-
-        // Check if the file is for the current month
-        if (lines.length >= 2) {
-            String fileMonth = lines[0].replace("Month: ", "").trim();
-            if (!fileMonth.equals(currentMonth)) {
-                // File is from a previous month, but don't reset automatically
-                // Let the cron job handle month transitions
-                log.info(
-                        "Counter file {} is from previous month ({}), current count will be preserved until cron job resets",
-                        filename,
-                        fileMonth);
-            }
-
-            // Extract count from second line
-            String countLine = lines[1].replace("Count: ", "").trim();
-            try {
-                return Integer.parseInt(countLine);
-            } catch (NumberFormatException _) {
-                log.warn("Invalid count format in {}: {}", filename, countLine);
-                return 0;
-            }
-        }
-
-        return 0;
-    }
-
-    private void persistCounter(String filename, int count) {
-        try {
-            Path filePath = Paths.get(counterDir, filename);
-            String content =
-                    String.format(
-                            "Month: %s%nCount: %d%nLast Updated: %s%n",
-                            currentMonth, count, LocalDateTime.now());
-            Files.writeString(filePath, content);
-        } catch (IOException e) {
-            log.error("Failed to persist counter to file {}: {}", filename, e.getMessage());
+            counter.set(meteringRecord.count());
+            log.info(
+                    "Initialized {} counter for {}: {}",
+                    meteringRecord.provider(),
+                    month,
+                    meteringRecord.count());
         }
     }
 }

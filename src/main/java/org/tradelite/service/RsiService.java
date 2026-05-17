@@ -13,7 +13,7 @@ import org.tradelite.service.model.DailyPrice;
 public class RsiService {
 
     static final int RSI_PERIOD = 14;
-    static final int RSI_LOOKBACK_DAYS = 30;
+    static final int RSI_LOOKBACK_DAYS = 300;
 
     private final DailyPriceProvider dailyPriceProvider;
 
@@ -68,22 +68,15 @@ public class RsiService {
     }
 
     double calculateRsi(List<Double> prices) {
-        if (prices.size() < RSI_PERIOD) {
+        if (prices.size() < RSI_PERIOD + 1) {
             return 50; // Not enough data
         }
 
         double avgGain = 0;
         double avgLoss = 0;
 
-        // First RSI value
-        double firstChange = prices.get(1) - prices.get(0);
-        if (firstChange > 0) {
-            avgGain = firstChange;
-        } else {
-            avgLoss = -firstChange;
-        }
-
-        for (int i = 2; i < RSI_PERIOD; i++) {
+        // Seed: average first RSI_PERIOD changes
+        for (int i = 1; i <= RSI_PERIOD; i++) {
             double change = prices.get(i) - prices.get(i - 1);
             if (change > 0) {
                 avgGain += change;
@@ -95,8 +88,8 @@ public class RsiService {
         avgGain /= RSI_PERIOD;
         avgLoss /= RSI_PERIOD;
 
-        // Subsequent RSI values
-        for (int i = RSI_PERIOD; i < prices.size(); i++) {
+        // Wilder smoothing for remaining
+        for (int i = RSI_PERIOD + 1; i < prices.size(); i++) {
             double change = prices.get(i) - prices.get(i - 1);
             double gain = change > 0 ? change : 0;
             double loss = change < 0 ? -change : 0;

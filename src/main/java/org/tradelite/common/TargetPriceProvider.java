@@ -1,11 +1,6 @@
 package org.tradelite.common;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -16,47 +11,41 @@ import org.springframework.stereotype.Component;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository.IgnoredSymbolRow;
+import org.tradelite.repository.TargetPriceRepository;
 
 @Slf4j
 @Component
 public class TargetPriceProvider {
 
-    public static final String FILE_PATH_STOCKS = "config/target-prices-stocks.json";
-    public static final String FILE_PATH_COINS = "config/target-prices-coins.json";
     public static final long IGNORE_DURATION_TTL_SECONDS = 3600L * 12; // 12 hours
 
-    private final ObjectMapper objectMapper;
+    private final TargetPriceRepository targetPriceRepository;
     private final SqliteIgnoredSymbolRepository ignoredSymbolRepository;
+    private final Clock clock;
 
     @Autowired
     public TargetPriceProvider(
-            ObjectMapper objectMapper, SqliteIgnoredSymbolRepository ignoredSymbolRepository) {
-        this.objectMapper = objectMapper;
+            TargetPriceRepository targetPriceRepository,
+            SqliteIgnoredSymbolRepository ignoredSymbolRepository,
+            Clock clock) {
+        this.targetPriceRepository = targetPriceRepository;
         this.ignoredSymbolRepository = ignoredSymbolRepository;
+        this.clock = clock;
     }
 
     public List<TargetPrice> getStockTargetPrices() {
-        return loadTargetPrices(FILE_PATH_STOCKS);
+        return targetPriceRepository.findByAssetType(AssetType.STOCK);
     }
 
     public List<TargetPrice> getCoinTargetPrices() {
-        return loadTargetPrices(FILE_PATH_COINS);
-    }
-
-    protected List<TargetPrice> loadTargetPrices(String filePath) {
-        File file = new File(filePath);
-        try (InputStream inputStream = new FileInputStream(file)) {
-            return objectMapper.readValue(inputStream, new TypeReference<>() {});
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to load target prices from JSON file", e);
-        }
+        return targetPriceRepository.findByAssetType(AssetType.COIN);
     }
 
     public void addIgnoredSymbol(TickerSymbol symbol, IgnoreReason reason, int alertThreshold) {
         ignoredSymbolRepository.save(
                 symbol.getName(),
                 reason.getReason(),
-                Instant.now().getEpochSecond(),
+                clock.instant().getEpochSecond(),
                 alertThreshold == 0 ? null : alertThreshold);
     }
 
@@ -78,7 +67,7 @@ public class TargetPriceProvider {
         }
 
         long elapsedSeconds =
-                Duration.between(Instant.ofEpochSecond(row.get().ignoredAt()), Instant.now())
+                Duration.between(Instant.ofEpochSecond(row.get().ignoredAt()), clock.instant())
                         .getSeconds();
         if (elapsedSeconds < reason.getTtlSeconds()) {
             log.info(
@@ -96,79 +85,45 @@ public class TargetPriceProvider {
     }
 
     public void cleanupIgnoreSymbols(long ttlSeconds) {
-        long cutoff = Instant.now().getEpochSecond() - ttlSeconds;
+        long cutoff = clock.instant().getEpochSecond() - ttlSeconds;
         ignoredSymbolRepository.deleteExpiredEntries(cutoff);
     }
 
-    public synchronized void updateTargetPrice(
-            TickerSymbol symbol, Double newBuyTarget, Double newSellTarget, String filePath) {
-        File file = new File(filePath);
+    public void updateTargetPrice(
+            TickerSymbol symbol, Double newBuyTarget, Double newSellTarget, AssetType type) {
+        List<TargetPrice> prices = targetPriceRepository.findByAssetType(type);
 
-        try {
-            List<TargetPrice> prices = objectMapper.readValue(file, new TypeReference<>() {});
-
-            for (TargetPrice tp : prices) {
-                if (tp.getSymbol().equalsIgnoreCase(symbol.getName())) {
-                    if (newBuyTarget != null) {
-                        tp.setBuyTarget(newBuyTarget);
-                    }
-                    if (newSellTarget != null) {
-                        tp.setSellTarget(newSellTarget);
-                    }
-                    break;
+        for (TargetPrice tp : prices) {
+            if (tp.getSymbol().equalsIgnoreCase(symbol.getName())) {
+                if (newBuyTarget != null) {
+                    tp.setBuyTarget(newBuyTarget);
                 }
+                if (newSellTarget != null) {
+                    tp.setSellTarget(newSellTarget);
+                }
+                targetPriceRepository.save(tp, type);
+                return;
             }
-
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, prices);
-
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to update target prices in JSON file", e);
         }
     }
 
-    public synchronized boolean addTargetPrice(TargetPrice targetPrice, String filePath) {
-        List<TargetPrice> entries;
-        File file = new File(filePath);
-        try {
-            entries = objectMapper.readValue(file, new TypeReference<>() {});
+    public boolean addTargetPrice(TargetPrice targetPrice, AssetType type) {
+        List<TargetPrice> existing = targetPriceRepository.findByAssetType(type);
 
-            boolean alreadyExists =
-                    entries.stream()
-                            .anyMatch(
-                                    tp -> tp.getSymbol().equalsIgnoreCase(targetPrice.getSymbol()));
+        boolean alreadyExists =
+                existing.stream()
+                        .anyMatch(tp -> tp.getSymbol().equalsIgnoreCase(targetPrice.getSymbol()));
 
-            if (alreadyExists) {
-                log.warn("Symbol {} already exists in target prices", targetPrice.getSymbol());
-                return false;
-            }
-
-            entries.add(targetPrice);
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
-
-            return true;
-
-        } catch (IOException e) {
-            log.error("Failed to add target price to JSON file", e);
+        if (alreadyExists) {
+            log.warn("Symbol {} already exists in target prices", targetPrice.getSymbol());
             return false;
         }
+
+        targetPriceRepository.save(targetPrice, type);
+        return true;
     }
 
-    public synchronized boolean removeSymbolFromTargetPrices(String ticker, String filePath) {
-        File file = new File(filePath);
-        try {
-            List<TargetPrice> entries = objectMapper.readValue(file, new TypeReference<>() {});
-
-            boolean removed = entries.removeIf(tp -> tp.getSymbol().equalsIgnoreCase(ticker));
-
-            if (removed) {
-                objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, entries);
-            }
-
-            return removed;
-
-        } catch (IOException e) {
-            log.error("Failed to remove symbol from target prices in JSON file", e);
-            return false;
-        }
+    public boolean removeSymbolFromTargetPrices(String ticker, AssetType type) {
+        return targetPriceRepository.deleteBySymbolAndType(ticker, type);
     }
 }

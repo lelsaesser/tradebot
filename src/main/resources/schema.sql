@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS momentum_roc_state (
     updated_at INTEGER NOT NULL
 );
 
+-- rs_crossover_state: Relative strength crossover detection state
+CREATE TABLE IF NOT EXISTS rs_crossover_state (
+    symbol TEXT PRIMARY KEY,
+    previous_rs REAL NOT NULL,
+    previous_ema REAL NOT NULL,
+    initialized INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+);
+
 -- ignored_symbols: Per-symbol alert suppression with reason and TTL
 CREATE TABLE IF NOT EXISTS ignored_symbols (
     symbol          TEXT    NOT NULL,
@@ -56,4 +65,75 @@ CREATE TABLE IF NOT EXISTS ignored_symbols (
     ignored_at      INTEGER NOT NULL,
     alert_threshold INTEGER,
     PRIMARY KEY (symbol, reason)
+);
+
+-- sector_rs_streaks: Consecutive days of outperformance/underperformance vs SPY per sector ETF
+CREATE TABLE IF NOT EXISTS sector_rs_streaks (
+    symbol TEXT PRIMARY KEY,
+    streak_days INTEGER NOT NULL DEFAULT 1,
+    is_outperforming INTEGER NOT NULL,
+    last_updated TEXT NOT NULL
+);
+
+-- insider_transactions: Weekly insider transaction counts per symbol (full replace each week)
+CREATE TABLE IF NOT EXISTS insider_transactions (
+    symbol TEXT NOT NULL,
+    transaction_type TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (symbol, transaction_type)
+);
+
+-- industry_performance: FinViz sector/industry performance snapshots
+CREATE TABLE IF NOT EXISTS industry_performance (
+    fetch_date TEXT NOT NULL,
+    industry_name TEXT NOT NULL,
+    daily_change REAL,
+    weekly_perf REAL,
+    monthly_perf REAL,
+    quarterly_perf REAL,
+    half_year_perf REAL,
+    yearly_perf REAL,
+    ytd_perf REAL,
+    PRIMARY KEY (fetch_date, industry_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_industry_performance_fetch_date
+    ON industry_performance(fetch_date);
+
+-- target_prices: Buy/sell target prices for stocks and coins
+CREATE TABLE IF NOT EXISTS target_prices (
+    symbol TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    buy_target REAL,
+    sell_target REAL,
+    PRIMARY KEY (symbol, asset_type)
+);
+
+-- tracked_symbols: All tracked symbols (stocks, ETFs, and coins)
+CREATE TABLE IF NOT EXISTS tracked_symbols (
+    ticker TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    PRIMARY KEY (ticker, asset_type)
+);
+
+-- api_request_metering: Monthly API request counters per provider
+CREATE TABLE IF NOT EXISTS api_request_metering (
+    provider TEXT NOT NULL,
+    month TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    last_updated TEXT NOT NULL,
+    PRIMARY KEY (provider, month)
+);
+
+CREATE TABLE IF NOT EXISTS accumulation_streaks (
+    symbol TEXT PRIMARY KEY,
+    streak_days INTEGER NOT NULL DEFAULT 1,
+    last_updated TEXT NOT NULL
+);
+
+-- newly_added_symbols: Symbols awaiting OHLCV backfill after being added via /add command
+CREATE TABLE IF NOT EXISTS newly_added_symbols (
+    ticker TEXT PRIMARY KEY,
+    added_at INTEGER NOT NULL
 );

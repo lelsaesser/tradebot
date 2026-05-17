@@ -1,8 +1,5 @@
 package org.tradelite.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 import lombok.Getter;
@@ -11,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.tradelite.core.RelativeStrengthSignal;
 import org.tradelite.quant.StatisticsUtil;
+import org.tradelite.quant.TrendDirection;
+import org.tradelite.repository.RsCrossoverStateRepository;
 import org.tradelite.service.model.DailyPrice;
 import org.tradelite.service.model.RelativeStrengthData;
 
@@ -35,7 +34,7 @@ public class RelativeStrengthService {
     private static final int MIN_HISTORY_SIZE = 10;
 
     /** Number of calendar days to fetch for RS calculation (with buffer for weekends/holidays) */
-    private static final int RS_LOOKBACK_DAYS = 80;
+    private static final int RS_LOOKBACK_DAYS = 400;
 
     /**
      * Dead zone around the EMA (percentage-based) to filter noise. RS must deviate more than
@@ -43,6 +42,14 @@ public class RelativeStrengthService {
      * false crossover alerts when RS oscillates tightly around the EMA in range-bound markets.
      */
     static final double RS_EMA_DEAD_ZONE = 0.2;
+
+    /** Number of trading days to look back for slope calculation */
+    static final int TREND_LOOKBACK_DAYS = 5;
+
+    /**
+     * Dead zone for slope classification (percentage change must exceed this to be RISING/FALLING)
+     */
+    static final double TREND_DEAD_ZONE = 0.5;
 
     /** Result of RS and EMA calculation with data completeness info */
     public record RsResult(double rs, double ema, int dataPoints, boolean isComplete) {
@@ -52,20 +59,18 @@ public class RelativeStrengthService {
         }
     }
 
-    /** File to persist RS data */
-    private static final String RS_DATA_FILE = "config/rs-data.json";
-
-    private final ObjectMapper objectMapper;
+    private final RsCrossoverStateRepository rsCrossoverStateRepository;
     private final DailyPriceProvider dailyPriceProvider;
 
-    @Getter private Map<String, RelativeStrengthData> rsHistory = new HashMap<>();
+    @Getter private final Map<String, RelativeStrengthData> rsHistory;
 
     @Autowired
-    public RelativeStrengthService(ObjectMapper objectMapper, DailyPriceProvider dailyPriceProvider)
-            throws IOException {
-        this.objectMapper = objectMapper;
+    public RelativeStrengthService(
+            RsCrossoverStateRepository rsCrossoverStateRepository,
+            DailyPriceProvider dailyPriceProvider) {
+        this.rsCrossoverStateRepository = rsCrossoverStateRepository;
         this.dailyPriceProvider = dailyPriceProvider;
-        loadRsHistory();
+        this.rsHistory = new HashMap<>(rsCrossoverStateRepository.findAll());
     }
 
     /**
@@ -140,6 +145,9 @@ public class RelativeStrengthService {
         rsData.setPreviousRs(currentRs);
         rsData.setPreviousEma(currentEma);
         rsData.setInitialized(true);
+
+        // Persist crossover state
+        rsCrossoverStateRepository.save(symbol, rsData);
 
         return signal;
     }
@@ -290,34 +298,72 @@ public class RelativeStrengthService {
         return Optional.of(new RsResult(currentRs, currentEma, rsValues.size(), isComplete));
     }
 
-    /** Persists RS history to file. */
-    public void saveRsHistory() throws IOException {
-        try {
-            objectMapper.writeValue(new File(RS_DATA_FILE), rsHistory);
-        } catch (IOException e) {
-            log.error("Error saving RS data", e);
-            throw e;
+    /**
+     * Gets the current RS and EMA values with their slope directions over the last 5 trading days.
+     *
+     * <p>Slope is classified using a ±0.5% dead zone: percentage change exceeding +0.5% is RISING,
+     * below -0.5% is FALLING, otherwise FLAT.
+     *
+     * @param symbol The stock ticker symbol
+     * @return Optional containing RsTrendResult with values and trend directions
+     */
+    public Optional<RsTrendResult> getRsTrend(String symbol) {
+        if (BENCHMARK_SYMBOL.equals(symbol)) {
+            return Optional.empty();
         }
+
+        List<DailyPrice> stockPrices =
+                dailyPriceProvider.findDailyClosingPrices(symbol, RS_LOOKBACK_DAYS);
+        List<DailyPrice> spyPrices =
+                dailyPriceProvider.findDailyClosingPrices(BENCHMARK_SYMBOL, RS_LOOKBACK_DAYS);
+
+        if (stockPrices.isEmpty() || spyPrices.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Map<LocalDate, Double> spyPriceMap = new HashMap<>();
+        for (DailyPrice price : spyPrices) {
+            spyPriceMap.put(price.getDate(), price.getPrice());
+        }
+
+        List<Double> rsValues = new ArrayList<>();
+        for (DailyPrice stockPrice : stockPrices) {
+            Double spyPrice = spyPriceMap.get(stockPrice.getDate());
+            if (spyPrice != null && spyPrice > 0) {
+                rsValues.add(stockPrice.getPrice() / spyPrice);
+            }
+        }
+
+        int minRequired = MIN_HISTORY_SIZE + TREND_LOOKBACK_DAYS;
+        if (rsValues.size() < minRequired) {
+            return Optional.empty();
+        }
+
+        double currentRs = rsValues.getLast();
+        int emaPeriod = Math.min(rsValues.size(), EMA_PERIOD);
+        double currentEma = StatisticsUtil.calculateEma(rsValues, emaPeriod);
+
+        double pastRs = rsValues.get(rsValues.size() - 1 - TREND_LOOKBACK_DAYS);
+        double pastEma =
+                StatisticsUtil.calculateEma(
+                        rsValues.subList(0, rsValues.size() - TREND_LOOKBACK_DAYS), emaPeriod);
+
+        TrendDirection rsTrend = classifySlope(currentRs, pastRs);
+        TrendDirection rsEmaTrend = classifySlope(currentEma, pastEma);
+
+        return Optional.of(new RsTrendResult(currentRs, currentEma, rsTrend, rsEmaTrend));
     }
 
-    /** Loads RS history from file. */
-    protected void loadRsHistory() throws IOException {
-        try {
-            File file = new File(RS_DATA_FILE);
-            if (file.exists()) {
-                rsHistory =
-                        objectMapper.readValue(
-                                file,
-                                objectMapper
-                                        .getTypeFactory()
-                                        .constructMapType(
-                                                HashMap.class,
-                                                String.class,
-                                                RelativeStrengthData.class));
-            }
-        } catch (IOException e) {
-            log.error("Error loading RS data", e);
-            throw e;
+    static TrendDirection classifySlope(double current, double past) {
+        if (past == 0) {
+            return TrendDirection.FLAT;
         }
+        double pctChange = ((current - past) / past) * 100;
+        if (pctChange > TREND_DEAD_ZONE) {
+            return TrendDirection.RISING;
+        } else if (pctChange < -TREND_DEAD_ZONE) {
+            return TrendDirection.FALLING;
+        }
+        return TrendDirection.FLAT;
     }
 }

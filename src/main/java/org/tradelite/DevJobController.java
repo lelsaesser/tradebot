@@ -98,6 +98,26 @@ public class DevJobController {
         return runJob("pullback-buy-alert", scheduler::manualPullbackBuyAlert);
     }
 
+    @PostMapping("/earnings-calendar")
+    public ResponseEntity<Map<String, String>> earningsCalendar() {
+        return runJob("earnings-calendar", scheduler::manualEarningsCalendarCheck);
+    }
+
+    @PostMapping("/accumulation-detection")
+    public ResponseEntity<Map<String, String>> accumulationDetection() {
+        return runJob("accumulation-detection", scheduler::manualAccumulationDetection);
+    }
+
+    @PostMapping("/market-holiday-notification")
+    public ResponseEntity<Map<String, String>> marketHolidayNotification() {
+        return runJob("market-holiday-notification", scheduler::manualMarketHolidayNotification);
+    }
+
+    @PostMapping("/yahoo-price-evaluation")
+    public ResponseEntity<Map<String, String>> yahooPriceEvaluation() {
+        return runJob("yahoo-price-evaluation", scheduler::manualYahooPriceEvaluation);
+    }
+
     @PostMapping("/run-all")
     public ResponseEntity<Map<String, Object>> runAll() {
         LinkedHashMap<String, String> results = new LinkedHashMap<>();
@@ -142,6 +162,19 @@ public class DevJobController {
         failures +=
                 runAndRecord(results, "monthly-api-usage", scheduler::manualMonthlyApiUsageReport);
         failures += runAndRecord(results, "pullback-buy-alert", scheduler::manualPullbackBuyAlert);
+        failures +=
+                runAndRecord(results, "earnings-calendar", scheduler::manualEarningsCalendarCheck);
+        failures +=
+                runAndRecord(
+                        results, "accumulation-detection", scheduler::manualAccumulationDetection);
+        failures +=
+                runAndRecord(
+                        results,
+                        "market-holiday-notification",
+                        scheduler::manualMarketHolidayNotification);
+        failures +=
+                runAndRecord(
+                        results, "yahoo-price-evaluation", scheduler::manualYahooPriceEvaluation);
 
         // Phase 4: VFI last (depends on OHLCV data)
         failures += runAndRecord(results, "vfi-report", scheduler::manualVfiReport);

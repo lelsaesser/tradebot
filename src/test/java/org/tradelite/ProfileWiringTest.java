@@ -3,7 +3,6 @@ package org.tradelite;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -23,10 +22,14 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.config.TradebotTelegramProperties;
-import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.repository.RsCrossoverStateRepository;
+import org.tradelite.repository.SectorPerformanceRepository;
+import org.tradelite.repository.TargetPriceRepository;
+import org.tradelite.repository.TrackedSymbolRepository;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RsiService;
 
@@ -109,11 +112,6 @@ class ProfileWiringTest {
         }
 
         @Bean
-        ObjectMapper objectMapper() {
-            return new ObjectMapper();
-        }
-
-        @Bean
         MomentumRocRepository momentumRocRepository() {
             return mock(MomentumRocRepository.class);
         }
@@ -126,6 +124,11 @@ class ProfileWiringTest {
         @Bean
         RsiService rsiService() {
             return mock(RsiService.class);
+        }
+
+        @Bean
+        RsCrossoverStateRepository rsCrossoverStateRepository() {
+            return mock(RsCrossoverStateRepository.class);
         }
 
         @Bean
@@ -149,8 +152,23 @@ class ProfileWiringTest {
         }
 
         @Bean
-        FinnhubPriceEvaluator finnhubPriceEvaluator() {
-            return mock(FinnhubPriceEvaluator.class);
+        LivePriceCache livePriceCache() {
+            return new LivePriceCache();
+        }
+
+        @Bean
+        SectorPerformanceRepository sectorPerformanceRepository() {
+            return mock(SectorPerformanceRepository.class);
+        }
+
+        @Bean
+        TrackedSymbolRepository trackedSymbolRepository() {
+            return mock(TrackedSymbolRepository.class);
+        }
+
+        @Bean
+        TargetPriceRepository targetPriceRepository() {
+            return mock(TargetPriceRepository.class);
         }
     }
 }

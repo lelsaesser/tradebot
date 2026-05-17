@@ -1,9 +1,8 @@
 package org.tradelite.client.telegram;
 
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 
@@ -47,6 +46,6 @@ public class RemoveCommandProcessor implements TelegramCommandProcessor<RemoveCo
     }
 
     private boolean removeFromTargetPrices(String ticker) {
-        return targetPriceProvider.removeSymbolFromTargetPrices(ticker, FILE_PATH_STOCKS);
+        return targetPriceProvider.removeSymbolFromTargetPrices(ticker, AssetType.STOCK);
     }
 }

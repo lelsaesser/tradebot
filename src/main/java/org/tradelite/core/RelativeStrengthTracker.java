@@ -1,6 +1,5 @@
 package org.tradelite.core;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +35,7 @@ public class RelativeStrengthTracker {
      *
      * <p>Should be called daily after market close (after RSI price data is collected).
      */
-    public void analyzeAndSendAlerts() throws IOException {
+    public void analyzeAndSendAlerts() {
         log.info("Starting relative strength analysis for all tracked stocks");
 
         List<RelativeStrengthSignal> outperformingSignals = new ArrayList<>();
@@ -83,8 +82,6 @@ public class RelativeStrengthTracker {
             log.info("No RS crossovers detected");
         }
 
-        // Persist RS data
-        relativeStrengthService.saveRsHistory();
         log.info("Relative strength analysis completed");
     }
 
@@ -100,10 +97,10 @@ public class RelativeStrengthTracker {
             List<RelativeStrengthSignal> underperforming) {
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📈 *RELATIVE STRENGTH ALERT*\n\n");
+        sb.append("📈 *Relative Strength Alert*\n\n");
 
         if (!outperforming.isEmpty()) {
-            sb.append("*🟢 OUTPERFORMING SPY:*\n");
+            sb.append("*🟢 Outperforming SPY:*\n");
             for (RelativeStrengthSignal signal : outperforming) {
                 sb.append(formatSignalLine(signal));
             }
@@ -111,7 +108,7 @@ public class RelativeStrengthTracker {
         }
 
         if (!underperforming.isEmpty()) {
-            sb.append("*🔴 UNDERPERFORMING SPY:*\n");
+            sb.append("*🔴 Underperforming SPY:*\n");
             for (RelativeStrengthSignal signal : underperforming) {
                 sb.append(formatSignalLine(signal));
             }
@@ -132,8 +129,8 @@ public class RelativeStrengthTracker {
     private String formatSignalLine(RelativeStrengthSignal signal) {
         return String.format(
                 "• *%s* (%s)%n  RS: %.4f | EMA: %.4f (%+.1f%%)%n",
-                signal.symbol(),
                 signal.displayName(),
+                signal.symbol(),
                 signal.rsValue(),
                 signal.emaValue(),
                 signal.percentageDiff());

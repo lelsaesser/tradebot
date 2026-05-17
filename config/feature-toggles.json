@@ -2,5 +2,8 @@
   "finnhubPriceCollection": true,
   "emaReport": true,
   "vfiReport": true,
-  "pullbackBuyAlert": true
+  "pullbackBuyAlert": true,
+  "earningsCalendarAlert": true,
+  "accumulationDetection": true,
+  "yahooIntradayPriceFetch": true
 }

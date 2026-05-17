@@ -3,11 +3,14 @@ package org.tradelite.client.telegram;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,10 +20,15 @@ import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.client.yahoo.YahooFetchException;
+import org.tradelite.client.yahoo.YahooFinanceClient;
+import org.tradelite.common.AssetType;
+import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.NewlyAddedSymbolRepository;
 
 @ExtendWith(MockitoExtension.class)
 class AddCommandProcessorTest {
@@ -30,6 +38,8 @@ class AddCommandProcessorTest {
     @Mock private SymbolRegistry symbolRegistry;
     @Mock private FinnhubClient finnhubClient;
     @Mock private CoinGeckoClient coinGeckoClient;
+    @Mock private YahooFinanceClient yahooFinanceClient;
+    @Mock private NewlyAddedSymbolRepository newlyAddedSymbolRepository;
 
     private AddCommandProcessor addCommandProcessor;
 
@@ -41,7 +51,9 @@ class AddCommandProcessorTest {
                         telegramClient,
                         symbolRegistry,
                         finnhubClient,
-                        coinGeckoClient);
+                        coinGeckoClient,
+                        yahooFinanceClient,
+                        newlyAddedSymbolRepository);
     }
 
     @Test
@@ -71,17 +83,30 @@ class AddCommandProcessorTest {
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
-        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
+        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
                 .thenReturn(true);
 
         addCommandProcessor.processCommand(command);
 
         verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
         verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
-        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), anyString());
+        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), any(AssetType.class));
+        verify(newlyAddedSymbolRepository).insert(eq("COHR"), anyLong());
         verify(telegramClient)
                 .sendMessage(
                         "All set!\nAdded Coherent Corp (COHR) with buy target 0.0 and sell target 0.0.");
+    }
+
+    @Test
+    void processCommand_invalidTicker_doesNotInsertNewlyAdded() {
+        AddCommand command = new AddCommand("INVALID", "Invalid Ticker", 0.0, 0.0);
+
+        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
+                .thenThrow(new RuntimeException("Not found"));
+
+        addCommandProcessor.processCommand(command);
+
+        verify(newlyAddedSymbolRepository, never()).insert(anyString(), anyLong());
     }
 
     @Test
@@ -130,13 +155,14 @@ class AddCommandProcessorTest {
         when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
-        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
+        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
                 .thenReturn(false);
 
         addCommandProcessor.processCommand(command);
 
         verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
         verify(symbolRegistry).removeSymbol("COHR");
+        verify(newlyAddedSymbolRepository, never()).insert(anyString(), anyLong());
         verify(telegramClient).sendMessage("Failed to add symbol to target prices: COHR");
     }
 
@@ -154,7 +180,7 @@ class AddCommandProcessorTest {
         when(coinGeckoClient.getCoinPriceData(any())).thenReturn(mockCoinData);
 
         when(symbolRegistry.addSymbol("bitcoin", "Bitcoin")).thenReturn(true);
-        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), anyString()))
+        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
                 .thenReturn(true);
 
         addCommandProcessor.processCommand(command);
@@ -162,9 +188,58 @@ class AddCommandProcessorTest {
         verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
         verify(coinGeckoClient).getCoinPriceData(any());
         verify(symbolRegistry).addSymbol("bitcoin", "Bitcoin");
-        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), anyString());
+        verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), any(AssetType.class));
         verify(telegramClient)
                 .sendMessage(
                         "All set!\nAdded Bitcoin (bitcoin) with buy target 0.0 and sell target 0.0.");
+    }
+
+    @Test
+    void processCommand_internationalTicker_validViaYahoo_succeeds() {
+        AddCommand command = new AddCommand("RHM.DE", "Rheinmetall", 400.0, 500.0);
+
+        // Mock international symbol detection
+        when(symbolRegistry.isInternationalSymbol("RHM.DE")).thenReturn(true);
+
+        // Mock successful Yahoo validation
+        OhlcvRecord ohlcvRecord =
+                new OhlcvRecord(
+                        "RHM.DE", java.time.LocalDate.now(), 450.0, 460.0, 440.0, 455.0, 100000L);
+        when(yahooFinanceClient.fetchDailyOhlcv("RHM.DE", 5)).thenReturn(List.of(ohlcvRecord));
+
+        when(symbolRegistry.addSymbol("RHM.DE", "Rheinmetall")).thenReturn(true);
+        when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
+                .thenReturn(true);
+
+        addCommandProcessor.processCommand(command);
+
+        verify(yahooFinanceClient).fetchDailyOhlcv("RHM.DE", 5);
+        verify(finnhubClient, never()).getPriceQuote(any(StockSymbol.class));
+        verify(coinGeckoClient, never()).getCoinPriceData(any());
+        verify(symbolRegistry).addSymbol("RHM.DE", "Rheinmetall");
+        verify(telegramClient)
+                .sendMessage(
+                        "All set!\nAdded Rheinmetall (RHM.DE) with buy target 400.0 and sell target 500.0.");
+    }
+
+    @Test
+    void processCommand_internationalTicker_yahooFails_sendsYahooErrorMessage() {
+        AddCommand command = new AddCommand("INVALID.XY", "Fake Stock", 100.0, 200.0);
+
+        // Mock international symbol detection
+        when(symbolRegistry.isInternationalSymbol("INVALID.XY")).thenReturn(true);
+
+        // Mock failed Yahoo validation
+        when(yahooFinanceClient.fetchDailyOhlcv("INVALID.XY", 5))
+                .thenThrow(new YahooFetchException("INVALID.XY", "curl exited with code 22"));
+
+        addCommandProcessor.processCommand(command);
+
+        verify(yahooFinanceClient).fetchDailyOhlcv("INVALID.XY", 5);
+        verify(finnhubClient, never()).getPriceQuote(any(StockSymbol.class));
+        verify(telegramClient)
+                .sendMessage(
+                        "Invalid ticker symbol: INVALID.XY. Could not fetch price data from Yahoo Finance.");
+        verify(symbolRegistry, never()).addSymbol(anyString(), anyString());
     }
 }

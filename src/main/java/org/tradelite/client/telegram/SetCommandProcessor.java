@@ -1,11 +1,9 @@
 package org.tradelite.client.telegram;
 
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_COINS;
-import static org.tradelite.common.TargetPriceProvider.FILE_PATH_STOCKS;
-
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.common.AssetType;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
@@ -54,11 +52,11 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
         if (coinId.isPresent()) {
             displayName = coinId.get().getName();
             targetPriceProvider.updateTargetPrice(
-                    coinId.get(), buyTarget, sellTarget, FILE_PATH_COINS);
+                    coinId.get(), buyTarget, sellTarget, AssetType.COIN);
         } else if (stockSymbol.isPresent()) {
             displayName = stockSymbol.get().getDisplayName();
             targetPriceProvider.updateTargetPrice(
-                    stockSymbol.get(), buyTarget, sellTarget, FILE_PATH_STOCKS);
+                    stockSymbol.get(), buyTarget, sellTarget, AssetType.STOCK);
         } else {
             throw new IllegalArgumentException("Invalid symbol: " + symbol);
         }

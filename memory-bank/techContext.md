@@ -41,6 +41,7 @@ This document covers the technologies used, development setup, technical constra
 | CoinGecko | `CoinGeckoClient` | Cryptocurrency prices | No auth |
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
 | Twelve Data | `TwelveDataClient` | Daily OHLCV data (400 data points) | API Key |
+| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (ProcessBuilder + curl) |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |
@@ -54,6 +55,14 @@ This document covers the technologies used, development setup, technical constra
 | `momentum_roc_state` | `SqliteMomentumRocRepository` | Momentum ROC state |
 | `twelvedata_daily_ohlcv` | `SqliteOhlcvRepository` | Twelve Data daily OHLCV (400 data points) |
 | `ignored_symbols` | `SqliteIgnoredSymbolRepository` | Per-symbol alert suppression with reason and TTL |
+| `rs_crossover_state` | `SqliteRsCrossoverStateRepository` | Relative strength crossover detection state |
+| `sector_rs_streaks` | `SqliteSectorRsStreakRepository` | Consecutive days of outperformance/underperformance |
+| `insider_transactions` | `SqliteInsiderTransactionRepository` | Weekly insider transaction counts |
+| `industry_performance` | `SqliteSectorPerformanceRepository` | FinViz sector/industry performance snapshots |
+| `target_prices` | `SqliteTargetPriceRepository` | Buy/sell target prices (stocks + coins, merged with asset_type) |
+| `stock_symbols` | `SqliteStockSymbolRepository` | All tracked stock symbols |
+| `api_request_metering` | `SqliteApiMeteringRepository` | Monthly API request counters per provider (periodic flush) |
+| `accumulation_streaks` | `SqliteAccumulationStreakRepository` | Consecutive days of accumulation signal per stock |
 
 All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centralized in `src/main/resources/schema.sql` and auto-initialized via `spring.sql.init.mode=always`. DataSource is auto-configured via `application.yaml` (`spring.datasource.*`) with HikariCP connection pool (max pool size 1 for SQLite single-writer). `DatabaseDirectoryInitializer` ensures the DB parent directory exists at startup.
 
@@ -61,15 +70,11 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `config/stock-symbols.json` | JSON | Dynamic stock symbol registry |
-| `config/target-prices-stocks.json` | JSON | Stock buy/sell targets |
-| `config/target-prices-coins.json` | JSON | Crypto buy/sell targets |
-| `config/sector-performance.json` | JSON | Sector performance history |
+| `config/stock-symbols.json` | JSON | Dynamic stock symbol registry (migrated to SQLite #326, pending removal #359) |
+| `config/target-prices-stocks.json` | JSON | Stock buy/sell targets (migrated to SQLite #326, pending removal #359) |
+| `config/target-prices-coins.json` | JSON | Crypto buy/sell targets (migrated to SQLite #326, pending removal #359) |
 | `config/insider-transactions.json` | JSON | Insider trading data |
-| `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT) |
-| `config/finnhub-monthly-requests.txt` | Text | Finnhub API metering |
-| `config/coingecko-monthly-requests.txt` | Text | CoinGecko API metering |
-| `config/twelvedata-monthly-requests.txt` | Text | Twelve Data API metering |
+| `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT, ACCUMULATION_DETECTION, EARNINGS_CALENDAR_ALERT) |
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `data/tradebot.db` | SQLite | All SQLite tables |
 
@@ -109,7 +114,10 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/ohlcv-fetch` | OHLCV data fetch from Twelve Data |
 | `/dev/jobs/vfi-report` | VFI + RS combined report |
 | `/dev/jobs/pullback-buy-alert` | EMA pullback buy alert scan |
-| `/dev/jobs/run-all` | Phased smoke test (runs all 14 jobs) |
+| `/dev/jobs/yahoo-price-evaluation` | Yahoo intraday price evaluation (international) |
+| `/dev/jobs/earnings-calendar` | Earnings calendar 7-day look-ahead |
+| `/dev/jobs/accumulation-detection` | Institutional accumulation detection |
+| `/dev/jobs/run-all` | Phased smoke test (runs all 18 jobs) |
 
 ### Bruno API Collection
 
@@ -212,7 +220,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~915
+- **Total Tests:** ~1061
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes

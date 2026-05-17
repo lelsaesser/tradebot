@@ -3,24 +3,19 @@ package org.tradelite.repository;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.jdbc.Sql;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.service.model.DailyPrice;
 
-@JdbcTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Sql("classpath:schema.sql")
-class SqlitePriceQuoteRepositoryTest {
+class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
 
     @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -69,10 +64,10 @@ class SqlitePriceQuoteRepositoryTest {
     }
 
     @Test
-    void save_multipleQuotesForSameSymbol() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
+    void save_multipleQuotesForSameSymbol() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
 
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
         assertThat(results, hasSize(2));
@@ -96,10 +91,10 @@ class SqlitePriceQuoteRepositoryTest {
     }
 
     @Test
-    void findBySymbol_returnsResultsOrderedByTimestamp() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
+    void findBySymbol_returnsResultsOrderedByTimestamp() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
 
         List<PriceQuoteEntity> results = repository.findBySymbol("AAPL");
         assertThat(results, hasSize(2));
@@ -187,12 +182,11 @@ class SqlitePriceQuoteRepositoryTest {
     }
 
     @Test
-    void findDailyClosingPrices_groupsByDate() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.50));
+    void findDailyClosingPrices_groupsByDate() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
+        repository.save(createPriceQuote("AAPL", 176.50, base + 2));
 
         List<DailyPrice> results = repository.findDailyClosingPrices("AAPL", 30);
         assertThat(results, hasSize(1));
@@ -235,70 +229,10 @@ class SqlitePriceQuoteRepositoryTest {
     }
 
     @Test
-    void findDailyChangePercents_returnsEmptyListForUnknownSymbol() {
-        List<Double> results = repository.findDailyChangePercents("UNKNOWN", 30);
-        assertThat(results, is(empty()));
-    }
-
-    @Test
-    void findDailyChangePercents_returnsChangePercentWithinDaysLimit() {
-        PriceQuoteResponse quote = createPriceQuote("AAPL", 175.50);
-        quote.setChangePercent(2.5);
-        repository.save(quote);
-
-        List<Double> results = repository.findDailyChangePercents("AAPL", 30);
-        assertThat(results, hasSize(1));
-        assertThat(results.getFirst(), is(2.5));
-    }
-
-    @Test
-    void findDailyChangePercents_groupsByDateReturnsLatestChangePercent()
-            throws InterruptedException {
-        PriceQuoteResponse quote1 = createPriceQuote("AAPL", 175.50);
-        quote1.setChangePercent(1.5);
-        repository.save(quote1);
-
-        Thread.sleep(1100);
-
-        PriceQuoteResponse quote2 = createPriceQuote("AAPL", 176.00);
-        quote2.setChangePercent(2.0);
-        repository.save(quote2);
-
-        Thread.sleep(1100);
-
-        PriceQuoteResponse quote3 = createPriceQuote("AAPL", 176.50);
-        quote3.setChangePercent(2.5);
-        repository.save(quote3);
-
-        List<Double> results = repository.findDailyChangePercents("AAPL", 30);
-        assertThat(results, hasSize(1));
-        assertThat(results.getFirst(), is(2.5));
-    }
-
-    @Test
-    void findDailyChangePercents_returnsOnlyMatchingSymbol() {
-        PriceQuoteResponse aaplQuote = createPriceQuote("AAPL", 175.50);
-        aaplQuote.setChangePercent(1.5);
-        repository.save(aaplQuote);
-
-        PriceQuoteResponse googQuote = createPriceQuote("GOOG", 150.25);
-        googQuote.setChangePercent(2.5);
-        repository.save(googQuote);
-
-        PriceQuoteResponse msftQuote = createPriceQuote("MSFT", 400.00);
-        msftQuote.setChangePercent(3.5);
-        repository.save(msftQuote);
-
-        List<Double> results = repository.findDailyChangePercents("GOOG", 30);
-        assertThat(results, hasSize(1));
-        assertThat(results.getFirst(), is(2.5));
-    }
-
-    @Test
-    void findLatestBySymbol_returnsLatestEntry() throws InterruptedException {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        Thread.sleep(1100);
-        repository.save(createPriceQuote("AAPL", 176.00));
+    void findLatestBySymbol_returnsLatestEntry() {
+        long base = Instant.now().getEpochSecond();
+        repository.save(createPriceQuote("AAPL", 175.50, base));
+        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
 
         var result = repository.findLatestBySymbol("AAPL");
         assertThat(result.isPresent(), is(true));
@@ -332,6 +266,12 @@ class SqlitePriceQuoteRepositoryTest {
         priceQuote.setChange(1.0);
         priceQuote.setChangePercent(0.5);
         priceQuote.setPreviousClose(price - 1);
+        return priceQuote;
+    }
+
+    private PriceQuoteResponse createPriceQuote(String symbol, double price, long timestamp) {
+        PriceQuoteResponse priceQuote = createPriceQuote(symbol, price);
+        priceQuote.setTimestamp(timestamp);
         return priceQuote;
     }
 }
