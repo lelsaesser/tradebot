@@ -60,8 +60,10 @@ public class SectorRsStreakPersistence {
                     isOutperforming ? "outperforming" : "underperforming");
         } else {
             SectorRsStreak currentStreak = currentStreakOpt.get();
-            if (currentStreak.lastUpdated().equals(date)) {
-                // Already updated today, return existing
+            if (currentStreak.lastUpdated().equals(date)
+                    && currentStreak.isOutperforming() == isOutperforming) {
+                // Already updated today with same direction — idempotent no-op.
+                // A same-day direction flip falls through to the update logic below.
                 return new StreakUpdateResult(currentStreak, 0, false);
             }
             // Update existing streak
