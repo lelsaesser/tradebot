@@ -12,7 +12,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SymbolRegistry`:** Unified `@Service` bean that owns all tracked symbols — ETFs (sector, thematic, benchmark as hardcoded constants) and individual stocks (JSON-loaded, dynamically add/remove via Telegram). Replaces the former split between `SectorEtfRegistry` (static) and `StockSymbolRegistry` (service). Methods: `getAll()`, `getAllEtfs()`, `getBroadSectorEtfs()`, `getThematicEtfs()`, `getStocks()`, `isEtf()`, `isSectorEtf()`, `fromString()`, `addSymbol()`, `removeSymbol()`.
 -   **`DailyPriceProvider`:** Unified data access layer for daily closing prices. Tries OHLCV (Twelve Data) first, falls back to Finnhub. Same `findDailyClosingPrices(symbol, days)` signature. Used by EmaService, BollingerBandService, RelativeStrengthService, MomentumRocService.
 -   **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`, `YahooPriceEvaluator`) responsible for fetching and evaluating prices from different APIs. Finnhub and Yahoo evaluators write to the shared `LivePriceCache`.
--   **`LivePriceCache`:** Shared `@Service` bean holding a `ConcurrentHashMap<String, Double>` of the latest known price per symbol. Both `FinnhubPriceEvaluator` (US stocks) and `YahooPriceEvaluator` (international stocks) write to it. Consumers (`PullbackBuyTracker`, `DailyPriceProvider`) read from it. Replaced the former `FinnhubPriceEvaluator.lastPriceCache` field.
+-   **`LivePriceCache`:** Shared `@Service` bean holding the latest known price per symbol. Internal storage is `ConcurrentHashMap<String, PricedAt>` (private nested record carrying price + write timestamp); public API exposes `Double` only. Both `FinnhubPriceEvaluator` (US stocks) and `YahooPriceEvaluator` (international stocks) write to it. Consumers (`PullbackBuyTracker`, `DailyPriceProvider`) read from it. Replaced the former `FinnhubPriceEvaluator.lastPriceCache` field. Stale entries (>30 min) are evicted by `evictStale()`, called from `Scheduler.periodicMaintenance()` as a safety net against persistent values from a downed exchange or failing data source.
 -   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays.
 -   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations.
 -   **`InsiderTracker`:** Tracks and reports insider trading activities. Excludes ETFs and international symbols (Finnhub free tier doesn't support non-US listings).
@@ -97,7 +97,7 @@ The application follows a modular, component-based architecture built on the Spr
 | `weeklyInsiderTradingReport` | Weekly Sat 12:00 | CET | Insider transactions |
 | `monthlyApiUsageReport` | Monthly 1st, 00:00 | UTC | API usage statistics |
 | `telegramMessagePolling` | Every 60 seconds | UTC | Process Telegram commands |
-| `periodicMaintenance` | Every 10 min | — | Cleanup ignored symbols + flush API metering counters + OHLCV backfill for new symbols + cleanup expired backfill entries |
+| `periodicMaintenance` | Every 10 min | — | Cleanup ignored symbols + flush API metering counters + OHLCV backfill for new symbols + cleanup expired backfill entries + evict stale `LivePriceCache` entries |
 
 ## Component Relationships
 

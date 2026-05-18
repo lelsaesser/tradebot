@@ -40,6 +40,7 @@ import org.tradelite.quant.RsiTracker;
 import org.tradelite.quant.TailRiskTracker;
 import org.tradelite.quant.VfiTracker;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.MarketStatusService;
 import org.tradelite.service.OhlcvBackfillService;
 import org.tradelite.service.OhlcvFetcher;
@@ -71,6 +72,7 @@ class SchedulerTest {
     @Mock private EarningsCalendarTracker earningsCalendarTracker;
     @Mock private AccumulationDetectionTracker accumulationDetectionTracker;
     @Mock private OhlcvBackfillService ohlcvBackfillService;
+    @Mock private LivePriceCache livePriceCache;
 
     private Scheduler scheduler;
 
@@ -101,7 +103,8 @@ class SchedulerTest {
                         marketStatusService,
                         earningsCalendarTracker,
                         accumulationDetectionTracker,
-                        ohlcvBackfillService);
+                        ohlcvBackfillService,
+                        livePriceCache);
     }
 
     @Test
@@ -204,13 +207,13 @@ class SchedulerTest {
     }
 
     @Test
-    void periodicMaintenance_shouldRunCleanupAndFlush() throws Exception {
+    void periodicMaintenance_shouldRunCleanupFlushAndEvict() throws Exception {
         scheduler.periodicMaintenance();
 
-        verify(rootErrorHandler, times(4)).run(argThat(Objects::nonNull));
+        verify(rootErrorHandler, times(5)).run(argThat(Objects::nonNull));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(4)).run(captor.capture());
+        verify(rootErrorHandler, times(5)).run(captor.capture());
 
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
@@ -221,6 +224,7 @@ class SchedulerTest {
         verify(apiRequestMeteringService, times(1)).flushCounters();
         verify(ohlcvBackfillService, times(1)).backfillNewlyAddedSymbols();
         verify(ohlcvBackfillService, times(1)).cleanupExpiredSymbols();
+        verify(livePriceCache, times(1)).evictStale();
     }
 
     @Test
