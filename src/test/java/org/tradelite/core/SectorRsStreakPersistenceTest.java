@@ -92,6 +92,40 @@ class SectorRsStreakPersistenceTest {
     }
 
     @Test
+    void updateStreak_sameDay_directionFlipsToUnderperforming_resetsStreak() {
+        LocalDate today = LocalDate.of(2026, 5, 18);
+        SectorRsStreak existing = new SectorRsStreak("XLE", 15, true, today);
+        when(sectorRsStreakRepository.findBySymbol("XLE")).thenReturn(Optional.of(existing));
+
+        SectorRsStreakPersistence.StreakUpdateResult result =
+                persistence.updateStreak("XLE", false, today);
+
+        assertEquals(1, result.newStreak().streakDays());
+        assertFalse(result.newStreak().isOutperforming());
+        assertEquals(today, result.newStreak().lastUpdated());
+        assertTrue(result.directionChanged());
+        assertEquals(15, result.previousStreakDays());
+        verify(sectorRsStreakRepository).save(result.newStreak());
+    }
+
+    @Test
+    void updateStreak_sameDay_directionFlipsToOutperforming_resetsStreak() {
+        LocalDate today = LocalDate.of(2026, 5, 18);
+        SectorRsStreak existing = new SectorRsStreak("XLU", 3, false, today);
+        when(sectorRsStreakRepository.findBySymbol("XLU")).thenReturn(Optional.of(existing));
+
+        SectorRsStreakPersistence.StreakUpdateResult result =
+                persistence.updateStreak("XLU", true, today);
+
+        assertEquals(1, result.newStreak().streakDays());
+        assertTrue(result.newStreak().isOutperforming());
+        assertEquals(today, result.newStreak().lastUpdated());
+        assertTrue(result.directionChanged());
+        assertEquals(3, result.previousStreakDays());
+        verify(sectorRsStreakRepository).save(result.newStreak());
+    }
+
+    @Test
     void getStreak_unknownSymbol_returnsEmpty() {
         when(sectorRsStreakRepository.findBySymbol("UNKNOWN")).thenReturn(Optional.empty());
 
