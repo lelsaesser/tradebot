@@ -15,7 +15,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`LivePriceCache`:** Shared `@Service` bean holding a `ConcurrentHashMap<String, Double>` of the latest known price per symbol. Both `FinnhubPriceEvaluator` (US stocks) and `YahooPriceEvaluator` (international stocks) write to it. Consumers (`PullbackBuyTracker`, `DailyPriceProvider`) read from it. Replaced the former `FinnhubPriceEvaluator.lastPriceCache` field.
 -   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays.
 -   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations.
--   **`InsiderTracker`:** Tracks and reports insider trading activities.
+-   **`InsiderTracker`:** Tracks and reports insider trading activities. Excludes ETFs and international symbols (Finnhub free tier doesn't support non-US listings).
 -   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz.
 -   **`SectorRotationAnalyzer`:** Statistical analysis component that detects sector rotation signals using Z-Score analysis.
 -   **`RelativeStrengthTracker`:** Tracks stock performance relative to SPY benchmark using 50-period EMA crossover detection.
@@ -59,14 +59,14 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SqliteApiMeteringRepository`:** API request counters per provider via batch `INSERT OR REPLACE`. Flushed periodically by Scheduler's `periodicMaintenance()` (every 10 min) and on shutdown (`@PreDestroy`). `AtomicInteger` map is the in-memory source of truth; SQLite is crash-recovery persistence.
 -   **`SqliteAccumulationStreakRepository`:** Accumulation streak data (consecutive signal days per stock) via `INSERT OR REPLACE`. Methods: `save()`, `findBySymbol()`, `deleteAllExcept(Set<String>)`. Streak deleted when signal stops firing.
 -   **`SqliteNewlyAddedSymbolRepository`:** Queue table for symbols awaiting OHLCV backfill. `INSERT OR REPLACE` on add, `DELETE ... RETURNING` for atomic expired cleanup. Methods: `insert()`, `findOldest()`, `deleteAll()`, `deleteExpiredReturning()`.
--   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence and caching.
+-   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence. Loaded once via `@PostConstruct`, updated in-memory and on disk via `setToggle(FeatureToggle, boolean)`. Controlled at runtime via `/toggle` Telegram command. Creates the JSON file if missing; can enable toggles not yet present in the file (enum is the source of truth).
 -   **`DatabaseDirectoryInitializer`:** `@PostConstruct` component that ensures the SQLite database parent directory exists at startup. Parses `spring.datasource.url` to extract the file path.
 -   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (12 tables). Auto-executed on startup via `spring.sql.init.mode=always`.
 
 ## Design Patterns
 
 -   **Repository Pattern:** Interface-implementation separation. `PriceQuoteRepository`, `OhlcvRepository`, `MomentumRocRepository`. All implementations use Spring's `JdbcTemplate` (not raw JDBC). DataSource auto-configured via `spring.datasource.*` with HikariCP (pool size 1 for SQLite). Spring's `DataAccessException` propagates naturally (no manual `IllegalStateException` wrapping).
--   **Command Pattern**: Telegram command processing (`/add`, `/remove`, `/rsi`, `/show`, `/set`).
+-   **Command Pattern**: Telegram command processing (`/add`, `/remove`, `/rsi`, `/show`, `/set`, `/data reset`, `/toggle`).
 -   **Dependency Injection**: Constructor injection via `@RequiredArgsConstructor`. All major components injected.
 -   **Profile Gating**: Default = production. `dev` = opt-in local profile.
 -   **Scheduler Pattern**: `@Scheduled` with cron expressions and timezone support.
