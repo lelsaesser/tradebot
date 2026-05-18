@@ -29,7 +29,8 @@ public class LivePriceCache {
 
     public Map<String, Double> getAll() {
         return cache.entrySet().stream()
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().price()));
+                .collect(
+                        Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().price()));
     }
 
     public void evictStale() {
@@ -40,8 +41,7 @@ public class LivePriceCache {
         List<String> evicted = new ArrayList<>();
         cache.forEach(
                 (symbol, entry) -> {
-                    if (now.isAfter(entry.updatedAt().plus(ttl))
-                            && cache.remove(symbol, entry)) {
+                    if (now.isAfter(entry.updatedAt().plus(ttl)) && cache.remove(symbol, entry)) {
                         evicted.add(symbol);
                     }
                 });
