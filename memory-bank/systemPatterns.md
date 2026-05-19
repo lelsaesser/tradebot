@@ -19,7 +19,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz.
 -   **`SectorRotationAnalyzer`:** Statistical analysis component that detects sector rotation signals using Z-Score analysis.
 -   **`RelativeStrengthTracker`:** Tracks stock performance relative to SPY benchmark using 50-period EMA crossover detection.
--   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Real-time RS crossover alerts + daily summary. Uses `SymbolRegistry.getAllEtfs()` and `getThematicSymbols()` for report section splitting.
+-   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Real-time RS crossover alerts + daily summary. Uses `SymbolRegistry.getAllEtfs()` and `getThematicSymbols()` for report section splitting. Daily summary also appends a "stocks outperforming sector leader" section: identifies the top-ranked ETF (by RS-vs-SPY pctDiff descending) and lists tracked stocks whose RS-vs-leader pctDiff is positive, top 10 sorted descending, with total qualifying count. Uses `RelativeStrengthService.getCurrentRsResult(symbol, leader)` (benchmark-parameterized). Single Telegram message — section is appended, not a separate send.
 -   **`MomentumRocService`:** Calculates Rate of Change (ROC) momentum and detects zero-line crossovers.
 -   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values.
 -   **`TailRiskService`:** Calculates excess kurtosis and skewness from daily price changes to detect fat tail risk.

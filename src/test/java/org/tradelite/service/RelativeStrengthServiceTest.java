@@ -393,6 +393,58 @@ class RelativeStrengthServiceTest {
     }
 
     @Test
+    void testGetCurrentRsResult_withCustomBenchmark_computesAgainstThatBenchmark() {
+        // Stock priced 600, leader (SMH) priced 300 -> RS = 2.0
+        stubDailyPrices("NVDA", constantPrices(55, 600.0));
+        stubDailyPrices("SMH", constantPrices(55, 300.0));
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("NVDA", "SMH");
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().rs(), is(closeTo(2.0, 0.01)));
+        assertThat(result.get().isComplete(), is(true));
+    }
+
+    @Test
+    void testGetCurrentRsResult_spyDefaultEqualsExplicitSpy() {
+        stubDailyPrices("XLK", constantPrices(55, 600.0));
+        stubDailyPrices("SPY", constantPrices(55, 500.0));
+
+        Optional<RelativeStrengthService.RsResult> defaultResult =
+                relativeStrengthService.getCurrentRsResult("XLK");
+        Optional<RelativeStrengthService.RsResult> explicitResult =
+                relativeStrengthService.getCurrentRsResult("XLK", "SPY");
+
+        assertThat(defaultResult.isPresent(), is(true));
+        assertThat(explicitResult.isPresent(), is(true));
+        assertThat(defaultResult.get().rs(), is(explicitResult.get().rs()));
+        assertThat(defaultResult.get().ema(), is(explicitResult.get().ema()));
+        assertThat(defaultResult.get().dataPoints(), is(explicitResult.get().dataPoints()));
+        assertThat(defaultResult.get().isComplete(), is(explicitResult.get().isComplete()));
+    }
+
+    @Test
+    void testGetCurrentRsResult_withCustomBenchmark_returnsEmptyWhenSymbolEqualsBenchmark() {
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("SMH", "SMH");
+
+        assertThat(result.isEmpty(), is(true));
+    }
+
+    @Test
+    void testGetCurrentRsResult_withCustomBenchmark_emptyWhenBenchmarkDataMissing() {
+        stubDailyPrices("NVDA", constantPrices(55, 600.0));
+        when(dailyPriceProvider.findDailyClosingPrices("SMH", RS_LOOKBACK_DAYS))
+                .thenReturn(new ArrayList<>());
+
+        Optional<RelativeStrengthService.RsResult> result =
+                relativeStrengthService.getCurrentRsResult("NVDA", "SMH");
+
+        assertThat(result.isEmpty(), is(true));
+    }
+
+    @Test
     void testCrossover_belowDeadZoneToAboveDeadZone_signalGenerated() {
         // Initialize
         stubDailyPrices("SPY", constantPrices(60, 500.0));

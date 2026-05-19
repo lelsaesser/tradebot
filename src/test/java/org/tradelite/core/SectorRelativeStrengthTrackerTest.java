@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
@@ -53,6 +54,10 @@ class SectorRelativeStrengthTrackerTest {
         lenient()
                 .when(relativeStrengthService.getCurrentRsResult(anyString()))
                 .thenReturn(Optional.empty());
+        lenient()
+                .when(relativeStrengthService.getCurrentRsResult(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        lenient().when(symbolRegistry.getStocks()).thenReturn(List.of());
     }
 
     @Test
@@ -768,5 +773,218 @@ class SectorRelativeStrengthTrackerTest {
         // Then - verify streak persistence was called with correct parameters
         verify(streakPersistence).updateStreak(eq("XLK"), eq(true), any(LocalDate.class));
         verify(streakPersistence).updateStreak(eq("XLU"), eq(false), any(LocalDate.class));
+    }
+
+    // ----- Leader-outperformer section tests -----
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_noQualifyingStocks_rendersEmptyMessage() {
+        // SMH is leader at +5%; all other ETFs neutral
+        stubLeaderAndStreaks();
+        when(symbolRegistry.getStocks()).thenReturn(List.of(new StockSymbol("AAPL", "Apple")));
+        // AAPL has negative RS vs SMH (no qualifiers)
+        when(relativeStrengthService.getCurrentRsResult("AAPL", "SMH"))
+                .thenReturn(Optional.of(new RsResult(0.95, 1.00, 50, true))); // -5%
+
+        tracker.sendDailySectorRsSummary();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        assertTrue(message.contains("Stocks outperforming sector leader (SMH):"));
+        assertTrue(message.contains("No tracked stocks outperforming SMH today."));
+    }
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_underCap_showsAllAndCount() {
+        stubLeaderAndStreaks();
+        when(symbolRegistry.getStocks())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("NVDA", "Nvidia"),
+                                new StockSymbol("AVGO", "Broadcom"),
+                                new StockSymbol("MU", "Micron")));
+        // NVDA +4%, AVGO +3%, MU +1% — all positive, ranked desc
+        when(relativeStrengthService.getCurrentRsResult("NVDA", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.04, 1.00, 50, true)));
+        when(relativeStrengthService.getCurrentRsResult("AVGO", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.03, 1.00, 50, true)));
+        when(relativeStrengthService.getCurrentRsResult("MU", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.01, 1.00, 50, true)));
+
+        tracker.sendDailySectorRsSummary();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        assertTrue(message.contains("Stocks outperforming sector leader (SMH):"));
+        // Ranked desc by pctDiff
+        int nvdaIdx = message.indexOf("Nvidia");
+        int avgoIdx = message.indexOf("Broadcom");
+        int muIdx = message.indexOf("Micron");
+        assertTrue(nvdaIdx > 0 && avgoIdx > 0 && muIdx > 0);
+        assertTrue(nvdaIdx < avgoIdx);
+        assertTrue(avgoIdx < muIdx);
+        assertTrue(message.contains("Total of 3 stocks outperform SMH"));
+    }
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_overCap_showsTopTenAndTotalCount() {
+        stubLeaderAndStreaks();
+        // 14 stocks all qualifying with descending pctDiff
+        List<StockSymbol> stocks = new java.util.ArrayList<>();
+        for (int i = 0; i < 14; i++) {
+            String ticker = "S" + i;
+            stocks.add(new StockSymbol(ticker, "Stock" + i));
+            // RS = 1.0 + (14 - i) * 0.01 → S0 highest (+14%), S13 lowest (+1%)
+            double rs = 1.0 + (14 - i) * 0.01;
+            when(relativeStrengthService.getCurrentRsResult(ticker, "SMH"))
+                    .thenReturn(Optional.of(new RsResult(rs, 1.0, 50, true)));
+        }
+        when(symbolRegistry.getStocks()).thenReturn(stocks);
+
+        tracker.sendDailySectorRsSummary();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        // Top 10 (S0..S9) shown; S10..S13 not shown
+        for (int i = 0; i < 10; i++) {
+            assertTrue(
+                    message.contains("Stock" + i + " (S" + i + ")"),
+                    "Expected top-10 entry Stock" + i + " in message");
+        }
+        for (int i = 10; i < 14; i++) {
+            assertFalse(
+                    message.contains("Stock" + i + " (S" + i + ")"),
+                    "Stock" + i + " should be cut off below top-10");
+        }
+        assertTrue(message.contains("Total of 14 stocks outperform SMH"));
+    }
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_skipsStocksWithEmptyRs() {
+        stubLeaderAndStreaks();
+        when(symbolRegistry.getStocks())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("NVDA", "Nvidia"),
+                                new StockSymbol("BAD", "BadData")));
+        // BAD has insufficient data (Optional.empty); NVDA qualifies
+        when(relativeStrengthService.getCurrentRsResult("NVDA", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.04, 1.00, 50, true)));
+        when(relativeStrengthService.getCurrentRsResult("BAD", "SMH")).thenReturn(Optional.empty());
+
+        tracker.sendDailySectorRsSummary();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        assertTrue(message.contains("Nvidia"));
+        assertFalse(message.contains("BadData"));
+        assertTrue(message.contains("Total of 1 stocks outperform SMH"));
+    }
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_skipsLeaderItselfFromStockList() {
+        // SMH itself is in the stock watchlist (edge case); should not appear in its own section.
+        stubLeaderAndStreaks();
+        when(symbolRegistry.getStocks())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("SMH", "Semis ETF"),
+                                new StockSymbol("NVDA", "Nvidia")));
+        when(relativeStrengthService.getCurrentRsResult("NVDA", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.04, 1.00, 50, true)));
+
+        tracker.sendDailySectorRsSummary();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        assertFalse(message.contains("Semis ETF"));
+        assertTrue(message.contains("Nvidia"));
+        // SMH was skipped without an RS lookup
+        verify(relativeStrengthService, never()).getCurrentRsResult("SMH", "SMH");
+    }
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_singleSendMessageInvariant() {
+        stubLeaderAndStreaks();
+        when(symbolRegistry.getStocks()).thenReturn(List.of(new StockSymbol("NVDA", "Nvidia")));
+        when(relativeStrengthService.getCurrentRsResult("NVDA", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.04, 1.00, 50, true)));
+
+        tracker.sendDailySectorRsSummary();
+
+        // Exactly one Telegram message; the leader section is appended, not a second send.
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_swallowsExceptionPerStock() {
+        stubLeaderAndStreaks();
+        when(symbolRegistry.getStocks())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("NVDA", "Nvidia"),
+                                new StockSymbol("BOOM", "Crashy")));
+        when(relativeStrengthService.getCurrentRsResult("NVDA", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.04, 1.00, 50, true)));
+        when(relativeStrengthService.getCurrentRsResult("BOOM", "SMH"))
+                .thenThrow(new RuntimeException("kaboom"));
+
+        tracker.sendDailySectorRsSummary();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        assertTrue(message.contains("Nvidia"));
+        assertFalse(message.contains("Crashy"));
+        assertTrue(message.contains("Total of 1 stocks outperform SMH"));
+    }
+
+    @Test
+    void sendDailySectorRsSummary_leaderSection_skipsStocksWithZeroEma() {
+        stubLeaderAndStreaks();
+        when(symbolRegistry.getStocks())
+                .thenReturn(
+                        List.of(
+                                new StockSymbol("NVDA", "Nvidia"),
+                                new StockSymbol("ZERO", "ZeroEma")));
+        when(relativeStrengthService.getCurrentRsResult("NVDA", "SMH"))
+                .thenReturn(Optional.of(new RsResult(1.04, 1.00, 50, true)));
+        when(relativeStrengthService.getCurrentRsResult("ZERO", "SMH"))
+                .thenReturn(Optional.of(new RsResult(0.5, 0.0, 50, true)));
+
+        tracker.sendDailySectorRsSummary();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+        String message = messageCaptor.getValue();
+        assertFalse(message.contains("ZeroEma"));
+        assertTrue(message.contains("Nvidia"));
+    }
+
+    /**
+     * Helper: stubs SMH as the sector leader (highest pctDiff vs SPY) and provides a default streak
+     * persistence response. Used by leader-outperformer-section tests.
+     */
+    private void stubLeaderAndStreaks() {
+        // SMH leader at +5%, plus one other sector to ensure ranking happens
+        when(relativeStrengthService.getCurrentRsResult("SMH"))
+                .thenReturn(Optional.of(new RsResult(1.05, 1.00, 50, true))); // +5%
+        when(relativeStrengthService.getCurrentRsResult("XLK"))
+                .thenReturn(Optional.of(new RsResult(1.02, 1.00, 50, true))); // +2%
+
+        when(streakPersistence.updateStreak(anyString(), anyBoolean(), any(LocalDate.class)))
+                .thenAnswer(
+                        invocation -> {
+                            String symbol = invocation.getArgument(0);
+                            boolean isOutperforming = invocation.getArgument(1);
+                            LocalDate date = invocation.getArgument(2);
+                            return new SectorRsStreakPersistence.StreakUpdateResult(
+                                    new SectorRsStreak(symbol, 1, isOutperforming, date), 0, false);
+                        });
     }
 }
