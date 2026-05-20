@@ -236,7 +236,7 @@ public class RelativeStrengthService {
     }
 
     /**
-     * Gets the current RS calculation result with data completeness info.
+     * Gets the current RS calculation result with data completeness info, computed against SPY.
      *
      * <p>This method fetches fresh price data from SQLite and includes metadata about whether the
      * calculation was based on complete data (at least 50 data points for the EMA period).
@@ -245,52 +245,65 @@ public class RelativeStrengthService {
      * @return Optional containing RsResult with RS, EMA, and completeness info
      */
     public Optional<RsResult> getCurrentRsResult(String symbol) {
+        return getCurrentRsResult(symbol, BENCHMARK_SYMBOL);
+    }
+
+    /**
+     * Gets the current RS calculation result with data completeness info, computed against the
+     * given benchmark.
+     *
+     * <p>This method fetches fresh price data from SQLite and includes metadata about whether the
+     * calculation was based on complete data (at least 50 data points for the EMA period).
+     *
+     * @param symbol The stock ticker symbol
+     * @param benchmark The benchmark ticker symbol to compare against
+     * @return Optional containing RsResult with RS, EMA, and completeness info
+     */
+    public Optional<RsResult> getCurrentRsResult(String symbol, String benchmark) {
         // Skip benchmark itself
-        if (BENCHMARK_SYMBOL.equals(symbol)) {
+        if (benchmark.equals(symbol)) {
             return Optional.empty();
         }
 
-        // Fetch fresh daily prices from SQLite (only last 80 days)
         List<DailyPrice> stockPrices =
                 dailyPriceProvider.findDailyClosingPrices(symbol, RS_LOOKBACK_DAYS);
-        List<DailyPrice> spyPrices =
-                dailyPriceProvider.findDailyClosingPrices(BENCHMARK_SYMBOL, RS_LOOKBACK_DAYS);
+        List<DailyPrice> benchmarkPrices =
+                dailyPriceProvider.findDailyClosingPrices(benchmark, RS_LOOKBACK_DAYS);
 
-        if (stockPrices.isEmpty() || spyPrices.isEmpty()) {
+        if (stockPrices.isEmpty() || benchmarkPrices.isEmpty()) {
             log.debug(
-                    "Insufficient price data for RS calculation. Stock={}, SPY={}",
+                    "Insufficient price data for RS calculation. Stock={}, Benchmark({})={}",
                     !stockPrices.isEmpty(),
-                    !spyPrices.isEmpty());
+                    benchmark,
+                    !benchmarkPrices.isEmpty());
             return Optional.empty();
         }
 
-        // Build a map of SPY prices by date for efficient lookup
-        Map<LocalDate, Double> spyPriceMap = new HashMap<>();
-        for (DailyPrice price : spyPrices) {
-            spyPriceMap.put(price.getDate(), price.getPrice());
+        Map<LocalDate, Double> benchmarkPriceMap = new HashMap<>();
+        for (DailyPrice price : benchmarkPrices) {
+            benchmarkPriceMap.put(price.getDate(), price.getPrice());
         }
 
-        // Calculate RS values for each date where we have both stock and SPY prices
         List<Double> rsValues = new ArrayList<>();
         for (DailyPrice stockPrice : stockPrices) {
-            Double spyPrice = spyPriceMap.get(stockPrice.getDate());
-            if (spyPrice != null && spyPrice > 0) {
-                double rs = stockPrice.getPrice() / spyPrice;
+            Double benchmarkPrice = benchmarkPriceMap.get(stockPrice.getDate());
+            if (benchmarkPrice != null && benchmarkPrice > 0) {
+                double rs = stockPrice.getPrice() / benchmarkPrice;
                 rsValues.add(rs);
             }
         }
 
         if (rsValues.size() < MIN_HISTORY_SIZE) {
             log.debug(
-                    "Insufficient RS history for {}: {} values (need {})",
+                    "Insufficient RS history for {} vs {}: {} values (need {})",
                     symbol,
+                    benchmark,
                     rsValues.size(),
                     MIN_HISTORY_SIZE);
             return Optional.empty();
         }
 
         double currentRs = rsValues.getLast();
-        // Use available data for EMA, even if less than full period
         int emaPeriod = Math.min(rsValues.size(), EMA_PERIOD);
         double currentEma = StatisticsUtil.calculateEma(rsValues, emaPeriod);
         boolean isComplete = rsValues.size() >= EMA_PERIOD;
