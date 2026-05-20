@@ -38,8 +38,26 @@ public class LocalTelegramGateway implements TelegramGateway {
 
     @Override
     public OptionalLong sendMessageAndReturnId(String message) {
+        TelegramMessageSanitizer.SanitizeResult sanitized =
+                TelegramMessageSanitizer.sanitize(message);
+        switch (sanitized.outcome()) {
+            case STRIPPED_ONLY ->
+                    log.warn(
+                            "Telegram message {} chars, exceeded {} char limit; stripped markers and sent as plain text",
+                            sanitized.originalLength(),
+                            TelegramMessageSanitizer.LIMIT);
+            case TRUNCATED ->
+                    log.warn(
+                            "Telegram message truncated from {} to {} chars; sent as plain text",
+                            sanitized.originalLength(),
+                            sanitized.payload().length());
+            case UNCHANGED -> {
+                /* no-op */
+            }
+        }
+
         long messageId = MESSAGE_IDS.getAndIncrement();
-        log.info("DEV Telegram sink [{}]: {}", messageId, message);
+        log.info("DEV Telegram sink [{}]: {}", messageId, sanitized.payload());
         try {
             Path parent = sinkFilePath.getParent();
             if (parent != null) {
@@ -48,7 +66,10 @@ public class LocalTelegramGateway implements TelegramGateway {
             String line =
                     String.format(
                             "%s [%d] %s%s",
-                            Instant.now(), messageId, message, System.lineSeparator());
+                            Instant.now(),
+                            messageId,
+                            sanitized.payload(),
+                            System.lineSeparator());
             Files.writeString(
                     sinkFilePath,
                     line,

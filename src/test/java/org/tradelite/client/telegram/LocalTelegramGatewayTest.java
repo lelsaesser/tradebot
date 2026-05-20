@@ -70,4 +70,52 @@ class LocalTelegramGatewayTest {
 
         assertThat(Files.isDirectory(directorySink), is(true));
     }
+
+    @Test
+    void sendMessage_whenOverLimitButFitsAfterStrip_writesStrippedPayload() throws Exception {
+        Path sinkFile = Files.createTempFile("telegram-dev-strip", ".log");
+        Files.deleteIfExists(sinkFile);
+
+        TradebotTelegramProperties properties = new TradebotTelegramProperties();
+        properties.setLocalSinkFile(sinkFile.toString());
+
+        // Message > 4096 chars that fits after stripping markers.
+        String plain = "x".repeat(TelegramMessageSanitizer.LIMIT - 100);
+        String markers = "*".repeat(200);
+        String oversized = plain + markers;
+        assertThat(oversized.length() > TelegramMessageSanitizer.LIMIT, is(true));
+
+        LocalTelegramGateway gateway = new LocalTelegramGateway(properties);
+        gateway.sendMessage(oversized);
+
+        String content = Files.readString(sinkFile);
+        // Stripping should have removed all markdown markers.
+        assertThat(content.contains("*"), is(false));
+        assertThat(content.contains("`"), is(false));
+        assertThat(content.contains("_"), is(false));
+    }
+
+    @Test
+    void sendMessage_whenOverLimitAfterStrip_writesTruncatedPayload() throws Exception {
+        Path sinkFile = Files.createTempFile("telegram-dev-trunc", ".log");
+        Files.deleteIfExists(sinkFile);
+
+        TradebotTelegramProperties properties = new TradebotTelegramProperties();
+        properties.setLocalSinkFile(sinkFile.toString());
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 1000; i++) {
+            sb.append("row-").append(i).append("\n");
+        }
+        String oversized = sb.toString();
+        assertThat(oversized.length() > TelegramMessageSanitizer.LIMIT, is(true));
+
+        LocalTelegramGateway gateway = new LocalTelegramGateway(properties);
+        gateway.sendMessage(oversized);
+
+        String content = Files.readString(sinkFile);
+        // Sink line is "<timestamp> [<id>] <payload>\n" — payload portion must be <= LIMIT.
+        // Verify the file content is much smaller than the original message.
+        assertThat(content.length() < oversized.length(), is(true));
+    }
 }
