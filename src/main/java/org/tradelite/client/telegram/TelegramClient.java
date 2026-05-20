@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.tradelite.client.telegram.TelegramMessageSanitizer.SanitizeResult;
 import org.tradelite.client.telegram.dto.TelegramSendMessageResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
@@ -20,7 +21,6 @@ public class TelegramClient implements TelegramGateway {
 
     protected static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage";
     protected static final String DELETE_URL = "https://api.telegram.org/bot%s/deleteMessage";
-    static final int TELEGRAM_MESSAGE_CHAR_LIMIT = 4096;
 
     private final RestTemplate restTemplate;
     private final String botToken;
@@ -45,19 +45,31 @@ public class TelegramClient implements TelegramGateway {
      */
     @Override
     public OptionalLong sendMessageAndReturnId(String message) {
-        if (message.length() > TELEGRAM_MESSAGE_CHAR_LIMIT) {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Telegram message exceeds %d char limit (was %d chars)",
-                            TELEGRAM_MESSAGE_CHAR_LIMIT, message.length()));
+        SanitizeResult sanitized = TelegramMessageSanitizer.sanitize(message);
+        switch (sanitized.outcome()) {
+            case STRIPPED_ONLY ->
+                    log.warn(
+                            "Telegram message {} chars, exceeded {} char limit; stripped markers and sent as plain text",
+                            sanitized.originalLength(),
+                            TelegramMessageSanitizer.LIMIT);
+            case TRUNCATED ->
+                    log.warn(
+                            "Telegram message truncated from {} to {} chars; sent as plain text",
+                            sanitized.originalLength(),
+                            sanitized.payload().length());
+            case UNCHANGED -> {
+                /* no-op */
+            }
         }
 
         String url = String.format(BASE_URL, botToken);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("chat_id", groupChatId);
-        payload.put("text", message);
-        payload.put("parse_mode", "Markdown");
+        payload.put("text", sanitized.payload());
+        if (sanitized.outcome() == TelegramMessageSanitizer.Outcome.UNCHANGED) {
+            payload.put("parse_mode", "Markdown");
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
