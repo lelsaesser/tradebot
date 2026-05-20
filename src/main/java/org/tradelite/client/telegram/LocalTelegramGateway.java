@@ -66,10 +66,7 @@ public class LocalTelegramGateway implements TelegramGateway {
             String line =
                     String.format(
                             "%s [%d] %s%s",
-                            Instant.now(),
-                            messageId,
-                            sanitized.payload(),
-                            System.lineSeparator());
+                            Instant.now(), messageId, sanitized.payload(), System.lineSeparator());
             Files.writeString(
                     sinkFilePath,
                     line,

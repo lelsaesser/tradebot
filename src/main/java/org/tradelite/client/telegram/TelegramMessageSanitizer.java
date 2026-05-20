@@ -5,9 +5,9 @@ package org.tradelite.client.telegram;
  *
  * <p>Strategy: if the message is over the limit, first strip legacy-Markdown markers ({@code *},
  * {@code _}, {@code `}); if that brings it under the limit, deliver the full report unformatted.
- * Otherwise truncate at the last newline within the limit (or hard-cut at 4093 if no newline
- * exists in the window). Truncated/stripped payloads must be sent without {@code parse_mode} since
- * the formatting markers are gone.
+ * Otherwise truncate at the last newline within the limit (or hard-cut at 4093 if no newline exists
+ * in the window). Truncated/stripped payloads must be sent without {@code parse_mode} since the
+ * formatting markers are gone.
  */
 public final class TelegramMessageSanitizer {
 
