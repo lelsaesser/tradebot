@@ -24,6 +24,7 @@ import org.tradelite.client.telegram.dto.TelegramSendMessageResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 import org.tradelite.config.TradebotTelegramProperties;
 
+@SuppressWarnings("unchecked")
 @ExtendWith(MockitoExtension.class)
 class TelegramClientTest {
 
