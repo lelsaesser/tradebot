@@ -2,6 +2,7 @@ package org.tradelite.quant;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.IgnoreReason;
+import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
@@ -36,6 +38,7 @@ public class PullbackBuyTracker {
     private final SymbolRegistry symbolRegistry;
     private final TargetPriceProvider targetPriceProvider;
     private final FeatureToggleService featureToggleService;
+    private final ApexPerformerRepository apexPerformerRepository;
 
     public void analyzeAndSendAlerts() {
         if (!featureToggleService.isEnabled(FeatureToggle.PULLBACK_BUY_ALERT)) {
@@ -43,6 +46,7 @@ public class PullbackBuyTracker {
         }
 
         Map<String, Double> priceCache = livePriceCache.getAll();
+        Set<String> apexPerformers = apexPerformerRepository.findAll();
 
         for (StockSymbol stock : symbolRegistry.getStocks()) {
             if (targetPriceProvider.isSymbolIgnored(stock, IgnoreReason.PULLBACK_BUY_ALERT)) {
@@ -116,7 +120,8 @@ public class PullbackBuyTracker {
                 continue;
             }
 
-            String message = buildAlertMessage(stock, livePrice);
+            String message =
+                    buildAlertMessage(stock, livePrice, apexPerformers.contains(stock.getTicker()));
             telegramClient.sendMessage(message);
             targetPriceProvider.addIgnoredSymbol(stock, IgnoreReason.PULLBACK_BUY_ALERT);
             log.info("Pullback buy alert sent for {}", stock.getTicker());
@@ -131,10 +136,15 @@ public class PullbackBuyTracker {
                 && price > ema.ema200();
     }
 
-    static String buildAlertMessage(StockSymbol stock, double price) {
-        return String.format(
-                "Potential buy for *%s (%s)* at $%.2f\n"
-                        + "_21 EMA pullback while volume and relative strength stay bullish_",
-                stock.getCompanyName(), stock.getTicker(), price);
+    static String buildAlertMessage(StockSymbol stock, double price, boolean isApexPerformer) {
+        String base =
+                String.format(
+                        "Potential buy for *%s (%s)* at $%.2f\n"
+                                + "_21 EMA pullback while volume and relative strength stay bullish_",
+                        stock.getCompanyName(), stock.getTicker(), price);
+        if (isApexPerformer) {
+            base += "\n\n🏆 _Apex performer: outperforming top sector — strongest signal._";
+        }
+        return base;
     }
 }

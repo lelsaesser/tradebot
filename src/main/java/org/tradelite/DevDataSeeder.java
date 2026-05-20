@@ -26,6 +26,7 @@ import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.SectorPerformanceSnapshot;
 import org.tradelite.quant.StatisticsUtil;
+import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
@@ -73,6 +74,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final SectorPerformanceRepository sectorPerformanceRepository;
     private final TrackedSymbolRepository trackedSymbolRepository;
     private final TargetPriceRepository targetPriceRepository;
+    private final ApexPerformerRepository apexPerformerRepository;
 
     @Autowired
     public DevDataSeeder(
@@ -87,7 +89,8 @@ public class DevDataSeeder implements ApplicationRunner {
             LivePriceCache livePriceCache,
             SectorPerformanceRepository sectorPerformanceRepository,
             TrackedSymbolRepository trackedSymbolRepository,
-            TargetPriceRepository targetPriceRepository) {
+            TargetPriceRepository targetPriceRepository,
+            ApexPerformerRepository apexPerformerRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.momentumRocRepository = momentumRocRepository;
         this.priceQuoteRepository = priceQuoteRepository;
@@ -100,6 +103,7 @@ public class DevDataSeeder implements ApplicationRunner {
         this.sectorPerformanceRepository = sectorPerformanceRepository;
         this.trackedSymbolRepository = trackedSymbolRepository;
         this.targetPriceRepository = targetPriceRepository;
+        this.apexPerformerRepository = apexPerformerRepository;
     }
 
     @Override
@@ -129,6 +133,7 @@ public class DevDataSeeder implements ApplicationRunner {
         seedOhlcvData(bundle);
         seedPriceCache(bundle);
         seedSectorPerformance();
+        seedApexPerformers();
         log.info("Seeded dev analytics data for {} symbols", bundle.priceSeriesBySymbol().size());
     }
 
@@ -159,6 +164,7 @@ public class DevDataSeeder implements ApplicationRunner {
         jdbcTemplate.update("DELETE FROM target_prices");
         jdbcTemplate.update("DELETE FROM tracked_symbols");
         jdbcTemplate.update("DELETE FROM rs_crossover_state");
+        jdbcTemplate.update("DELETE FROM apex_performers");
 
         relativeStrengthService.getRsHistory().clear();
     }
@@ -521,6 +527,12 @@ public class DevDataSeeder implements ApplicationRunner {
                 "Seeded sector performance data: {} days, {} industries",
                 SECTOR_PERF_SEED_DAYS,
                 SEEDED_INDUSTRIES.size());
+    }
+
+    private void seedApexPerformers() {
+        java.util.Set<String> sample = java.util.Set.of("AAPL", "NVDA", "MSFT");
+        apexPerformerRepository.replaceAll(sample);
+        log.info("Seeded apex performers: {}", sample);
     }
 
     private IndustryPerformance buildIndustryPerformance(String industryName, int dayOffset) {

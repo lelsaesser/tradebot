@@ -22,6 +22,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.config.TradebotTelegramProperties;
+import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
@@ -169,6 +170,11 @@ class ProfileWiringTest {
         @Bean
         TargetPriceRepository targetPriceRepository() {
             return mock(TargetPriceRepository.class);
+        }
+
+        @Bean
+        ApexPerformerRepository apexPerformerRepository() {
+            return mock(ApexPerformerRepository.class);
         }
     }
 }

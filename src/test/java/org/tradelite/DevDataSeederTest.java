@@ -27,6 +27,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.repository.MomentumRocRepository;
 import org.tradelite.repository.OhlcvRepository;
 import org.tradelite.repository.PriceQuoteRepository;
@@ -96,7 +97,8 @@ class DevDataSeederTest {
                         livePriceCache,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
-                        targetPriceRepository);
+                        targetPriceRepository,
+                        mock(ApexPerformerRepository.class));
 
         seeder.reseed();
 
@@ -149,7 +151,8 @@ class DevDataSeederTest {
                         livePriceCache,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
-                        targetPriceRepository);
+                        targetPriceRepository,
+                        mock(ApexPerformerRepository.class));
 
         assertThat(seeder.seedIfMissing(), is(false));
     }
@@ -217,7 +220,8 @@ class DevDataSeederTest {
                         livePriceCache,
                         sectorPerformanceRepository,
                         trackedSymbolRepository,
-                        targetPriceRepository);
+                        targetPriceRepository,
+                        mock(ApexPerformerRepository.class));
 
         seeder.reseed();
 
@@ -258,7 +262,8 @@ class DevDataSeederTest {
                 livePriceCache,
                 sectorPerformanceRepository,
                 trackedSymbolRepository,
-                targetPriceRepository);
+                targetPriceRepository,
+                mock(ApexPerformerRepository.class));
     }
 
     private SQLiteDataSource createDataSource(String dbName) {
@@ -351,6 +356,13 @@ class DevDataSeederTest {
                     previous_ema REAL NOT NULL,
                     initialized INTEGER NOT NULL DEFAULT 0,
                     updated_at INTEGER NOT NULL
+                )
+                """);
+        jdbcTemplate.execute(
+                """
+                CREATE TABLE IF NOT EXISTS apex_performers (
+                    symbol TEXT PRIMARY KEY,
+                    last_updated TEXT NOT NULL
                 )
                 """);
         return jdbcTemplate;
