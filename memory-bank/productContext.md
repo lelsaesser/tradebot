@@ -35,7 +35,7 @@ Spring Boot application running continuously via scheduled tasks. All data persi
 - **Tail risk** (13:00 CET) — kurtosis + skewness analysis for fat tail detection
 - **Bollinger Band summary** (15:40 CET) — daily BB report
 - **EMA classification** (15:50 CET) — price vs 5 EMAs (green/yellow/red)
-- **Sector RS summary** (16:00, 21:00 CET) — RS streak tracking, performance comparison
+- **Sector RS summary** (16:00, 21:00 CET) — RS streak tracking, performance comparison; also includes a "stocks outperforming sector leader" sub-section listing the top 10 tracked stocks beating the strongest ETF
 - **OHLCV fetch** (23:00 CET) — Twelve Data backfill for all symbols (400 data points)
 
 ### Weekly/Monthly

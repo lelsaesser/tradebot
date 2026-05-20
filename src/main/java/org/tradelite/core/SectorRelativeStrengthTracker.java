@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
@@ -30,6 +31,9 @@ import org.tradelite.service.RelativeStrengthService.RsResult;
 @RequiredArgsConstructor
 @Slf4j
 public class SectorRelativeStrengthTracker {
+
+    /** Maximum number of stocks to show in the leader-outperformer section. */
+    static final int LEADER_OUTPERFORMER_LIMIT = 10;
 
     private final RelativeStrengthService relativeStrengthService;
     private final TelegramGateway telegramClient;
@@ -148,9 +152,88 @@ public class SectorRelativeStrengthTracker {
         }
 
         String message = formatSummaryMessage(sectorData);
+        message += "\n\n" + buildLeaderOutperformerSection(sectorData);
         telegramClient.sendMessage(message);
         log.info("Sent sector RS summary with {} sectors", sectorData.size());
     }
+
+    /**
+     * Builds the "stocks outperforming sector leader" section.
+     *
+     * <p>The leader is the top-ranked ETF by RS-vs-SPY percentage deviation. For each tracked
+     * stock, computes RS vs the leader (stock/leader ratio's deviation from 50-EMA). Stocks with
+     * positive deviation are outperforming the leader. Top {@link #LEADER_OUTPERFORMER_LIMIT} are
+     * shown, sorted by deviation descending. Total qualifying count is shown.
+     *
+     * @param sectorData Already-ranked sector RS data (descending). The first entry is the leader.
+     * @return Formatted Markdown section.
+     */
+    protected String buildLeaderOutperformerSection(List<SectorRsData> sectorData) {
+        SectorRsData leader = sectorData.getFirst();
+
+        List<LeaderOutperformer> qualifying = new ArrayList<>();
+        for (StockSymbol stock : symbolRegistry.getStocks()) {
+            String ticker = stock.getTicker();
+            if (ticker.equals(leader.symbol())) {
+                continue;
+            }
+            Optional<RsResult> result = safeGetCurrentRsResult(ticker, leader.symbol());
+            if (result.isEmpty()) {
+                continue;
+            }
+            RsResult rs = result.get();
+            if (rs.ema() == 0) {
+                continue;
+            }
+            double pctDiff = ((rs.rs() - rs.ema()) / rs.ema()) * 100;
+            if (pctDiff > 0) {
+                qualifying.add(new LeaderOutperformer(ticker, stock.getDisplayName(), pctDiff));
+            }
+        }
+
+        qualifying.sort((a, b) -> Double.compare(b.pctDiff(), a.pctDiff()));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("*Stocks outperforming sector leader (").append(leader.symbol()).append("):*\n");
+
+        if (qualifying.isEmpty()) {
+            sb.append("_No tracked stocks outperforming ")
+                    .append(leader.symbol())
+                    .append(" today._");
+            return sb.toString();
+        }
+
+        int shown = Math.min(qualifying.size(), LEADER_OUTPERFORMER_LIMIT);
+        for (int i = 0; i < shown; i++) {
+            LeaderOutperformer s = qualifying.get(i);
+            sb.append(
+                    String.format(
+                            "%d. *%s* (%s): %+.1f%%%n",
+                            i + 1, s.displayName(), s.symbol(), s.pctDiff()));
+        }
+        sb.append("\n_Total of ")
+                .append(qualifying.size())
+                .append(" stocks outperform ")
+                .append(leader.symbol())
+                .append("_");
+        return sb.toString();
+    }
+
+    /**
+     * Wrapper around {@link RelativeStrengthService#getCurrentRsResult(String, String)} that
+     * swallows exceptions per-symbol so a single bad data point doesn't break the whole report.
+     */
+    private Optional<RsResult> safeGetCurrentRsResult(String symbol, String benchmark) {
+        try {
+            return relativeStrengthService.getCurrentRsResult(symbol, benchmark);
+        } catch (Exception e) {
+            log.error("Error getting RS for {} vs {}: {}", symbol, benchmark, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /** A single stock that outperforms the sector leader. */
+    protected record LeaderOutperformer(String symbol, String displayName, double pctDiff) {}
 
     /**
      * Collects RS data for all sector ETFs, including streak information.
