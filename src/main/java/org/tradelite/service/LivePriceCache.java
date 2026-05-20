@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class LivePriceCache {
 
-    private static final Duration TTL = Duration.ofMinutes(30);
+    private static final Duration TTL = Duration.ofHours(24);
 
     private final Map<String, PricedAt> cache = new ConcurrentHashMap<>();
 
