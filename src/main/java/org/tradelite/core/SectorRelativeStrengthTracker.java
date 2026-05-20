@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
+import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -39,6 +40,7 @@ public class SectorRelativeStrengthTracker {
     private final TelegramGateway telegramClient;
     private final SectorRsStreakPersistence streakPersistence;
     private final SymbolRegistry symbolRegistry;
+    private final ApexPerformerRepository apexPerformerRepository;
 
     /**
      * Analyzes sector ETFs for RS crossovers and sends alerts.
@@ -151,24 +153,27 @@ public class SectorRelativeStrengthTracker {
             return;
         }
 
+        List<LeaderOutperformer> qualifying = computeLeaderOutperformers(sectorData);
+        Set<String> apexSymbols = new HashSet<>();
+        for (LeaderOutperformer lo : qualifying) {
+            apexSymbols.add(lo.symbol());
+        }
+        apexPerformerRepository.replaceAll(apexSymbols);
+
         String message = formatSummaryMessage(sectorData);
-        message += "\n\n" + buildLeaderOutperformerSection(sectorData);
+        message += "\n\n" + formatLeaderOutperformerSection(sectorData.getFirst(), qualifying);
         telegramClient.sendMessage(message);
         log.info("Sent sector RS summary with {} sectors", sectorData.size());
     }
 
     /**
-     * Builds the "stocks outperforming sector leader" section.
-     *
-     * <p>The leader is the top-ranked ETF by RS-vs-SPY percentage deviation. For each tracked
-     * stock, computes RS vs the leader (stock/leader ratio's deviation from 50-EMA). Stocks with
-     * positive deviation are outperforming the leader. Top {@link #LEADER_OUTPERFORMER_LIMIT} are
-     * shown, sorted by deviation descending. Total qualifying count is shown.
+     * Computes the full set of stocks outperforming the sector leader (positive RS-vs-leader
+     * pctDiff), unbounded and sorted descending by pctDiff.
      *
      * @param sectorData Already-ranked sector RS data (descending). The first entry is the leader.
-     * @return Formatted Markdown section.
+     * @return All qualifying stocks, sorted by pctDiff descending. Empty if none qualify.
      */
-    protected String buildLeaderOutperformerSection(List<SectorRsData> sectorData) {
+    protected List<LeaderOutperformer> computeLeaderOutperformers(List<SectorRsData> sectorData) {
         SectorRsData leader = sectorData.getFirst();
 
         List<LeaderOutperformer> qualifying = new ArrayList<>();
@@ -192,7 +197,15 @@ public class SectorRelativeStrengthTracker {
         }
 
         qualifying.sort((a, b) -> Double.compare(b.pctDiff(), a.pctDiff()));
+        return qualifying;
+    }
 
+    /**
+     * Formats the "stocks outperforming sector leader" section. Top {@link
+     * #LEADER_OUTPERFORMER_LIMIT} are shown; total qualifying count is appended.
+     */
+    protected String formatLeaderOutperformerSection(
+            SectorRsData leader, List<LeaderOutperformer> qualifying) {
         StringBuilder sb = new StringBuilder();
         sb.append("*Stocks outperforming sector leader (").append(leader.symbol()).append("):*\n");
 

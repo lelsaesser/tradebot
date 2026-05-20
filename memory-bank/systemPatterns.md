@@ -31,7 +31,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`EmaTracker`:** Orchestrates daily EMA report across all tracked stocks via `SymbolRegistry.getAll()`.
 -   **`VfiService`:** Calculates Volume Flow Indicator from OHLCV data (130-day lookback, 5-period signal line EMA). Returns `Optional<VfiAnalysis>`.
 -   **`VfiTracker`:** Orchestrates daily RS+VFI combined report. Iterates `SymbolRegistry.getAll()`, classifies each symbol as GREEN (RS↑ + VFI↑), YELLOW (mixed), or RED (RS↓ + VFI↓) via `CombinedSignalType`. Sends via `TelegramGateway.sendMessage()` at 9:00 CET pre-market.
--   **`PullbackBuyTracker`:** Real-time EMA pullback buy alerts. Runs every 5 min during market hours (inside `stockMarketMonitoring`). Detects stocks below EMA 9/21 but above EMA 50/100/200, with positive RS and VFI. Reads live prices from `LivePriceCache` (no separate API calls). Per-stock Telegram alerts with 8-hour cooldown via `IgnoreReason.PULLBACK_BUY_ALERT`.
+-   **`PullbackBuyTracker`:** Real-time EMA pullback buy alerts. Runs every 5 min during market hours (inside `stockMarketMonitoring`). Detects stocks below EMA 9/21 but above EMA 50/100/200, with positive RS and VFI. Reads live prices from `LivePriceCache` (no separate API calls). Per-stock Telegram alerts with 8-hour cooldown via `IgnoreReason.PULLBACK_BUY_ALERT`. Alerts are tagged with a 🏆 _Apex performer_ highlight when the symbol is in `apex_performers` (set populated by the daily sector RS summary).
 -   **`AccumulationDetectionTracker`:** Daily (10:00 CET) institutional accumulation detection. Identifies stocks where EMA9 < EMA21 (weak price) but VFI > 0 and VFI > signal (bullish volume). Sends consolidated Telegram alert with streak counter showing consecutive signal days (persisted in `accumulation_streaks` SQLite table). Streak annotation omitted for day-1 signals.
 -   **`OhlcvFetcher`:** Fetches daily OHLCV data from Twelve Data for all tracked symbols (ETFs + stocks via `SymbolRegistry.getAll()`). Backfill: 400 data points. Refresh: 5 data points. 8-second delay between requests. Also provides `backfillSymbols(List<String>)` for on-demand backfill of newly added symbols.
 -   **`OhlcvBackfillService`:** Processes newly added symbols that need OHLCV data. Reads from `newly_added_symbols` queue table (populated by `/add` command). Filters out symbols no longer tracked before fetching. Batch size: 10. TTL: 24h (expired entries logged and removed atomically via `DELETE ... RETURNING`). Runs in `periodicMaintenance`.
@@ -59,9 +59,10 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SqliteApiMeteringRepository`:** API request counters per provider via batch `INSERT OR REPLACE`. Flushed periodically by Scheduler's `periodicMaintenance()` (every 10 min) and on shutdown (`@PreDestroy`). `AtomicInteger` map is the in-memory source of truth; SQLite is crash-recovery persistence.
 -   **`SqliteAccumulationStreakRepository`:** Accumulation streak data (consecutive signal days per stock) via `INSERT OR REPLACE`. Methods: `save()`, `findBySymbol()`, `deleteAllExcept(Set<String>)`. Streak deleted when signal stops firing.
 -   **`SqliteNewlyAddedSymbolRepository`:** Queue table for symbols awaiting OHLCV backfill. `INSERT OR REPLACE` on add, `DELETE ... RETURNING` for atomic expired cleanup. Methods: `insert()`, `findOldest()`, `deleteAll()`, `deleteExpiredReturning()`.
+-   **`SqliteApexPerformerRepository`:** Persists the apex performer set — stocks outperforming the top sector ETF (positive RS-vs-leader). Refreshed atomically (DELETE + batch INSERT in a transaction) by `SectorRelativeStrengthTracker.sendDailySectorRsSummary()` on its 16:00 / 21:00 CET cron. Read by `PullbackBuyTracker` to highlight buy alerts. Methods: `replaceAll(Set<String>)`, `findAll()`. Persisted (not in-memory) so the set survives the daily ~23:30 deploy window — required for Korean stock alerts that fire before the next refresh.
 -   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence. Loaded once via `@PostConstruct`, updated in-memory and on disk via `setToggle(FeatureToggle, boolean)`. Controlled at runtime via `/toggle` Telegram command. Creates the JSON file if missing; can enable toggles not yet present in the file (enum is the source of truth).
 -   **`DatabaseDirectoryInitializer`:** `@PostConstruct` component that ensures the SQLite database parent directory exists at startup. Parses `spring.datasource.url` to extract the file path.
--   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (12 tables). Auto-executed on startup via `spring.sql.init.mode=always`.
+-   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (13 tables). Auto-executed on startup via `spring.sql.init.mode=always`.
 
 ## Design Patterns
 
@@ -128,7 +129,7 @@ Scheduler
 ├── EmaTracker → EmaService + SymbolRegistry
 ├── VfiTracker → VfiService + RelativeStrengthService + SymbolRegistry
 │   └── CombinedSignalType: GREEN/YELLOW/RED classification
-├── PullbackBuyTracker → EmaService + RelativeStrengthService + VfiService + LivePriceCache + SymbolRegistry
+├── PullbackBuyTracker → EmaService + RelativeStrengthService + VfiService + LivePriceCache + SymbolRegistry + ApexPerformerRepository
 │   └── Per-stock alerts with 8h cooldown via IgnoreReason.PULLBACK_BUY_ALERT
 ├── OhlcvFetcher → TwelveDataClient + YahooFinanceClient + SymbolRegistry
 ├── StatisticsUtil (shared math: mean, stddev, EMA, ROC, zScore)

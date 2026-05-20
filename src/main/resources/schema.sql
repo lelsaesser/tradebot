@@ -137,3 +137,11 @@ CREATE TABLE IF NOT EXISTS newly_added_symbols (
     ticker TEXT PRIMARY KEY,
     added_at INTEGER NOT NULL
 );
+
+-- apex_performers: Stocks currently outperforming the top sector ETF (positive RS vs the leader).
+-- Refreshed twice daily by SectorRelativeStrengthTracker.sendDailySectorRsSummary (16:00 / 21:00 CET).
+-- Read by PullbackBuyTracker to highlight buy alerts for these strongest-signal stocks.
+CREATE TABLE IF NOT EXISTS apex_performers (
+    symbol TEXT PRIMARY KEY,
+    last_updated TEXT NOT NULL
+);

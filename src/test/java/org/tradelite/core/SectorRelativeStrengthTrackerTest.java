@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
+import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -32,13 +34,19 @@ class SectorRelativeStrengthTrackerTest {
 
     @Mock private SymbolRegistry symbolRegistry;
 
+    @Mock private ApexPerformerRepository apexPerformerRepository;
+
     private SectorRelativeStrengthTracker tracker;
 
     @BeforeEach
     void setUp() {
         tracker =
                 new SectorRelativeStrengthTracker(
-                        relativeStrengthService, telegramClient, streakPersistence, symbolRegistry);
+                        relativeStrengthService,
+                        telegramClient,
+                        streakPersistence,
+                        symbolRegistry,
+                        apexPerformerRepository);
 
         Map<String, String> etfs = new LinkedHashMap<>(SymbolRegistry.BROAD_SECTOR_ETFS);
         etfs.putAll(SymbolRegistry.THEMATIC_ETFS);
@@ -964,6 +972,32 @@ class SectorRelativeStrengthTrackerTest {
         String message = messageCaptor.getValue();
         assertFalse(message.contains("ZeroEma"));
         assertTrue(message.contains("Nvidia"));
+    }
+
+    @Test
+    void sendDailySectorRsSummary_persistsUnboundedApexSet_notJustTopTen() {
+        stubLeaderAndStreaks();
+        // 14 stocks all qualifying (over the display cap of 10) — apex set must contain all 14.
+        List<StockSymbol> stocks = new java.util.ArrayList<>();
+        for (int i = 0; i < 14; i++) {
+            String ticker = "S" + i;
+            stocks.add(new StockSymbol(ticker, "Stock" + i));
+            double rs = 1.0 + (14 - i) * 0.01;
+            when(relativeStrengthService.getCurrentRsResult(ticker, "SMH"))
+                    .thenReturn(Optional.of(new RsResult(rs, 1.0, 50, true)));
+        }
+        when(symbolRegistry.getStocks()).thenReturn(stocks);
+
+        tracker.sendDailySectorRsSummary();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<String>> setCaptor = ArgumentCaptor.forClass(Set.class);
+        verify(apexPerformerRepository).replaceAll(setCaptor.capture());
+        Set<String> persisted = setCaptor.getValue();
+        assertEquals(14, persisted.size());
+        for (int i = 0; i < 14; i++) {
+            assertTrue(persisted.contains("S" + i), "Apex set must contain S" + i);
+        }
     }
 
     /**

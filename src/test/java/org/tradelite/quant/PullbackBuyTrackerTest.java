@@ -9,6 +9,7 @@ import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +22,7 @@ import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.IgnoreReason;
+import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.RelativeStrengthService;
@@ -37,6 +39,7 @@ class PullbackBuyTrackerTest {
     @Mock private SymbolRegistry symbolRegistry;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private FeatureToggleService featureToggleService;
+    @Mock private ApexPerformerRepository apexPerformerRepository;
 
     private LivePriceCache livePriceCache;
     private PullbackBuyTracker tracker;
@@ -56,11 +59,13 @@ class PullbackBuyTrackerTest {
                         telegramClient,
                         symbolRegistry,
                         targetPriceProvider,
-                        featureToggleService);
+                        featureToggleService,
+                        apexPerformerRepository);
         lenient()
                 .when(featureToggleService.isEnabled(FeatureToggle.PULLBACK_BUY_ALERT))
                 .thenReturn(Boolean.TRUE);
         lenient().when(symbolRegistry.getStocks()).thenReturn(List.of());
+        lenient().when(apexPerformerRepository.findAll()).thenReturn(Set.of());
     }
 
     @Test
@@ -310,14 +315,60 @@ class PullbackBuyTrackerTest {
     }
 
     @Test
-    void buildAlertMessage_correctFormat() {
-        String message = PullbackBuyTracker.buildAlertMessage(AAPL, 178.50);
+    void buildAlertMessage_notApexPerformer_correctFormat() {
+        String message = PullbackBuyTracker.buildAlertMessage(AAPL, 178.50, false);
         assertThat(
                 message,
                 is(
                         "Potential buy for *Apple Inc (AAPL)* at $178.50\n"
                                 + "_21 EMA pullback while volume and relative strength stay"
                                 + " bullish_"));
+    }
+
+    @Test
+    void buildAlertMessage_apexPerformer_appendsHighlight() {
+        String message = PullbackBuyTracker.buildAlertMessage(AAPL, 178.50, true);
+        assertThat(
+                message,
+                is(
+                        """
+                        Potential buy for *Apple Inc (AAPL)* at $178.50
+                        _21 EMA pullback while volume and relative strength stay bullish_
+
+                        🏆 _Apex performer: outperforming top sector — strongest signal._"""));
+    }
+
+    @Test
+    void analyzeAndSendAlerts_symbolInApexSet_alertContainsHighlight() {
+        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+        when(apexPerformerRepository.findAll()).thenReturn(Set.of("AAPL"));
+        livePriceCache.put("AAPL", 178.50);
+        mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
+        mockRsPositive("AAPL");
+        mockVfiPositive("AAPL", "Apple Inc");
+
+        tracker.analyzeAndSendAlerts();
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(captor.capture());
+        assertThat(captor.getValue(), containsString("🏆 _Apex performer:"));
+    }
+
+    @Test
+    void analyzeAndSendAlerts_symbolNotInApexSet_alertOmitsHighlight() {
+        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+        when(apexPerformerRepository.findAll()).thenReturn(Set.of("NVDA"));
+        livePriceCache.put("AAPL", 178.50);
+        mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
+        mockRsPositive("AAPL");
+        mockVfiPositive("AAPL", "Apple Inc");
+
+        tracker.analyzeAndSendAlerts();
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(captor.capture());
+        assertThat(captor.getValue(), org.hamcrest.Matchers.not(containsString("🏆")));
+        assertThat(captor.getValue(), org.hamcrest.Matchers.not(containsString("Apex performer")));
     }
 
     private void mockEma(
