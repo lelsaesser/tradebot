@@ -207,7 +207,9 @@ public class SectorRelativeStrengthTracker {
     protected String formatLeaderOutperformerSection(
             SectorRsData leader, List<LeaderOutperformer> qualifying) {
         StringBuilder sb = new StringBuilder();
-        sb.append("*Stocks outperforming sector leader (").append(leader.symbol()).append("):*\n");
+        sb.append("🏆 *Stocks outperforming sector leader (")
+                .append(leader.symbol())
+                .append("):*\n");
 
         if (qualifying.isEmpty()) {
             sb.append("_No tracked stocks outperforming ")
