@@ -101,10 +101,10 @@ public class SectorRelativeStrengthTracker {
             List<RelativeStrengthSignal> underperforming) {
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 *SECTOR RS CROSSOVER ALERT*\n\n");
+        sb.append("*Sector RS Crossover Alert*\n\n");
 
         if (!outperforming.isEmpty()) {
-            sb.append("*🟢 NOW OUTPERFORMING SPY:*\n");
+            sb.append("*📈 Now outperforming SPY:*\n");
             for (RelativeStrengthSignal signal : outperforming) {
                 sb.append(formatCrossoverSignalLine(signal));
             }
@@ -112,7 +112,7 @@ public class SectorRelativeStrengthTracker {
         }
 
         if (!underperforming.isEmpty()) {
-            sb.append("*🔴 NOW UNDERPERFORMING SPY:*\n");
+            sb.append("*📉 Now underperforming SPY:*\n");
             for (RelativeStrengthSignal signal : underperforming) {
                 sb.append(formatCrossoverSignalLine(signal));
             }
@@ -207,7 +207,9 @@ public class SectorRelativeStrengthTracker {
     protected String formatLeaderOutperformerSection(
             SectorRsData leader, List<LeaderOutperformer> qualifying) {
         StringBuilder sb = new StringBuilder();
-        sb.append("*Stocks outperforming sector leader (").append(leader.symbol()).append("):*\n");
+        sb.append("🏆 *Stocks outperforming sector leader (")
+                .append(leader.symbol())
+                .append("):*\n");
 
         if (qualifying.isEmpty()) {
             sb.append("_No tracked stocks outperforming ")

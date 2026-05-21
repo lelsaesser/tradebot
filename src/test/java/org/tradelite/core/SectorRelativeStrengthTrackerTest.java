@@ -103,8 +103,8 @@ class SectorRelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("SECTOR RS CROSSOVER ALERT"));
-        assertTrue(message.contains("NOW OUTPERFORMING SPY"));
+        assertTrue(message.contains("Sector RS Crossover Alert"));
+        assertTrue(message.contains("Now outperforming SPY"));
         assertTrue(message.contains("Technology"));
     }
 
@@ -130,7 +130,7 @@ class SectorRelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("NOW UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Now underperforming SPY"));
         assertTrue(message.contains("Utilities"));
     }
 
@@ -167,8 +167,8 @@ class SectorRelativeStrengthTrackerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String message = messageCaptor.getValue();
-        assertTrue(message.contains("NOW OUTPERFORMING SPY"));
-        assertTrue(message.contains("NOW UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Now outperforming SPY"));
+        assertTrue(message.contains("Now underperforming SPY"));
         assertTrue(message.contains("Technology"));
         assertTrue(message.contains("Utilities"));
     }
@@ -209,12 +209,12 @@ class SectorRelativeStrengthTrackerTest {
 
         String message = tracker.formatCrossoverAlertMessage(List.of(signal), List.of());
 
-        assertTrue(message.contains("SECTOR RS CROSSOVER ALERT"));
-        assertTrue(message.contains("NOW OUTPERFORMING SPY"));
+        assertTrue(message.contains("Sector RS Crossover Alert"));
+        assertTrue(message.contains("Now outperforming SPY"));
         assertTrue(message.contains("Technology"));
         assertTrue(message.contains("XLK"));
         assertTrue(message.contains("+2.5%"));
-        assertFalse(message.contains("NOW UNDERPERFORMING SPY"));
+        assertFalse(message.contains("Now underperforming SPY"));
     }
 
     @Test
@@ -230,10 +230,10 @@ class SectorRelativeStrengthTrackerTest {
 
         String message = tracker.formatCrossoverAlertMessage(List.of(), List.of(signal));
 
-        assertTrue(message.contains("NOW UNDERPERFORMING SPY"));
+        assertTrue(message.contains("Now underperforming SPY"));
         assertTrue(message.contains("Utilities"));
         assertTrue(message.contains("-3.5%"));
-        assertFalse(message.contains("NOW OUTPERFORMING SPY"));
+        assertFalse(message.contains("Now outperforming SPY"));
     }
 
     @Test
