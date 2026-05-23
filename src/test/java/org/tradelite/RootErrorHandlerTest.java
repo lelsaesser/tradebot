@@ -3,7 +3,6 @@ package org.tradelite;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -67,35 +66,5 @@ class RootErrorHandlerTest {
         rootErrorHandler.run(() -> {});
 
         verify(telegramClient, never()).sendMessage(anyString());
-    }
-
-    @Test
-    void runWithStatus_whenSendMessageFails_stillReturnsFalse() {
-        doThrow(new RuntimeException("Telegram unreachable"))
-                .when(telegramClient)
-                .sendMessage(anyString());
-
-        boolean success =
-                rootErrorHandler.runWithStatus(
-                        () -> {
-                            throw new RuntimeException("Original error");
-                        });
-
-        assertFalse(success);
-    }
-
-    @Test
-    void runWithStatus_whenSendMessageFailsOnInterrupt_stillReturnsFalse() {
-        doThrow(new RuntimeException("Telegram unreachable"))
-                .when(telegramClient)
-                .sendMessage(anyString());
-
-        boolean success =
-                rootErrorHandler.runWithStatus(
-                        () -> {
-                            throw new InterruptedException("Interrupted");
-                        });
-
-        assertFalse(success);
     }
 }

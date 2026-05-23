@@ -12,14 +12,14 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SymbolRegistry`:** Unified `@Service` bean that owns all tracked symbols — ETFs (sector, thematic, benchmark as hardcoded constants) and individual stocks (JSON-loaded, dynamically add/remove via Telegram). Replaces the former split between `SectorEtfRegistry` (static) and `StockSymbolRegistry` (service). Methods: `getAll()`, `getAllEtfs()`, `getBroadSectorEtfs()`, `getThematicEtfs()`, `getStocks()`, `isEtf()`, `isSectorEtf()`, `fromString()`, `addSymbol()`, `removeSymbol()`.
 -   **`DailyPriceProvider`:** Unified data access layer for daily closing prices. Tries OHLCV (Twelve Data) first, falls back to Finnhub. Same `findDailyClosingPrices(symbol, days)` signature. Used by EmaService, BollingerBandService, RelativeStrengthService, MomentumRocService.
 -   **`*PriceEvaluator`:** A set of components (`FinnhubPriceEvaluator`, `CoinGeckoPriceEvaluator`, `YahooPriceEvaluator`) responsible for fetching and evaluating prices from different APIs. Finnhub and Yahoo evaluators write to the shared `LivePriceCache`.
--   **`LivePriceCache`:** Shared `@Service` bean holding a `ConcurrentHashMap<String, Double>` of the latest known price per symbol. Both `FinnhubPriceEvaluator` (US stocks) and `YahooPriceEvaluator` (international stocks) write to it. Consumers (`PullbackBuyTracker`, `DailyPriceProvider`) read from it. Replaced the former `FinnhubPriceEvaluator.lastPriceCache` field.
+-   **`LivePriceCache`:** Shared `@Service` bean holding the latest known price per symbol. Internal storage is `ConcurrentHashMap<String, PricedAt>` (private nested record carrying price + write timestamp); public API exposes `Double` only. Both `FinnhubPriceEvaluator` (US stocks) and `YahooPriceEvaluator` (international stocks) write to it. Consumers (`PullbackBuyTracker`, `DailyPriceProvider`) read from it. Replaced the former `FinnhubPriceEvaluator.lastPriceCache` field. Stale entries (>24 hours) are evicted by `evictStale()`, called from `Scheduler.periodicMaintenance()` as a safety net against persistent values from a downed exchange or failing data source.
 -   **`RsiService`:** Core service for RSI calculations. Manages historical price data, calculates RSI values, detects market holidays.
 -   **`RsiPriceFetcher`:** Dedicated component for fetching historical price data for RSI calculations.
--   **`InsiderTracker`:** Tracks and reports insider trading activities.
+-   **`InsiderTracker`:** Tracks and reports insider trading activities. Excludes ETFs and international symbols (Finnhub free tier doesn't support non-US listings).
 -   **`SectorRotationTracker`:** Tracks industry sector performance from FinViz.
 -   **`SectorRotationAnalyzer`:** Statistical analysis component that detects sector rotation signals using Z-Score analysis.
 -   **`RelativeStrengthTracker`:** Tracks stock performance relative to SPY benchmark using 50-period EMA crossover detection.
--   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Real-time RS crossover alerts + daily summary. Uses `SymbolRegistry.getAllEtfs()` and `getThematicSymbols()` for report section splitting.
+-   **`SectorRelativeStrengthTracker`:** Monitors sector ETF performance vs SPY benchmark. Real-time RS crossover alerts + daily summary. Uses `SymbolRegistry.getAllEtfs()` and `getThematicSymbols()` for report section splitting. Daily summary also appends a "stocks outperforming sector leader" section: identifies the top-ranked ETF (by RS-vs-SPY pctDiff descending) and lists tracked stocks whose RS-vs-leader pctDiff is positive, top 10 sorted descending, with total qualifying count. Uses `RelativeStrengthService.getCurrentRsResult(symbol, leader)` (benchmark-parameterized). Single Telegram message — section is appended, not a separate send.
 -   **`MomentumRocService`:** Calculates Rate of Change (ROC) momentum and detects zero-line crossovers.
 -   **`SectorMomentumRocTracker`:** Real-time sector ETF momentum analysis using ROC10/ROC20 values.
 -   **`TailRiskService`:** Calculates excess kurtosis and skewness from daily price changes to detect fat tail risk.
@@ -31,7 +31,7 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`EmaTracker`:** Orchestrates daily EMA report across all tracked stocks via `SymbolRegistry.getAll()`.
 -   **`VfiService`:** Calculates Volume Flow Indicator from OHLCV data (130-day lookback, 5-period signal line EMA). Returns `Optional<VfiAnalysis>`.
 -   **`VfiTracker`:** Orchestrates daily RS+VFI combined report. Iterates `SymbolRegistry.getAll()`, classifies each symbol as GREEN (RS↑ + VFI↑), YELLOW (mixed), or RED (RS↓ + VFI↓) via `CombinedSignalType`. Sends via `TelegramGateway.sendMessage()` at 9:00 CET pre-market.
--   **`PullbackBuyTracker`:** Real-time EMA pullback buy alerts. Runs every 5 min during market hours (inside `stockMarketMonitoring`). Detects stocks below EMA 9/21 but above EMA 50/100/200, with positive RS and VFI. Reads live prices from `LivePriceCache` (no separate API calls). Per-stock Telegram alerts with 8-hour cooldown via `IgnoreReason.PULLBACK_BUY_ALERT`.
+-   **`PullbackBuyTracker`:** Real-time EMA pullback buy alerts. Runs every 5 min during market hours (inside `stockMarketMonitoring`). Detects stocks below EMA 9/21 but above EMA 50/100/200, with positive RS and VFI. Reads live prices from `LivePriceCache` (no separate API calls). Per-stock Telegram alerts with 8-hour cooldown via `IgnoreReason.PULLBACK_BUY_ALERT`. Alerts are tagged with a 🏆 _Apex performer_ highlight when the symbol is in `apex_performers` (set populated by the daily sector RS summary).
 -   **`AccumulationDetectionTracker`:** Daily (10:00 CET) institutional accumulation detection. Identifies stocks where EMA9 < EMA21 (weak price) but VFI > 0 and VFI > signal (bullish volume). Sends consolidated Telegram alert with streak counter showing consecutive signal days (persisted in `accumulation_streaks` SQLite table). Streak annotation omitted for day-1 signals.
 -   **`OhlcvFetcher`:** Fetches daily OHLCV data from Twelve Data for all tracked symbols (ETFs + stocks via `SymbolRegistry.getAll()`). Backfill: 400 data points. Refresh: 5 data points. 8-second delay between requests. Also provides `backfillSymbols(List<String>)` for on-demand backfill of newly added symbols.
 -   **`OhlcvBackfillService`:** Processes newly added symbols that need OHLCV data. Reads from `newly_added_symbols` queue table (populated by `/add` command). Filters out symbols no longer tracked before fetching. Batch size: 10. TTL: 24h (expired entries logged and removed atomically via `DELETE ... RETURNING`). Runs in `periodicMaintenance`.
@@ -59,14 +59,15 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`SqliteApiMeteringRepository`:** API request counters per provider via batch `INSERT OR REPLACE`. Flushed periodically by Scheduler's `periodicMaintenance()` (every 10 min) and on shutdown (`@PreDestroy`). `AtomicInteger` map is the in-memory source of truth; SQLite is crash-recovery persistence.
 -   **`SqliteAccumulationStreakRepository`:** Accumulation streak data (consecutive signal days per stock) via `INSERT OR REPLACE`. Methods: `save()`, `findBySymbol()`, `deleteAllExcept(Set<String>)`. Streak deleted when signal stops firing.
 -   **`SqliteNewlyAddedSymbolRepository`:** Queue table for symbols awaiting OHLCV backfill. `INSERT OR REPLACE` on add, `DELETE ... RETURNING` for atomic expired cleanup. Methods: `insert()`, `findOldest()`, `deleteAll()`, `deleteExpiredReturning()`.
--   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence and caching.
+-   **`SqliteApexPerformerRepository`:** Persists the apex performer set — stocks outperforming the top sector ETF (positive RS-vs-leader). Refreshed atomically (DELETE + batch INSERT in a transaction) by `SectorRelativeStrengthTracker.sendDailySectorRsSummary()` on its 16:00 / 21:00 CET cron. Read by `PullbackBuyTracker` to highlight buy alerts. Methods: `replaceAll(Set<String>)`, `findAll()`. Persisted (not in-memory) so the set survives the daily ~23:30 deploy window — required for Korean stock alerts that fire before the next refresh.
+-   **`FeatureToggleService`:** Runtime feature flag management with JSON persistence. Loaded once via `@PostConstruct`, updated in-memory and on disk via `setToggle(FeatureToggle, boolean)`. Controlled at runtime via `/toggle` Telegram command. Creates the JSON file if missing; can enable toggles not yet present in the file (enum is the source of truth).
 -   **`DatabaseDirectoryInitializer`:** `@PostConstruct` component that ensures the SQLite database parent directory exists at startup. Parses `spring.datasource.url` to extract the file path.
--   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (12 tables). Auto-executed on startup via `spring.sql.init.mode=always`.
+-   **Schema Management:** All DDL centralized in `src/main/resources/schema.sql` (13 tables). Auto-executed on startup via `spring.sql.init.mode=always`.
 
 ## Design Patterns
 
 -   **Repository Pattern:** Interface-implementation separation. `PriceQuoteRepository`, `OhlcvRepository`, `MomentumRocRepository`. All implementations use Spring's `JdbcTemplate` (not raw JDBC). DataSource auto-configured via `spring.datasource.*` with HikariCP (pool size 1 for SQLite). Spring's `DataAccessException` propagates naturally (no manual `IllegalStateException` wrapping).
--   **Command Pattern**: Telegram command processing (`/add`, `/remove`, `/rsi`, `/show`, `/set`).
+-   **Command Pattern**: Telegram command processing (`/add`, `/remove`, `/rsi`, `/show`, `/set`, `/data reset`, `/toggle`).
 -   **Dependency Injection**: Constructor injection via `@RequiredArgsConstructor`. All major components injected.
 -   **Profile Gating**: Default = production. `dev` = opt-in local profile.
 -   **Scheduler Pattern**: `@Scheduled` with cron expressions and timezone support.
@@ -97,7 +98,7 @@ The application follows a modular, component-based architecture built on the Spr
 | `weeklyInsiderTradingReport` | Weekly Sat 12:00 | CET | Insider transactions |
 | `monthlyApiUsageReport` | Monthly 1st, 00:00 | UTC | API usage statistics |
 | `telegramMessagePolling` | Every 60 seconds | UTC | Process Telegram commands |
-| `periodicMaintenance` | Every 10 min | — | Cleanup ignored symbols + flush API metering counters + OHLCV backfill for new symbols + cleanup expired backfill entries |
+| `periodicMaintenance` | Every 10 min | — | Cleanup ignored symbols + flush API metering counters + OHLCV backfill for new symbols + cleanup expired backfill entries + evict stale `LivePriceCache` entries |
 
 ## Component Relationships
 
@@ -128,7 +129,7 @@ Scheduler
 ├── EmaTracker → EmaService + SymbolRegistry
 ├── VfiTracker → VfiService + RelativeStrengthService + SymbolRegistry
 │   └── CombinedSignalType: GREEN/YELLOW/RED classification
-├── PullbackBuyTracker → EmaService + RelativeStrengthService + VfiService + LivePriceCache + SymbolRegistry
+├── PullbackBuyTracker → EmaService + RelativeStrengthService + VfiService + LivePriceCache + SymbolRegistry + ApexPerformerRepository
 │   └── Per-stock alerts with 8h cooldown via IgnoreReason.PULLBACK_BUY_ALERT
 ├── OhlcvFetcher → TwelveDataClient + YahooFinanceClient + SymbolRegistry
 ├── StatisticsUtil (shared math: mean, stddev, EMA, ROC, zScore)

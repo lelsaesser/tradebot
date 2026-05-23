@@ -5,12 +5,13 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.tradelite.client.telegram.TelegramClient.BASE_URL;
 import static org.tradelite.client.telegram.TelegramClient.DELETE_URL;
-import static org.tradelite.client.telegram.TelegramClient.TELEGRAM_MESSAGE_CHAR_LIMIT;
+import static org.tradelite.client.telegram.TelegramMessageSanitizer.LIMIT;
 
 import java.util.OptionalLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpEntity;
@@ -23,6 +24,7 @@ import org.tradelite.client.telegram.dto.TelegramSendMessageResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 import org.tradelite.config.TradebotTelegramProperties;
 
+@SuppressWarnings("unchecked")
 @ExtendWith(MockitoExtension.class)
 class TelegramClientTest {
 
@@ -166,22 +168,125 @@ class TelegramClientTest {
     }
 
     @Test
-    void sendMessageAndReturnId_exceedsCharLimit_throwsException() {
-        String oversizedMessage = "x".repeat(TELEGRAM_MESSAGE_CHAR_LIMIT + 1);
+    void sendMessageAndReturnId_underLimit_sendsWithMarkdownParseMode() {
+        TelegramMessage message = new TelegramMessage();
+        message.setMessageId(1L);
+        TelegramSendMessageResponse body = new TelegramSendMessageResponse();
+        body.setOk(true);
+        body.setResult(message);
 
-        IllegalArgumentException ex =
-                assertThrows(
-                        IllegalArgumentException.class,
-                        () -> telegramClient.sendMessageAndReturnId(oversizedMessage));
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
 
-        assertTrue(ex.getMessage().contains("exceeds"));
-        assertTrue(ex.getMessage().contains(String.valueOf(TELEGRAM_MESSAGE_CHAR_LIMIT)));
-        verifyNoInteractions(restTemplate);
+        telegramClient.sendMessageAndReturnId("*Hello* _world_");
+
+        ArgumentCaptor<HttpEntity<java.util.Map<String, Object>>> captor =
+                ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate)
+                .exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        captor.capture(),
+                        eq(TelegramSendMessageResponse.class));
+        java.util.Map<String, Object> payload = captor.getValue().getBody();
+        assertNotNull(payload);
+        assertEquals("Markdown", payload.get("parse_mode"));
+        assertEquals("*Hello* _world_", payload.get("text"));
+    }
+
+    @Test
+    void sendMessageAndReturnId_strippedOnly_sendsWithoutParseMode() {
+        // Message that is over the limit but fits after stripping markers.
+        String plain = "x".repeat(LIMIT - 100);
+        String markers = "*".repeat(200);
+        String oversized = plain + markers;
+        assertTrue(oversized.length() > LIMIT);
+
+        TelegramMessage message = new TelegramMessage();
+        message.setMessageId(2L);
+        TelegramSendMessageResponse body = new TelegramSendMessageResponse();
+        body.setOk(true);
+        body.setResult(message);
+
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
+
+        telegramClient.sendMessageAndReturnId(oversized);
+
+        ArgumentCaptor<HttpEntity<java.util.Map<String, Object>>> captor =
+                ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate)
+                .exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        captor.capture(),
+                        eq(TelegramSendMessageResponse.class));
+        java.util.Map<String, Object> payload = captor.getValue().getBody();
+        assertNotNull(payload);
+        assertFalse(payload.containsKey("parse_mode"));
+        String text = (String) payload.get("text");
+        assertNotNull(text);
+        assertTrue(text.length() <= LIMIT);
+        assertFalse(text.contains("*"));
+        assertFalse(text.contains("_"));
+        assertFalse(text.contains("`"));
+    }
+
+    @Test
+    void sendMessageAndReturnId_truncated_sendsWithoutParseMode() {
+        // Plain text well over the limit with newlines for cut boundary.
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 1000; i++) {
+            sb.append("row-").append(i).append("\n");
+        }
+        String oversized = sb.toString();
+        assertTrue(oversized.length() > LIMIT);
+
+        TelegramMessage message = new TelegramMessage();
+        message.setMessageId(3L);
+        TelegramSendMessageResponse body = new TelegramSendMessageResponse();
+        body.setOk(true);
+        body.setResult(message);
+
+        String expectedUrl = String.format(BASE_URL, "testToken");
+        when(restTemplate.exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
+
+        telegramClient.sendMessageAndReturnId(oversized);
+
+        ArgumentCaptor<HttpEntity<java.util.Map<String, Object>>> captor =
+                ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate)
+                .exchange(
+                        eq(expectedUrl),
+                        eq(HttpMethod.POST),
+                        captor.capture(),
+                        eq(TelegramSendMessageResponse.class));
+        java.util.Map<String, Object> payload = captor.getValue().getBody();
+        assertNotNull(payload);
+        assertFalse(payload.containsKey("parse_mode"));
+        String text = (String) payload.get("text");
+        assertNotNull(text);
+        assertTrue(text.length() <= LIMIT);
     }
 
     @Test
     void sendMessageAndReturnId_exactlyAtCharLimit_doesNotThrow() {
-        String maxMessage = "x".repeat(TELEGRAM_MESSAGE_CHAR_LIMIT);
+        String maxMessage = "x".repeat(LIMIT);
 
         TelegramMessage message = new TelegramMessage();
         message.setMessageId(1L);

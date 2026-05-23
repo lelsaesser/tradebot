@@ -28,11 +28,7 @@ public class RootErrorHandler {
             Thread.currentThread().interrupt();
             log.error("Operation was interrupted: {}", e.getMessage());
             String message = "⏸️ *Operation Interrupted!* Check application logs for details.";
-            try {
-                telegramClient.sendMessage(message);
-            } catch (Exception alertEx) {
-                log.warn("Failed to send Telegram alert: {}", alertEx.getMessage());
-            }
+            telegramClient.sendMessage(message);
             return false;
         } catch (Exception e) {
             log.error(e.getMessage(), e);
@@ -50,11 +46,7 @@ public class RootErrorHandler {
                         .append("`\n");
             }
 
-            try {
-                telegramClient.sendMessage(message.toString());
-            } catch (Exception alertEx) {
-                log.warn("Failed to send Telegram alert: {}", alertEx.getMessage());
-            }
+            telegramClient.sendMessage(message.toString());
             return false;
         }
     }
