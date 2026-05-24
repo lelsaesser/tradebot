@@ -11,10 +11,10 @@ Durable decisions that apply across all phases:
 - **Server port**: Spring Boot runs on `9090` (existing). Vite dev server runs on `5173` (default). Vite proxy forwards `/api` → `localhost:9090` in dev, eliminating CORS complexity during development.
 - **REST base path**: All dashboard REST endpoints are under `/api/`.
 - **SSE endpoint**: `GET /api/events` — single persistent SSE stream, all event types multiplexed on it with named event fields.
-- **SSE event naming**: Snake-case event type names map 1:1 to report/alert types: `price-alert`, `price-swing`, `rsi-report`, `bb-alert`, `bb-daily-report`, `ema-report`, `sector-rs-crossover`, `sector-rs-daily`, `sector-roc-alert`, `tail-risk-alert`, `tail-risk-report`, `sector-rotation-alert`, `sector-rotation-daily`, `insider-report`, `error-alert`.
-- **Data caching strategy**: Each tracker/service stores its most recent result in memory (simple field, no TTL). REST read endpoints serve this cached value. Cache resets on app restart — acceptable for a local tool.
+- **SSE event naming**: Snake-case event type names map 1:1 to report/alert types: `price-alert`, `price-swing`, `rsi-report`, `bb-alert`, `bb-daily-report`, `ema-report`, `sector-rs-crossover`, `sector-rs-daily`, `sector-roc-alert`, `tail-risk-alert`, `tail-risk-report`, `sector-rotation-alert`, `sector-rotation-daily`, `insider-report`, `pullback-buy-alert`, `accumulation-report`, `vfi-report`, `error-alert`.
+- **Data caching strategy**: Each tracker/service stores its most recent result in memory (simple field, no TTL). REST read endpoints serve this cached value. Cache resets on app restart — acceptable for a local tool. `LivePriceCache` has a 24-hour TTL; `GET /api/watchlist` serves the last price stored in this cache.
 - **Update model**: SSE for live push (server → client) + REST `GET` for initial page load per panel. No polling.
-- **Command endpoints**: Dashboard command endpoints (`POST /api/symbols`, `DELETE /api/symbols/{ticker}`, `POST /api/targets`, `GET /api/rsi/{symbol}`) delegate directly to the same service layer used by Telegram command processors. No duplicated logic.
+- **Command endpoints**: Dashboard command endpoints (`POST /api/symbols`, `DELETE /api/symbols/{ticker}`, `POST /api/targets`, `GET /api/rsi/{symbol}`, `POST /api/toggles/{key}/enable`, `POST /api/toggles/{key}/disable`) delegate directly to the same service layer used by Telegram command processors. No duplicated logic.
 - **Profiles**: All dashboard controllers and `DashboardEventPublisher` are active in both default and `dev` profiles (unlike `DevJobController` which is `dev`-only).
 - **Frontend tech stack**: React 18 + Vite + TypeScript. Tailwind CSS for styling. Dark theme. Native `EventSource` API for SSE — no third-party SSE library needed.
 - **Layout**: Single-page dashboard. Fixed header, responsive CSS grid of panels. No client-side routing.
@@ -29,6 +29,10 @@ Durable decisions that apply across all phases:
   - `SectorRotationResponse` — sectors rotating in / rotating out with Z-scores
   - `SectorPerformanceResponse` — top/bottom daily and weekly industry performers
   - `InsiderReportResponse` — table of symbols with buy/sell counts and deltas
+  - `PullbackAlertResponse` — list of recent pullback buy alerts (symbol, timestamp, RS, VFI, cooldown state)
+  - `AccumulationReportResponse` — list of accumulation signals (symbol, streak count)
+  - `VfiReportResponse` — list of symbols with RS classification, VFI classification, traffic-light color
+  - `ToggleListResponse` — list of feature toggles with key and enabled state
   - `DashboardEvent` — SSE envelope: `{ type, timestamp, payload }`
 
 ---
@@ -186,3 +190,36 @@ Add visual polish across all panels: last-updated timestamps on every panel head
 - [ ] Buy alerts and sell alerts in the price panel are visually distinct from each other (e.g. rocket icon for buy, coin icon for sell).
 - [ ] Error states (failed command, no data yet) are visually distinct from normal empty states.
 - [ ] Frontend component tests updated to assert color/icon rendering for key signal states.
+
+---
+
+## Phase 7: Feature toggles management panel
+
+**User stories**: 31
+**GitHub issue**: #438
+
+### What to build
+
+Add a Feature Toggles panel showing all `FeatureToggle` enum values with their current enabled/disabled state. The user can flip any toggle from the panel — the dashboard equivalent of the `/toggle` Telegram command. Delegates entirely to `FeatureToggleService`.
+
+**REST endpoints added this phase:**
+- `GET /api/toggles` — returns all feature toggles with key and current enabled state
+- `POST /api/toggles/{key}/enable` — enables the named toggle
+- `POST /api/toggles/{key}/disable` — disables the named toggle
+
+**Toggle keys** (from `FeatureToggle` enum):
+- `finnhubPriceCollection`
+- `emaReport`
+- `vfiReport`
+- `pullbackBuyAlert`
+- `earningsCalendarAlert`
+- `accumulationDetection`
+- `yahooIntradayPriceFetch`
+
+### Acceptance criteria
+
+- [ ] Feature Toggles panel loads all toggles from `GET /api/toggles` on page load with current on/off state per toggle.
+- [ ] Flipping a toggle calls `POST /api/toggles/{key}/enable` or `POST /api/toggles/{key}/disable` and reflects the new state on success.
+- [ ] Failed toggle operations show an inline error message.
+- [ ] Controller tests for all three endpoints with mocked `FeatureToggleService`.
+- [ ] Frontend component test: given a `ToggleListResponse`, panel renders one row per toggle with correct state.
