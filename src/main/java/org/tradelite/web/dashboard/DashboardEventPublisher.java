@@ -25,15 +25,16 @@ public class DashboardEventPublisher {
     public void publish(String eventType, Object payload) {
         DashboardEvent event = DashboardEvent.of(eventType, payload);
         SseEmitter.SseEventBuilder builder = SseEmitter.event().name(eventType).data(event);
-        emitters.forEach(emitter -> {
-            try {
-                emitter.send(builder);
-            } catch (IOException e) {
-                log.debug("SSE emitter dead during publish, removing: {}", e.getMessage());
-                emitter.complete();
-                emitters.remove(emitter);
-            }
-        });
+        emitters.forEach(
+                emitter -> {
+                    try {
+                        emitter.send(builder);
+                    } catch (IOException e) {
+                        log.debug("SSE emitter dead during publish, removing: {}", e.getMessage());
+                        emitter.complete();
+                        emitters.remove(emitter);
+                    }
+                });
     }
 
     @Scheduled(fixedRate = 30_000)
