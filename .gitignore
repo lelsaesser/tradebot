@@ -42,3 +42,7 @@ deploy-full.sh
 # Log scan reports
 log-reports/
 /scripts/scan-logs.sh
+
+# Dashboard frontend
+dashboard/node_modules/
+dashboard/dist/
