@@ -116,12 +116,13 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        // Called 5 times: finnhubPriceEvaluator, pullbackBuyTracker,
-        // sectorRelativeStrengthTracker, sectorMomentumRocTracker, yahooPriceEvaluator
-        verify(rootErrorHandler, times(5)).run(any(ThrowingRunnable.class));
+        // Called 6 times: finnhubPriceEvaluator, pullbackBuyTracker.analyzeDomestic,
+        // sectorRelativeStrengthTracker, sectorMomentumRocTracker, yahooPriceEvaluator,
+        // pullbackBuyTracker.analyzeInternational
+        verify(rootErrorHandler, times(6)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(5)).run(captor.capture());
+        verify(rootErrorHandler, times(6)).run(captor.capture());
 
         // Execute all captured runnables
         for (ThrowingRunnable runnable : captor.getAllValues()) {
@@ -130,7 +131,8 @@ class SchedulerTest {
 
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
         verify(yahooPriceEvaluator, times(1)).evaluatePrice();
-        verify(pullbackBuyTracker, times(1)).analyzeAndSendAlerts();
+        verify(pullbackBuyTracker, times(1)).analyzeDomestic();
+        verify(pullbackBuyTracker, times(1)).analyzeInternational();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
         verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
@@ -146,8 +148,9 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        // Yahoo evaluator still runs (handles its own exchange-hours gating)
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        // Yahoo evaluator + analyzeInternational still run (both handle their own per-symbol
+        // exchange-hours gating)
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
         verify(finnhubPriceEvaluator, never()).evaluatePrice();
         verify(coinGeckoPriceEvaluator, never()).evaluatePrice();
     }
@@ -431,10 +434,10 @@ class SchedulerTest {
 
         boolean success = scheduler.manualStockMarketMonitoring();
 
-        verify(rootErrorHandler, times(5)).runWithStatus(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(6)).runWithStatus(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(5)).runWithStatus(captor.capture());
+        verify(rootErrorHandler, times(6)).runWithStatus(captor.capture());
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
         }
@@ -442,7 +445,8 @@ class SchedulerTest {
         assertTrue(success);
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
         verify(yahooPriceEvaluator, times(1)).evaluatePrice();
-        verify(pullbackBuyTracker, times(1)).analyzeAndSendAlerts();
+        verify(pullbackBuyTracker, times(1)).analyzeDomestic();
+        verify(pullbackBuyTracker, times(1)).analyzeInternational();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
     }
@@ -632,8 +636,9 @@ class SchedulerTest {
         boolean success = scheduler.manualPullbackBuyAlert();
 
         assertTrue(success);
-        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
-        verify(pullbackBuyTracker).analyzeAndSendAlerts();
+        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
+        verify(pullbackBuyTracker).analyzeDomestic();
+        verify(pullbackBuyTracker).analyzeInternational();
     }
 
     @Test

@@ -25,6 +25,7 @@ import org.tradelite.core.IgnoreReason;
 import org.tradelite.repository.ApexPerformerRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.LivePriceCache;
+import org.tradelite.service.MarketStatusService;
 import org.tradelite.service.RelativeStrengthService;
 import org.tradelite.service.RelativeStrengthService.RsResult;
 
@@ -40,12 +41,15 @@ class PullbackBuyTrackerTest {
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private FeatureToggleService featureToggleService;
     @Mock private ApexPerformerRepository apexPerformerRepository;
+    @Mock private MarketStatusService marketStatusService;
 
     private LivePriceCache livePriceCache;
     private PullbackBuyTracker tracker;
 
     private static final StockSymbol AAPL = new StockSymbol("AAPL", "Apple Inc");
     private static final StockSymbol MSFT = new StockSymbol("MSFT", "Microsoft");
+    private static final StockSymbol RHM_DE = new StockSymbol("RHM.DE", "Rheinmetall");
+    private static final StockSymbol SAMSUNG_KS = new StockSymbol("005930.KS", "Samsung");
 
     @BeforeEach
     void setUp() {
@@ -60,34 +64,36 @@ class PullbackBuyTrackerTest {
                         symbolRegistry,
                         targetPriceProvider,
                         featureToggleService,
-                        apexPerformerRepository);
+                        apexPerformerRepository,
+                        marketStatusService);
         lenient()
                 .when(featureToggleService.isEnabled(FeatureToggle.PULLBACK_BUY_ALERT))
                 .thenReturn(Boolean.TRUE);
-        lenient().when(symbolRegistry.getStocks()).thenReturn(List.of());
+        lenient().when(symbolRegistry.getDomesticStocks()).thenReturn(List.of());
+        lenient().when(symbolRegistry.getInternationalStocks()).thenReturn(List.of());
         lenient().when(apexPerformerRepository.findAll()).thenReturn(Set.of());
     }
 
     @Test
-    void analyzeAndSendAlerts_featureToggleDisabled_skips() {
+    void analyzeDomestic_featureToggleDisabled_skips() {
         when(featureToggleService.isEnabled(FeatureToggle.PULLBACK_BUY_ALERT))
                 .thenReturn(Boolean.FALSE);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
         verify(emaService, never()).analyze(anyString(), anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_allConditionsMet_sendsAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_allConditionsMet_sendsAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
         mockRsPositive("AAPL");
         mockVfiPositive("AAPL", "Apple Inc");
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(captor.capture());
@@ -100,128 +106,128 @@ class PullbackBuyTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_priceAboveEma9_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_priceAboveEma9_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 181.0);
         // Price 181 > EMA9 180 → not a pullback
         mockEma("AAPL", "Apple Inc", 181.0, 180.0, 179.0, 175.0, 170.0, 165.0);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_priceBelowEma50_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_priceBelowEma50_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 174.0);
         // Price 174 < EMA50 175 → too deep, not a healthy pullback
         mockEma("AAPL", "Apple Inc", 174.0, 180.0, 181.0, 175.0, 170.0, 165.0);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_priceBelowEma100_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_priceBelowEma100_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 169.0);
         // Price 169 < EMA100 170 → too deep
         mockEma("AAPL", "Apple Inc", 169.0, 180.0, 181.0, 175.0, 170.0, 165.0);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_priceBelowEma200_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_priceBelowEma200_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 164.0);
         // Price 164 < EMA200 165 → broken trend
         mockEma("AAPL", "Apple Inc", 164.0, 180.0, 181.0, 175.0, 170.0, 165.0);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_ema50IsNaN_skipsStock() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_ema50IsNaN_skipsStock() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, Double.NaN, 170.0, 165.0);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
         verify(relativeStrengthService, never()).getCurrentRsResult(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_ema100IsNaN_skipsStock() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_ema100IsNaN_skipsStock() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, Double.NaN, 165.0);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_ema200IsNaN_skipsStock() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_ema200IsNaN_skipsStock() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, Double.NaN);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_noCachedPrice_skipsStock() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_noCachedPrice_skipsStock() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         // No entry in priceCache for AAPL
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
         verify(relativeStrengthService, never()).getCurrentRsResult(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_rsNegative_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_rsNegative_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
         // RS below EMA → underperforming SPY
         when(relativeStrengthService.getCurrentRsResult("AAPL"))
                 .thenReturn(Optional.of(new RsResult(0.95, 0.98, 50, true)));
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_rsEmpty_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_rsEmpty_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
         when(relativeStrengthService.getCurrentRsResult("AAPL")).thenReturn(Optional.empty());
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_vfiNegative_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_vfiNegative_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
         mockRsPositive("AAPL");
@@ -229,39 +235,39 @@ class PullbackBuyTrackerTest {
         when(vfiService.analyze(eq("AAPL"), anyString()))
                 .thenReturn(Optional.of(new VfiAnalysis("AAPL", "Apple Inc", -1.0, -0.5)));
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_vfiEmpty_noAlert() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_vfiEmpty_noAlert() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
         mockRsPositive("AAPL");
         when(vfiService.analyze(eq("AAPL"), anyString())).thenReturn(Optional.empty());
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_symbolIgnored_skipsEntirely() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_symbolIgnored_skipsEntirely() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         when(targetPriceProvider.isSymbolIgnored(AAPL, IgnoreReason.PULLBACK_BUY_ALERT))
                 .thenReturn(Boolean.TRUE);
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(emaService, never()).analyze(anyString(), anyString());
         verify(telegramClient, never()).sendMessage(anyString());
     }
 
     @Test
-    void analyzeAndSendAlerts_multipleStocks_sendsSeperateMessages() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL, MSFT));
+    void analyzeDomestic_multipleStocks_sendsSeperateMessages() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL, MSFT));
         livePriceCache.put("AAPL", 178.50);
         livePriceCache.put("MSFT", 420.0);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
@@ -271,7 +277,7 @@ class PullbackBuyTrackerTest {
         mockVfiPositive("AAPL", "Apple Inc");
         mockVfiPositive("MSFT", "Microsoft");
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, times(2)).sendMessage(anyString());
         verify(targetPriceProvider).addIgnoredSymbol(AAPL, IgnoreReason.PULLBACK_BUY_ALERT);
@@ -279,12 +285,12 @@ class PullbackBuyTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_emaDataUnavailable_skipsStock() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_emaDataUnavailable_skipsStock() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         livePriceCache.put("AAPL", 178.50);
         when(emaService.analyze(eq("AAPL"), anyString())).thenReturn(Optional.empty());
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         verify(telegramClient, never()).sendMessage(anyString());
         verify(relativeStrengthService, never()).getCurrentRsResult(anyString());
@@ -339,15 +345,15 @@ class PullbackBuyTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_symbolInApexSet_alertContainsHighlight() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_symbolInApexSet_alertContainsHighlight() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         when(apexPerformerRepository.findAll()).thenReturn(Set.of("AAPL"));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
         mockRsPositive("AAPL");
         mockVfiPositive("AAPL", "Apple Inc");
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(captor.capture());
@@ -355,20 +361,78 @@ class PullbackBuyTrackerTest {
     }
 
     @Test
-    void analyzeAndSendAlerts_symbolNotInApexSet_alertOmitsHighlight() {
-        when(symbolRegistry.getStocks()).thenReturn(List.of(AAPL));
+    void analyzeDomestic_symbolNotInApexSet_alertOmitsHighlight() {
+        when(symbolRegistry.getDomesticStocks()).thenReturn(List.of(AAPL));
         when(apexPerformerRepository.findAll()).thenReturn(Set.of("NVDA"));
         livePriceCache.put("AAPL", 178.50);
         mockEma("AAPL", "Apple Inc", 178.50, 180.0, 181.0, 175.0, 170.0, 165.0);
         mockRsPositive("AAPL");
         mockVfiPositive("AAPL", "Apple Inc");
 
-        tracker.analyzeAndSendAlerts();
+        tracker.analyzeDomestic();
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(telegramClient).sendMessage(captor.capture());
         assertThat(captor.getValue(), org.hamcrest.Matchers.not(containsString("🏆")));
         assertThat(captor.getValue(), org.hamcrest.Matchers.not(containsString("Apex performer")));
+    }
+
+    @Test
+    void analyzeInternational_featureToggleDisabled_skips() {
+        when(featureToggleService.isEnabled(FeatureToggle.PULLBACK_BUY_ALERT))
+                .thenReturn(Boolean.FALSE);
+
+        tracker.analyzeInternational();
+
+        verify(symbolRegistry, never()).getInternationalStocks();
+        verify(telegramClient, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void analyzeInternational_exchangeClosed_skips() {
+        when(symbolRegistry.getInternationalStocks()).thenReturn(List.of(RHM_DE));
+        when(marketStatusService.isExchangeOpen("RHM.DE")).thenReturn(Boolean.FALSE);
+
+        tracker.analyzeInternational();
+
+        verify(emaService, never()).analyze(eq("RHM.DE"), anyString());
+        verify(telegramClient, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void analyzeInternational_exchangeOpen_sendsAlert() {
+        when(symbolRegistry.getInternationalStocks()).thenReturn(List.of(RHM_DE));
+        when(marketStatusService.isExchangeOpen("RHM.DE")).thenReturn(Boolean.TRUE);
+        livePriceCache.put("RHM.DE", 525.50);
+        mockEma("RHM.DE", "Rheinmetall", 525.50, 530.0, 532.0, 510.0, 480.0, 450.0);
+        mockRsPositive("RHM.DE");
+        mockVfiPositive("RHM.DE", "Rheinmetall");
+
+        tracker.analyzeInternational();
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(captor.capture());
+        assertThat(captor.getValue(), containsString("Potential buy for *Rheinmetall (RHM.DE)*"));
+        verify(targetPriceProvider).addIgnoredSymbol(RHM_DE, IgnoreReason.PULLBACK_BUY_ALERT);
+    }
+
+    @Test
+    void analyzeInternational_mixedOpenClosed_onlyOpenAlerts() {
+        when(symbolRegistry.getInternationalStocks()).thenReturn(List.of(RHM_DE, SAMSUNG_KS));
+        when(marketStatusService.isExchangeOpen("RHM.DE")).thenReturn(Boolean.TRUE);
+        when(marketStatusService.isExchangeOpen("005930.KS")).thenReturn(Boolean.FALSE);
+        livePriceCache.put("RHM.DE", 525.50);
+        mockEma("RHM.DE", "Rheinmetall", 525.50, 530.0, 532.0, 510.0, 480.0, 450.0);
+        mockRsPositive("RHM.DE");
+        mockVfiPositive("RHM.DE", "Rheinmetall");
+
+        tracker.analyzeInternational();
+
+        verify(telegramClient, times(1)).sendMessage(anyString());
+        verify(emaService, never()).analyze(eq("005930.KS"), anyString());
+        verify(targetPriceProvider).addIgnoredSymbol(RHM_DE, IgnoreReason.PULLBACK_BUY_ALERT);
+        verify(targetPriceProvider, never())
+                .addIgnoredSymbol(SAMSUNG_KS, IgnoreReason.PULLBACK_BUY_ALERT);
     }
 
     private void mockEma(
