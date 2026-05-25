@@ -11,7 +11,7 @@ Automated market surveillance system that monitors financial markets across mult
 - **Price Monitoring:** Track stock, ETF, crypto, and international equity prices against configurable buy/sell targets
 - **Quantitative Analysis:** EMA structure, Bollinger Bands, VFI (Volume Flow Indicator), Relative Strength vs SPY, Momentum ROC, Tail Risk (kurtosis/skewness)
 - **Signal Detection:** EMA pullback buy alerts, institutional accumulation detection (with streak tracking), RS/ROC crossovers, high-change alerts
-- **Sector Rotation:** Track 20 sector/thematic ETFs for rotation patterns, momentum shifts, and relative performance
+- **Sector Rotation:** Track 29 sector/thematic ETFs for rotation patterns, momentum shifts, and relative performance
 - **Earnings & Insider Reports:** 7-day earnings calendar look-ahead, weekly insider trading reports
 - **Telegram Integration:** Command interface for managing watchlist + automated alert/report delivery
 
