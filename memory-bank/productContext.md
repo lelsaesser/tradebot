@@ -74,9 +74,9 @@ All alerts and reports delivered as Telegram messages (no user action required).
 
 ## Tracked Symbols
 
-### Sector & Thematic ETFs (20 total)
+### Sector & Thematic ETFs (29 total)
 **Broad Sectors (11 SPDR):** XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLC, XLRE, XLB, XLU
-**Thematic (9):** SMH (Semiconductors), URA (Uranium), SHLD (Cybersecurity), IGV (Software), XOP (Oil & Gas), XHB (Homebuilders), ITA (Aerospace & Defense), XBI (Biotech), TAN (Solar)
+**Thematic (18):** SMH (Semiconductors), SHLD (Defence Tech), IGV (Software), XOP (Oil & Gas), XHB (Homebuilders), ITA (Aerospace & Defence), XBI (Biotech), UFO (Space), TAN (Solar), URA (Uranium & Nuclear), REMX (Rare Earths), QTUM (Quantum), DTCR (Data Centers), FINX (FinTech), LIT (Batteries), BOTZ (Robotics), STCE (Crypto), DRAM (Memory Chips)
 
 ### International Stocks
 - German XETRA: RHM.DE (Rheinmetall), ENR.DE (Siemens Energy)
