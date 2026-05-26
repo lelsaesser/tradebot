@@ -41,6 +41,9 @@ The application follows a modular, component-based architecture built on the Spr
 -   **`RootErrorHandler`:** Centralized error handler wrapping all scheduled tasks. `run()` preserves fire-and-log; `runWithStatus()` adds boolean success/failure for dev triggers.
 -   **`DevDataSeeder`:** `dev`-only startup seeder that populates SQLite quote history (via `PriceQuoteRepository.saveAll()`), OHLCV data (400 days), RSI/RS/ROC state. Uses `JdbcTemplate` for direct table operations (DELETE, COUNT queries).
 -   **`DevJobController`:** `dev`-only manual trigger surface. 14 individual endpoints + 1 composite `run-all` endpoint. Individual endpoints return HTTP 200/500. `run-all` orchestrates 4-phase smoke test execution.
+-   **`DashboardEventPublisher`:** Spring service owning the active SSE emitter registry. `register(SseEmitter)` adds emitters (add-first, then wire callbacks to close registration race). `publish(String eventType, Object payload)` fans out `DashboardEvent` to all active emitters; catches `IOException` at warn (client gone, expected) and other `Exception` at error (unexpected bug). Emits a heartbeat `ping` event every 30 s on a dedicated single-thread `TaskScheduler` (`dashboardHeartbeatScheduler`) to isolate from long-running scheduled jobs.
+-   **`SseController`:** REST controller at `GET /api/v1/events`. Creates `SseEmitter` with 8-hour safety timeout and delegates registration to `DashboardEventPublisher`. Active in all profiles (no `@Profile`).
+-   **`DashboardConfig`:** `@Configuration` in `web/dashboard` package. Declares `dashboardHeartbeatScheduler` bean (`ThreadPoolTaskScheduler`, pool size 1) used exclusively by the SSE heartbeat.
 
 ## External API Clients
 
