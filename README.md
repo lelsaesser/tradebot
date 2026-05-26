@@ -7,7 +7,7 @@
 [![OSV-Scanner](https://github.com/lelsaesser/tradebot/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/osv-scanner.yml)
 
 Integrates into several APIs and sends notifications and updates to Telegram chats.
-
+a
 24/7 market monitoring, quantitative analysis and sector/industry/smart money rotation tracking.
 
 Stock market and price data from Finnhub.io (https://finnhub.io/) and TwelveData (https://twelvedata.com/)  
