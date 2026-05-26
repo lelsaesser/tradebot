@@ -36,7 +36,6 @@ jobs:
       scan-args: |-
         -r
         --allow-no-lockfiles
-        --retry-count=3
         ./
   scan-pr:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
@@ -45,5 +44,4 @@ jobs:
       scan-args: |-
         -r
         --allow-no-lockfiles
-        --retry-count=3
         ./

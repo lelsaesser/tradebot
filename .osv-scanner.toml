@@ -1,4 +1,0 @@
-[maven]
-max_parallel_downloads = 4
-fetch_timeout_seconds = 30
-retry_count = 3
