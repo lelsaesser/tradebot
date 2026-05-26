@@ -25,6 +25,7 @@ import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.MarketStatusService;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class YahooPriceEvaluatorTest {
@@ -36,6 +37,7 @@ class YahooPriceEvaluatorTest {
     @Mock private PriceQuoteRepository priceQuoteRepository;
     @Mock private FeatureToggleService featureToggleService;
     @Mock private MarketStatusService marketStatusService;
+    @Mock private DashboardEventPublisher dashboardEventPublisher;
 
     private LivePriceCache livePriceCache;
     private YahooPriceEvaluator evaluator;
@@ -55,7 +57,8 @@ class YahooPriceEvaluatorTest {
                         priceQuoteRepository,
                         featureToggleService,
                         marketStatusService,
-                        livePriceCache);
+                        livePriceCache,
+                        dashboardEventPublisher);
         lenient()
                 .when(featureToggleService.isEnabled(FeatureToggle.YAHOO_INTRADAY_PRICE_FETCH))
                 .thenReturn(true);

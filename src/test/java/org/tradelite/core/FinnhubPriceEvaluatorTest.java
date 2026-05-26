@@ -22,6 +22,7 @@ import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.MarketStatusService;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class FinnhubPriceEvaluatorTest {
@@ -33,6 +34,7 @@ class FinnhubPriceEvaluatorTest {
     @Mock private PriceQuoteRepository priceQuoteRepository;
     @Mock private FeatureToggleService featureToggleService;
     @Mock private MarketStatusService marketStatusService;
+    @Mock private DashboardEventPublisher dashboardEventPublisher;
 
     private LivePriceCache livePriceCache;
     private FinnhubPriceEvaluator finnhubPriceEvaluator;
@@ -49,7 +51,8 @@ class FinnhubPriceEvaluatorTest {
                         priceQuoteRepository,
                         featureToggleService,
                         marketStatusService,
-                        livePriceCache);
+                        livePriceCache,
+                        dashboardEventPublisher);
     }
 
     @Test

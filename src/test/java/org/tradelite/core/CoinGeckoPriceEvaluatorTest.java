@@ -18,6 +18,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class CoinGeckoPriceEvaluatorTest {
@@ -25,6 +26,7 @@ class CoinGeckoPriceEvaluatorTest {
     @Mock private CoinGeckoClient coinGeckoClient;
     @Mock private TargetPriceProvider targetPriceProvider;
     @Mock private TelegramGateway telegramClient;
+    @Mock private DashboardEventPublisher dashboardEventPublisher;
 
     private CoinGeckoPriceEvaluator coinGeckoPriceEvaluator;
 
@@ -33,7 +35,7 @@ class CoinGeckoPriceEvaluatorTest {
         coinGeckoPriceEvaluator =
                 spy(
                         new CoinGeckoPriceEvaluator(
-                                coinGeckoClient, targetPriceProvider, telegramClient));
+                                coinGeckoClient, targetPriceProvider, telegramClient, dashboardEventPublisher));
     }
 
     @Test
