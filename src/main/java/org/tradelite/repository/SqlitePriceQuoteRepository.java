@@ -1,7 +1,6 @@
 package org.tradelite.repository;
 
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -92,67 +91,6 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                     }
                 });
         log.debug("Saved {} price quotes in batch", priceQuotes.size());
-    }
-
-    @Override
-    public List<PriceQuoteEntity> findBySymbol(String symbol) {
-        String sql =
-                """
-                SELECT id, symbol, timestamp, current_price, daily_open, daily_high, daily_low,
-                       change_amount, change_percent, previous_close
-                FROM finnhub_price_quotes
-                WHERE symbol = ?
-                ORDER BY timestamp ASC
-                """;
-
-        return jdbcTemplate.query(sql, this::mapResultSetToEntity, symbol);
-    }
-
-    @Override
-    public List<PriceQuoteEntity> findBySymbolAndDate(String symbol, LocalDate date) {
-        long startOfDay = date.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
-        long endOfDay = date.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
-
-        return findBySymbolAndTimestampRange(symbol, startOfDay, endOfDay);
-    }
-
-    @Override
-    public List<PriceQuoteEntity> findBySymbolAndDateRange(
-            String symbol, LocalDate startDate, LocalDate endDate) {
-        long startTimestamp = startDate.atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
-        long endTimestamp = endDate.plusDays(1).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
-
-        return findBySymbolAndTimestampRange(symbol, startTimestamp, endTimestamp);
-    }
-
-    private List<PriceQuoteEntity> findBySymbolAndTimestampRange(
-            String symbol, long startTimestamp, long endTimestamp) {
-        String sql =
-                """
-                SELECT id, symbol, timestamp, current_price, daily_open, daily_high, daily_low,
-                       change_amount, change_percent, previous_close
-                FROM finnhub_price_quotes
-                WHERE symbol = ? AND timestamp >= ? AND timestamp < ?
-                ORDER BY timestamp ASC
-                """;
-
-        return jdbcTemplate.query(
-                sql, this::mapResultSetToEntity, symbol, startTimestamp, endTimestamp);
-    }
-
-    private PriceQuoteEntity mapResultSetToEntity(ResultSet rs, int rowNum) throws SQLException {
-        return PriceQuoteEntity.builder()
-                .id(rs.getLong("id"))
-                .symbol(rs.getString("symbol"))
-                .timestamp(rs.getLong("timestamp"))
-                .currentPrice(rs.getDouble("current_price"))
-                .dailyOpen(rs.getDouble("daily_open"))
-                .dailyHigh(rs.getDouble("daily_high"))
-                .dailyLow(rs.getDouble("daily_low"))
-                .changeAmount(rs.getDouble("change_amount"))
-                .changePercent(rs.getDouble("change_percent"))
-                .previousClose(rs.getDouble("previous_close"))
-                .build();
     }
 
     @Override

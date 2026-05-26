@@ -11,6 +11,4 @@ public interface TargetPriceRepository {
     void save(TargetPrice targetPrice, AssetType type);
 
     boolean deleteBySymbolAndType(String symbol, AssetType type);
-
-    int count();
 }
