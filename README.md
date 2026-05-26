@@ -4,7 +4,6 @@
 [![CodeQL](https://github.com/lelsaesser/tradebot/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/github-code-scanning/codeql)
 [![DevSkim](https://github.com/lelsaesser/tradebot/actions/workflows/devskim.yml/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/devskim.yml)
 [![Java CI with Maven](https://github.com/lelsaesser/tradebot/actions/workflows/maven.yml/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/maven.yml)
-[![OSV-Scanner](https://github.com/lelsaesser/tradebot/actions/workflows/osv-scanner.yml/badge.svg)](https://github.com/lelsaesser/tradebot/actions/workflows/osv-scanner.yml)
 
 Integrates into several APIs and sends notifications and updates to Telegram chats.
 

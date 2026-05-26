@@ -117,7 +117,7 @@ public class Scheduler {
     public void stockMarketMonitoring() {
         if (marketStatusService.isMarketOpen(marketDateTime)) {
             rootErrorHandler.run(finnhubPriceEvaluator::evaluatePrice);
-            rootErrorHandler.run(pullbackBuyTracker::analyzeAndSendAlerts);
+            rootErrorHandler.run(pullbackBuyTracker::analyzeDomestic);
             // Analyze sector ETFs in real-time for rotation signals
             rootErrorHandler.run(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
             rootErrorHandler.run(sectorMomentumRocTracker::analyzeAndSendAlerts);
@@ -131,6 +131,9 @@ public class Scheduler {
         // could silently skip valid trading windows (e.g., adding ASX where Monday open
         // in Sydney falls on Sunday CET).
         rootErrorHandler.run(yahooPriceEvaluator::evaluatePrice);
+        // International pullback runs after Yahoo so LivePriceCache is fresh for .DE/.KS tickers.
+        // The tracker gates per-symbol via MarketStatusService.isExchangeOpen().
+        rootErrorHandler.run(pullbackBuyTracker::analyzeInternational);
         log.info("Stock market monitoring round completed.");
     }
 
@@ -315,7 +318,8 @@ public class Scheduler {
         boolean success = true;
         success &= rootErrorHandler.runWithStatus(finnhubPriceEvaluator::evaluatePrice);
         success &= rootErrorHandler.runWithStatus(yahooPriceEvaluator::evaluatePrice);
-        success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
+        success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeDomestic);
+        success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeInternational);
         success &=
                 rootErrorHandler.runWithStatus(sectorRelativeStrengthTracker::analyzeAndSendAlerts);
         success &= rootErrorHandler.runWithStatus(sectorMomentumRocTracker::analyzeAndSendAlerts);
@@ -408,7 +412,9 @@ public class Scheduler {
     }
 
     public boolean manualPullbackBuyAlert() {
-        boolean success = rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeAndSendAlerts);
+        boolean success = true;
+        success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeDomestic);
+        success &= rootErrorHandler.runWithStatus(pullbackBuyTracker::analyzeInternational);
         log.info("Manual pullback buy alert scan completed.");
         return success;
     }
