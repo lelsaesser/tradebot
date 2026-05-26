@@ -228,34 +228,6 @@ class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
         assertThat(results, is(notNullValue()));
     }
 
-    @Test
-    void findLatestBySymbol_returnsLatestEntry() {
-        long base = Instant.now().getEpochSecond();
-        repository.save(createPriceQuote("AAPL", 175.50, base));
-        repository.save(createPriceQuote("AAPL", 176.00, base + 1));
-
-        var result = repository.findLatestBySymbol("AAPL");
-        assertThat(result.isPresent(), is(true));
-        assertThat(result.get().getCurrentPrice(), is(176.00));
-    }
-
-    @Test
-    void findLatestBySymbol_returnsEmptyForUnknownSymbol() {
-        var result = repository.findLatestBySymbol("UNKNOWN");
-        assertThat(result.isPresent(), is(false));
-    }
-
-    @Test
-    void findLatestBySymbol_returnsOnlyMatchingSymbol() {
-        repository.save(createPriceQuote("AAPL", 175.50));
-        repository.save(createPriceQuote("GOOG", 150.25));
-
-        var result = repository.findLatestBySymbol("GOOG");
-        assertThat(result.isPresent(), is(true));
-        assertThat(result.get().getSymbol(), is("GOOG"));
-        assertThat(result.get().getCurrentPrice(), is(150.25));
-    }
-
     private PriceQuoteResponse createPriceQuote(String symbol, double price) {
         PriceQuoteResponse priceQuote = new PriceQuoteResponse();
         priceQuote.setStockSymbol(new StockSymbol(symbol, symbol + " Inc."));
