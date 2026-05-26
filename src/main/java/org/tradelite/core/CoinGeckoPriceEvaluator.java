@@ -10,6 +10,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @Component
 public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
@@ -24,8 +25,9 @@ public class CoinGeckoPriceEvaluator extends BasePriceEvaluator {
     public CoinGeckoPriceEvaluator(
             CoinGeckoClient coinGeckoClient,
             TargetPriceProvider targetPriceProvider,
-            TelegramGateway telegramClient) {
-        super(telegramClient, targetPriceProvider);
+            TelegramGateway telegramClient,
+            DashboardEventPublisher dashboardEventPublisher) {
+        super(telegramClient, targetPriceProvider, dashboardEventPublisher);
         this.coinGeckoClient = coinGeckoClient;
         this.targetPriceProvider = targetPriceProvider;
         this.telegramClient = telegramClient;
