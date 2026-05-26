@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -93,23 +92,6 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                     }
                 });
         log.debug("Saved {} price quotes in batch", priceQuotes.size());
-    }
-
-    @Override
-    public Optional<PriceQuoteEntity> findLatestBySymbol(String symbol) {
-        String sql =
-                """
-                SELECT id, symbol, timestamp, current_price, daily_open, daily_high, daily_low,
-                       change_amount, change_percent, previous_close
-                FROM finnhub_price_quotes
-                WHERE symbol = ?
-                ORDER BY timestamp DESC
-                LIMIT 1
-                """;
-
-        List<PriceQuoteEntity> results =
-                jdbcTemplate.query(sql, this::mapResultSetToEntity, symbol);
-        return results.stream().findFirst();
     }
 
     @Override

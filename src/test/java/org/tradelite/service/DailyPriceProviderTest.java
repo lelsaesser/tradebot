@@ -3,7 +3,9 @@ package org.tradelite.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -14,8 +16,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.repository.OhlcvRepository;
-import org.tradelite.repository.PriceQuoteEntity;
 import org.tradelite.repository.PriceQuoteRepository;
+import org.tradelite.service.LivePriceCache.PricedAt;
 import org.tradelite.service.model.DailyPrice;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,16 +27,17 @@ class DailyPriceProviderTest {
 
     @Mock private OhlcvRepository ohlcvRepository;
     @Mock private PriceQuoteRepository priceQuoteRepository;
+    @Mock private LivePriceCache livePriceCache;
 
     private DailyPriceProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new DailyPriceProvider(ohlcvRepository, priceQuoteRepository);
+        provider = new DailyPriceProvider(ohlcvRepository, priceQuoteRepository, livePriceCache);
     }
 
     @Test
-    void findDailyClosingPrices_ohlcvPresent_appendsFinnhubForNewDay() {
+    void findDailyClosingPrices_ohlcvPresent_appendsLivePriceForNewDay() {
         LocalDate yesterday = LocalDate.of(2026, 4, 15);
         LocalDate today = LocalDate.of(2026, 4, 16);
         when(ohlcvRepository.findBySymbol("AAPL", 90))
@@ -42,14 +45,8 @@ class DailyPriceProviderTest {
                         List.of(
                                 new OhlcvRecord(
                                         "AAPL", yesterday, 150.0, 155.0, 149.0, 153.0, 1000000)));
-        when(priceQuoteRepository.findLatestBySymbol("AAPL"))
-                .thenReturn(
-                        Optional.of(
-                                PriceQuoteEntity.builder()
-                                        .symbol("AAPL")
-                                        .timestamp(toEpochSecond(today, 15, 30))
-                                        .currentPrice(157.0)
-                                        .build()));
+        when(livePriceCache.getEntry("AAPL"))
+                .thenReturn(Optional.of(new PricedAt(157.0, instantAt(today, 15, 30))));
 
         List<DailyPrice> result = provider.findDailyClosingPrices("AAPL", 90);
 
@@ -62,21 +59,15 @@ class DailyPriceProviderTest {
     }
 
     @Test
-    void findDailyClosingPrices_ohlcvPresent_finnhubSameDateAsOhlcv_notAppended() {
+    void findDailyClosingPrices_ohlcvPresent_livePriceSameDateAsOhlcv_notAppended() {
         LocalDate friday = LocalDate.of(2026, 4, 10);
         when(ohlcvRepository.findBySymbol("AAPL", 90))
                 .thenReturn(
                         List.of(
                                 new OhlcvRecord(
                                         "AAPL", friday, 150.0, 155.0, 149.0, 153.0, 1000000)));
-        when(priceQuoteRepository.findLatestBySymbol("AAPL"))
-                .thenReturn(
-                        Optional.of(
-                                PriceQuoteEntity.builder()
-                                        .symbol("AAPL")
-                                        .timestamp(toEpochSecond(friday, 15, 59))
-                                        .currentPrice(154.0)
-                                        .build()));
+        when(livePriceCache.getEntry("AAPL"))
+                .thenReturn(Optional.of(new PricedAt(154.0, instantAt(friday, 15, 59))));
 
         List<DailyPrice> result = provider.findDailyClosingPrices("AAPL", 90);
 
@@ -86,7 +77,7 @@ class DailyPriceProviderTest {
     }
 
     @Test
-    void findDailyClosingPrices_ohlcvPresent_finnhubEmpty_returnsOhlcvOnly() {
+    void findDailyClosingPrices_ohlcvPresent_livePriceCacheEmpty_returnsOhlcvOnly() {
         LocalDate date1 = LocalDate.of(2026, 4, 10);
         LocalDate date2 = LocalDate.of(2026, 4, 11);
         when(ohlcvRepository.findBySymbol("AAPL", 90))
@@ -95,7 +86,7 @@ class DailyPriceProviderTest {
                                 new OhlcvRecord("AAPL", date1, 150.0, 155.0, 149.0, 153.0, 1000000),
                                 new OhlcvRecord(
                                         "AAPL", date2, 153.0, 157.0, 152.0, 156.0, 1200000)));
-        when(priceQuoteRepository.findLatestBySymbol("AAPL")).thenReturn(Optional.empty());
+        when(livePriceCache.getEntry("AAPL")).thenReturn(Optional.empty());
 
         List<DailyPrice> result = provider.findDailyClosingPrices("AAPL", 90);
 
@@ -108,7 +99,7 @@ class DailyPriceProviderTest {
     }
 
     @Test
-    void findDailyClosingPrices_ohlcvPresent_finnhubOlderThanOhlcv_notAppended() {
+    void findDailyClosingPrices_ohlcvPresent_livePriceOlderThanOhlcv_notAppended() {
         LocalDate wednesday = LocalDate.of(2026, 4, 15);
         LocalDate tuesday = LocalDate.of(2026, 4, 14);
         when(ohlcvRepository.findBySymbol("AAPL", 90))
@@ -116,14 +107,8 @@ class DailyPriceProviderTest {
                         List.of(
                                 new OhlcvRecord(
                                         "AAPL", wednesday, 150.0, 155.0, 149.0, 153.0, 1000000)));
-        when(priceQuoteRepository.findLatestBySymbol("AAPL"))
-                .thenReturn(
-                        Optional.of(
-                                PriceQuoteEntity.builder()
-                                        .symbol("AAPL")
-                                        .timestamp(toEpochSecond(tuesday, 15, 30))
-                                        .currentPrice(148.0)
-                                        .build()));
+        when(livePriceCache.getEntry("AAPL"))
+                .thenReturn(Optional.of(new PricedAt(148.0, instantAt(tuesday, 15, 30))));
 
         List<DailyPrice> result = provider.findDailyClosingPrices("AAPL", 90);
 
@@ -145,14 +130,8 @@ class DailyPriceProviderTest {
                                 new OhlcvRecord("MSFT", date2, 402.0, 410.0, 401.0, 408.0, 600000),
                                 new OhlcvRecord(
                                         "MSFT", date3, 408.0, 412.0, 406.0, 410.0, 550000)));
-        when(priceQuoteRepository.findLatestBySymbol("MSFT"))
-                .thenReturn(
-                        Optional.of(
-                                PriceQuoteEntity.builder()
-                                        .symbol("MSFT")
-                                        .timestamp(toEpochSecond(today, 14, 0))
-                                        .currentPrice(415.0)
-                                        .build()));
+        when(livePriceCache.getEntry("MSFT"))
+                .thenReturn(Optional.of(new PricedAt(415.0, instantAt(today, 14, 0))));
 
         List<DailyPrice> result = provider.findDailyClosingPrices("MSFT", 30);
 
@@ -175,7 +154,9 @@ class DailyPriceProviderTest {
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().getPrice()).isEqualTo(200.0);
         verify(priceQuoteRepository).findDailyClosingPrices("XLK", 90);
-        verify(priceQuoteRepository, never()).findLatestBySymbol(anyString());
+        // Intraday append is gated on the OHLCV-hit branch — must not consult LivePriceCache
+        // on the Finnhub fallback path.
+        verify(livePriceCache, never()).getEntry(anyString());
     }
 
     @Test
@@ -189,10 +170,12 @@ class DailyPriceProviderTest {
     }
 
     @Test
-    void findDailyClosingPrices_ohlcvPresent_alwaysQueriesFinnhubForIntradayPrice() {
-        // Regression guard: DailyPriceProvider MUST always query Finnhub for the latest
-        // intraday price when OHLCV data exists. Removing this call would silently break
-        // all intraday indicator signals (see issue #276).
+    void findDailyClosingPrices_ohlcvPresent_alwaysQueriesLivePriceCacheForIntradayPrice() {
+        // Regression guard: DailyPriceProvider MUST always query LivePriceCache for the latest
+        // intraday price when OHLCV data exists. Removing this call would silently break all
+        // intraday indicator signals (originally for Finnhub-backed quotes — see issue #276;
+        // moved from PriceQuoteRepository.findLatestBySymbol to LivePriceCache.getEntry in #445
+        // to support international stocks and eliminate redundant SQLite reads).
         when(ohlcvRepository.findBySymbol("AAPL", 90))
                 .thenReturn(
                         List.of(
@@ -204,14 +187,14 @@ class DailyPriceProviderTest {
                                         149.0,
                                         153.0,
                                         1000000)));
-        when(priceQuoteRepository.findLatestBySymbol("AAPL")).thenReturn(Optional.empty());
+        when(livePriceCache.getEntry("AAPL")).thenReturn(Optional.empty());
 
         provider.findDailyClosingPrices("AAPL", 90);
 
-        verify(priceQuoteRepository).findLatestBySymbol("AAPL");
+        verify(livePriceCache).getEntry("AAPL");
     }
 
-    private long toEpochSecond(LocalDate date, int hour, int minute) {
-        return date.atTime(hour, minute).atZone(NY_ZONE).toEpochSecond();
+    private Instant instantAt(LocalDate date, int hour, int minute) {
+        return date.atTime(LocalTime.of(hour, minute)).atZone(NY_ZONE).toInstant();
     }
 }

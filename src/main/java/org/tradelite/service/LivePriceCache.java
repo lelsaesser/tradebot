@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,10 @@ public class LivePriceCache {
     public Double get(String symbol) {
         PricedAt entry = cache.get(symbol);
         return entry == null ? null : entry.price();
+    }
+
+    public Optional<PricedAt> getEntry(String symbol) {
+        return Optional.ofNullable(cache.get(symbol));
     }
 
     public Map<String, Double> getAll() {
@@ -50,5 +55,5 @@ public class LivePriceCache {
         }
     }
 
-    private record PricedAt(double price, Instant updatedAt) {}
+    public record PricedAt(double price, Instant updatedAt) {}
 }
