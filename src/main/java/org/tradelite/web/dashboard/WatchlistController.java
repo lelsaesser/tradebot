@@ -48,32 +48,39 @@ public class WatchlistController {
     @GetMapping("/watchlist")
     public WatchlistResponse getWatchlist() {
         Map<String, Double> prices = livePriceCache.getAll();
-        Map<String, TargetPrice> targets = targetPriceProvider.getStockTargetPrices().stream()
-                .collect(Collectors.toMap(tp -> tp.getSymbol().toUpperCase(), Function.identity()));
+        Map<String, TargetPrice> targets =
+                targetPriceProvider.getStockTargetPrices().stream()
+                        .collect(
+                                Collectors.toMap(
+                                        tp -> tp.getSymbol().toUpperCase(), Function.identity()));
 
         List<WatchlistRow> rows = new ArrayList<>();
         for (StockSymbol symbol : symbolRegistry.getAll()) {
             String ticker = symbol.getName().toUpperCase();
             TargetPrice tp = targets.get(ticker);
-            rows.add(new WatchlistRow(
-                    ticker,
-                    symbol.getDisplayName(),
-                    deriveExchange(ticker),
-                    prices.get(ticker),
-                    tp != null ? tp.getBuyTarget() : null,
-                    tp != null ? tp.getSellTarget() : null));
+            rows.add(
+                    new WatchlistRow(
+                            ticker,
+                            symbol.getDisplayName(),
+                            deriveExchange(ticker),
+                            prices.get(ticker),
+                            tp != null ? tp.getBuyTarget() : null,
+                            tp != null ? tp.getSellTarget() : null));
         }
         return new WatchlistResponse(rows);
     }
 
     @PostMapping("/symbols")
     public ResponseEntity<String> addSymbol(@RequestBody AddSymbolRequest request) {
-        if (request.ticker() == null || request.ticker().isBlank()
-                || request.displayName() == null || request.displayName().isBlank()) {
+        if (request.ticker() == null
+                || request.ticker().isBlank()
+                || request.displayName() == null
+                || request.displayName().isBlank()) {
             return ResponseEntity.badRequest().body("ticker and displayName are required");
         }
-        SymbolManagementService.AddResult result = symbolManagementService.addSymbol(
-                request.ticker().toUpperCase(), request.displayName(), null, null);
+        SymbolManagementService.AddResult result =
+                symbolManagementService.addSymbol(
+                        request.ticker().toUpperCase(), request.displayName(), null, null);
         if (!result.success()) {
             return ResponseEntity.badRequest().body(result.message());
         }
@@ -95,7 +102,8 @@ public class WatchlistController {
         if (symbol.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        targetPriceProvider.updateTargetPrice(symbol.get(), request.side(), request.price(), AssetType.STOCK);
+        targetPriceProvider.updateTargetPrice(
+                symbol.get(), request.side(), request.price(), AssetType.STOCK);
         return ResponseEntity.ok().build();
     }
 

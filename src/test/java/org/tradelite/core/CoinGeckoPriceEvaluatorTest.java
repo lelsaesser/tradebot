@@ -35,7 +35,10 @@ class CoinGeckoPriceEvaluatorTest {
         coinGeckoPriceEvaluator =
                 spy(
                         new CoinGeckoPriceEvaluator(
-                                coinGeckoClient, targetPriceProvider, telegramClient, dashboardEventPublisher));
+                                coinGeckoClient,
+                                targetPriceProvider,
+                                telegramClient,
+                                dashboardEventPublisher));
     }
 
     @Test

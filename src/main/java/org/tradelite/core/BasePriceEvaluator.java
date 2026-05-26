@@ -76,10 +76,14 @@ public abstract class BasePriceEvaluator {
             dashboardEventPublisher.publish(
                     "price-alert",
                     Map.of(
-                            "ticker", ticker.getName(),
-                            "side", "SELL",
-                            "currentPrice", currentPrice,
-                            "target", targetPriceSell));
+                            "ticker",
+                            ticker.getName(),
+                            "side",
+                            "SELL",
+                            "currentPrice",
+                            currentPrice,
+                            "target",
+                            targetPriceSell));
         }
 
         if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
@@ -98,10 +102,14 @@ public abstract class BasePriceEvaluator {
             dashboardEventPublisher.publish(
                     "price-alert",
                     Map.of(
-                            "ticker", ticker.getName(),
-                            "side", "BUY",
-                            "currentPrice", currentPrice,
-                            "target", targetPriceBuy));
+                            "ticker",
+                            ticker.getName(),
+                            "side",
+                            "BUY",
+                            "currentPrice",
+                            currentPrice,
+                            "target",
+                            targetPriceBuy));
         }
     }
 }

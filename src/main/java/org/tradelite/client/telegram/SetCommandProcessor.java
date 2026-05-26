@@ -50,10 +50,12 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
 
         if (coinId.isPresent()) {
             displayName = coinId.get().getName();
-            targetPriceProvider.updateTargetPrice(coinId.get(), side, command.getTarget(), AssetType.COIN);
+            targetPriceProvider.updateTargetPrice(
+                    coinId.get(), side, command.getTarget(), AssetType.COIN);
         } else if (stockSymbol.isPresent()) {
             displayName = stockSymbol.get().getDisplayName();
-            targetPriceProvider.updateTargetPrice(stockSymbol.get(), side, command.getTarget(), AssetType.STOCK);
+            targetPriceProvider.updateTargetPrice(
+                    stockSymbol.get(), side, command.getTarget(), AssetType.STOCK);
         } else {
             throw new IllegalArgumentException("Invalid symbol: " + symbol);
         }

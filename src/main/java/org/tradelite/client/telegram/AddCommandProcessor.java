@@ -11,7 +11,8 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     private final TelegramGateway telegramClient;
 
     @Autowired
-    public AddCommandProcessor(SymbolManagementService symbolManagementService, TelegramGateway telegramClient) {
+    public AddCommandProcessor(
+            SymbolManagementService symbolManagementService, TelegramGateway telegramClient) {
         this.symbolManagementService = symbolManagementService;
         this.telegramClient = telegramClient;
     }
@@ -23,11 +24,12 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
 
     @Override
     public void processCommand(AddCommand command) {
-        SymbolManagementService.AddResult result = symbolManagementService.addSymbol(
-                command.getTicker(),
-                command.getDisplayName(),
-                command.getBuyTargetPrice(),
-                command.getSellTargetPrice());
+        SymbolManagementService.AddResult result =
+                symbolManagementService.addSymbol(
+                        command.getTicker(),
+                        command.getDisplayName(),
+                        command.getBuyTargetPrice(),
+                        command.getSellTargetPrice());
 
         if (!result.success()) {
             telegramClient.sendMessage(result.message());

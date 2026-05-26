@@ -44,26 +44,39 @@ public class SymbolManagementService {
     /**
      * Validates, adds, and queues a symbol for OHLCV backfill.
      *
-     * @param ticker      uppercase ticker symbol
+     * @param ticker uppercase ticker symbol
      * @param displayName human-readable name
-     * @param buyTarget   initial buy target (null = none)
-     * @param sellTarget  initial sell target (null = none)
+     * @param buyTarget initial buy target (null = none)
+     * @param sellTarget initial sell target (null = none)
      * @return AddResult indicating success or failure reason
      */
-    public AddResult addSymbol(String ticker, String displayName, Double buyTarget, Double sellTarget) {
+    public AddResult addSymbol(
+            String ticker, String displayName, Double buyTarget, Double sellTarget) {
         if (!isValidTicker(ticker, displayName)) {
-            String source = symbolRegistry.isInternationalSymbol(ticker)
-                    ? "Yahoo Finance"
-                    : "Finnhub or CoinGecko";
-            return new AddResult(false, "Invalid ticker: " + ticker + ". Could not fetch price data from " + source + ".");
+            String source =
+                    symbolRegistry.isInternationalSymbol(ticker)
+                            ? "Yahoo Finance"
+                            : "Finnhub or CoinGecko";
+            return new AddResult(
+                    false,
+                    "Invalid ticker: "
+                            + ticker
+                            + ". Could not fetch price data from "
+                            + source
+                            + ".");
         }
 
         boolean symbolAdded = symbolRegistry.addSymbol(ticker, displayName);
         if (!symbolAdded) {
-            return new AddResult(false, "Failed to add symbol: " + ticker + ". It may already exist.");
+            return new AddResult(
+                    false, "Failed to add symbol: " + ticker + ". It may already exist.");
         }
 
-        TargetPrice targetPrice = new TargetPrice(ticker, buyTarget != null ? buyTarget : 0.0, sellTarget != null ? sellTarget : 0.0);
+        TargetPrice targetPrice =
+                new TargetPrice(
+                        ticker,
+                        buyTarget != null ? buyTarget : 0.0,
+                        sellTarget != null ? sellTarget : 0.0);
         boolean priceAdded = targetPriceProvider.addTargetPrice(targetPrice, AssetType.STOCK);
         if (!priceAdded) {
             symbolRegistry.removeSymbol(ticker);
@@ -127,8 +140,12 @@ public class SymbolManagementService {
         }
 
         try {
-            CoinId tempCoinId = CoinId.fromString(ticker.toLowerCase())
-                    .orElseThrow(() -> new IllegalArgumentException("Not a known crypto coin ID"));
+            CoinId tempCoinId =
+                    CoinId.fromString(ticker.toLowerCase())
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalArgumentException(
+                                                    "Not a known crypto coin ID"));
             CoinGeckoPriceResponse.CoinData coinData = coinGeckoClient.getCoinPriceData(tempCoinId);
             if (coinData != null && coinData.getUsd() > 0) {
                 log.info("Ticker {} validated successfully via CoinGecko", ticker);

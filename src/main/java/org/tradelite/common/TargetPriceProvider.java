@@ -89,7 +89,8 @@ public class TargetPriceProvider {
         ignoredSymbolRepository.deleteExpiredEntries(cutoff);
     }
 
-    public void updateTargetPrice(TickerSymbol symbol, TargetSide side, double price, AssetType type) {
+    public void updateTargetPrice(
+            TickerSymbol symbol, TargetSide side, double price, AssetType type) {
         List<TargetPrice> prices = targetPriceRepository.findByAssetType(type);
 
         for (TargetPrice tp : prices) {

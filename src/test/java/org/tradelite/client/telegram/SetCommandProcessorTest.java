@@ -58,9 +58,16 @@ class SetCommandProcessorTest {
 
         verify(targetPriceProvider, times(1))
                 .updateTargetPrice(
-                        CoinId.fromString("BITCOIN").get(), TargetSide.BUY, 50000.0, AssetType.COIN);
+                        CoinId.fromString("BITCOIN").get(),
+                        TargetSide.BUY,
+                        50000.0,
+                        AssetType.COIN);
         verify(targetPriceProvider, never())
-                .updateTargetPrice(any(StockSymbol.class), any(TargetSide.class), anyDouble(), any(AssetType.class));
+                .updateTargetPrice(
+                        any(StockSymbol.class),
+                        any(TargetSide.class),
+                        anyDouble(),
+                        any(AssetType.class));
     }
 
     @Test
@@ -74,7 +81,11 @@ class SetCommandProcessorTest {
         verify(targetPriceProvider, times(1))
                 .updateTargetPrice(aaplSymbol, TargetSide.SELL, 150.0, AssetType.STOCK);
         verify(targetPriceProvider, never())
-                .updateTargetPrice(any(CoinId.class), any(TargetSide.class), anyDouble(), any(AssetType.class));
+                .updateTargetPrice(
+                        any(CoinId.class),
+                        any(TargetSide.class),
+                        anyDouble(),
+                        any(AssetType.class));
     }
 
     @Test

@@ -18,7 +18,6 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.sqlite.SQLiteDataSource;
-import org.tradelite.common.TargetSide;
 import org.tradelite.core.IgnoreReason;
 import org.tradelite.repository.SqliteIgnoredSymbolRepository;
 import org.tradelite.repository.TargetPriceRepository;
@@ -236,7 +235,8 @@ class TargetPriceProviderTest {
         prices.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
         when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(prices);
 
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, TargetSide.SELL, 1105.0, AssetType.COIN);
+        targetPriceProvider.updateTargetPrice(
+                CoinId.SOLANA, TargetSide.SELL, 1105.0, AssetType.COIN);
 
         verify(targetPriceRepository)
                 .save(
