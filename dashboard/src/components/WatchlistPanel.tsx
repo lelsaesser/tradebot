@@ -75,8 +75,8 @@ export function WatchlistPanel() {
   useEffect(() => {
     loadWatchlist()
 
-    const unsubAlert = subscribe('price-alert', (e: MessageEvent) => {
-      const p: PriceAlertPayload = JSON.parse(e.data).payload
+    const unsubAlert = subscribe('price-alert', (data: unknown) => {
+      const p = data as PriceAlertPayload
       setHighlighted(prev => ({ ...prev, [p.ticker]: p.side }))
       if (highlightTimers.current[p.ticker]) clearTimeout(highlightTimers.current[p.ticker])
       highlightTimers.current[p.ticker] = setTimeout(() => {
@@ -88,8 +88,8 @@ export function WatchlistPanel() {
       }, 10_000)
     })
 
-    const unsubSwing = subscribe('price-swing', (e: MessageEvent) => {
-      const p: PriceSwingPayload = JSON.parse(e.data).payload
+    const unsubSwing = subscribe('price-swing', (data: unknown) => {
+      const p = data as PriceSwingPayload
       setSwings(prev => ({ ...prev, [p.ticker]: p.changePercent }))
     })
 
