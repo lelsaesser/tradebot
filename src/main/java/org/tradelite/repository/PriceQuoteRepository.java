@@ -1,6 +1,5 @@
 package org.tradelite.repository;
 
-import java.time.LocalDate;
 import java.util.List;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.service.model.DailyPrice;
@@ -10,13 +9,6 @@ public interface PriceQuoteRepository {
     void save(PriceQuoteResponse priceQuote);
 
     void saveAll(List<PriceQuoteResponse> priceQuotes);
-
-    List<PriceQuoteEntity> findBySymbol(String symbol);
-
-    List<PriceQuoteEntity> findBySymbolAndDate(String symbol, LocalDate date);
-
-    List<PriceQuoteEntity> findBySymbolAndDateRange(
-            String symbol, LocalDate startDate, LocalDate endDate);
 
     /**
      * Finds daily closing prices for a symbol for the last N calendar days.

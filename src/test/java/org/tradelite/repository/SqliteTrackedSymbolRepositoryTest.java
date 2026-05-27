@@ -61,20 +61,6 @@ class SqliteTrackedSymbolRepositoryTest extends AbstractSqliteRepositoryTest {
     }
 
     @Test
-    void findByAssetType_returnsOnlyMatchingType() {
-        repository.save("AAPL", "Apple", AssetType.STOCK);
-        repository.save("BITCOIN", "Bitcoin", AssetType.COIN);
-
-        List<StockSymbolEntry> stocks = repository.findByAssetType(AssetType.STOCK);
-        List<StockSymbolEntry> coins = repository.findByAssetType(AssetType.COIN);
-
-        assertEquals(1, stocks.size());
-        assertEquals("AAPL", stocks.getFirst().getTicker());
-        assertEquals(1, coins.size());
-        assertEquals("BITCOIN", coins.getFirst().getTicker());
-    }
-
-    @Test
     void deleteByTickerAndType_existingEntry_returnsTrue() {
         repository.save("AAPL", "Apple", AssetType.STOCK);
 
@@ -98,15 +84,5 @@ class SqliteTrackedSymbolRepositoryTest extends AbstractSqliteRepositoryTest {
 
         assertFalse(deleted);
         assertEquals(1, repository.findAll().size());
-    }
-
-    @Test
-    void count_returnsTotal() {
-        assertEquals(0, repository.count());
-
-        repository.save("AAPL", "Apple", AssetType.STOCK);
-        repository.save("BITCOIN", "Bitcoin", AssetType.COIN);
-
-        assertEquals(2, repository.count());
     }
 }

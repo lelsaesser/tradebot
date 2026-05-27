@@ -8,11 +8,7 @@ public interface TrackedSymbolRepository {
 
     List<StockSymbolEntry> findAll();
 
-    List<StockSymbolEntry> findByAssetType(AssetType type);
-
     void save(String ticker, String displayName, AssetType type);
 
     boolean deleteByTickerAndType(String ticker, AssetType type);
-
-    int count();
 }
