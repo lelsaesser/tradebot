@@ -3,7 +3,7 @@
 This document covers the technologies used, development setup, technical constraints, dependencies, and tool usage patterns.
 
 ## Technologies
-- **Language:** Java 23
+- **Language:** Java 25
 - **Framework:** Spring Boot 4.0.6
 - **Build Tool:** Maven (use `mvn` directly — there is no `./mvnw` wrapper)
 - **Database:** SQLite (embedded, via JdbcTemplate)
@@ -19,18 +19,18 @@ This document covers the technologies used, development setup, technical constra
 - **Lombok 1.18.34:** Reduces boilerplate code with annotations like `@Slf4j`, `@RequiredArgsConstructor`, `@Getter`, etc.
 - **Jackson:** JSON serialization/deserialization with JSR-310 (Java Time) datatype support
 - **JSoup 1.22.2:** HTML parsing library for web scraping (FinViz sector data)
-- **SQLite JDBC 3.53.0.0:** Embedded SQLite database driver for historical price storage
+- **SQLite JDBC 3.53.1.0:** Embedded SQLite database driver for historical price storage
 - **Testing:** 
-  - JUnit Jupiter 6.0.3
+  - JUnit Jupiter 6.1.0
   - Mockito 5.23.0 (core and junit-jupiter integration)
   - Hamcrest 3.0
   - Spring Boot Test support
 
 ## Build Configuration
-- **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 23 with Lombok annotation processing
+- **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 25 with Lombok annotation processing
 - **Packaging:** `spring-boot-maven-plugin` for creating executable JARs
 - **Code Coverage:** `jacoco-maven-plugin` 0.8.14 enforces 97% instruction coverage ratio
-- **Code Formatting:** `spotless-maven-plugin` 3.4.0 with Google Java Format 1.30.0 (AOSP style)
+- **Code Formatting:** `spotless-maven-plugin` 3.5.1 with Google Java Format 1.30.0 (AOSP style)
 
 ## External Data Sources
 
