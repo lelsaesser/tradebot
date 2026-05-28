@@ -3,7 +3,14 @@ package org.tradelite.client.yahoo;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -15,8 +22,10 @@ import lombok.Generated;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.FeatureToggleService;
 
 @Slf4j
 @Component
@@ -24,15 +33,24 @@ public class YahooFinanceClient {
 
     private static final String BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/";
     private static final int PROCESS_TIMEOUT_SECONDS = 15;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
+    private static final String USER_AGENT = "Mozilla/5.0";
 
     private final ObjectMapper objectMapper;
     private final ApiRequestMeteringService meteringService;
+    private final HttpClient yahooHttpClient;
+    private final FeatureToggleService featureToggleService;
 
     @Autowired
     public YahooFinanceClient(
-            ObjectMapper objectMapper, ApiRequestMeteringService meteringService) {
+            ObjectMapper objectMapper,
+            ApiRequestMeteringService meteringService,
+            HttpClient yahooHttpClient,
+            FeatureToggleService featureToggleService) {
         this.objectMapper = objectMapper;
         this.meteringService = meteringService;
+        this.yahooHttpClient = yahooHttpClient;
+        this.featureToggleService = featureToggleService;
     }
 
     public List<OhlcvRecord> fetchDailyOhlcv(String symbol, int days) {
@@ -40,7 +58,7 @@ public class YahooFinanceClient {
         String url = BASE_URL + symbol + "?interval=1d&range=" + range;
 
         meteringService.incrementYahooRequests();
-        String json = executeCurl(symbol, url);
+        String json = executeTransport(symbol, url);
         return parseResponse(symbol, json);
     }
 
@@ -48,8 +66,18 @@ public class YahooFinanceClient {
         String url = BASE_URL + symbol + "?interval=1d&range=1d";
 
         meteringService.incrementYahooRequests();
-        String json = executeCurl(symbol, url);
+        String json = executeTransport(symbol, url);
         return parseQuoteFromMeta(symbol, json);
+    }
+
+    /**
+     * Dispatches transport based on {@link FeatureToggle#YAHOO_HTTP_CLIENT}. ON → {@link
+     * #executeRequest}; OFF → {@link #executeCurl}. Temporary; removed in #457.
+     */
+    private String executeTransport(String symbol, String url) {
+        return featureToggleService.isEnabled(FeatureToggle.YAHOO_HTTP_CLIENT)
+                ? executeRequest(symbol, url)
+                : executeCurl(symbol, url);
     }
 
     YahooPriceQuote parseQuoteFromMeta(String symbol, String json) {
@@ -147,6 +175,50 @@ public class YahooFinanceClient {
             throw new YahooFetchException(symbol, "interrupted");
         } catch (Exception e) {
             throw new YahooFetchException(symbol, e.getMessage());
+        }
+    }
+
+    /**
+     * HTTP transport via {@link java.net.http.HttpClient}. Active when {@link
+     * FeatureToggle#YAHOO_HTTP_CLIENT} is ON. On non-2xx, the exception message includes status
+     * code, full response headers, and full response body so failure forensics during the #435
+     * comparison period are unambiguous. On I/O failure, the exception message includes the
+     * exception class simple name (e.g. {@code SSLHandshakeException}, {@code ConnectException}) so
+     * transport-level failure modes are visible without DEBUG logging.
+     */
+    @Generated
+    String executeRequest(String symbol, String url) {
+        HttpRequest request =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .header("User-Agent", USER_AGENT)
+                        .timeout(REQUEST_TIMEOUT)
+                        .GET()
+                        .build();
+        try {
+            HttpResponse<String> response =
+                    yahooHttpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new YahooFetchException(
+                        symbol,
+                        "HTTP "
+                                + response.statusCode()
+                                + " headers="
+                                + response.headers().map()
+                                + " body="
+                                + response.body());
+            }
+            return response.body();
+        } catch (YahooFetchException e) {
+            throw e;
+        } catch (HttpTimeoutException _) {
+            throw new YahooFetchException(symbol, "request timed out after 15 seconds");
+        } catch (IOException e) {
+            throw new YahooFetchException(
+                    symbol, "I/O error: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            throw new YahooFetchException(symbol, "interrupted");
         }
     }
 

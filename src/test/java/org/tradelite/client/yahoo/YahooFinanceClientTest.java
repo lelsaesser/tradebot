@@ -8,6 +8,8 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,13 +17,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.service.ApiRequestMeteringService;
+import org.tradelite.service.FeatureToggleService;
 
 @ExtendWith(MockitoExtension.class)
 class YahooFinanceClientTest {
 
     @Mock private ApiRequestMeteringService meteringService;
+    @Mock private FeatureToggleService featureToggleService;
 
     private YahooFinanceClient client;
 
@@ -29,7 +34,15 @@ class YahooFinanceClientTest {
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
-        client = new YahooFinanceClient(objectMapper, meteringService);
+        HttpClient httpClient =
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        // Default: toggle OFF → existing tests exercise the curl path unchanged.
+        lenient()
+                .when(featureToggleService.isEnabled(FeatureToggle.YAHOO_HTTP_CLIENT))
+                .thenReturn(false);
+        client =
+                new YahooFinanceClient(
+                        objectMapper, meteringService, httpClient, featureToggleService);
     }
 
     @Test
@@ -331,6 +344,46 @@ class YahooFinanceClientTest {
 
         assertThat(json, containsString("\"chart\""));
         assertThat(json, containsString("\"result\""));
+    }
+
+    @Test
+    void executeRequest_realYahooCall_returnsValidJson() {
+        // Integration test: covers HttpClient success path against live Yahoo. If the
+        // TLS-fingerprinting hypothesis were true, this test would fail with an SSL exception
+        // on every CI run — providing fast disproof rather than waiting 3 trading days.
+        String json =
+                client.executeRequest(
+                        "SAP",
+                        "https://query1.finance.yahoo.com/v8/finance/chart/SAP?interval=1d&range=5d");
+
+        assertThat(json, containsString("\"chart\""));
+        assertThat(json, containsString("\"result\""));
+    }
+
+    @Test
+    void executeRequest_invalidUrl_throwsYahooFetchException() {
+        // Tests the HttpClient connection-failure branch deterministically.
+        YahooFetchException ex =
+                assertThrows(
+                        YahooFetchException.class,
+                        () -> client.executeRequest("TEST.XX", "https://localhost:1/nonexistent"));
+
+        assertThat(ex.getMessage(), containsString("TEST.XX"));
+        assertThat(ex.getMessage(), containsString("I/O error"));
+        assertThat(ex.getMessage(), containsString("ConnectException"));
+    }
+
+    @Test
+    void fetchDailyOhlcv_realCall_toggleOn_returnsRecords() {
+        // Integration test: end-to-end with toggle ON, exercising executeTransport →
+        // executeRequest.
+        when(featureToggleService.isEnabled(FeatureToggle.YAHOO_HTTP_CLIENT)).thenReturn(true);
+
+        List<OhlcvRecord> records = client.fetchDailyOhlcv("SAP", 5);
+
+        assertThat(records, is(not(empty())));
+        assertThat(records.getFirst().symbol(), is("SAP"));
+        verify(meteringService).incrementYahooRequests();
     }
 
     @Test
