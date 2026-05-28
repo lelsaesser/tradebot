@@ -1,7 +1,10 @@
 package org.tradelite.client.telegram;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -16,6 +19,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.dto.TelegramMessage;
@@ -488,6 +493,55 @@ class TelegramMessageProcessorTest {
 
         assertThat(command.isPresent(), is(false));
         verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
+    /**
+     * Regression for #456: the invalid-format error message contained {@code <feature_name>} and
+     * {@code <on|off>}, whose underscore made Telegram's Markdown parser fail with "Can't find end
+     * of the entity starting at byte offset 44". Underscore-bearing placeholders must be wrapped in
+     * backticks so {@code parse_mode=Markdown} treats them as inline code.
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "/toggle list",
+                "/toggle emaReport yes",
+                "/toggle emaReport on extra",
+                "/add foo",
+                "/add foo bar baz",
+                "/remove",
+                "/remove foo bar",
+                "/rsi",
+                "/rsi foo bar",
+                "/data reset",
+                "/data reset foo bar",
+                "/set foo bar 1.0",
+            })
+    void parseInvalidCommand_errorMessageHasNoUnescapedMarkdownSpecials(String commandText) {
+        messageProcessor.parseMessage(buildUpdate(commandText));
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient, atLeastOnce()).sendMessage(captor.capture());
+
+        for (String msg : captor.getAllValues()) {
+            // Strip backtick-delimited spans (inline code is escaped by Telegram's Markdown
+            // parser),
+            // then assert the remaining text contains no Markdown specials that would break
+            // parsing.
+            String outsideCode = msg.replaceAll("`[^`]*`", "");
+            assertThat(
+                    "Markdown specials outside backtick spans in: " + msg,
+                    outsideCode,
+                    not(anyOf(containsString("_"), containsString("*"), containsString("["))));
+        }
+    }
+
+    private TelegramUpdateResponse buildUpdate(String text) {
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+        return update;
     }
 
     @Test
