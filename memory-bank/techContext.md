@@ -5,7 +5,7 @@ This document covers the technologies used, development setup, technical constra
 ## Technologies
 - **Language:** Java 23
 - **Framework:** Spring Boot 4.0.6
-- **Build Tool:** Maven 
+- **Build Tool:** Maven (use `mvn` directly — there is no `./mvnw` wrapper)
 - **Database:** SQLite (embedded, via JdbcTemplate)
 
 ## Dependencies
@@ -233,6 +233,8 @@ src/main/java/org/tradelite/
 - **Configurable delays:** `OhlcvFetcher.setRequestDelayMs(0)` in tests to avoid 8s sleeps
 
 ## Build Commands
+
+**Use `mvn` directly. There is no Maven wrapper (`./mvnw`) and no Gradle in this project.** The `mvn` binary is on `PATH`; do not look for or invoke `./mvnw`.
 
 ```bash
 mvn test              # Run all tests
