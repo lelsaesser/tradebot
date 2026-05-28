@@ -1,6 +1,7 @@
 package org.tradelite.quant;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,18 +20,34 @@ import org.tradelite.common.SymbolRegistry;
  *   <li><b>Kurtosis</b>: High values indicate increased probability of extreme moves
  *   <li><b>Skewness</b>: Direction of risk - negative = crash bias, positive = rally potential
  * </ul>
+ *
+ * <p><b>Dual-window comparison:</b> tail risk is computed for two parallel lookback windows — a
+ * short {@value #LOOKBACK_SHORT_DAYS}-calendar-day window and a long {@value
+ * #LOOKBACK_LONG_DAYS}-trading-day window. Alerts and the daily report tag every block with {@code
+ * [35d]} / {@code [252d]} so the streams are distinguishable. See issue #336.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TailRiskTracker {
 
+    /** Short lookback window: 35 calendar days (~25 trading days). */
+    static final int LOOKBACK_SHORT_DAYS = 35;
+
+    /** Long lookback window: ~1 year (252 trading days). */
+    static final int LOOKBACK_LONG_DAYS = 252;
+
+    private static final String SHORT_TAG = "`[35d]`";
+    private static final String LONG_TAG = "`[252d]`";
+    private static final String SHORT_SECTION_TAG = "`[35d window]`";
+    private static final String LONG_SECTION_TAG = "`[252d window]`";
+
     private final TailRiskService tailRiskService;
     private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
 
-    /** Analyzes tail risk for all tracked sector ETFs and returns the results. */
-    public List<TailRiskAnalysis> analyzeAllSectors() {
+    /** Analyzes tail risk for all tracked sector ETFs using the given lookback window. */
+    public List<TailRiskAnalysis> analyzeAllSectors(int lookbackDays) {
         List<TailRiskAnalysis> results = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : symbolRegistry.getAllEtfs().entrySet()) {
@@ -38,7 +55,7 @@ public class TailRiskTracker {
             String displayName = entry.getValue();
 
             Optional<TailRiskAnalysis> analysis =
-                    tailRiskService.analyzeTailRisk(symbol, displayName);
+                    tailRiskService.analyzeTailRisk(symbol, displayName, lookbackDays);
             analysis.ifPresent(results::add);
         }
 
@@ -47,50 +64,109 @@ public class TailRiskTracker {
 
     /** Performs daily tail risk check and sends Telegram alerts for elevated risk. */
     public void trackAndAlert() {
-        List<TailRiskAnalysis> analyses = analyzeAllSectors();
+        // Stable order: 35d first, 252d second.
+        sendAlertIfElevated(analyzeAllSectors(LOOKBACK_SHORT_DAYS), SHORT_TAG);
+        sendAlertIfElevated(analyzeAllSectors(LOOKBACK_LONG_DAYS), LONG_TAG);
+    }
 
+    private void sendAlertIfElevated(List<TailRiskAnalysis> analyses, String tag) {
         if (analyses.isEmpty()) {
-            log.warn("No tail risk data available - insufficient price history");
+            log.warn("No tail risk data available for {} window", tag);
             return;
         }
 
         List<TailRiskAnalysis> highRiskSectors =
                 analyses.stream().filter(a -> a.riskLevel() == TailRiskLevel.HIGH).toList();
-
         List<TailRiskAnalysis> extremeRiskSectors =
                 analyses.stream().filter(a -> a.riskLevel() == TailRiskLevel.EXTREME).toList();
 
-        // Only send alerts if there's elevated risk
-        if (!highRiskSectors.isEmpty() || !extremeRiskSectors.isEmpty()) {
-            String alertMessage = buildAlertMessage(analyses, highRiskSectors, extremeRiskSectors);
-            telegramClient.sendMessage(alertMessage);
+        if (highRiskSectors.isEmpty() && extremeRiskSectors.isEmpty()) {
             log.info(
-                    "Tail risk alert sent: {} HIGH, {} EXTREME sectors",
-                    highRiskSectors.size(),
-                    extremeRiskSectors.size());
-        } else {
-            log.info("Tail risk check complete: all sectors within normal range");
+                    "Tail risk check complete for {} window: all sectors within normal range", tag);
+            return;
         }
+
+        String alertMessage = buildAlertMessage(analyses, highRiskSectors, extremeRiskSectors, tag);
+        telegramClient.sendMessage(alertMessage);
+        log.info(
+                "Tail risk alert sent for {} window: {} HIGH, {} EXTREME sectors",
+                tag,
+                highRiskSectors.size(),
+                extremeRiskSectors.size());
     }
 
     public void sendDailyReport() {
-        String report = buildSummaryReport();
+        List<TailRiskAnalysis> shortResults = analyzeAllSectors(LOOKBACK_SHORT_DAYS);
+        List<TailRiskAnalysis> longResults = analyzeAllSectors(LOOKBACK_LONG_DAYS);
+
+        logComparison(shortResults, longResults);
+
+        String report = buildCombinedSummaryReport(shortResults, longResults);
         telegramClient.sendMessage(report);
-        log.info("Daily tail risk report sent");
+        log.info("Daily tail risk report sent (dual-window)");
+    }
+
+    private void logComparison(
+            List<TailRiskAnalysis> shortResults, List<TailRiskAnalysis> longResults) {
+        Map<String, TailRiskAnalysis> shortBySymbol = indexBySymbol(shortResults);
+        Map<String, TailRiskAnalysis> longBySymbol = indexBySymbol(longResults);
+
+        java.util.Set<String> symbols = new java.util.LinkedHashSet<>();
+        symbols.addAll(shortBySymbol.keySet());
+        symbols.addAll(longBySymbol.keySet());
+
+        for (String symbol : symbols) {
+            TailRiskAnalysis s = shortBySymbol.get(symbol);
+            TailRiskAnalysis l = longBySymbol.get(symbol);
+
+            String agreement;
+            if (s == null || l == null) {
+                agreement = "N/A";
+            } else {
+                agreement = String.valueOf(s.riskLevel() == l.riskLevel());
+            }
+
+            log.info(
+                    "TAIL_RISK_COMPARE symbol={} k35={} k252={} excess35={} excess252={}"
+                            + " skew35={} skew252={} lvl35={} lvl252={} agreement={}",
+                    symbol,
+                    fmt(s == null ? null : s.kurtosis()),
+                    fmt(l == null ? null : l.kurtosis()),
+                    fmt(s == null ? null : s.excessKurtosis()),
+                    fmt(l == null ? null : l.excessKurtosis()),
+                    fmt(s == null ? null : s.skewness()),
+                    fmt(l == null ? null : l.skewness()),
+                    s == null ? "N/A" : s.riskLevel(),
+                    l == null ? "N/A" : l.riskLevel(),
+                    agreement);
+        }
+    }
+
+    private static Map<String, TailRiskAnalysis> indexBySymbol(List<TailRiskAnalysis> analyses) {
+        Map<String, TailRiskAnalysis> map = new HashMap<>();
+        for (TailRiskAnalysis a : analyses) {
+            map.put(a.symbol(), a);
+        }
+        return map;
+    }
+
+    private static String fmt(Double v) {
+        return v == null ? "N/A" : String.format(java.util.Locale.ROOT, "%.2f", v);
     }
 
     private String buildAlertMessage(
             List<TailRiskAnalysis> allAnalyses,
             List<TailRiskAnalysis> highRisk,
-            List<TailRiskAnalysis> extremeRisk) {
+            List<TailRiskAnalysis> extremeRisk,
+            String tag) {
 
         StringBuilder sb = new StringBuilder();
 
-        // Header with severity
+        // Header with severity and window tag
         if (!extremeRisk.isEmpty()) {
-            sb.append("🔴 *Tail Risk Alert - Extreme*\n\n");
+            sb.append("🔴 *Tail Risk Alert - Extreme* ").append(tag).append("\n\n");
         } else {
-            sb.append("🟠 *Tail Risk Alert - High*\n\n");
+            sb.append("🟠 *Tail Risk Alert - High* ").append(tag).append("\n\n");
         }
 
         // List extreme risk sectors first with skewness context
@@ -147,23 +223,33 @@ public class TailRiskTracker {
         return sb.toString();
     }
 
-    /** Builds a summary report of all sector tail risk levels for display. */
-    public String buildSummaryReport() {
-        List<TailRiskAnalysis> analyses = analyzeAllSectors();
-
-        if (analyses.isEmpty()) {
-            return "*Tail Risk Report*\n\n_Insufficient data for analysis._";
-        }
-
+    /**
+     * Builds a combined daily report containing both window sections, each independently
+     * summarized.
+     */
+    String buildCombinedSummaryReport(
+            List<TailRiskAnalysis> shortResults, List<TailRiskAnalysis> longResults) {
         StringBuilder sb = new StringBuilder();
         sb.append("*Tail Risk Report*\n\n");
+        appendReportSection(sb, SHORT_SECTION_TAG, shortResults);
+        sb.append("\n\n");
+        appendReportSection(sb, LONG_SECTION_TAG, longResults);
+        return sb.toString();
+    }
+
+    private void appendReportSection(
+            StringBuilder sb, String sectionTag, List<TailRiskAnalysis> analyses) {
+        sb.append(sectionTag).append("\n");
+        if (analyses.isEmpty()) {
+            sb.append("_Insufficient data for analysis._");
+            return;
+        }
 
         for (TailRiskAnalysis analysis : analyses) {
             sb.append(analysis.toSummaryLine()).append("\n");
         }
 
         long elevatedCount = analyses.stream().filter(a -> a.riskLevel().isElevated()).count();
-
         long crashRiskCount = analyses.stream().filter(TailRiskAnalysis::hasCrashRisk).count();
         long rallyPotentialCount =
                 analyses.stream().filter(TailRiskAnalysis::hasRallyPotential).count();
@@ -181,7 +267,5 @@ public class TailRiskTracker {
                 sb.append(String.format("   ⬆️ %d with rally potential", rallyPotentialCount));
             }
         }
-
-        return sb.toString();
     }
 }
