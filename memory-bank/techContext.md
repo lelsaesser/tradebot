@@ -30,7 +30,7 @@ This document covers the technologies used, development setup, technical constra
 - **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 25 with Lombok annotation processing
 - **Packaging:** `spring-boot-maven-plugin` for creating executable JARs
 - **Code Coverage:** `jacoco-maven-plugin` 0.8.14 enforces 97% instruction coverage ratio
-- **Code Formatting:** `spotless-maven-plugin` 3.5.1 with Google Java Format 1.30.0 (AOSP style)
+- **Code Formatting:** `spotless-maven-plugin` 3.6.0 with Google Java Format 1.30.0 (AOSP style)
 
 ## External Data Sources
 
@@ -77,6 +77,7 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 | `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT, ACCUMULATION_DETECTION, EARNINGS_CALENDAR_ALERT) |
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `data/tradebot.db` | SQLite | All SQLite tables |
+| `src/main/resources/logback-spring.xml` | XML | Logback configuration: Spring Boot defaults via `<include>` + global `SecretRedactingTurboFilter` registration |
 
 ## Runtime Profiles
 
@@ -190,6 +191,8 @@ src/main/java/org/tradelite/
 │   ├── SectorRelativeStrengthTracker.java
 │   ├── SectorMomentumRocTracker.java
 │   └── ...
+├── logging/                     # Logging infrastructure
+│   └── SecretRedactingTurboFilter.java  # Global Logback filter dropping events containing known secret shapes (#470)
 ├── quant/                       # Quantitative analysis
 │   ├── VfiService.java          # Volume Flow Indicator calculation
 │   ├── VfiTracker.java          # Combined RS+VFI daily report
@@ -197,6 +200,7 @@ src/main/java/org/tradelite/
 │   ├── BollingerBandService.java / BollingerBandTracker.java
 │   ├── EmaService.java / EmaTracker.java
 │   ├── TailRiskService.java / TailRiskTracker.java
+│   ├── TailRiskWindow.java      # (lookbackCalendarDays, minDataPoints) record
 │   ├── StatisticsUtil.java      # Shared math utilities
 │   └── ...
 ├── repository/                  # Data persistence layer
@@ -220,7 +224,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~1061
+- **Total Tests:** ~1164
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes
