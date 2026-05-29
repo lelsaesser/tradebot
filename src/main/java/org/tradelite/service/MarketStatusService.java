@@ -26,6 +26,7 @@ public class MarketStatusService {
     static final ZoneId BERLIN_ZONE = ZoneId.of("Europe/Berlin");
     static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
     static final ZoneId TOKYO_ZONE = ZoneId.of("Asia/Tokyo");
+    static final ZoneId STOCKHOLM_ZONE = ZoneId.of("Europe/Stockholm");
     private static final LocalTime MARKET_OPEN = LocalTime.of(9, 30);
     private static final LocalTime MARKET_CLOSE = LocalTime.of(16, 0);
     private static final LocalTime XETRA_OPEN = LocalTime.of(9, 0);
@@ -36,6 +37,8 @@ public class MarketStatusService {
     private static final LocalTime JPX_MORNING_CLOSE = LocalTime.of(11, 30);
     private static final LocalTime JPX_AFTERNOON_OPEN = LocalTime.of(12, 30);
     private static final LocalTime JPX_AFTERNOON_CLOSE = LocalTime.of(15, 0);
+    private static final LocalTime STO_OPEN = LocalTime.of(9, 0);
+    private static final LocalTime STO_CLOSE = LocalTime.of(17, 30);
 
     private final FinnhubClient finnhubClient;
     private final AtomicReference<Map<LocalDate, MarketHoliday>> holidayCache =
@@ -140,6 +143,9 @@ public class MarketStatusService {
         if (symbol.endsWith(".T")) {
             return isJpxOpen(ZonedDateTime.now(TOKYO_ZONE));
         }
+        if (symbol.endsWith(".ST")) {
+            return isStoOpen(ZonedDateTime.now(STOCKHOLM_ZONE));
+        }
         log.warn("No exchange mapping found for symbol: {} — skipping price evaluation", symbol);
         return false;
     }
@@ -171,6 +177,14 @@ public class MarketStatusService {
         boolean afternoon =
                 !time.isBefore(JPX_AFTERNOON_OPEN) && time.isBefore(JPX_AFTERNOON_CLOSE);
         return morning || afternoon;
+    }
+
+    boolean isStoOpen(ZonedDateTime now) {
+        if (!isWeekday(now.getDayOfWeek())) {
+            return false;
+        }
+        LocalTime time = now.toLocalTime();
+        return !time.isBefore(STO_OPEN) && time.isBefore(STO_CLOSE);
     }
 
     boolean isLoaded() {

@@ -265,7 +265,8 @@ public class DevDataSeeder implements ApplicationRunner {
                         new String[] {"ENR.DE", "Siemens Energy"},
                         new String[] {"005930.KS", "Samsung Electronics"},
                         new String[] {"000660.KS", "SK Hynix"},
-                        new String[] {"285A.T", "Kioxia Holdings"});
+                        new String[] {"285A.T", "Kioxia Holdings"},
+                        new String[] {"SIVE.ST", "Sivers Semiconductors"});
 
         for (String[] stock : sampleStocks) {
             trackedSymbolRepository.save(stock[0], stock[1], AssetType.STOCK);
