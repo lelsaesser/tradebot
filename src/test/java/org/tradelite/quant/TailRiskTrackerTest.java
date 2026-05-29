@@ -1,7 +1,7 @@
 package org.tradelite.quant;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -22,8 +22,8 @@ import org.tradelite.common.SymbolRegistry;
 @ExtendWith(MockitoExtension.class)
 class TailRiskTrackerTest {
 
-    private static final int SHORT = TailRiskTracker.LOOKBACK_SHORT_DAYS;
-    private static final int LONG = TailRiskTracker.LOOKBACK_LONG_DAYS;
+    private static final TailRiskWindow SHORT = TailRiskTracker.SHORT;
+    private static final TailRiskWindow LONG = TailRiskTracker.LONG;
 
     @Mock private TailRiskService tailRiskService;
 
@@ -52,7 +52,9 @@ class TailRiskTrackerTest {
 
         // Default: return empty for all symbols
         lenient()
-                .when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+                .when(
+                        tailRiskService.analyzeTailRisk(
+                                anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         // Override specific symbols on the short window
         when(tailRiskService.analyzeTailRisk("SPY", "S&P 500", SHORT))
@@ -67,7 +69,7 @@ class TailRiskTrackerTest {
 
     @Test
     void analyzeAllSectors_callsServiceForBothWindows() {
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
 
         tailRiskTracker.analyzeAllSectors(SHORT);
@@ -87,7 +89,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis lowRiskAnalysis =
                 createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.0);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.of(lowRiskAnalysis));
 
         tailRiskTracker.trackAndAlert();
@@ -103,7 +105,7 @@ class TailRiskTrackerTest {
                 createAnalysis("XLE", "Energy", 7.0, TailRiskLevel.HIGH, -0.5);
 
         // Default LOW for everything in both windows.
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.of(lowRiskAnalysis));
         // Short window has elevated risk for XLE; long window stays LOW.
         when(tailRiskService.analyzeTailRisk("XLE", "Energy", SHORT))
@@ -123,7 +125,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis highRiskLong =
                 createAnalysis("XLE", "Energy", 7.0, TailRiskLevel.HIGH, -0.5);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.of(lowRiskAnalysis));
         when(tailRiskService.analyzeTailRisk("XLE", "Energy", LONG))
                 .thenReturn(Optional.of(highRiskLong));
@@ -144,7 +146,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis highRiskLong =
                 createAnalysis("XLF", "Financials", 8.0, TailRiskLevel.HIGH, -0.6);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.of(lowRiskAnalysis));
         when(tailRiskService.analyzeTailRisk("XLE", "Energy", SHORT))
                 .thenReturn(Optional.of(highRiskShort));
@@ -170,7 +172,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis extremeRiskAnalysis =
                 createAnalysis("XLF", "Financials", 10.0, TailRiskLevel.EXTREME, -1.5);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("XLF", "Financials", SHORT))
                 .thenReturn(Optional.of(extremeRiskAnalysis));
@@ -186,7 +188,7 @@ class TailRiskTrackerTest {
 
     @Test
     void trackAndAlert_noAlertWhenNoData() {
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
 
         tailRiskTracker.trackAndAlert();
@@ -200,7 +202,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis highRiskAnalysis =
                 createAnalysis("XLK", "Technology", 7.5, TailRiskLevel.HIGH, -1.2);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("XLK", "Technology", SHORT))
                 .thenReturn(Optional.of(highRiskAnalysis));
@@ -219,7 +221,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis crashRiskAnalysis =
                 createAnalysis("XLE", "Energy", 8.0, TailRiskLevel.HIGH, -1.5);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("XLE", "Energy", SHORT))
                 .thenReturn(Optional.of(crashRiskAnalysis));
@@ -238,7 +240,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis rallyPotentialAnalysis =
                 createAnalysis("XLK", "Technology", 8.0, TailRiskLevel.HIGH, 1.5);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("XLK", "Technology", SHORT))
                 .thenReturn(Optional.of(rallyPotentialAnalysis));
@@ -258,7 +260,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis xleShort = createAnalysis("XLE", "Energy", 6.5, TailRiskLevel.HIGH, -0.8);
         TailRiskAnalysis spyLong = createAnalysis("SPY", "S&P 500", 3.2, TailRiskLevel.LOW, 0.05);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("SPY", "S&P 500", SHORT))
                 .thenReturn(Optional.of(spyShort));
@@ -288,7 +290,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis highRiskAnalysis =
                 createAnalysis("XLF", "Financials", 7.0, TailRiskLevel.HIGH, -0.5);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("XLF", "Financials", SHORT))
                 .thenReturn(Optional.of(highRiskAnalysis));
@@ -306,7 +308,7 @@ class TailRiskTrackerTest {
         TailRiskAnalysis lowRiskAnalysis =
                 createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.0);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.of(lowRiskAnalysis));
 
         tailRiskTracker.sendDailyReport();
@@ -319,7 +321,7 @@ class TailRiskTrackerTest {
 
     @Test
     void sendDailyReport_handlesInsufficientData() {
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
 
         tailRiskTracker.sendDailyReport();
@@ -334,7 +336,7 @@ class TailRiskTrackerTest {
     void sendDailyReport_sendsSummaryReportViaTelegram() {
         TailRiskAnalysis analysis = createAnalysis("SPY", "S&P 500", 3.5, TailRiskLevel.LOW, 0.1);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("SPY", "S&P 500", SHORT))
                 .thenReturn(Optional.of(analysis));
@@ -352,7 +354,7 @@ class TailRiskTrackerTest {
     void sendDailyReport_includesSkewnessInformation() {
         TailRiskAnalysis analysis = createAnalysis("XLE", "Energy", 6.5, TailRiskLevel.HIGH, -1.2);
 
-        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), anyInt()))
+        when(tailRiskService.analyzeTailRisk(anyString(), anyString(), any(TailRiskWindow.class)))
                 .thenReturn(Optional.empty());
         when(tailRiskService.analyzeTailRisk("XLE", "Energy", SHORT))
                 .thenReturn(Optional.of(analysis));

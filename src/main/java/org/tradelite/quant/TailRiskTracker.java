@@ -22,20 +22,26 @@ import org.tradelite.common.SymbolRegistry;
  * </ul>
  *
  * <p><b>Dual-window comparison:</b> tail risk is computed for two parallel lookback windows — a
- * short {@value #LOOKBACK_SHORT_DAYS}-calendar-day window and a long {@value
- * #LOOKBACK_LONG_DAYS}-trading-day window. Alerts and the daily report tag every block with {@code
- * [35d]} / {@code [252d]} so the streams are distinguishable. See issue #336.
+ * short ~1-month window ({@link #SHORT}) and a long ~1-year window ({@link #LONG}). Alerts and the
+ * daily report tag every block with {@code [35d]} / {@code [252d]} so the streams are
+ * distinguishable. See issue #336.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TailRiskTracker {
 
-    /** Short lookback window: 35 calendar days (~25 trading days). */
-    static final int LOOKBACK_SHORT_DAYS = 35;
+    /**
+     * Short window: 50-calendar-day fetch (oversized to guarantee row coverage even with holidays)
+     * yielding a 25-trading-day kurtosis/skewness sample.
+     */
+    static final TailRiskWindow SHORT = new TailRiskWindow(50, 25);
 
-    /** Long lookback window: ~1 year (252 trading days). */
-    static final int LOOKBACK_LONG_DAYS = 252;
+    /**
+     * Long window: 400-calendar-day fetch (matches the codebase convention used by
+     * EmaService/VfiService/RelativeStrengthService) yielding a 252-trading-day sample.
+     */
+    static final TailRiskWindow LONG = new TailRiskWindow(400, 252);
 
     private static final String SHORT_TAG = "`[35d]`";
     private static final String LONG_TAG = "`[252d]`";
@@ -47,7 +53,7 @@ public class TailRiskTracker {
     private final SymbolRegistry symbolRegistry;
 
     /** Analyzes tail risk for all tracked sector ETFs using the given lookback window. */
-    public List<TailRiskAnalysis> analyzeAllSectors(int lookbackDays) {
+    public List<TailRiskAnalysis> analyzeAllSectors(TailRiskWindow window) {
         List<TailRiskAnalysis> results = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : symbolRegistry.getAllEtfs().entrySet()) {
@@ -55,7 +61,7 @@ public class TailRiskTracker {
             String displayName = entry.getValue();
 
             Optional<TailRiskAnalysis> analysis =
-                    tailRiskService.analyzeTailRisk(symbol, displayName, lookbackDays);
+                    tailRiskService.analyzeTailRisk(symbol, displayName, window);
             analysis.ifPresent(results::add);
         }
 
@@ -65,8 +71,8 @@ public class TailRiskTracker {
     /** Performs daily tail risk check and sends Telegram alerts for elevated risk. */
     public void trackAndAlert() {
         // Stable order: 35d first, 252d second.
-        sendAlertIfElevated(analyzeAllSectors(LOOKBACK_SHORT_DAYS), SHORT_TAG);
-        sendAlertIfElevated(analyzeAllSectors(LOOKBACK_LONG_DAYS), LONG_TAG);
+        sendAlertIfElevated(analyzeAllSectors(SHORT), SHORT_TAG);
+        sendAlertIfElevated(analyzeAllSectors(LONG), LONG_TAG);
     }
 
     private void sendAlertIfElevated(List<TailRiskAnalysis> analyses, String tag) {
@@ -96,8 +102,8 @@ public class TailRiskTracker {
     }
 
     public void sendDailyReport() {
-        List<TailRiskAnalysis> shortResults = analyzeAllSectors(LOOKBACK_SHORT_DAYS);
-        List<TailRiskAnalysis> longResults = analyzeAllSectors(LOOKBACK_LONG_DAYS);
+        List<TailRiskAnalysis> shortResults = analyzeAllSectors(SHORT);
+        List<TailRiskAnalysis> longResults = analyzeAllSectors(LONG);
 
         logComparison(shortResults, longResults);
 
