@@ -37,17 +37,17 @@ import org.slf4j.MarkerFactory;
  *
  * <pre>log.error("Error sending message: {}", e.getMessage());</pre>
  *
- * <p>The token-bearing URL arrives at this filter as element 0 of {@code params} (a String,
- * because the caller already invoked {@code getMessage()}). Scanning {@code params} catches it.
- * The {@code Throwable} cause-chain scan additionally covers the more idiomatic
- * {@code log.error("message", e)} shape — where the URL surfaces only via {@code
- * e.getMessage()} or a wrapped cause's message — which is the future-proofing case.
+ * <p>The token-bearing URL arrives at this filter as element 0 of {@code params} (a String, because
+ * the caller already invoked {@code getMessage()}). Scanning {@code params} catches it. The {@code
+ * Throwable} cause-chain scan additionally covers the more idiomatic {@code log.error("message",
+ * e)} shape — where the URL surfaces only via {@code e.getMessage()} or a wrapped cause's message —
+ * which is the future-proofing case.
  *
  * <p><b>Known blind spot (accepted residual risk):</b> rendered stack frames. TurboFilter runs
  * before event creation, so frame info has not yet been materialized. {@code
- * Throwable.getMessage()} on each cause is sufficient for {@code RestTemplate} exceptions (the
- * URL lives in the message, not in frame data), which is the only known concrete leak vector in
- * this codebase.
+ * Throwable.getMessage()} on each cause is sufficient for {@code RestTemplate} exceptions (the URL
+ * lives in the message, not in frame data), which is the only known concrete leak vector in this
+ * codebase.
  *
  * <h2>Drop behavior</h2>
  *
