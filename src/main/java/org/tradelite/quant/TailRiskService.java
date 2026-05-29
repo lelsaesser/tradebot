@@ -26,14 +26,14 @@ import org.tradelite.service.model.DailyPrice;
  * <p>Normal distribution has kurtosis = 3.0 (mesokurtic) and skewness = 0.0. Values above 3
  * indicate fat tails (leptokurtic), meaning extreme price moves are more likely than normal.
  *
- * <p><b>Lookback window:</b> the lookback is a parameter on {@link #analyzeTailRisk}. Canonical
- * values used by {@link TailRiskTracker} are:
+ * <p><b>Lookback window:</b> the lookback is a {@link TailRiskWindow} parameter on {@link
+ * #analyzeTailRisk}. Canonical instances used by {@link TailRiskTracker} are:
  *
  * <ul>
- *   <li>{@code 35} calendar days (~25 trading days) — short window, responsive but biased downward
+ *   <li>{@code SHORT} — 25 trading days (~1 month) — short window, responsive but biased downward
  *       on kurtosis
- *   <li>{@code 252} trading days (~1 year) — long window, matches Quantpedia / Basel-FRTB practice
- *       and is stable enough that sample kurtosis approximates the population value
+ *   <li>{@code LONG} — 252 trading days (~1 year) — long window, matches Quantpedia / Basel-FRTB
+ *       practice and is stable enough that sample kurtosis approximates the population value
  * </ul>
  *
  * <p>Both windows are run in parallel during the comparison period so production data can decide
@@ -57,26 +57,33 @@ public class TailRiskService {
      *
      * @param symbol The stock or ETF ticker symbol
      * @param displayName Human-readable name for the symbol
-     * @param lookbackDays Number of calendar days of price history to fetch. Canonical values: 35
-     *     (short window) and 252 (long window).
-     * @return Optional containing analysis results, empty if fewer than {@code lookbackDays} prices
-     *     are available
+     * @param window Window spec coupling the calendar lookback (used to fetch price data) with the
+     *     minimum row count required for the analysis to be valid.
+     * @return Optional containing analysis results, empty if fewer than {@code
+     *     window.minDataPoints()} prices are available
      */
     public Optional<TailRiskAnalysis> analyzeTailRisk(
-            String symbol, String displayName, int lookbackDays) {
+            String symbol, String displayName, TailRiskWindow window) {
         List<DailyPrice> dailyPrices =
-                dailyPriceProvider.findDailyClosingPrices(symbol, lookbackDays);
+                dailyPriceProvider.findDailyClosingPrices(symbol, window.lookbackCalendarDays());
 
-        if (dailyPrices.size() < lookbackDays) {
+        if (dailyPrices.size() < window.minDataPoints()) {
             log.warn(
-                    "Insufficient price history for {}: have {} days, need {}",
+                    "Insufficient price history for {}: have {} rows, need {}",
                     symbol,
                     dailyPrices.size(),
-                    lookbackDays);
+                    window.minDataPoints());
             return Optional.empty();
         }
 
-        List<Double> returns = toDailyChangePercents(dailyPrices);
+        // Truncate to exactly minDataPoints (latest rows) so the sample size is stable across runs.
+        // Kurtosis and skewness estimators are sensitive to sample size; fixing it makes
+        // day-over-day comparisons meaningful.
+        List<DailyPrice> sample =
+                dailyPrices.subList(
+                        dailyPrices.size() - window.minDataPoints(), dailyPrices.size());
+
+        List<Double> returns = toDailyChangePercents(sample);
 
         double kurtosis = calculateKurtosis(returns);
         double excessKurtosis = kurtosis - 3.0;
