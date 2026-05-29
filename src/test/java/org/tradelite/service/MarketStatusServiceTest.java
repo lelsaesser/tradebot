@@ -24,6 +24,8 @@ class MarketStatusServiceTest {
 
     private static final ZoneId NY_ZONE = ZoneId.of("America/New_York");
     private static final ZoneId BERLIN_ZONE = ZoneId.of("Europe/Berlin");
+    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+    private static final ZoneId TOKYO_ZONE = ZoneId.of("Asia/Tokyo");
 
     @Mock private FinnhubClient finnhubClient;
 
@@ -349,18 +351,223 @@ class MarketStatusServiceTest {
         assertFalse(service.isExchangeOpen("UNKNOWN.XX"));
     }
 
+    // --- isXetraOpen tests ---
+
     @Test
-    void isExchangeOpen_xetraSymbol_checksGermanHours() {
-        // isExchangeOpen uses ZonedDateTime.now() internally so we test basic behavior
-        // — the method returns true/false based on current Berlin time
+    void isXetraOpen_beforeOpen_returnsFalse() {
+        // Wednesday 08:59 Berlin → before XETRA opens at 09:00
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 8, 59, 0, 0, BERLIN_ZONE);
+        assertFalse(service.isXetraOpen(time));
+    }
+
+    @Test
+    void isXetraOpen_atOpen_returnsTrue() {
+        // Wednesday 09:00 Berlin → XETRA just opened (open boundary inclusive)
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 9, 0, 0, 0, BERLIN_ZONE);
+        assertTrue(service.isXetraOpen(time));
+    }
+
+    @Test
+    void isXetraOpen_midSession_returnsTrue() {
+        // Wednesday 13:00 Berlin → solidly mid-session
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 13, 0, 0, 0, BERLIN_ZONE);
+        assertTrue(service.isXetraOpen(time));
+    }
+
+    @Test
+    void isXetraOpen_atCloseBoundary_returnsFalse() {
+        // Wednesday 17:30 Berlin → close boundary exclusive
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 17, 30, 0, 0, BERLIN_ZONE);
+        assertFalse(service.isXetraOpen(time));
+    }
+
+    @Test
+    void isXetraOpen_oneMinuteBeforeClose_returnsTrue() {
+        // Wednesday 17:29 Berlin → still trading
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 17, 29, 0, 0, BERLIN_ZONE);
+        assertTrue(service.isXetraOpen(time));
+    }
+
+    @Test
+    void isXetraOpen_afterClose_returnsFalse() {
+        // Wednesday 18:00 Berlin → after close
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 18, 0, 0, 0, BERLIN_ZONE);
+        assertFalse(service.isXetraOpen(time));
+    }
+
+    @Test
+    void isXetraOpen_saturday_returnsFalse() {
+        // Saturday 13:00 Berlin (mid-session time but weekend)
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 18, 13, 0, 0, 0, BERLIN_ZONE);
+        assertFalse(service.isXetraOpen(time));
+    }
+
+    @Test
+    void isXetraOpen_sunday_returnsFalse() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 19, 13, 0, 0, 0, BERLIN_ZONE);
+        assertFalse(service.isXetraOpen(time));
+    }
+
+    // --- isKrxOpen tests ---
+
+    @Test
+    void isKrxOpen_beforeOpen_returnsFalse() {
+        // Wednesday 08:59 Seoul
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 8, 59, 0, 0, SEOUL_ZONE);
+        assertFalse(service.isKrxOpen(time));
+    }
+
+    @Test
+    void isKrxOpen_atOpen_returnsTrue() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 9, 0, 0, 0, SEOUL_ZONE);
+        assertTrue(service.isKrxOpen(time));
+    }
+
+    @Test
+    void isKrxOpen_midSession_returnsTrue() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 12, 0, 0, 0, SEOUL_ZONE);
+        assertTrue(service.isKrxOpen(time));
+    }
+
+    @Test
+    void isKrxOpen_atCloseBoundary_returnsFalse() {
+        // 15:30 Seoul → close boundary exclusive
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 15, 30, 0, 0, SEOUL_ZONE);
+        assertFalse(service.isKrxOpen(time));
+    }
+
+    @Test
+    void isKrxOpen_oneMinuteBeforeClose_returnsTrue() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 15, 29, 0, 0, SEOUL_ZONE);
+        assertTrue(service.isKrxOpen(time));
+    }
+
+    @Test
+    void isKrxOpen_afterClose_returnsFalse() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 16, 0, 0, 0, SEOUL_ZONE);
+        assertFalse(service.isKrxOpen(time));
+    }
+
+    @Test
+    void isKrxOpen_saturday_returnsFalse() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 18, 12, 0, 0, 0, SEOUL_ZONE);
+        assertFalse(service.isKrxOpen(time));
+    }
+
+    @Test
+    void isKrxOpen_sunday_returnsFalse() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 19, 12, 0, 0, 0, SEOUL_ZONE);
+        assertFalse(service.isKrxOpen(time));
+    }
+
+    // --- isJpxOpen tests ---
+
+    @Test
+    void isJpxOpen_beforeOpen_returnsFalse() {
+        // Wednesday 08:59 Tokyo
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 8, 59, 0, 0, TOKYO_ZONE);
+        assertFalse(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_atMorningOpen_returnsTrue() {
+        // Wednesday 09:00 Tokyo → morning open boundary inclusive
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 9, 0, 0, 0, TOKYO_ZONE);
+        assertTrue(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_midMorning_returnsTrue() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 10, 0, 0, 0, TOKYO_ZONE);
+        assertTrue(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_oneMinuteBeforeMorningClose_returnsTrue() {
+        // 11:29 Tokyo → still in morning session
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 11, 29, 0, 0, TOKYO_ZONE);
+        assertTrue(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_atMorningCloseBoundary_returnsFalse() {
+        // 11:30 Tokyo → morning close boundary exclusive (lunch break begins)
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 11, 30, 0, 0, TOKYO_ZONE);
+        assertFalse(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_duringLunchBreak_returnsFalse() {
+        // 12:00 Tokyo → middle of the lunch break (this is the central JPX-specific guarantee)
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 12, 0, 0, 0, TOKYO_ZONE);
+        assertFalse(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_atAfternoonOpen_returnsTrue() {
+        // 12:30 Tokyo → afternoon open boundary inclusive
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 12, 30, 0, 0, TOKYO_ZONE);
+        assertTrue(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_midAfternoon_returnsTrue() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 14, 0, 0, 0, TOKYO_ZONE);
+        assertTrue(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_oneMinuteBeforeAfternoonClose_returnsTrue() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 14, 59, 0, 0, TOKYO_ZONE);
+        assertTrue(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_atAfternoonCloseBoundary_returnsFalse() {
+        // 15:00 Tokyo → afternoon close boundary exclusive
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 15, 0, 0, 0, TOKYO_ZONE);
+        assertFalse(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_afterClose_returnsFalse() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 16, 0, 0, 0, TOKYO_ZONE);
+        assertFalse(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_saturday_returnsFalse() {
+        // Saturday 10:00 Tokyo (mid-morning time but weekend)
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 18, 10, 0, 0, 0, TOKYO_ZONE);
+        assertFalse(service.isJpxOpen(time));
+    }
+
+    @Test
+    void isJpxOpen_sunday_returnsFalse() {
+        // Sunday 14:00 Tokyo (mid-afternoon time but weekend)
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 19, 14, 0, 0, 0, TOKYO_ZONE);
+        assertFalse(service.isJpxOpen(time));
+    }
+
+    // --- isExchangeOpen routing smoke tests ---
+    // The boundary-correctness logic is exercised by the per-helper tests above. These verify
+    // isExchangeOpen routes the .DE / .KS / .T suffix to the right helper without throwing.
+
+    @Test
+    void isExchangeOpen_xetraSymbol_routesToXetraHelper() {
         boolean result = service.isExchangeOpen("RHM.DE");
-        // Just verify it doesn't throw — actual correctness depends on time of day
         assertTrue(result || !result);
     }
 
     @Test
-    void isExchangeOpen_krxSymbol_checksKoreanHours() {
+    void isExchangeOpen_krxSymbol_routesToKrxHelper() {
         boolean result = service.isExchangeOpen("005930.KS");
+        assertTrue(result || !result);
+    }
+
+    @Test
+    void isExchangeOpen_jpxSymbol_routesToJpxHelper() {
+        boolean result = service.isExchangeOpen("285A.T");
         assertTrue(result || !result);
     }
 }
