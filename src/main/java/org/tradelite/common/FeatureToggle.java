@@ -30,6 +30,9 @@ public enum FeatureToggle {
     /** Controls whether the daily accumulation detection alert is sent via Telegram */
     ACCUMULATION_DETECTION("accumulationDetection"),
 
+    /** Controls whether the hourly RSI report is sent via Telegram */
+    RSI_REPORT("rsiReport"),
+
     /** Controls whether Yahoo Finance intraday price fetching is active for international stocks */
     YAHOO_INTRADAY_PRICE_FETCH("yahooIntradayPriceFetch"),
 

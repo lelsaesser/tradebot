@@ -13,8 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
+import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.RsiService;
 import org.tradelite.service.RsiService.RsiSignal;
 
@@ -25,6 +27,7 @@ class RsiTrackerTest {
     @Mock private RsiService rsiService;
     @Mock private TelegramGateway telegramClient;
     @Mock private SymbolRegistry symbolRegistry;
+    @Mock private FeatureToggleService featureToggleService;
 
     private RsiTracker tracker;
 
@@ -33,7 +36,8 @@ class RsiTrackerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new RsiTracker(rsiService, telegramClient, symbolRegistry);
+        tracker = new RsiTracker(rsiService, telegramClient, symbolRegistry, featureToggleService);
+        lenient().when(featureToggleService.isEnabled(FeatureToggle.RSI_REPORT)).thenReturn(true);
     }
 
     @Test
@@ -216,6 +220,15 @@ class RsiTrackerTest {
                                                 && report.contains("Tesla (TSLA): 20.00")
                                                 && report.contains(
                                                         "1 signal(s): 0 overbought, 1 oversold")));
+    }
+
+    @Test
+    void analyzeAndSendReport_skipsWhenToggleDisabled() {
+        when(featureToggleService.isEnabled(FeatureToggle.RSI_REPORT)).thenReturn(false);
+
+        tracker.analyzeAndSendReport();
+
+        verifyNoInteractions(rsiService, telegramClient, symbolRegistry);
     }
 
     // --- helpers ---
