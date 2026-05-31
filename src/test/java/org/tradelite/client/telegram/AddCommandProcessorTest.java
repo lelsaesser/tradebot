@@ -81,7 +81,8 @@ class AddCommandProcessorTest {
         PriceQuoteResponse mockQuote = new PriceQuoteResponse();
         mockQuote.setStockSymbol(new StockSymbol("COHR", "Coherent Corp"));
         mockQuote.setCurrentPrice(100.0);
-        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class))).thenReturn(Optional.of(mockQuote));
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class)))
+                .thenReturn(Optional.of(mockQuote));
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
@@ -132,7 +133,8 @@ class AddCommandProcessorTest {
         PriceQuoteResponse mockQuote = new PriceQuoteResponse();
         mockQuote.setStockSymbol(new StockSymbol("AAPL", "Apple"));
         mockQuote.setCurrentPrice(150.0);
-        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class))).thenReturn(Optional.of(mockQuote));
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class)))
+                .thenReturn(Optional.of(mockQuote));
 
         when(symbolRegistry.addSymbol("AAPL", "Apple")).thenReturn(false);
 
@@ -151,7 +153,8 @@ class AddCommandProcessorTest {
         PriceQuoteResponse mockQuote = new PriceQuoteResponse();
         mockQuote.setStockSymbol(new StockSymbol("COHR", "Coherent Corp"));
         mockQuote.setCurrentPrice(100.0);
-        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class))).thenReturn(Optional.of(mockQuote));
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class)))
+                .thenReturn(Optional.of(mockQuote));
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))

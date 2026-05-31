@@ -113,8 +113,7 @@ public class FinnhubClient {
 
         meteringService.incrementFinnhubRequests();
         ResponseEntity<PriceQuoteResponse> response =
-                restTemplate.exchange(
-                        url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
+                restTemplate.exchange(url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
 
         PriceQuoteResponse quote = response.getBody();
         if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
