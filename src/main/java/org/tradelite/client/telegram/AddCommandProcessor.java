@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 import org.tradelite.client.coingecko.CoinGeckoClient;
 import org.tradelite.client.coingecko.dto.CoinGeckoPriceResponse;
 import org.tradelite.client.finnhub.FinnhubClient;
-import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
 import org.tradelite.client.yahoo.YahooFetchException;
 import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.common.AssetType;
@@ -155,16 +154,13 @@ public class AddCommandProcessor implements TelegramCommandProcessor<AddCommand>
     }
 
     private boolean isValidDomesticTicker(String ticker, String displayName) {
-        // Try Finnhub first (for stocks)
-        try {
-            StockSymbol tempStockSymbol = new StockSymbol(ticker, displayName);
-            PriceQuoteResponse quoteResponse = finnhubClient.getPriceQuote(tempStockSymbol);
-            if (quoteResponse != null && quoteResponse.isValid()) {
-                log.info("Ticker {} validated successfully via Finnhub", ticker);
-                return true;
-            }
-        } catch (Exception e) {
-            log.info("Finnhub validation failed for ticker {}: {}", ticker, e.getMessage());
+        // Try Finnhub first (for stocks). Use the non-throwing variant — an unknown symbol is an
+        // expected outcome here, not an error worth logging loudly. See issue #481.
+        StockSymbol tempStockSymbol = new StockSymbol(ticker, displayName);
+        var quote = finnhubClient.tryGetPriceQuote(tempStockSymbol);
+        if (quote.isPresent() && quote.get().isValid()) {
+            log.info("Ticker {} validated successfully via Finnhub", ticker);
+            return true;
         }
 
         // Try CoinGecko (for crypto)
