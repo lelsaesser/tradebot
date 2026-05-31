@@ -48,39 +48,11 @@ public class FinnhubClient {
     }
 
     public PriceQuoteResponse getPriceQuote(StockSymbol ticker) {
-        if (apiProperties.getFinnhubKey() == null || apiProperties.getFinnhubKey().isBlank()) {
-            throw quoteFailure(ticker, new IllegalStateException("FINNHUB key not configured"));
-        }
-
-        String baseUrl = "/quote?symbol=%s";
-        String url = getApiUrl(baseUrl, ticker);
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-        ResponseEntity<PriceQuoteResponse> response;
         try {
-            meteringService.incrementFinnhubRequests();
-            response =
-                    restTemplate.exchange(
-                            url, HttpMethod.GET, requestEntity, PriceQuoteResponse.class);
+            return fetchPriceQuote(ticker);
         } catch (Exception e) {
             throw quoteFailure(ticker, e);
         }
-
-        PriceQuoteResponse quote = response.getBody();
-        if (quote == null || !response.getStatusCode().is2xxSuccessful()) {
-            throw quoteFailure(
-                    ticker,
-                    new IllegalStateException(
-                            "Failed to fetch price quote for "
-                                    + ticker.getTicker()
-                                    + ": "
-                                    + response.getStatusCode()));
-        }
-        quote.setStockSymbol(ticker);
-        return quote;
     }
 
     /**
@@ -90,7 +62,7 @@ public class FinnhubClient {
      */
     public Optional<PriceQuoteResponse> tryGetPriceQuote(StockSymbol ticker) {
         try {
-            return Optional.of(getPriceQuoteQuiet(ticker));
+            return Optional.of(fetchPriceQuote(ticker));
         } catch (Exception e) {
             log.info(
                     "Finnhub quote unavailable for ticker {}: {}",
@@ -100,14 +72,12 @@ public class FinnhubClient {
         }
     }
 
-    private PriceQuoteResponse getPriceQuoteQuiet(StockSymbol ticker) {
+    private PriceQuoteResponse fetchPriceQuote(StockSymbol ticker) {
         if (apiProperties.getFinnhubKey() == null || apiProperties.getFinnhubKey().isBlank()) {
             throw new IllegalStateException("FINNHUB key not configured");
         }
 
-        String baseUrl = "/quote?symbol=%s";
-        String url = getApiUrl(baseUrl, ticker);
-
+        String url = getApiUrl("/quote?symbol=%s", ticker);
         HttpEntity<MultiValueMap<String, Object>> requestEntity =
                 new HttpEntity<>(new LinkedMultiValueMap<>(), new HttpHeaders());
 
