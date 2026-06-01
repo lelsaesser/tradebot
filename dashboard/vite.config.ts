@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/api': 'http://localhost:9090'
+      '/api': 'http://localhost:9090' // DevSkim: ignore DS137138
     }
   },
   test: {

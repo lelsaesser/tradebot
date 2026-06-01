@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { SSE_ENDPOINT } from '../api/config'
 
-const HEARTBEAT_TIMEOUT_MS = 90_000
+const HEARTBEAT_TIMEOUT_MS = 60_000
 const HEARTBEAT_CHECK_INTERVAL_MS = 10_000
 
 type EventHandler = (data: unknown) => void
@@ -10,17 +11,23 @@ interface SSEContextValue {
   subscribe: (eventType: string, handler: EventHandler) => () => void
 }
 
-const SSEContext = createContext<SSEContextValue | null>(null)
+export const SSEContext = createContext<SSEContextValue | null>(null)
 
 export function SSEProvider({ children }: { children: React.ReactNode }) {
   const [isLive, setIsLive] = useState(false)
   const lastPingRef = useRef<number | null>(null)
   const listenersRef = useRef<Map<string, Set<EventHandler>>>(new Map())
+  const boundListenersRef = useRef<Map<string, (e: MessageEvent) => void>>(new Map())
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
-    const es = new EventSource('/api/events')
+    const es = new EventSource(SSE_ENDPOINT)
     esRef.current = es
+
+    es.onopen = () => {
+      setIsLive(true)
+      lastPingRef.current = Date.now()
+    }
 
     es.addEventListener('ping', () => {
       lastPingRef.current = Date.now()
@@ -30,16 +37,6 @@ export function SSEProvider({ children }: { children: React.ReactNode }) {
     es.onerror = () => {
       setIsLive(false)
       lastPingRef.current = null
-    }
-
-    es.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data)
-        const handlers = listenersRef.current.get(event.type)
-        handlers?.forEach(h => h(event.payload))
-      } catch {
-        // ignore unparseable messages
-      }
     }
 
     const checkInterval = setInterval(() => {
@@ -55,26 +52,39 @@ export function SSEProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  function subscribe(eventType: string, handler: EventHandler): () => void {
+  const subscribe = useCallback((eventType: string, handler: EventHandler): () => void => {
     if (!listenersRef.current.has(eventType)) {
       listenersRef.current.set(eventType, new Set())
-      esRef.current?.addEventListener(eventType, (e: MessageEvent) => {
+      const boundListener = (e: MessageEvent) => {
         try {
           const event = JSON.parse(e.data)
           listenersRef.current.get(eventType)?.forEach(h => h(event.payload))
         } catch {
-          // ignore
+          // ignore unparseable messages
         }
-      })
+      }
+      boundListenersRef.current.set(eventType, boundListener)
+      esRef.current?.addEventListener(eventType, boundListener)
     }
     listenersRef.current.get(eventType)!.add(handler)
     return () => {
-      listenersRef.current.get(eventType)?.delete(handler)
+      const handlers = listenersRef.current.get(eventType)
+      handlers?.delete(handler)
+      if (handlers?.size === 0) {
+        const bound = boundListenersRef.current.get(eventType)
+        if (bound) {
+          esRef.current?.removeEventListener(eventType, bound)
+          boundListenersRef.current.delete(eventType)
+          listenersRef.current.delete(eventType)
+        }
+      }
     }
-  }
+  }, [])
+
+  const value = useMemo(() => ({ isLive, subscribe }), [isLive, subscribe])
 
   return (
-    <SSEContext.Provider value={{ isLive, subscribe }}>
+    <SSEContext.Provider value={value}>
       {children}
     </SSEContext.Provider>
   )

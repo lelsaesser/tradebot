@@ -8,6 +8,14 @@ This document covers the technologies used, development setup, technical constra
 - **Build Tool:** Maven 
 - **Database:** SQLite (embedded, via JdbcTemplate)
 
+### Dashboard (React Frontend)
+- **Framework:** React 19 + Vite 6
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS v4
+- **Testing:** Vitest + @testing-library/react
+- **Dev proxy:** Vite server proxy → localhost:9090
+- **SSE:** Single EventSource in SSEProvider context, `/api/v1/events`
+
 ## Dependencies
 - **Spring Boot Starters:** 
   - `spring-boot-starter`: Core Spring Boot functionality

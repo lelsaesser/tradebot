@@ -162,3 +162,15 @@ Daily reports (VFI, EMA, Tail Risk, BB daily) use regular `sendMessage()` — ea
 - **Plain JUnit + JdbcTemplate**: Tests constructing repositories directly use file-based temp SQLite DBs with manual schema init via `JdbcTemplate.execute()`.
 - **Configurable File Paths**: Constructor injection for file paths in tests
 - **Lenient stubs**: Used when SymbolRegistry methods return real ETF data via static constants but only specific symbols are relevant to the test
+
+## Dashboard Frontend Patterns
+
+### SSEProvider (Single EventSource)
+- One `EventSource` per app lifetime, owned by `SSEProvider`
+- Components subscribe via `useSSE().subscribe(type, handler)` — never open their own `EventSource`
+- Auth cookie/token attaches here when auth lands
+- `SSEContext` exported for test injection via `<SSEContext.Provider value={mock}>`
+
+### State Ownership Rule
+- Per-browser preferences (theme, layout) → `localStorage`
+- Per-user state (watchlist, selectedSymbols) → server-side once auth lands; never `localStorage`

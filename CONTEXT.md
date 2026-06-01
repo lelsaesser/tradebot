@@ -17,7 +17,7 @@ SSE wire envelope: `{ type, timestamp, payload }`. Timestamp is server-side `Ins
 A `ping` `DashboardEvent` (null payload) published every 30 seconds by `DashboardEventPublisher`. Keeps SSE connections alive and lets the frontend verify connectivity.
 
 **ConnectionStatus**
-Frontend-only derived state: `live` when a `ping` heartbeat arrived within the last 90 seconds, `disconnected` otherwise. Owned by `SSEProvider`. Exposed to components via React context.
+Frontend-only derived state: `live` from the moment the SSE connection opens (`EventSource.onopen`), `disconnected` after 60 seconds of silence or on `onerror`. Owned by `SSEProvider`. Exposed to components via React context.
 
 **ThemeContext**
 React context owning the active colour scheme (`light` | `dark`). On mount: reads `localStorage` key `theme`; falls back to `prefers-color-scheme`. Toggling writes to `localStorage` and sets `class="dark"` on `<html>`. Toggle UI (button) lives in the dashboard header, wired in the UX polish phase.
