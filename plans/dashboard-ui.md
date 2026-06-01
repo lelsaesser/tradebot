@@ -9,8 +9,8 @@ Durable decisions that apply across all phases:
 - **Frontend location**: `dashboard/` at repo root — standalone Vite project with its own `package.json`, not managed by Maven.
 - **Backend package**: `org.tradelite.web.dashboard` — all new dashboard controllers and SSE infrastructure live here.
 - **Server port**: Spring Boot runs on `9090` (existing). Vite dev server runs on `5173` (default). Vite proxy forwards `/api` → `localhost:9090` in dev, eliminating CORS complexity during development.
-- **REST base path**: All dashboard REST endpoints are under `/api/`.
-- **SSE endpoint**: `GET /api/events` — single persistent SSE stream, all event types multiplexed on it with named event fields.
+- **REST base path**: All production dashboard REST endpoints are under `/api/v1/`. Dev/internal routes (`/dev/**`) are exempt.
+- **SSE endpoint**: `GET /api/v1/events` — single persistent SSE stream, all event types multiplexed on it with named event fields.
 - **SSE event naming**: Snake-case event type names map 1:1 to report/alert types: `price-alert`, `price-swing`, `rsi-report`, `bb-alert`, `bb-daily-report`, `ema-report`, `sector-rs-crossover`, `sector-rs-daily`, `sector-roc-alert`, `tail-risk-alert`, `tail-risk-report`, `sector-rotation-alert`, `sector-rotation-daily`, `insider-report`, `pullback-buy-alert`, `accumulation-report`, `vfi-report`, `error-alert`.
 - **Data caching strategy**: Each tracker/service stores its most recent result in memory (simple field, no TTL). REST read endpoints serve this cached value. Cache resets on app restart — acceptable for a local tool. `LivePriceCache` has a 24-hour TTL; `GET /api/watchlist` serves the last price stored in this cache.
 - **Update model**: SSE for live push (server → client) + REST `GET` for initial page load per panel. No polling.
@@ -49,7 +49,7 @@ Create the React + Vite + TypeScript project in `dashboard/` with a single place
 
 - [ ] `dashboard/` directory exists with a valid Vite + React + TypeScript project that starts with `npm run dev`.
 - [ ] Vite proxy config forwards `/api` requests to `localhost:9090`.
-- [ ] `GET /api/events` returns a valid `text/event-stream` response.
+- [ ] `GET /api/v1/events` returns a valid `text/event-stream` response.
 - [ ] The browser `EventSource` connects to `/api/events` and receives heartbeat `ping` events.
 - [ ] The dashboard header shows a green "Live" indicator when SSE is connected and a red "Disconnected" indicator when the connection is lost.
 - [ ] `DashboardEventPublisher.publish(String eventType, Object payload)` is injectable by any service and fans out to all active `SseEmitter` connections.
