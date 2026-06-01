@@ -90,14 +90,4 @@ class SqliteTargetPriceRepositoryTest extends AbstractSqliteRepositoryTest {
         assertFalse(deleted);
         assertEquals(1, repository.findByAssetType(AssetType.STOCK).size());
     }
-
-    @Test
-    void count_returnsTotal() {
-        assertEquals(0, repository.count());
-
-        repository.save(new TargetPrice("AAPL", 150.0, 200.0), AssetType.STOCK);
-        repository.save(new TargetPrice("BITCOIN", 100000.0, 0.0), AssetType.COIN);
-
-        assertEquals(2, repository.count());
-    }
 }

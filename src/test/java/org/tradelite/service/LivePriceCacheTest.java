@@ -5,11 +5,15 @@ import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.anEmptyMap;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.tradelite.service.LivePriceCache.PricedAt;
 
 class LivePriceCacheTest {
 
@@ -48,6 +52,44 @@ class LivePriceCacheTest {
         cache.put("AAPL", 180.00);
 
         assertThat(cache.get("AAPL"), is(180.00));
+    }
+
+    @Test
+    void getEntry_returnsPriceAndTimestamp() {
+        Instant before = Instant.now();
+        cache.put("AAPL", 175.50);
+        Instant after = Instant.now();
+
+        Optional<PricedAt> entry = cache.getEntry("AAPL");
+
+        assertTrue(entry.isPresent());
+        assertThat(entry.get().price(), is(175.50));
+        assertThat(entry.get().updatedAt(), is(greaterThanOrEqualTo(before)));
+        assertThat(after, is(greaterThanOrEqualTo(entry.get().updatedAt())));
+    }
+
+    @Test
+    void getEntry_unknownSymbol_returnsEmpty() {
+        assertThat(cache.getEntry("UNKNOWN").isEmpty(), is(true));
+    }
+
+    @Test
+    void getEntry_reflectsLatestPutAtomically() throws InterruptedException {
+        cache.put("AAPL", 175.50);
+        Instant firstWrite = cache.getEntry("AAPL").orElseThrow().updatedAt();
+
+        // Sleep to ensure System.currentTimeMillis advances; Instant.now() is millisecond
+        // resolution on some JVMs and back-to-back puts can otherwise share a timestamp.
+        Thread.sleep(2);
+
+        cache.put("AAPL", 180.00);
+        PricedAt second = cache.getEntry("AAPL").orElseThrow();
+
+        assertThat(second.price(), is(180.00));
+        assertThat(second.updatedAt(), is(greaterThanOrEqualTo(firstWrite)));
+        // The second timestamp must strictly post-date the first — otherwise put() is updating
+        // price without refreshing the timestamp, which would silently freeze cache eviction.
+        assertTrue(second.updatedAt().isAfter(firstWrite));
     }
 
     @Test

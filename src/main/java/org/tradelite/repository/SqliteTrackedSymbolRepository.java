@@ -23,17 +23,6 @@ public class SqliteTrackedSymbolRepository implements TrackedSymbolRepository {
     }
 
     @Override
-    public List<StockSymbolEntry> findByAssetType(AssetType type) {
-        String sql =
-                "SELECT ticker, display_name FROM tracked_symbols WHERE asset_type = ? ORDER BY ticker";
-        return jdbcTemplate.query(
-                sql,
-                (rs, _) ->
-                        new StockSymbolEntry(rs.getString("ticker"), rs.getString("display_name")),
-                type.name());
-    }
-
-    @Override
     public void save(String ticker, String displayName, AssetType type) {
         String sql =
                 """
@@ -47,12 +36,5 @@ public class SqliteTrackedSymbolRepository implements TrackedSymbolRepository {
     public boolean deleteByTickerAndType(String ticker, AssetType type) {
         String sql = "DELETE FROM tracked_symbols WHERE ticker = ? AND asset_type = ?";
         return jdbcTemplate.update(sql, ticker, type.name()) > 0;
-    }
-
-    @Override
-    public int count() {
-        Integer result =
-                jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tracked_symbols", Integer.class);
-        return result != null ? result : 0;
     }
 }
