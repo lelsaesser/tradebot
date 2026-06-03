@@ -2,6 +2,7 @@ package org.tradelite.quant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
@@ -20,6 +21,13 @@ import org.tradelite.service.model.DailyPrice;
 @ExtendWith(MockitoExtension.class)
 class TailRiskServiceTest {
 
+    /**
+     * Window used by most data-shape tests. {@code minDataPoints=20} matches the size of the
+     * hand-rolled return series (20–25 points) used throughout this file. The fetch window is
+     * generous enough to cover all test inputs without rejection by the new size guard.
+     */
+    private static final TailRiskWindow TEST_WINDOW = new TailRiskWindow(40, 20);
+
     @Mock private DailyPriceProvider dailyPriceProvider;
 
     private TailRiskService tailRiskService;
@@ -31,29 +39,110 @@ class TailRiskServiceTest {
 
     @Test
     void analyzeTailRisk_returnsEmptyWhenInsufficientData() {
-        // Only 3 change percents → need 4 prices
-        List<DailyPrice> prices = toDailyPrices(100.0, 101.0, 103.0, 102.0);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 35)).thenReturn(prices);
+        // Provider returns minDataPoints - 1 prices → guard returns empty.
+        TailRiskWindow window = new TailRiskWindow(50, 25);
+        List<DailyPrice> prices =
+                changesToPrices(generateNormalReturns(window.minDataPoints() - 2));
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", window.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("SPY", "S&P 500");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("SPY", "S&P 500", window);
 
         assertThat(result).isEmpty();
     }
 
     @Test
-    void analyzeTailRisk_returnsAnalysisWithSufficientData() {
-        // 21 prices → 20 change percents (minimum required)
-        List<DailyPrice> prices = changesToPrices(generateNormalReturns(20));
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+    void analyzeTailRisk_succeedsAtBoundaryWhenExactlyEnoughData() {
+        // Provider returns exactly minDataPoints prices → analysis succeeds with minDataPoints-1
+        // returns.
+        TailRiskWindow window = new TailRiskWindow(50, 25);
+        List<DailyPrice> prices =
+                changesToPrices(generateNormalReturns(window.minDataPoints() - 1));
+        assertThat(prices).hasSize(window.minDataPoints());
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", window.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLK", "Technology");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("SPY", "S&P 500", window);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dataPoints()).isEqualTo(window.minDataPoints() - 1);
+    }
+
+    /**
+     * Regression test for #472. The bug: caller passed a single value used as both the calendar
+     * fetch argument and the minimum row threshold. A 35-calendar-day window only yields ~24
+     * trading-day rows, so {@code rows < 35} always rejected. After the fix, {@code
+     * lookbackCalendarDays} (fetch) and {@code minDataPoints} (validation) are independent — the
+     * provider returning fewer rows than the calendar window is normal and must be accepted as long
+     * as the row count meets {@code minDataPoints}.
+     */
+    @Test
+    void analyzeTailRisk_acceptsRowCountBelowCalendarLookback_regressionForIssue472() {
+        // Window: fetch 50 calendar days, require 25 rows. Provider returns 30 rows (typical for
+        // a 50-calendar-day query: 50 × 5/7 ≈ 35, minus holidays ≈ 30). 30 ≥ 25 → must accept.
+        TailRiskWindow window = new TailRiskWindow(50, 25);
+        List<DailyPrice> prices = changesToPrices(generateNormalReturns(29));
+        assertThat(prices).hasSize(30);
+        assertThat(prices.size()).isLessThan(window.lookbackCalendarDays());
+        assertThat(prices.size()).isGreaterThanOrEqualTo(window.minDataPoints());
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", window.lookbackCalendarDays()))
+                .thenReturn(prices);
+
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("SPY", "S&P 500", window);
+
+        assertThat(result).isPresent();
+        // Sample is truncated to exactly minDataPoints rows → minDataPoints-1 returns.
+        assertThat(result.get().dataPoints()).isEqualTo(window.minDataPoints() - 1);
+    }
+
+    @Test
+    void analyzeTailRisk_truncatesToMinDataPointsForStableSampleSize() {
+        // Provider returns more rows than minDataPoints → analysis must use exactly minDataPoints
+        // (the latest ones). This keeps the kurtosis/skewness sample size stable across runs.
+        TailRiskWindow window = new TailRiskWindow(400, 25);
+        List<DailyPrice> prices = changesToPrices(generateNormalReturns(150));
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", window.lookbackCalendarDays()))
+                .thenReturn(prices);
+
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("SPY", "S&P 500", window);
+
+        assertThat(result).isPresent();
+        // Sample is exactly minDataPoints rows → minDataPoints-1 returns regardless of input size.
+        assertThat(result.get().dataPoints()).isEqualTo(window.minDataPoints() - 1);
+    }
+
+    @Test
+    void analyzeTailRisk_usesCalendarLookbackWhenQueryingProvider() {
+        TailRiskWindow window = new TailRiskWindow(400, 252);
+        List<DailyPrice> prices =
+                changesToPrices(generateNormalReturns(window.minDataPoints() - 1));
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", window.lookbackCalendarDays()))
+                .thenReturn(prices);
+
+        tailRiskService.analyzeTailRisk("SPY", "S&P 500", window);
+
+        verify(dailyPriceProvider).findDailyClosingPrices("SPY", window.lookbackCalendarDays());
+    }
+
+    @Test
+    void analyzeTailRisk_returnsAnalysisWithSufficientData() {
+        List<DailyPrice> prices =
+                changesToPrices(generateNormalReturns(TEST_WINDOW.minDataPoints() - 1));
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", TEST_WINDOW.lookbackCalendarDays()))
+                .thenReturn(prices);
+
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("XLK", "Technology", TEST_WINDOW);
 
         assertThat(result).isPresent();
         TailRiskAnalysis analysis = result.get();
         assertThat(analysis.symbol()).isEqualTo("XLK");
         assertThat(analysis.displayName()).isEqualTo("Technology");
-        assertThat(analysis.dataPoints()).isEqualTo(20);
-        assertThat(analysis.hasReliableData()).isTrue();
+        assertThat(analysis.dataPoints()).isEqualTo(TEST_WINDOW.minDataPoints() - 1);
     }
 
     @Test
@@ -61,11 +150,13 @@ class TailRiskServiceTest {
         List<Double> normalReturns =
                 Arrays.asList(
                         -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, -1.8, 1.8, -0.8, 0.8, -1.2,
-                        1.2, -0.3, 0.3, -0.1, 0.1, 0.0);
+                        1.2, -0.3, 0.3, -0.1, 0.1);
         List<DailyPrice> prices = changesToPrices(normalReturns);
-        when(dailyPriceProvider.findDailyClosingPrices("SPY", 35)).thenReturn(prices);
+        when(dailyPriceProvider.findDailyClosingPrices("SPY", TEST_WINDOW.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("SPY", "S&P 500");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("SPY", "S&P 500", TEST_WINDOW);
 
         assertThat(result).isPresent();
         assertThat(result.get().riskLevel()).isEqualTo(TailRiskLevel.LOW);
@@ -78,9 +169,12 @@ class TailRiskServiceTest {
                         0.1, 0.2, -0.1, 0.0, 0.1, -0.2, 0.1, 0.0, -0.1, 0.2, 0.1, -0.1, 0.0, 0.1,
                         -0.1, 0.0, 0.1, -0.2, 8.0, -7.0);
         List<DailyPrice> prices = changesToPrices(fatTailReturns);
-        when(dailyPriceProvider.findDailyClosingPrices("XLE", 35)).thenReturn(prices);
+        TailRiskWindow window = new TailRiskWindow(40, prices.size());
+        when(dailyPriceProvider.findDailyClosingPrices("XLE", window.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLE", "Energy");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("XLE", "Energy", window);
 
         assertThat(result).isPresent();
         TailRiskLevel level = result.get().riskLevel();
@@ -185,10 +279,13 @@ class TailRiskServiceTest {
 
     @Test
     void analyzeTailRisk_includesSkewnessInResult() {
-        List<DailyPrice> prices = changesToPrices(generateNormalReturns(25));
-        when(dailyPriceProvider.findDailyClosingPrices("XLK", 35)).thenReturn(prices);
+        List<DailyPrice> prices =
+                changesToPrices(generateNormalReturns(TEST_WINDOW.minDataPoints() - 1));
+        when(dailyPriceProvider.findDailyClosingPrices("XLK", TEST_WINDOW.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLK", "Technology");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("XLK", "Technology", TEST_WINDOW);
 
         assertThat(result).isPresent();
         TailRiskAnalysis analysis = result.get();
@@ -203,9 +300,12 @@ class TailRiskServiceTest {
                         0.5, 0.3, 0.4, 0.2, 0.1, 0.3, 0.4, 0.2, 0.5, 0.3, 0.4, 0.2, 0.1, 0.3, 0.4,
                         0.2, -5.0, -6.0, -4.5, 0.1);
         List<DailyPrice> prices = changesToPrices(leftSkewedData);
-        when(dailyPriceProvider.findDailyClosingPrices("XLE", 35)).thenReturn(prices);
+        TailRiskWindow window = new TailRiskWindow(40, prices.size());
+        when(dailyPriceProvider.findDailyClosingPrices("XLE", window.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLE", "Energy");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("XLE", "Energy", window);
 
         assertThat(result).isPresent();
         assertThat(result.get().skewness()).isLessThan(0);
@@ -219,9 +319,12 @@ class TailRiskServiceTest {
                         -0.5, -0.3, -0.4, -0.2, -0.1, -0.3, -0.4, -0.2, -0.5, -0.3, -0.4, -0.2,
                         -0.1, -0.3, -0.4, -0.2, 5.0, 6.0, 4.5, -0.1);
         List<DailyPrice> prices = changesToPrices(rightSkewedData);
-        when(dailyPriceProvider.findDailyClosingPrices("XLF", 35)).thenReturn(prices);
+        TailRiskWindow window = new TailRiskWindow(40, prices.size());
+        when(dailyPriceProvider.findDailyClosingPrices("XLF", window.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLF", "Financials");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("XLF", "Financials", window);
 
         assertThat(result).isPresent();
         assertThat(result.get().skewness()).isGreaterThan(0);
@@ -229,22 +332,14 @@ class TailRiskServiceTest {
     }
 
     @Test
-    void tailRiskAnalysis_hasReliableDataWithMinimumPoints() {
-        List<DailyPrice> prices = changesToPrices(generateNormalReturns(20));
-        when(dailyPriceProvider.findDailyClosingPrices("XLF", 35)).thenReturn(prices);
-
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLF", "Financials");
-
-        assertThat(result).isPresent();
-        assertThat(result.get().hasReliableData()).isTrue();
-    }
-
-    @Test
     void tailRiskAnalysis_formatsSummaryLineCorrectly() {
-        List<DailyPrice> prices = changesToPrices(generateNormalReturns(25));
-        when(dailyPriceProvider.findDailyClosingPrices("XLI", 35)).thenReturn(prices);
+        List<DailyPrice> prices =
+                changesToPrices(generateNormalReturns(TEST_WINDOW.minDataPoints() - 1));
+        when(dailyPriceProvider.findDailyClosingPrices("XLI", TEST_WINDOW.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLI", "Industrials");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("XLI", "Industrials", TEST_WINDOW);
 
         assertThat(result).isPresent();
         String summaryLine = result.get().toSummaryLine();
@@ -253,10 +348,13 @@ class TailRiskServiceTest {
 
     @Test
     void tailRiskAnalysis_formatsCompactLineCorrectly() {
-        List<DailyPrice> prices = changesToPrices(generateNormalReturns(25));
-        when(dailyPriceProvider.findDailyClosingPrices("XLV", 35)).thenReturn(prices);
+        List<DailyPrice> prices =
+                changesToPrices(generateNormalReturns(TEST_WINDOW.minDataPoints() - 1));
+        when(dailyPriceProvider.findDailyClosingPrices("XLV", TEST_WINDOW.lookbackCalendarDays()))
+                .thenReturn(prices);
 
-        Optional<TailRiskAnalysis> result = tailRiskService.analyzeTailRisk("XLV", "Healthcare");
+        Optional<TailRiskAnalysis> result =
+                tailRiskService.analyzeTailRisk("XLV", "Healthcare", TEST_WINDOW);
 
         assertThat(result).isPresent();
         String compactLine = result.get().toCompactLine();

@@ -3,9 +3,9 @@
 This document covers the technologies used, development setup, technical constraints, dependencies, and tool usage patterns.
 
 ## Technologies
-- **Language:** Java 23
+- **Language:** Java 25
 - **Framework:** Spring Boot 4.0.6
-- **Build Tool:** Maven 
+- **Build Tool:** Maven (use `mvn` directly — there is no `./mvnw` wrapper)
 - **Database:** SQLite (embedded, via JdbcTemplate)
 
 ### Dashboard (React Frontend)
@@ -27,18 +27,18 @@ This document covers the technologies used, development setup, technical constra
 - **Lombok 1.18.34:** Reduces boilerplate code with annotations like `@Slf4j`, `@RequiredArgsConstructor`, `@Getter`, etc.
 - **Jackson:** JSON serialization/deserialization with JSR-310 (Java Time) datatype support
 - **JSoup 1.22.2:** HTML parsing library for web scraping (FinViz sector data)
-- **SQLite JDBC 3.53.0.0:** Embedded SQLite database driver for historical price storage
+- **SQLite JDBC 3.53.1.0:** Embedded SQLite database driver for historical price storage
 - **Testing:** 
-  - JUnit Jupiter 6.0.3
+  - JUnit Jupiter 6.1.0
   - Mockito 5.23.0 (core and junit-jupiter integration)
   - Hamcrest 3.0
   - Spring Boot Test support
 
 ## Build Configuration
-- **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 23 with Lombok annotation processing
+- **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 25 with Lombok annotation processing
 - **Packaging:** `spring-boot-maven-plugin` for creating executable JARs
 - **Code Coverage:** `jacoco-maven-plugin` 0.8.14 enforces 97% instruction coverage ratio
-- **Code Formatting:** `spotless-maven-plugin` 3.4.0 with Google Java Format 1.30.0 (AOSP style)
+- **Code Formatting:** `spotless-maven-plugin` 3.6.0 with Google Java Format 1.30.0 (AOSP style)
 
 ## External Data Sources
 
@@ -85,6 +85,7 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 | `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT, ACCUMULATION_DETECTION, EARNINGS_CALENDAR_ALERT) |
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `data/tradebot.db` | SQLite | All SQLite tables |
+| `src/main/resources/logback-spring.xml` | XML | Logback configuration: Spring Boot defaults via `<include>` + global `SecretRedactingTurboFilter` registration |
 
 ## Runtime Profiles
 
@@ -198,6 +199,8 @@ src/main/java/org/tradelite/
 │   ├── SectorRelativeStrengthTracker.java
 │   ├── SectorMomentumRocTracker.java
 │   └── ...
+├── logging/                     # Logging infrastructure
+│   └── SecretRedactingTurboFilter.java  # Global Logback filter dropping events containing known secret shapes (#470)
 ├── quant/                       # Quantitative analysis
 │   ├── VfiService.java          # Volume Flow Indicator calculation
 │   ├── VfiTracker.java          # Combined RS+VFI daily report
@@ -205,6 +208,7 @@ src/main/java/org/tradelite/
 │   ├── BollingerBandService.java / BollingerBandTracker.java
 │   ├── EmaService.java / EmaTracker.java
 │   ├── TailRiskService.java / TailRiskTracker.java
+│   ├── TailRiskWindow.java      # (lookbackCalendarDays, minDataPoints) record
 │   ├── StatisticsUtil.java      # Shared math utilities
 │   └── ...
 ├── repository/                  # Data persistence layer
@@ -228,7 +232,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~1061
+- **Total Tests:** ~1164
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes
@@ -241,6 +245,8 @@ src/main/java/org/tradelite/
 - **Configurable delays:** `OhlcvFetcher.setRequestDelayMs(0)` in tests to avoid 8s sleeps
 
 ## Build Commands
+
+**Use `mvn` directly. There is no Maven wrapper (`./mvnw`) and no Gradle in this project.** The `mvn` binary is on `PATH`; do not look for or invoke `./mvnw`.
 
 ```bash
 mvn test              # Run all tests

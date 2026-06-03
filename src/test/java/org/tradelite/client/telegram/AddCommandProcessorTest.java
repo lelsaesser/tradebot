@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,7 +81,8 @@ class AddCommandProcessorTest {
         PriceQuoteResponse mockQuote = new PriceQuoteResponse();
         mockQuote.setStockSymbol(new StockSymbol("COHR", "Coherent Corp"));
         mockQuote.setCurrentPrice(100.0);
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class)))
+                .thenReturn(Optional.of(mockQuote));
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
@@ -88,7 +90,7 @@ class AddCommandProcessorTest {
 
         addCommandProcessor.processCommand(command);
 
-        verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
+        verify(finnhubClient).tryGetPriceQuote(any(StockSymbol.class));
         verify(symbolRegistry).addSymbol("COHR", "Coherent Corp");
         verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), any(AssetType.class));
         verify(newlyAddedSymbolRepository).insert(eq("COHR"), anyLong());
@@ -101,8 +103,7 @@ class AddCommandProcessorTest {
     void processCommand_invalidTicker_doesNotInsertNewlyAdded() {
         AddCommand command = new AddCommand("INVALID", "Invalid Ticker", 0.0, 0.0);
 
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
-                .thenThrow(new RuntimeException("Not found"));
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class))).thenReturn(Optional.empty());
 
         addCommandProcessor.processCommand(command);
 
@@ -113,9 +114,8 @@ class AddCommandProcessorTest {
     void processCommand_invalidTicker_sendsErrorMessage() {
         AddCommand command = new AddCommand("INVALID", "Invalid Ticker", 0.0, 0.0);
 
-        // Mock failed validation from Finnhub (CoinGecko will fail on CoinId.fromString)
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
-                .thenThrow(new RuntimeException("Not found"));
+        // Finnhub returns empty (unknown symbol); CoinGecko will fail on CoinId.fromString
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class))).thenReturn(Optional.empty());
 
         addCommandProcessor.processCommand(command);
 
@@ -133,7 +133,8 @@ class AddCommandProcessorTest {
         PriceQuoteResponse mockQuote = new PriceQuoteResponse();
         mockQuote.setStockSymbol(new StockSymbol("AAPL", "Apple"));
         mockQuote.setCurrentPrice(150.0);
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class)))
+                .thenReturn(Optional.of(mockQuote));
 
         when(symbolRegistry.addSymbol("AAPL", "Apple")).thenReturn(false);
 
@@ -152,7 +153,8 @@ class AddCommandProcessorTest {
         PriceQuoteResponse mockQuote = new PriceQuoteResponse();
         mockQuote.setStockSymbol(new StockSymbol("COHR", "Coherent Corp"));
         mockQuote.setCurrentPrice(100.0);
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class))).thenReturn(mockQuote);
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class)))
+                .thenReturn(Optional.of(mockQuote));
 
         when(symbolRegistry.addSymbol("COHR", "Coherent Corp")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), any(AssetType.class)))
@@ -171,8 +173,7 @@ class AddCommandProcessorTest {
         AddCommand command = new AddCommand("bitcoin", "Bitcoin", 0.0, 0.0);
 
         // Mock failed Finnhub validation
-        when(finnhubClient.getPriceQuote(any(StockSymbol.class)))
-                .thenThrow(new RuntimeException("Not a stock"));
+        when(finnhubClient.tryGetPriceQuote(any(StockSymbol.class))).thenReturn(Optional.empty());
 
         // Mock successful CoinGecko validation
         CoinGeckoPriceResponse.CoinData mockCoinData = new CoinGeckoPriceResponse.CoinData();
@@ -185,7 +186,7 @@ class AddCommandProcessorTest {
 
         addCommandProcessor.processCommand(command);
 
-        verify(finnhubClient).getPriceQuote(any(StockSymbol.class));
+        verify(finnhubClient).tryGetPriceQuote(any(StockSymbol.class));
         verify(coinGeckoClient).getCoinPriceData(any());
         verify(symbolRegistry).addSymbol("bitcoin", "Bitcoin");
         verify(targetPriceProvider).addTargetPrice(any(TargetPrice.class), any(AssetType.class));
@@ -214,7 +215,7 @@ class AddCommandProcessorTest {
         addCommandProcessor.processCommand(command);
 
         verify(yahooFinanceClient).fetchDailyOhlcv("RHM.DE", 5);
-        verify(finnhubClient, never()).getPriceQuote(any(StockSymbol.class));
+        verify(finnhubClient, never()).tryGetPriceQuote(any(StockSymbol.class));
         verify(coinGeckoClient, never()).getCoinPriceData(any());
         verify(symbolRegistry).addSymbol("RHM.DE", "Rheinmetall");
         verify(telegramClient)
@@ -236,7 +237,7 @@ class AddCommandProcessorTest {
         addCommandProcessor.processCommand(command);
 
         verify(yahooFinanceClient).fetchDailyOhlcv("INVALID.XY", 5);
-        verify(finnhubClient, never()).getPriceQuote(any(StockSymbol.class));
+        verify(finnhubClient, never()).tryGetPriceQuote(any(StockSymbol.class));
         verify(telegramClient)
                 .sendMessage(
                         "Invalid ticker symbol: INVALID.XY. Could not fetch price data from Yahoo Finance.");

@@ -122,7 +122,7 @@ public class TelegramMessageProcessor {
     protected Optional<SetCommand> buildSetCommand(
             String subCommand, String symbol, double target) {
         String errorMessageCommandFormat =
-                "Invalid command format. Use /set <buy|sell> <symbol> <target>";
+                "Invalid command format. Use /set `<buy|sell>` `<symbol>` `<target>`";
         String errorMessageInvalidTarget = "Invalid target. Please provide a valid target price.";
 
         if (subCommand == null) {
@@ -152,7 +152,8 @@ public class TelegramMessageProcessor {
     protected Optional<AddCommand> parseAddCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 3) {
-            telegramClient.sendMessage("Invalid command format. Use /add <TICKER> <Display_Name>");
+            telegramClient.sendMessage(
+                    "Invalid command format. Use /add `<TICKER>` `<Display_Name>`");
             return Optional.empty();
         }
 
@@ -165,7 +166,7 @@ public class TelegramMessageProcessor {
     protected Optional<RemoveCommand> parseRemoveCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 2) {
-            telegramClient.sendMessage("Invalid command format. Use /remove <TICKER>");
+            telegramClient.sendMessage("Invalid command format. Use /remove `<TICKER>`");
             return Optional.empty();
         }
 
@@ -188,7 +189,7 @@ public class TelegramMessageProcessor {
     protected Optional<RsiCommand> parseRsiCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 2) {
-            telegramClient.sendMessage("Invalid command format. Use /rsi <symbol>");
+            telegramClient.sendMessage("Invalid command format. Use /rsi `<symbol>`");
             return Optional.empty();
         }
 
@@ -205,7 +206,7 @@ public class TelegramMessageProcessor {
     protected Optional<DataResetCommand> parseDataResetCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 3 || !parts[1].equalsIgnoreCase("reset")) {
-            telegramClient.sendMessage("Invalid command format. Use /data reset <SYMBOL>");
+            telegramClient.sendMessage("Invalid command format. Use /data reset `<SYMBOL>`");
             return Optional.empty();
         }
         String ticker = parts[2].toUpperCase();
@@ -226,7 +227,8 @@ public class TelegramMessageProcessor {
                 return Optional.of(new ToggleCommand(featureName, false));
             }
         }
-        telegramClient.sendMessage("Invalid command format. Use /toggle <feature_name> <on|off>");
+        telegramClient.sendMessage(
+                "Invalid command format. Use /toggle `<feature_name>` `<on|off>`");
         return Optional.empty();
     }
 }

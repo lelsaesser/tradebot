@@ -10,8 +10,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
+import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.RsiService;
 import org.tradelite.service.RsiService.RsiSignal;
 
@@ -23,6 +25,7 @@ public class RsiTracker {
     private final RsiService rsiService;
     private final TelegramGateway telegramClient;
     private final SymbolRegistry symbolRegistry;
+    private final FeatureToggleService featureToggleService;
 
     /**
      * Stores the Telegram message ID of the last sent RSI report so it can be deleted before
@@ -39,6 +42,11 @@ public class RsiTracker {
      * the previous report message.
      */
     public void analyzeAndSendReport() {
+        if (!featureToggleService.isEnabled(FeatureToggle.RSI_REPORT)) {
+            log.info("RSI report feature toggle is disabled, skipping");
+            return;
+        }
+
         List<SignalWithDelta> signals = analyzeAllSymbols();
 
         if (signals.isEmpty()) {
