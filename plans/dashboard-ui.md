@@ -50,7 +50,7 @@ Create the React + Vite + TypeScript project in `dashboard/` with a single place
 - [ ] `dashboard/` directory exists with a valid Vite + React + TypeScript project that starts with `npm run dev`.
 - [ ] Vite proxy config forwards `/api` requests to `localhost:9090`.
 - [ ] `GET /api/v1/events` returns a valid `text/event-stream` response.
-- [ ] The browser `EventSource` connects to `/api/events` and receives heartbeat `ping` events.
+- [ ] The browser `EventSource` connects to `/api/v1/events` and receives heartbeat `ping` events.
 - [ ] The dashboard header shows a green "Live" indicator when SSE is connected and a red "Disconnected" indicator when the connection is lost.
 - [ ] `DashboardEventPublisher.publish(String eventType, Object payload)` is injectable by any service and fans out to all active `SseEmitter` connections.
 - [ ] `SseController` cleans up dead emitters on timeout or client disconnect.
