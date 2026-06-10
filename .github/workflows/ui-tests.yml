@@ -12,6 +12,9 @@ on:
       - "dashboard/**"
       - ".github/workflows/ui-tests.yml"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
