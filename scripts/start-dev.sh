@@ -13,4 +13,4 @@ set -a
 source "$ENV_FILE"
 set +a
 
-SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dtradebot.scheduling.enabled=true"
+SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
