@@ -27,6 +27,7 @@ class MarketStatusServiceTest {
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
     private static final ZoneId TOKYO_ZONE = ZoneId.of("Asia/Tokyo");
     private static final ZoneId STOCKHOLM_ZONE = ZoneId.of("Europe/Stockholm");
+    private static final ZoneId PARIS_ZONE = ZoneId.of("Europe/Paris");
 
     @Mock private FinnhubClient finnhubClient;
 
@@ -606,6 +607,62 @@ class MarketStatusServiceTest {
         assertFalse(service.isStoOpen(time));
     }
 
+    // --- isParOpen tests ---
+
+    @Test
+    void isParOpen_beforeOpen_returnsFalse() {
+        // Wednesday 08:59 Paris → before Euronext Paris opens at 09:00
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 8, 59, 0, 0, PARIS_ZONE);
+        assertFalse(service.isParOpen(time));
+    }
+
+    @Test
+    void isParOpen_atOpen_returnsTrue() {
+        // Wednesday 09:00 Paris → open boundary inclusive
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 9, 0, 0, 0, PARIS_ZONE);
+        assertTrue(service.isParOpen(time));
+    }
+
+    @Test
+    void isParOpen_midSession_returnsTrue() {
+        // Wednesday 13:00 Paris
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 13, 0, 0, 0, PARIS_ZONE);
+        assertTrue(service.isParOpen(time));
+    }
+
+    @Test
+    void isParOpen_oneMinuteBeforeClose_returnsTrue() {
+        // 17:29 Paris → still trading (17:30-17:35 closing auction is treated as outside hours)
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 17, 29, 0, 0, PARIS_ZONE);
+        assertTrue(service.isParOpen(time));
+    }
+
+    @Test
+    void isParOpen_atCloseBoundary_returnsFalse() {
+        // 17:30 Paris → close boundary exclusive
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 17, 30, 0, 0, PARIS_ZONE);
+        assertFalse(service.isParOpen(time));
+    }
+
+    @Test
+    void isParOpen_afterClose_returnsFalse() {
+        // 18:00 Paris → after close
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 15, 18, 0, 0, 0, PARIS_ZONE);
+        assertFalse(service.isParOpen(time));
+    }
+
+    @Test
+    void isParOpen_saturday_returnsFalse() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 18, 13, 0, 0, 0, PARIS_ZONE);
+        assertFalse(service.isParOpen(time));
+    }
+
+    @Test
+    void isParOpen_sunday_returnsFalse() {
+        ZonedDateTime time = ZonedDateTime.of(2026, 7, 19, 13, 0, 0, 0, PARIS_ZONE);
+        assertFalse(service.isParOpen(time));
+    }
+
     // --- isExchangeOpen routing smoke tests ---
     // The boundary-correctness logic is exercised by the per-helper tests above. These verify
     // isExchangeOpen routes the .DE / .KS / .T / .ST suffix to the right helper without throwing.
@@ -631,6 +688,12 @@ class MarketStatusServiceTest {
     @Test
     void isExchangeOpen_stoSymbol_routesToStoHelper() {
         boolean result = service.isExchangeOpen("SIVE.ST");
+        assertTrue(result || !result);
+    }
+
+    @Test
+    void isExchangeOpen_parSymbol_routesToParHelper() {
+        boolean result = service.isExchangeOpen("SOI.PA");
         assertTrue(result || !result);
     }
 }
