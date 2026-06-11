@@ -3,6 +3,7 @@ package org.tradelite.quant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,17 @@ public class TailRiskService {
     private final DailyPriceProvider dailyPriceProvider;
 
     /**
+     * Symbols for which the "insufficient price history" WARN log is suppressed.
+     *
+     * <p><b>Why:</b> these are newly-listed instruments whose history is legitimately shorter than
+     * the {@link TailRiskTracker#LONG} 252-trading-day window requires. The warn fires every run
+     * and pollutes {@code ./scan-logs.sh} output for ~200+ days while the symbol matures.
+     *
+     * <p><b>When to remove:</b> once the symbol has ≥ 252 rows of price history. See issue #494.
+     */
+    private static final Set<String> SUPPRESS_INSUFFICIENT_DATA_WARN = Set.of("DRAM");
+
+    /**
      * Analyzes tail risk for a symbol based on historical price data.
      *
      * @param symbol The stock or ETF ticker symbol
@@ -68,11 +80,13 @@ public class TailRiskService {
                 dailyPriceProvider.findDailyClosingPrices(symbol, window.lookbackCalendarDays());
 
         if (dailyPrices.size() < window.minDataPoints()) {
-            log.warn(
-                    "Insufficient price history for {}: have {} rows, need {}",
-                    symbol,
-                    dailyPrices.size(),
-                    window.minDataPoints());
+            if (!SUPPRESS_INSUFFICIENT_DATA_WARN.contains(symbol)) {
+                log.warn(
+                        "Insufficient price history for {}: have {} rows, need {}",
+                        symbol,
+                        dailyPrices.size(),
+                        window.minDataPoints());
+            }
             return Optional.empty();
         }
 
