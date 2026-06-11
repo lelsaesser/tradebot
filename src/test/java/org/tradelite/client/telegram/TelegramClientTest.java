@@ -1,5 +1,6 @@
 package org.tradelite.client.telegram;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -7,13 +8,21 @@ import static org.tradelite.client.telegram.TelegramClient.BASE_URL;
 import static org.tradelite.client.telegram.TelegramClient.DELETE_URL;
 import static org.tradelite.client.telegram.TelegramMessageSanitizer.LIMIT;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.util.OptionalLong;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -26,11 +35,17 @@ import org.tradelite.config.TradebotTelegramProperties;
 
 @SuppressWarnings("unchecked")
 @ExtendWith(MockitoExtension.class)
+// Tests share the TelegramClient logger via ListAppender; serialize within this class so
+// concurrent tests do not leak log events into each other's appenders (would otherwise cause
+// ConcurrentModificationException on the shared ArrayList).
+@Execution(ExecutionMode.SAME_THREAD)
 class TelegramClientTest {
 
     @Mock private RestTemplate restTemplate;
 
     private TelegramClient telegramClient;
+    private ListAppender<ILoggingEvent> logAppender;
+    private Logger telegramClientLogger;
 
     @BeforeEach
     void setUp() {
@@ -38,6 +53,16 @@ class TelegramClientTest {
         properties.setBotToken("testToken");
         properties.setGroupChatId("testChatId");
         telegramClient = new TelegramClient(restTemplate, properties);
+
+        telegramClientLogger = (Logger) LoggerFactory.getLogger(TelegramClient.class);
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        telegramClientLogger.addAppender(logAppender);
+    }
+
+    @AfterEach
+    void tearDown() {
+        telegramClientLogger.detachAppender(logAppender);
     }
 
     @Test
@@ -339,5 +364,102 @@ class TelegramClientTest {
                 .thenThrow(new RuntimeException("Network error"));
 
         assertThrows(IllegalStateException.class, () -> telegramClient.getChatUpdates());
+    }
+
+    // --- Token redaction (#484) ---
+    //
+    // Token shape matches the SecretRedactingTurboFilter pattern (8–10 digits, ':', 35 chars of
+    // [A-Za-z0-9_-]) so a missed redaction would also be caught by the global filter — which is
+    // exactly the original-#484 symptom we want to prevent.
+    private static final String FAKE_TOKEN = "1234567890:AAEabcdefghijklmnopqrstuvwxyzABCDEFGHI";
+
+    private static String tokenBearingRestTemplateMessage(String urlPath) {
+        // Same shape as Spring's RestClientResponseException.getMessage(): the URL leaks via the
+        // human-readable message string.
+        return "400 Bad Request on POST request for \"https://api.telegram.org/bot"
+                + FAKE_TOKEN
+                + urlPath
+                + "\": \"...\"";
+    }
+
+    @Test
+    void sendMessageAndReturnId_exception_logRedactsToken() {
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.POST),
+                        any(HttpEntity.class),
+                        eq(TelegramSendMessageResponse.class)))
+                .thenThrow(new RuntimeException(tokenBearingRestTemplateMessage("/sendMessage")));
+
+        OptionalLong result = telegramClient.sendMessageAndReturnId("anything");
+
+        assertTrue(result.isEmpty());
+        assertThat(logAppender.list)
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                            assertThat(event.getFormattedMessage())
+                                    .contains("Error sending message")
+                                    .contains("/bot<redacted>/")
+                                    .doesNotContain(FAKE_TOKEN);
+                        });
+    }
+
+    @Test
+    void deleteMessage_exception_logRedactsToken() {
+        when(restTemplate.exchange(
+                        anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(new RuntimeException(tokenBearingRestTemplateMessage("/deleteMessage")));
+
+        telegramClient.deleteMessage(7L);
+
+        assertThat(logAppender.list)
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                            assertThat(event.getFormattedMessage())
+                                    .contains("Error deleting message")
+                                    .contains("/bot<redacted>/")
+                                    .doesNotContain(FAKE_TOKEN);
+                        });
+    }
+
+    @Test
+    void getChatUpdates_exception_logAndRethrowBothRedactToken() {
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(TelegramUpdateResponseWrapper.class)))
+                .thenThrow(new RuntimeException(tokenBearingRestTemplateMessage("/getUpdates")));
+
+        IllegalStateException thrown =
+                assertThrows(IllegalStateException.class, () -> telegramClient.getChatUpdates());
+
+        // Rethrown exception's message is what RootErrorHandler ultimately logs; redaction here is
+        // what closes the second log line in issue #484.
+        assertThat(thrown.getMessage()).contains("/bot<redacted>/").doesNotContain(FAKE_TOKEN);
+
+        assertThat(logAppender.list)
+                .anySatisfy(
+                        event -> {
+                            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                            assertThat(event.getFormattedMessage())
+                                    .contains("Error fetching chat updates")
+                                    .contains("/bot<redacted>/")
+                                    .doesNotContain(FAKE_TOKEN);
+                        });
+    }
+
+    @Test
+    void redact_nullInput_returnsNull() {
+        // Null-safety contract: callers pass e.getMessage() which can be null for some exceptions.
+        assertNull(TelegramClient.redact(null));
+    }
+
+    @Test
+    void redact_noTokenPresent_returnsInputUnchanged() {
+        String plain = "Connection timed out after 5s";
+        assertEquals(plain, TelegramClient.redact(plain));
     }
 }
