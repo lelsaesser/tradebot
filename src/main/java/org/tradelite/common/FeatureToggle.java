@@ -34,14 +34,7 @@ public enum FeatureToggle {
     RSI_REPORT("rsiReport"),
 
     /** Controls whether Yahoo Finance intraday price fetching is active for international stocks */
-    YAHOO_INTRADAY_PRICE_FETCH("yahooIntradayPriceFetch"),
-
-    /**
-     * Selects the HTTP transport for Yahoo Finance: ON uses {@code java.net.http.HttpClient}; OFF
-     * uses ProcessBuilder + curl (legacy). Temporary toggle for #435; will be removed in the
-     * cleanup follow-up (#457) once verified in production.
-     */
-    YAHOO_HTTP_CLIENT("yahooHttpClient");
+    YAHOO_INTRADAY_PRICE_FETCH("yahooIntradayPriceFetch");
 
     private final String key;
 }
