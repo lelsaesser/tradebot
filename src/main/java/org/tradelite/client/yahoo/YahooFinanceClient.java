@@ -2,9 +2,7 @@ package org.tradelite.client.yahoo;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,41 +14,33 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import lombok.Generated;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.service.ApiRequestMeteringService;
-import org.tradelite.service.FeatureToggleService;
 
 @Slf4j
 @Component
 public class YahooFinanceClient {
 
     private static final String BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/";
-    private static final int PROCESS_TIMEOUT_SECONDS = 15;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
     private static final String USER_AGENT = "Mozilla/5.0";
 
     private final ObjectMapper objectMapper;
     private final ApiRequestMeteringService meteringService;
     private final HttpClient yahooHttpClient;
-    private final FeatureToggleService featureToggleService;
 
     @Autowired
     public YahooFinanceClient(
             ObjectMapper objectMapper,
             ApiRequestMeteringService meteringService,
-            HttpClient yahooHttpClient,
-            FeatureToggleService featureToggleService) {
+            HttpClient yahooHttpClient) {
         this.objectMapper = objectMapper;
         this.meteringService = meteringService;
         this.yahooHttpClient = yahooHttpClient;
-        this.featureToggleService = featureToggleService;
     }
 
     public List<OhlcvRecord> fetchDailyOhlcv(String symbol, int days) {
@@ -58,7 +48,7 @@ public class YahooFinanceClient {
         String url = BASE_URL + symbol + "?interval=1d&range=" + range;
 
         meteringService.incrementYahooRequests();
-        String json = executeTransport(symbol, url);
+        String json = executeRequest(symbol, url);
         return parseResponse(symbol, json);
     }
 
@@ -66,18 +56,8 @@ public class YahooFinanceClient {
         String url = BASE_URL + symbol + "?interval=1d&range=1d";
 
         meteringService.incrementYahooRequests();
-        String json = executeTransport(symbol, url);
+        String json = executeRequest(symbol, url);
         return parseQuoteFromMeta(symbol, json);
-    }
-
-    /**
-     * Dispatches transport based on {@link FeatureToggle#YAHOO_HTTP_CLIENT}. ON → {@link
-     * #executeRequest}; OFF → {@link #executeCurl}. Temporary; removed in #457.
-     */
-    private String executeTransport(String symbol, String url) {
-        return featureToggleService.isEnabled(FeatureToggle.YAHOO_HTTP_CLIENT)
-                ? executeRequest(symbol, url)
-                : executeCurl(symbol, url);
     }
 
     YahooPriceQuote parseQuoteFromMeta(String symbol, String json) {
@@ -129,62 +109,17 @@ public class YahooFinanceClient {
         }
     }
 
-    @Generated
-    String executeCurl(String symbol, String url) {
-        List<String> command =
-                List.of(
-                        "curl",
-                        "--fail",
-                        "-s",
-                        "--connect-timeout",
-                        "5",
-                        "--max-time",
-                        "10",
-                        "-H",
-                        "User-Agent: Mozilla/5.0",
-                        url);
-
-        try {
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            String output;
-            try (BufferedReader reader =
-                    new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                output = reader.lines().collect(Collectors.joining("\n"));
-            }
-
-            boolean finished = process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            if (!finished) {
-                process.destroyForcibly();
-                throw new YahooFetchException(symbol, "curl timed out after 15 seconds");
-            }
-
-            int exitCode = process.exitValue();
-            if (exitCode != 0) {
-                throw new YahooFetchException(
-                        symbol, "curl exited with code " + exitCode + ": " + output);
-            }
-
-            return output;
-        } catch (YahooFetchException e) {
-            throw e;
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            throw new YahooFetchException(symbol, "interrupted");
-        } catch (Exception e) {
-            throw new YahooFetchException(symbol, e.getMessage());
-        }
-    }
-
     /**
-     * HTTP transport via {@link java.net.http.HttpClient}. Active when {@link
-     * FeatureToggle#YAHOO_HTTP_CLIENT} is ON. On non-2xx, the exception message includes status
-     * code, full response headers, and full response body so failure forensics during the #435
-     * comparison period are unambiguous. On I/O failure, the exception message includes the
-     * exception class simple name (e.g. {@code SSLHandshakeException}, {@code ConnectException}) so
-     * transport-level failure modes are visible without DEBUG logging.
+     * HTTP transport via {@link java.net.http.HttpClient}. On non-2xx, the exception message
+     * includes status code, full response headers, and full response body so failure forensics are
+     * unambiguous. On I/O failure, the exception message includes the exception class simple name
+     * (e.g. {@code SSLHandshakeException}, {@code ConnectException}) so transport-level failure
+     * modes are visible without DEBUG logging.
+     *
+     * <p>Verified in production over a 2-week window after #435 introduced the path: no
+     * SSL/TLS-related failures observed, disproving the original "Yahoo blocks Java HTTP clients
+     * via TLS fingerprinting" hypothesis. The legacy ProcessBuilder + curl path was removed in
+     * #457.
      */
     @Generated
     String executeRequest(String symbol, String url) {

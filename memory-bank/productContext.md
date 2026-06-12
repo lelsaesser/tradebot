@@ -69,7 +69,7 @@ All alerts and reports delivered as Telegram messages (no user action required).
 | Finnhub | Live stock prices, insider trades, market holidays, earnings calendar | API key | — |
 | CoinGecko | Crypto prices | None | — |
 | Twelve Data | Daily OHLCV (400 data points) | API key | 8 req/min |
-| Yahoo Finance | International OHLCV + intraday quotes (via curl/ProcessBuilder) | None | 3s delay |
+| Yahoo Finance | International OHLCV + intraday quotes (via `java.net.http.HttpClient`) | None | 3s delay |
 | FinViz | Industry sector performance (web scraping) | None | — |
 
 ## Tracked Symbols

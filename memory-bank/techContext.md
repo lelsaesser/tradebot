@@ -49,7 +49,7 @@ This document covers the technologies used, development setup, technical constra
 | CoinGecko | `CoinGeckoClient` | Cryptocurrency prices | No auth |
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
 | Twelve Data | `TwelveDataClient` | Daily OHLCV data (400 data points) | API Key |
-| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (ProcessBuilder + curl) |
+| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (`java.net.http.HttpClient`) |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |

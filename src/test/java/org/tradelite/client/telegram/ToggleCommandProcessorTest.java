@@ -39,7 +39,6 @@ class ToggleCommandProcessorTest {
         when(featureToggleService.isEnabled(FeatureToggle.RSI_REPORT)).thenReturn(true);
         when(featureToggleService.isEnabled(FeatureToggle.YAHOO_INTRADAY_PRICE_FETCH))
                 .thenReturn(true);
-        when(featureToggleService.isEnabled(FeatureToggle.YAHOO_HTTP_CLIENT)).thenReturn(false);
 
         ToggleCommand command = new ToggleCommand(null, null);
         processor.processCommand(command);
@@ -55,8 +54,7 @@ class ToggleCommandProcessorTest {
                         earningsCalendarAlert: ON
                         accumulationDetection: OFF
                         rsiReport: ON
-                        yahooIntradayPriceFetch: ON
-                        yahooHttpClient: OFF""");
+                        yahooIntradayPriceFetch: ON""");
     }
 
     @Test

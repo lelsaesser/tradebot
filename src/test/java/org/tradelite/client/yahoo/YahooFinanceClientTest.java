@@ -17,16 +17,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.service.ApiRequestMeteringService;
-import org.tradelite.service.FeatureToggleService;
 
 @ExtendWith(MockitoExtension.class)
 class YahooFinanceClientTest {
 
     @Mock private ApiRequestMeteringService meteringService;
-    @Mock private FeatureToggleService featureToggleService;
 
     private YahooFinanceClient client;
 
@@ -36,13 +33,7 @@ class YahooFinanceClientTest {
         objectMapper.registerModule(new JavaTimeModule());
         HttpClient httpClient =
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-        // Default: toggle OFF → existing tests exercise the curl path unchanged.
-        lenient()
-                .when(featureToggleService.isEnabled(FeatureToggle.YAHOO_HTTP_CLIENT))
-                .thenReturn(false);
-        client =
-                new YahooFinanceClient(
-                        objectMapper, meteringService, httpClient, featureToggleService);
+        client = new YahooFinanceClient(objectMapper, meteringService, httpClient);
     }
 
     @Test
@@ -302,55 +293,17 @@ class YahooFinanceClientTest {
 
     @Test
     void fetchDailyOhlcv_incrementsMeter() {
-        // This test verifies metering is called even when the curl fails
-        // (since metering happens before the process starts)
+        // Metering happens before the HTTP call, so it increments even when the request fails.
         assertThrows(YahooFetchException.class, () -> client.fetchDailyOhlcv("INVALID.XX", 5));
 
         verify(meteringService, times(1)).incrementYahooRequests();
     }
 
     @Test
-    void executeCurl_invalidUrl_throwsYahooFetchException() {
-        // Tests the actual ProcessBuilder execution with an unreachable URL
-        YahooFetchException ex =
-                assertThrows(
-                        YahooFetchException.class,
-                        () -> client.executeCurl("TEST.XX", "https://localhost:1/nonexistent"));
-
-        assertThat(ex.getMessage(), containsString("TEST.XX"));
-        assertThat(ex.getMessage(), containsString("curl exited with code"));
-    }
-
-    @Test
-    void executeCurl_validEchoCommand_returnsOutput() {
-        // Test executeCurl indirectly by calling fetchDailyOhlcv with the real client
-        // which will hit Yahoo and fail (since INVALID.XX doesn't exist)
-        YahooFetchException ex =
-                assertThrows(
-                        YahooFetchException.class,
-                        () -> client.fetchDailyOhlcv("NONEXISTENT.ZZ", 5));
-
-        assertThat(ex.getMessage(), containsString("NONEXISTENT.ZZ"));
-    }
-
-    @Test
-    void executeCurl_realYahooCall_returnsValidJson() {
-        // Integration test: actually calls Yahoo Finance for a known symbol
-        // This covers the success path of executeCurl (ProcessBuilder + stdout reading)
-        String json =
-                client.executeCurl(
-                        "SAP",
-                        "https://query1.finance.yahoo.com/v8/finance/chart/SAP?interval=1d&range=5d");
-
-        assertThat(json, containsString("\"chart\""));
-        assertThat(json, containsString("\"result\""));
-    }
-
-    @Test
     void executeRequest_realYahooCall_returnsValidJson() {
-        // Integration test: covers HttpClient success path against live Yahoo. If the
-        // TLS-fingerprinting hypothesis were true, this test would fail with an SSL exception
-        // on every CI run — providing fast disproof rather than waiting 3 trading days.
+        // Integration test: covers the HttpClient success path against live Yahoo. If Yahoo ever
+        // started TLS-fingerprinting Java HTTP clients, this test would fail with an SSL exception
+        // — providing fast disproof rather than waiting for the next deploy to surface the issue.
         String json =
                 client.executeRequest(
                         "SAP",
@@ -374,21 +327,8 @@ class YahooFinanceClientTest {
     }
 
     @Test
-    void fetchDailyOhlcv_realCall_toggleOn_returnsRecords() {
-        // Integration test: end-to-end with toggle ON, exercising executeTransport →
-        // executeRequest.
-        when(featureToggleService.isEnabled(FeatureToggle.YAHOO_HTTP_CLIENT)).thenReturn(true);
-
-        List<OhlcvRecord> records = client.fetchDailyOhlcv("SAP", 5);
-
-        assertThat(records, is(not(empty())));
-        assertThat(records.getFirst().symbol(), is("SAP"));
-        verify(meteringService).incrementYahooRequests();
-    }
-
-    @Test
     void fetchDailyOhlcv_realCall_returnsRecords() {
-        // Integration test: full end-to-end with a real API call
+        // Integration test: full end-to-end with a real API call.
         List<OhlcvRecord> records = client.fetchDailyOhlcv("SAP", 5);
 
         assertThat(records, is(not(empty())));
