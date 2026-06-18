@@ -681,6 +681,7 @@ class SchedulerTest {
         holiday.setEventName("Memorial Day");
         holiday.setTradingHour("");
         when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
+        when(marketStatusService.getTodayInternationalHolidays()).thenReturn(java.util.Map.of());
 
         scheduler.dailyMarketHolidayNotification();
 
@@ -694,9 +695,9 @@ class SchedulerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String msg = messageCaptor.getValue();
-        assertTrue(msg.contains("*Market Holiday*"));
+        assertTrue(msg.contains("*Markets closed today*"));
+        assertTrue(msg.contains("🇺🇸 NYSE"));
         assertTrue(msg.contains("Memorial Day"));
-        assertTrue(msg.contains("Markets are closed"));
     }
 
     @Test
@@ -705,6 +706,7 @@ class SchedulerTest {
         holiday.setEventName("Day After Thanksgiving");
         holiday.setTradingHour("09:30-13:00");
         when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
+        when(marketStatusService.getTodayInternationalHolidays()).thenReturn(java.util.Map.of());
 
         scheduler.dailyMarketHolidayNotification();
 
@@ -718,14 +720,16 @@ class SchedulerTest {
         verify(telegramClient).sendMessage(messageCaptor.capture());
 
         String msg = messageCaptor.getValue();
-        assertTrue(msg.contains("*Early Close*"));
+        assertTrue(msg.contains("*Markets closed today*"));
+        assertTrue(msg.contains("🇺🇸 NYSE"));
         assertTrue(msg.contains("Day After Thanksgiving"));
-        assertTrue(msg.contains("13:00 ET"));
+        assertTrue(msg.contains("early close 13:00 ET"));
     }
 
     @Test
     void dailyMarketHolidayNotification_noHoliday_sendsNoMessage() throws Exception {
         when(marketStatusService.getTodayHoliday()).thenReturn(Optional.empty());
+        when(marketStatusService.getTodayInternationalHolidays()).thenReturn(java.util.Map.of());
 
         scheduler.dailyMarketHolidayNotification();
 
@@ -739,11 +743,66 @@ class SchedulerTest {
     }
 
     @Test
+    void dailyMarketHolidayNotification_internationalHolidays_sendsConsolidatedMessage()
+            throws Exception {
+        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.empty());
+        when(marketStatusService.getTodayInternationalHolidays())
+                .thenReturn(
+                        java.util.Map.of(
+                                org.tradelite.common.Exchange.XETRA, "Tag der Arbeit",
+                                org.tradelite.common.Exchange.PAR, "Fête du Travail"));
+
+        scheduler.dailyMarketHolidayNotification();
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String msg = messageCaptor.getValue();
+        assertTrue(msg.contains("*Markets closed today*"));
+        assertTrue(msg.contains("XETRA"));
+        assertTrue(msg.contains("Tag der Arbeit"));
+        assertTrue(msg.contains("PAR"));
+        assertTrue(msg.contains("Fête du Travail"));
+    }
+
+    @Test
+    void dailyMarketHolidayNotification_nyseAndInternational_listsAllExchanges() throws Exception {
+        MarketHolidayResponse.MarketHoliday nyseHoliday = new MarketHolidayResponse.MarketHoliday();
+        nyseHoliday.setEventName("Christmas Day");
+        nyseHoliday.setTradingHour("");
+        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(nyseHoliday));
+        when(marketStatusService.getTodayInternationalHolidays())
+                .thenReturn(
+                        java.util.Map.of(
+                                org.tradelite.common.Exchange.XETRA, "Erster Weihnachtstag"));
+
+        scheduler.dailyMarketHolidayNotification();
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient).sendMessage(messageCaptor.capture());
+
+        String msg = messageCaptor.getValue();
+        assertTrue(msg.contains("🇺🇸 NYSE"));
+        assertTrue(msg.contains("Christmas Day"));
+        assertTrue(msg.contains("XETRA"));
+        assertTrue(msg.contains("Erster Weihnachtstag"));
+    }
+
+    @Test
     void manualMarketHolidayNotification_fullClose_sendsMessageAndReturnsTrue() {
         MarketHolidayResponse.MarketHoliday holiday = new MarketHolidayResponse.MarketHoliday();
         holiday.setEventName("Independence Day");
         holiday.setTradingHour(null);
         when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
+        when(marketStatusService.getTodayInternationalHolidays()).thenReturn(java.util.Map.of());
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualMarketHolidayNotification();
