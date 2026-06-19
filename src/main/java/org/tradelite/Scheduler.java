@@ -243,48 +243,8 @@ public class Scheduler {
 
     @Scheduled(cron = "0 0 0 1 * *", zone = "UTC")
     public void monthlyApiUsageReport() {
-        rootErrorHandler.run(this::doMonthlyApiUsageReport);
+        rootErrorHandler.run(apiRequestMeteringService::sendMonthlyUsageReport);
         log.info("Monthly API usage report completed.");
-    }
-
-    private void doMonthlyApiUsageReport() {
-        int finnhubCount = apiRequestMeteringService.getFinnhubRequestCount();
-        int coingeckoCount = apiRequestMeteringService.getCoingeckoRequestCount();
-        int twelveDataCount = apiRequestMeteringService.getTwelveDataRequestCount();
-        int yahooCount = apiRequestMeteringService.getYahooRequestCount();
-
-        if (finnhubCount > 0 || coingeckoCount > 0 || twelveDataCount > 0 || yahooCount > 0) {
-            String previousMonth = apiRequestMeteringService.getPreviousMonth();
-
-            String message =
-                    String.format(
-                            """
-                            *Monthly API Usage Report - %s*
-                            🔹 *Finnhub API*: %,d requests
-                            🔹 *CoinGecko API*: %,d requests
-                            🔹 *Twelve Data API*: %,d requests
-                            🔹 *Yahoo Finance*: %,d requests
-                            🔹 *Total*: %,d requests""",
-                            previousMonth,
-                            finnhubCount,
-                            coingeckoCount,
-                            twelveDataCount,
-                            yahooCount,
-                            finnhubCount + coingeckoCount + twelveDataCount + yahooCount);
-
-            telegramClient.sendMessage(message);
-            log.info(
-                    "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}, TwelveData={}, Yahoo={}",
-                    previousMonth,
-                    finnhubCount,
-                    coingeckoCount,
-                    twelveDataCount,
-                    yahooCount);
-        } else {
-            log.info("No API requests recorded for the previous month, skipping report");
-        }
-
-        apiRequestMeteringService.resetCounters();
     }
 
     public boolean manualStockMarketMonitoring() {
@@ -359,7 +319,8 @@ public class Scheduler {
     }
 
     public boolean manualMonthlyApiUsageReport() {
-        boolean success = rootErrorHandler.runWithStatus(this::doMonthlyApiUsageReport);
+        boolean success =
+                rootErrorHandler.runWithStatus(apiRequestMeteringService::sendMonthlyUsageReport);
         log.info("Manual monthly API usage report completed.");
         return success;
     }
