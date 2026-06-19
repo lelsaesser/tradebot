@@ -169,7 +169,8 @@ class ApiRequestMeteringServiceTest {
                                 new ApiMeteringRecord("twelvedata", currentMonth, 99, now),
                                 new ApiMeteringRecord("yahoo", currentMonth, 5, now)));
 
-        ApiRequestMeteringService service = new ApiRequestMeteringService(repository, telegramClient);
+        ApiRequestMeteringService service =
+                new ApiRequestMeteringService(repository, telegramClient);
         service.startup();
 
         assertEquals(42, service.getFinnhubRequestCount());
@@ -188,7 +189,8 @@ class ApiRequestMeteringServiceTest {
                         List.of(new ApiMeteringRecord("unknown_provider", currentMonth, 100, now)));
 
         // Should not throw
-        ApiRequestMeteringService service = new ApiRequestMeteringService(repository, telegramClient);
+        ApiRequestMeteringService service =
+                new ApiRequestMeteringService(repository, telegramClient);
         service.startup();
 
         assertEquals(0, service.getFinnhubRequestCount());
@@ -272,8 +274,7 @@ class ApiRequestMeteringServiceTest {
         verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
 
         String sent = messageCaptor.getValue();
-        String expectedPreviousMonth =
-                LocalDateTime.now().minusMonths(1).format(MONTH_FORMATTER);
+        String expectedPreviousMonth = LocalDateTime.now().minusMonths(1).format(MONTH_FORMATTER);
         assertTrue(sent.contains("*Monthly API Usage Report - " + expectedPreviousMonth + "*"));
         assertTrue(sent.contains("🔹 *Finnhub API*: 1 requests"));
         assertTrue(sent.contains("🔹 *CoinGecko API*: 75 requests"));
