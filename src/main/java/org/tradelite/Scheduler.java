@@ -3,19 +3,14 @@ package org.tradelite;
 import static org.tradelite.common.TargetPriceProvider.IGNORE_DURATION_TTL_SECONDS;
 
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.tradelite.client.finnhub.dto.MarketHolidayResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
-import org.tradelite.common.Exchange;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.core.*;
 import org.tradelite.quant.BollingerBandTracker;
@@ -59,6 +54,7 @@ public class Scheduler {
     private final AccumulationDetectionTracker accumulationDetectionTracker;
     private final OhlcvBackfillService ohlcvBackfillService;
     private final LivePriceCache livePriceCache;
+    private final MarketHolidayNotifier marketHolidayNotifier;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -88,7 +84,8 @@ public class Scheduler {
             EarningsCalendarTracker earningsCalendarTracker,
             AccumulationDetectionTracker accumulationDetectionTracker,
             OhlcvBackfillService ohlcvBackfillService,
-            LivePriceCache livePriceCache) {
+            LivePriceCache livePriceCache,
+            MarketHolidayNotifier marketHolidayNotifier) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.yahooPriceEvaluator = yahooPriceEvaluator;
@@ -114,6 +111,7 @@ public class Scheduler {
         this.accumulationDetectionTracker = accumulationDetectionTracker;
         this.ohlcvBackfillService = ohlcvBackfillService;
         this.livePriceCache = livePriceCache;
+        this.marketHolidayNotifier = marketHolidayNotifier;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -191,7 +189,7 @@ public class Scheduler {
 
     @Scheduled(cron = "0 0 8 * * MON-FRI", zone = "CET")
     protected void dailyMarketHolidayNotification() {
-        rootErrorHandler.run(this::doMarketHolidayNotification);
+        rootErrorHandler.run(marketHolidayNotifier::sendDailyReport);
         log.info("Daily market holiday notification check completed.");
     }
 
@@ -287,49 +285,6 @@ public class Scheduler {
         }
 
         apiRequestMeteringService.resetCounters();
-    }
-
-    private void doMarketHolidayNotification() {
-        List<String> lines = new ArrayList<>();
-
-        Optional<MarketHolidayResponse.MarketHoliday> nyse = marketStatusService.getTodayHoliday();
-        if (nyse.isPresent()) {
-            MarketHolidayResponse.MarketHoliday h = nyse.get();
-            String tradingHour = h.getTradingHour();
-            if (tradingHour == null || tradingHour.isEmpty()) {
-                lines.add("🇺🇸 NYSE — " + h.getEventName());
-            } else {
-                String closeTime = tradingHour.split("-")[1];
-                lines.add(
-                        "🇺🇸 NYSE — " + h.getEventName() + " (early close " + closeTime + " ET)");
-            }
-        }
-
-        Map<Exchange, String> internationalHolidays =
-                marketStatusService.getTodayInternationalHolidays();
-        for (Map.Entry<Exchange, String> entry : internationalHolidays.entrySet()) {
-            lines.add(flagFor(entry.getKey()) + " " + entry.getKey() + " — " + entry.getValue());
-        }
-
-        if (lines.isEmpty()) {
-            return;
-        }
-
-        StringBuilder sb = new StringBuilder("*Markets closed today*");
-        for (String line : lines) {
-            sb.append("\n").append(line);
-        }
-        telegramClient.sendMessage(sb.toString());
-    }
-
-    private static String flagFor(Exchange exchange) {
-        return switch (exchange) {
-            case XETRA -> "🇩🇪";
-            case KRX -> "🇰🇷";
-            case JPX -> "🇯🇵";
-            case STO -> "🇸🇪";
-            case PAR -> "🇫🇷";
-        };
     }
 
     public boolean manualStockMarketMonitoring() {
@@ -451,7 +406,7 @@ public class Scheduler {
     }
 
     public boolean manualMarketHolidayNotification() {
-        boolean success = rootErrorHandler.runWithStatus(this::doMarketHolidayNotification);
+        boolean success = rootErrorHandler.runWithStatus(marketHolidayNotifier::sendDailyReport);
         log.info("Manual market holiday notification completed.");
         return success;
     }
