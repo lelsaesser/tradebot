@@ -13,8 +13,8 @@ import org.tradelite.common.Exchange;
 import org.tradelite.service.MarketStatusService;
 
 /**
- * Sends a consolidated Telegram message listing every supported exchange that is closed today
- * (NYSE via Finnhub, international exchanges via Enrico). Invoked by {@code
+ * Sends a consolidated Telegram message listing every supported exchange that is closed today (NYSE
+ * via Finnhub, international exchanges via Enrico). Invoked by {@code
  * Scheduler.dailyMarketHolidayNotification}; extracted from Scheduler so the scheduler stays a thin
  * cron-definition layer.
  */
