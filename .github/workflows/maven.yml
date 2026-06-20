@@ -11,6 +11,14 @@ name: Java CI with Maven
 on:
   push:
     branches: [ "main" ]
+    # The badge-commit step at the end of this workflow pushes back to main
+    # via PAT_GITHUB. PAT-driven pushes re-trigger workflows (only GITHUB_TOKEN
+    # pushes are exempt), so without this filter every badge push starts a
+    # fresh run of this workflow. Excluding the badges directory breaks the
+    # loop while still running on real source changes. See issue tracker for
+    # the underlying branch-count flap that makes the loop non-converging.
+    paths-ignore:
+      - '.github/badges/**'
   pull_request:
     branches: [ "main" ]
 
