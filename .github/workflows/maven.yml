@@ -14,6 +14,11 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# GITHUB_TOKEN only needs read access here. The badge-commit step pushes
+# to main via PAT_GITHUB, which carries its own credentials.
+permissions:
+  contents: read
+
 jobs:
   build:
 
