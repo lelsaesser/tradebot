@@ -262,6 +262,10 @@ public class TelegramMessageProcessor {
         if (parts.length == 1) {
             return Optional.of(new ToggleCommand(null, null));
         }
+        // `/toggle list` is a discoverability alias for the no-args show-all form (#461).
+        if (parts.length == 2 && "list".equalsIgnoreCase(parts[1])) {
+            return Optional.of(new ToggleCommand(null, null));
+        }
         if (parts.length == 3) {
             String featureName = parts[1];
             String onOff = parts[2].toLowerCase();

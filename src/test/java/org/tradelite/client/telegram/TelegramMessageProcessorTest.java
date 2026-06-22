@@ -496,6 +496,16 @@ class TelegramMessageProcessorTest {
         assertThat(command.get().getEnabled(), is((Boolean) null));
     }
 
+    @ParameterizedTest
+    @CsvSource({"/toggle list", "/toggle LIST", "/toggle List"})
+    void parseToggleCommand_listAlias_returnsShowAllCommand(String commandText) {
+        Optional<ToggleCommand> command = messageProcessor.parseToggleCommand(commandText);
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().getFeatureName(), is((String) null));
+        assertThat(command.get().getEnabled(), is((Boolean) null));
+    }
+
     @Test
     void parseToggleCommand_featureOn_returnsEnableCommand() {
         Optional<ToggleCommand> command =
@@ -538,7 +548,6 @@ class TelegramMessageProcessorTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "/toggle list",
                 "/toggle emaReport yes",
                 "/toggle emaReport on extra",
                 "/add foo",
