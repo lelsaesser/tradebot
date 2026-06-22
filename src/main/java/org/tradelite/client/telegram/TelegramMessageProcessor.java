@@ -5,10 +5,12 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.client.telegram.dto.TelegramMessage;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.config.TradebotTelegramProperties;
 
 @Slf4j
 @Component
@@ -22,16 +24,25 @@ public class TelegramMessageProcessor {
     private final TelegramMessageTracker telegramMessageTracker;
     private final SymbolRegistry symbolRegistry;
 
+    /**
+     * Chat ID authorized to issue commands. Parsed once at construction time from {@link
+     * TradebotTelegramProperties#getGroupChatId()} — a malformed value fails bean creation rather
+     * than silently disabling validation at runtime.
+     */
+    private final long allowedChatId;
+
     @Autowired
     public TelegramMessageProcessor(
             TelegramGateway telegramClient,
             TelegramCommandDispatcher telegramCommandDispatcher,
             TelegramMessageTracker telegramMessageTracker,
-            SymbolRegistry symbolRegistry) {
+            SymbolRegistry symbolRegistry,
+            TradebotTelegramProperties telegramProperties) {
         this.telegramClient = telegramClient;
         this.telegramCommandDispatcher = telegramCommandDispatcher;
         this.telegramMessageTracker = telegramMessageTracker;
         this.symbolRegistry = symbolRegistry;
+        this.allowedChatId = Long.parseLong(telegramProperties.getGroupChatId());
     }
 
     public void processUpdates(List<TelegramUpdateResponse> chatUpdates) {
@@ -39,13 +50,32 @@ public class TelegramMessageProcessor {
 
         for (TelegramUpdateResponse chatUpdate : chatUpdates) {
 
-            if (chatUpdate.getMessage() == null || chatUpdate.getMessage().getText() == null) {
+            TelegramMessage msg = chatUpdate.getMessage();
+            if (msg == null
+                    || msg.getText() == null
+                    || msg.getChat() == null
+                    || msg.getChat().getChatId() == null) {
                 continue;
             }
 
-            long messageId = chatUpdate.getMessage().getMessageId();
+            long messageId = msg.getMessageId();
             if (messageId <= lastProcessedMessageId) {
                 log.info("Skipping already processed message with ID: {}", messageId);
+                continue;
+            }
+
+            long incomingChatId = msg.getChat().getChatId();
+            if (incomingChatId != allowedChatId) {
+                // Closes the leaked-token attack vector: even with the bot token an attacker
+                // cannot drive commands unless their message arrives in the configured group.
+                // Log the command prefix only — full text is attacker-controlled and would
+                // expand the log-injection surface (#465).
+                String prefix = msg.getText().split("\\s+", 2)[0];
+                log.warn(
+                        "Rejected command from unexpected chat id={} prefix={}",
+                        incomingChatId,
+                        prefix);
+                telegramMessageTracker.setLastProcessedMessageId(messageId);
                 continue;
             }
 
