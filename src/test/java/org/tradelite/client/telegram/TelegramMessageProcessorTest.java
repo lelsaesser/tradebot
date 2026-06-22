@@ -473,6 +473,20 @@ class TelegramMessageProcessorTest {
         verify(telegramClient, times(1)).sendMessage(anyString());
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "/set",
+        "/set buy",
+        "/set buy AAPL",
+        "/set buy AAPL abc",
+    })
+    void parseSetCommand_malformedShape_sendsErrorAndReturnsEmpty(String commandText) {
+        var command = messageProcessor.parseMessage(buildUpdate(commandText));
+
+        assertThat(command.isPresent(), is(false));
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
     @Test
     void parseToggleCommand_noArgs_returnsShowAllCommand() {
         Optional<ToggleCommand> command = messageProcessor.parseToggleCommand("/toggle");
@@ -536,6 +550,10 @@ class TelegramMessageProcessorTest {
                 "/data reset",
                 "/data reset foo bar",
                 "/set foo bar 1.0",
+                "/set",
+                "/set buy",
+                "/set buy AAPL",
+                "/set buy AAPL abc",
             })
     void parseInvalidCommand_errorMessageHasNoUnescapedMarkdownSpecials(String commandText) {
         messageProcessor.parseMessage(buildUpdate(commandText));
