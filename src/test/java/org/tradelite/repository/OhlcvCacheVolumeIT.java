@@ -35,6 +35,7 @@ import org.tradelite.service.DailyPriceProvider;
             "tradebot.api.finnhub-key=test-key",
             "tradebot.api.coingecko-key=test-key",
             "tradebot.api.twelvedata-key=test-key",
+            "tradebot.telegram.group-chat-id=0",
             "tradebot.scheduling.enabled=false"
         })
 @ActiveProfiles("dev")
