@@ -43,6 +43,7 @@ class ApplicationIT {
                     + "?journal_mode=DELETE",
             "--tradebot.api.finnhub-key=test-finnhub-key",
             "--tradebot.api.coingecko-key=test-coingecko-key",
+            "--tradebot.telegram.group-chat-id=0",
             "--tradebot.telegram.local-sink-file=" + tempDir.resolve("telegram.log")
         };
 
