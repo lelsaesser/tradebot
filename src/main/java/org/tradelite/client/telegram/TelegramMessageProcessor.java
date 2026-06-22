@@ -18,6 +18,8 @@ public class TelegramMessageProcessor {
 
     private static final String ERROR_MSG_INVALID_SYMBOL =
             "Invalid symbol. Please provide a valid symbol.";
+    private static final String SET_ERROR_FORMAT =
+            "Invalid command format. Use /set `<buy|sell>` `<symbol>` `<target>`";
 
     private final TelegramGateway telegramClient;
     private final TelegramCommandDispatcher telegramCommandDispatcher;
@@ -91,21 +93,10 @@ public class TelegramMessageProcessor {
     protected Optional<TelegramCommand> parseMessage(TelegramUpdateResponse update) {
         String messageText = update.getMessage().getText();
         if (messageText != null && messageText.toLowerCase().startsWith("/set")) {
-            String[] parts = messageText.split("\\s+");
-            if (parts.length == 4) {
-                String subCommand = parts[1]; // buy or sell
-                String symbol = parts[2];
-                double target = Double.parseDouble(parts[3]);
-
-                Optional<SetCommand> cmd = buildSetCommand(subCommand, symbol, target);
-                if (cmd.isPresent()) {
-                    log.info(
-                            "Received set command: {}, symbol: {}, target: {}",
-                            subCommand,
-                            symbol,
-                            target);
-                    return Optional.of(cmd.get());
-                }
+            Optional<SetCommand> setCommand = parseSetCommand(messageText);
+            if (setCommand.isPresent()) {
+                log.info("Received set command: {}", setCommand.get());
+                return Optional.of(setCommand.get());
             }
         } else if (messageText != null && messageText.toLowerCase().startsWith("/show")) {
             String[] parts = messageText.split("\\s+");
@@ -151,16 +142,14 @@ public class TelegramMessageProcessor {
 
     protected Optional<SetCommand> buildSetCommand(
             String subCommand, String symbol, double target) {
-        String errorMessageCommandFormat =
-                "Invalid command format. Use /set `<buy|sell>` `<symbol>` `<target>`";
         String errorMessageInvalidTarget = "Invalid target. Please provide a valid target price.";
 
         if (subCommand == null) {
-            telegramClient.sendMessage(errorMessageCommandFormat);
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
             return Optional.empty();
         }
         if (!subCommand.equalsIgnoreCase("buy") && !subCommand.equalsIgnoreCase("sell")) {
-            telegramClient.sendMessage(errorMessageCommandFormat);
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
             return Optional.empty();
         }
         if (symbol == null || symbol.isEmpty()) {
@@ -177,6 +166,31 @@ public class TelegramMessageProcessor {
         }
 
         return Optional.of(new SetCommand(subCommand, symbol, target));
+    }
+
+    /**
+     * Shape check + target parsing for {@code /set}. Mirrors the pattern of every other parseXxx
+     * helper: malformed shape (or unparseable target) is reported back to the user via Telegram
+     * here, then delegated to {@link #buildSetCommand} for content validation. Extracted in #460 to
+     * close the silent-fallthrough gap where {@code /set}, {@code /set buy}, or {@code /set buy
+     * AAPL} were swallowed without an error message.
+     */
+    protected Optional<SetCommand> parseSetCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 4) {
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
+            return Optional.empty();
+        }
+        String subCommand = parts[1];
+        String symbol = parts[2];
+        double target;
+        try {
+            target = Double.parseDouble(parts[3]);
+        } catch (NumberFormatException e) {
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
+            return Optional.empty();
+        }
+        return buildSetCommand(subCommand, symbol, target);
     }
 
     protected Optional<AddCommand> parseAddCommand(String commandText) {
