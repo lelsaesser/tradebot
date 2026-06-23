@@ -112,6 +112,18 @@ public class TailRiskTracker {
         log.info("Daily tail risk report sent (dual-window)");
     }
 
+    /**
+     * Emits one {@code TAIL_RISK_COMPARE} INFO log line per symbol, side-by-side SHORT and LONG
+     * window values, for offline grep-based analysis (issue #336 comparison period).
+     *
+     * <p><b>Formula boundary (#433):</b> log lines emitted before the #433 merge used the biased
+     * method-of-moments formula ({@code m₄/m₂²}, {@code m₃/m₂^(3/2)}). Lines from #433 onward use
+     * Fisher-Pearson G2 (kurtosis) and G1 (skewness) via Apache Commons Statistics. <b>The two
+     * regimes are not directly comparable.</b> At the SHORT window (n=25), new kurtosis values are
+     * ~1.08× larger and new skewness magnitudes ~1.15× larger than equivalent historical values. At
+     * the LONG window (n=252), differences are &lt;1%. When grepping {@code TAIL_RISK_COMPARE}
+     * lines for the comparison-period analysis, filter by the #433 merge date.
+     */
     private void logComparison(
             List<TailRiskAnalysis> shortResults, List<TailRiskAnalysis> longResults) {
         Map<String, TailRiskAnalysis> shortBySymbol = indexBySymbol(shortResults);
