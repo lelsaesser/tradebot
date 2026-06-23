@@ -10,4 +10,10 @@ tradebot:
     coingecko-key: ${COINGECKO_DEV_API_KEY:}
     twelvedata-key: ${TWELVEDATA_DEV_API_KEY:}
   telegram:
+    # `0` is a non-existent Telegram chat ID — under dev profile the bot uses
+    # LocalTelegramGateway which never polls real Telegram (`getChatUpdates`
+    # returns an empty list), so this value is unused at runtime. It only
+    # exists to satisfy the fail-fast Long.parseLong in TelegramMessageProcessor
+    # so dev can boot without setting TELEGRAM_BOT_GROUP_CHAT_ID. (#465)
+    group-chat-id: 0
     local-sink-file: config/dev-telegram-messages.log
