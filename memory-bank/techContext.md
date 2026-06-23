@@ -28,6 +28,7 @@ This document covers the technologies used, development setup, technical constra
 - **Jackson:** JSON serialization/deserialization with JSR-310 (Java Time) datatype support
 - **JSoup 1.22.2:** HTML parsing library for web scraping (FinViz sector data)
 - **SQLite JDBC 3.53.1.0:** Embedded SQLite database driver for historical price storage
+- **Apache Commons Statistics Descriptive 1.3+:** Bias-corrected sample moment estimators (Fisher-Pearson G1 skewness, G2 kurtosis). Consumed by `TailRiskService` for fat-tail detection. Industry-standard formulas matching Pandas / NumPy `bias=False` / Excel `KURT`/`SKEW` / Basel-FRTB. Replaces the legacy `commons-math3` artifact (which Apache themselves marked as "not supported anymore" — see `apache/commons-math` README). Single direct dep with two tiny transitive ones (`commons-numbers-core`, `commons-numbers-arrays`).
 - **Testing:** 
   - JUnit Jupiter 6.1.0
   - Mockito 5.23.0 (core and junit-jupiter integration)
