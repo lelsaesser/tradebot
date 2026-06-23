@@ -6,6 +6,8 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.statistics.descriptive.Kurtosis;
+import org.apache.commons.statistics.descriptive.Skewness;
 import org.springframework.stereotype.Service;
 import org.tradelite.service.DailyPriceProvider;
 import org.tradelite.service.model.DailyPrice;
@@ -131,40 +133,42 @@ public class TailRiskService {
     }
 
     /**
-     * Calculates the kurtosis of a distribution.
+     * Calculates the kurtosis of a distribution using the bias-corrected G2 (Fisher-Pearson)
+     * estimator — the industry standard in quantitative finance, matching what Pandas, NumPy (with
+     * {@code bias=False}), Excel {@code KURT}, R {@code e1071::kurtosis(type=2)}, and the
+     * Basel-FRTB framework return.
      *
-     * <p>Kurtosis formula: E[(X - μ)^4] / σ^4
+     * <p>Returns the raw kurtosis (normal distribution = 3.0). The G2 estimator unbiased-ly
+     * estimates the population kurtosis from a sample; this is materially different from the biased
+     * method-of-moments formula at small sample sizes (~8% upward shift at n=25). The biased
+     * formula was used prior to #433 and systematically under-read tail risk.
      *
-     * <p>For sample kurtosis, we use the formula: n * Σ((xi - x̄)^4) / (Σ((xi - x̄)^2))^2
+     * <p>Implementation delegates to Apache Commons Statistics' {@link Kurtosis}, which returns
+     * <em>excess</em> kurtosis (normal = 0); we add 3.0 to preserve the raw-kurtosis contract used
+     * at call sites in {@link #analyzeTailRisk}.
+     *
+     * <p>Size and zero-variance guards are kept as safety nets: Commons Statistics returns {@code
+     * NaN} for n &lt; 4 or zero variance, and downstream {@link TailRiskLevel#fromExcessKurtosis}
+     * misclassifies {@code NaN} as {@code EXTREME} (because {@code NaN < 1.0} is false → falls
+     * through every comparison branch). The guards short-circuit before Commons Statistics is
+     * called and return the normal-distribution sentinel (3.0) — the right semantic for
+     * "insufficient data" or "perfectly flat series."
      *
      * @param values List of values (e.g., daily returns)
-     * @return The calculated kurtosis (normal distribution = 3.0)
+     * @return Raw kurtosis (normal distribution = 3.0); returns 3.0 as sentinel for {@code n < 4}
+     *     or zero-variance input
+     * @see <a href="https://github.com/lelsaesser/tradebot/issues/433">#433</a>
      */
     protected double calculateKurtosis(List<Double> values) {
         if (values.size() < 4) {
-            return 3.0; // Return normal kurtosis if insufficient data
+            return 3.0; // Defensive guard for direct test calls; never fires in production.
         }
-
-        int n = values.size();
-        double mean = StatisticsUtil.mean(values);
-
-        // Calculate second and fourth central moments
-        double sumSquaredDiff = 0;
-        double sumFourthPower = 0;
-
-        for (Double value : values) {
-            double diff = value - mean;
-            double squaredDiff = diff * diff;
-            sumSquaredDiff += squaredDiff;
-            sumFourthPower += squaredDiff * squaredDiff;
+        if (hasZeroVariance(values)) {
+            return 3.0; // Flat series has no kurtosis — return normal-distribution sentinel.
         }
-
-        if (sumSquaredDiff == 0) {
-            return 3.0; // No variance, return normal kurtosis
-        }
-
-        // Sample kurtosis using the formula: n * Σ(xi - x̄)^4 / (Σ(xi - x̄)^2)^2
-        return (n * sumFourthPower) / (sumSquaredDiff * sumSquaredDiff);
+        // Commons Statistics' Kurtosis is G2 (Fisher-Pearson, bias-corrected) and returns excess
+        // kurtosis. Add 3.0 to preserve the raw-kurtosis (normal=3) contract used at call sites.
+        return Kurtosis.of(toArray(values)).getAsDouble() + 3.0;
     }
 
     /**
@@ -186,56 +190,56 @@ public class TailRiskService {
     }
 
     /**
-     * Calculates the skewness of a distribution.
+     * Calculates the skewness of a distribution using the bias-corrected G1 (Fisher-Pearson)
+     * estimator — the industry standard in quantitative finance, matching what Pandas, NumPy (with
+     * {@code bias=False}), Excel {@code SKEW}, and R {@code e1071::skewness(type=2)} return.
      *
-     * <p>Skewness formula: E[(X - μ)^3] / σ^3
+     * <p>Returns skewness with the textbook convention (normal distribution = 0; negative = left
+     * tail / crash bias; positive = right tail / rally bias). At small sample sizes the G1
+     * estimator yields larger magnitudes than the biased method-of-moments formula (~15% larger at
+     * n=25). The biased formula was used prior to #433 and systematically under-read directional
+     * skew.
      *
-     * <p>For sample skewness, we use: Σ((xi - x̄)^3) / (n * σ^3)
+     * <p>Implementation delegates to Apache Commons Statistics' {@link Skewness}.
      *
-     * <p>Interpretation:
-     *
-     * <ul>
-     *   <li>Negative skew (< 0): Left tail is longer/fatter → more crash risk
-     *   <li>Zero skew (= 0): Symmetric distribution
-     *   <li>Positive skew (> 0): Right tail is longer/fatter → more rally potential
-     * </ul>
+     * <p>Size and zero-variance guards are kept as safety nets: Commons Statistics returns {@code
+     * NaN} for n &lt; 3 or zero variance, and downstream {@link SkewnessLevel#fromSkewness} would
+     * misclassify NaN. The guards short-circuit before Commons Statistics is called and return 0.0
+     * — the right semantic for "insufficient data" or "perfectly flat series."
      *
      * @param values List of values (e.g., daily returns)
-     * @return The calculated skewness (normal distribution = 0.0)
+     * @return Skewness (normal distribution = 0.0); returns 0.0 as sentinel for {@code n < 3} or
+     *     zero-variance input
+     * @see <a href="https://github.com/lelsaesser/tradebot/issues/433">#433</a>
      */
     protected double calculateSkewness(List<Double> values) {
         if (values.size() < 3) {
-            return 0.0; // Return zero skewness if insufficient data
-        }
-
-        int n = values.size();
-        double mean = StatisticsUtil.mean(values);
-
-        // Calculate sum of squared differences and cubed differences
-        double sumSquaredDiff = 0;
-        double sumCubedDiff = 0;
-
-        for (Double value : values) {
-            double diff = value - mean;
-            double squaredDiff = diff * diff;
-            sumSquaredDiff += squaredDiff;
-            sumCubedDiff += squaredDiff * diff; // diff^3
-        }
-
-        if (sumSquaredDiff == 0) {
-            return 0.0; // No variance, return zero skewness
-        }
-
-        // Calculate standard deviation
-        double variance = sumSquaredDiff / n;
-        double stdDev = Math.sqrt(variance);
-
-        if (stdDev == 0) {
             return 0.0;
         }
+        if (hasZeroVariance(values)) {
+            return 0.0;
+        }
+        // Commons Statistics' Skewness is G1 (Fisher-Pearson, bias-corrected).
+        return Skewness.of(toArray(values)).getAsDouble();
+    }
 
-        // Sample skewness: (1/n) * Σ((xi - x̄)^3) / σ^3
-        double stdDevCubed = stdDev * stdDev * stdDev;
-        return (sumCubedDiff / n) / stdDevCubed;
+    /**
+     * Returns {@code true} if every value is identical (within exact double equality of the mean).
+     * Used to short-circuit Commons Statistics, which returns {@code NaN} for zero-variance input.
+     * Equivalent to checking {@code Σ(xᵢ − x̄)² == 0}.
+     */
+    private static boolean hasZeroVariance(List<Double> values) {
+        double mean = StatisticsUtil.mean(values);
+        for (Double v : values) {
+            if (v != mean) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Stream-based conversion used at the {@code List<Double>} → Commons Statistics boundary. */
+    private static double[] toArray(List<Double> values) {
+        return values.stream().mapToDouble(Double::doubleValue).toArray();
     }
 }

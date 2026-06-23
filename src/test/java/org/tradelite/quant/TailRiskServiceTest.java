@@ -10,9 +10,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
+import org.apache.commons.statistics.descriptive.Kurtosis;
+import org.apache.commons.statistics.descriptive.Skewness;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.service.DailyPriceProvider;
@@ -438,5 +444,99 @@ class TailRiskServiceTest {
             prices.add(new DailyPrice(date, price));
         }
         return prices;
+    }
+
+    // ========== Cross-check tests against Apache Commons Statistics (#433) ==========
+    //
+    // After #433, calculateKurtosis / calculateSkewness delegate to Commons Statistics' G2/G1
+    // estimators. These tests pin agreement to a tight tolerance (1e-12) as regression coverage
+    // against any future drift in the wrapping arithmetic (e.g. the "+3.0" raw-kurtosis
+    // adjustment, the List<Double>→double[] conversion).
+    //
+    // Covers 3 distribution shapes × 4 sample sizes for each of kurtosis and skewness = 24 tests.
+
+    @ParameterizedTest
+    @MethodSource("crossCheckFixtures")
+    void calculateKurtosis_matchesCommonsStatisticsG2WithinTolerance(
+            String name, List<Double> series, int n) {
+        List<Double> sample = series.subList(0, n);
+        double[] arr = sample.stream().mapToDouble(Double::doubleValue).toArray();
+        double expected = Kurtosis.of(arr).getAsDouble() + 3.0;
+
+        double actual = tailRiskService.calculateKurtosis(sample);
+
+        assertThat(actual).as(name + " n=" + n).isCloseTo(expected, within(1e-12));
+    }
+
+    @ParameterizedTest
+    @MethodSource("crossCheckFixtures")
+    void calculateSkewness_matchesCommonsStatisticsG1WithinTolerance(
+            String name, List<Double> series, int n) {
+        List<Double> sample = series.subList(0, n);
+        double[] arr = sample.stream().mapToDouble(Double::doubleValue).toArray();
+        double expected = Skewness.of(arr).getAsDouble();
+
+        double actual = tailRiskService.calculateSkewness(sample);
+
+        assertThat(actual).as(name + " n=" + n).isCloseTo(expected, within(1e-12));
+    }
+
+    /**
+     * Yields (name, series, n) tuples for the cross-check tests. Three 100-element deterministic
+     * fixtures × four sample sizes (n=20, 30, 50, 100) via {@code subList}.
+     */
+    private static Stream<Arguments> crossCheckFixtures() {
+        List<Double> nearNormal = buildNearNormalSeries(100);
+        List<Double> fatTailed = buildFatTailedSeries(100);
+        List<Double> skewed = buildSkewedSeries(100);
+        List<Arguments> args = new ArrayList<>();
+        for (int n : new int[] {20, 30, 50, 100}) {
+            args.add(Arguments.of("nearNormal", nearNormal, n));
+            args.add(Arguments.of("fatTailed", fatTailed, n));
+            args.add(Arguments.of("skewed", skewed, n));
+        }
+        return args.stream();
+    }
+
+    /** Deterministic near-normal series (sawtooth around 0 with bounded magnitude). */
+    private static List<Double> buildNearNormalSeries(int count) {
+        List<Double> series = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            // Alternating sign with slowly varying magnitude — produces low kurtosis and ~0 skew.
+            double mag = 0.5 + (i % 7) * 0.1;
+            series.add((i % 2 == 0 ? 1 : -1) * mag);
+        }
+        return series;
+    }
+
+    /** Mostly small returns with a few extreme outliers — produces high kurtosis, low |skew|. */
+    private static List<Double> buildFatTailedSeries(int count) {
+        List<Double> series = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            // Insert symmetric extreme values at fixed positions to keep skew low and bump
+            // kurtosis. The rest is small-magnitude noise.
+            if (i % 25 == 0) {
+                series.add(8.0);
+            } else if (i % 25 == 1) {
+                series.add(-8.0);
+            } else {
+                series.add((i % 2 == 0 ? 1 : -1) * 0.1);
+            }
+        }
+        return series;
+    }
+
+    /** Many small positive returns + a few large negative outliers — produces negative skew. */
+    private static List<Double> buildSkewedSeries(int count) {
+        List<Double> series = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            // Negative tail every 17th element keeps skew clearly < 0 across all sample sizes.
+            if (i % 17 == 0) {
+                series.add(-6.0);
+            } else {
+                series.add(0.3);
+            }
+        }
+        return series;
     }
 }
