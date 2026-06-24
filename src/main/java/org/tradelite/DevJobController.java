@@ -103,6 +103,11 @@ public class DevJobController {
         return runJob("earnings-calendar", scheduler::manualEarningsCalendarCheck);
     }
 
+    @PostMapping("/treasury")
+    public ResponseEntity<Map<String, String>> treasury() {
+        return runJob("treasury", scheduler::manualTreasuryReport);
+    }
+
     @PostMapping("/accumulation-detection")
     public ResponseEntity<Map<String, String>> accumulationDetection() {
         return runJob("accumulation-detection", scheduler::manualAccumulationDetection);

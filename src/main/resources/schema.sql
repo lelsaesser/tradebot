@@ -49,6 +49,20 @@ CREATE TABLE IF NOT EXISTS momentum_roc_state (
     updated_at INTEGER NOT NULL
 );
 
+-- treasury_indicator_state: Per-series state for US Treasury macro indicators (#516).
+-- One row per FRED series (T10Y3M / T10Y2Y / DFII10 / THREEFYTP10). last_band is the
+-- enum name from YieldCurveSpreadLevel / RealYieldLevel / TermPremiumLevel; TreasuryTracker
+-- compares against today's classification to detect transitions. initialized=0 on first
+-- write suppresses ghost alerts.
+CREATE TABLE IF NOT EXISTS treasury_indicator_state (
+    series_id TEXT PRIMARY KEY,
+    last_band TEXT NOT NULL,
+    last_value REAL NOT NULL,
+    last_observation_date TEXT NOT NULL,
+    initialized INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+);
+
 -- rs_crossover_state: Relative strength crossover detection state
 CREATE TABLE IF NOT EXISTS rs_crossover_state (
     symbol TEXT PRIMARY KEY,

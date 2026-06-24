@@ -12,4 +12,5 @@ public class TradebotApiProperties {
     private String finnhubKey;
     private String coingeckoKey;
     private String twelvedataKey;
+    private String fredKey;
 }

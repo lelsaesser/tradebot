@@ -51,6 +51,8 @@ This document covers the technologies used, development setup, technical constra
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
 | Twelve Data | `TwelveDataClient` | Daily OHLCV data (400 data points) | API Key |
 | Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (`java.net.http.HttpClient`) |
+| Enrico (Kayaposoft) | `EnricoClient` | Public-holiday calendars per country | No auth |
+| FRED | `FredClient` | US Treasury macro time series (yield-curve spreads, real yield, term premium). Free API key (email signup); single 32-char key as `api_key` query param. Not metered — ~4 requests/day total. ToS requires attribution in consumer-facing renderings. Added in #516. | API Key |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |
@@ -91,7 +93,7 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 ## Runtime Profiles
 
 ### Default Runtime (Production)
-- Uses `FINNHUB_API_KEY`, `COINGECKO_API_KEY`, `TWELVEDATA_API_KEY`
+- Uses `FINNHUB_API_KEY`, `COINGECKO_API_KEY`, `TWELVEDATA_API_KEY`, `FRED_API_KEY`
 - Uses `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_GROUP_CHAT_ID`
 - All schedulers active
 

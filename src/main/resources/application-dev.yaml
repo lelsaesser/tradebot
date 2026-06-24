@@ -9,6 +9,7 @@ tradebot:
     finnhub-key: ${FINNHUB_DEV_API_KEY:}
     coingecko-key: ${COINGECKO_DEV_API_KEY:}
     twelvedata-key: ${TWELVEDATA_DEV_API_KEY:}
+    fred-key: ${FRED_DEV_API_KEY:}
   telegram:
     # `0` is a non-existent Telegram chat ID — under dev profile the bot uses
     # LocalTelegramGateway which never polls real Telegram (`getChatUpdates`

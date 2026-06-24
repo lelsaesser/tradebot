@@ -55,6 +55,7 @@ public class Scheduler {
     private final OhlcvBackfillService ohlcvBackfillService;
     private final LivePriceCache livePriceCache;
     private final MarketHolidayNotifier marketHolidayNotifier;
+    private final TreasuryTracker treasuryTracker;
 
     protected ZonedDateTime marketDateTime = null;
 
@@ -85,7 +86,8 @@ public class Scheduler {
             AccumulationDetectionTracker accumulationDetectionTracker,
             OhlcvBackfillService ohlcvBackfillService,
             LivePriceCache livePriceCache,
-            MarketHolidayNotifier marketHolidayNotifier) {
+            MarketHolidayNotifier marketHolidayNotifier,
+            TreasuryTracker treasuryTracker) {
         this.finnhubPriceEvaluator = finnhubPriceEvaluator;
         this.coinGeckoPriceEvaluator = coinGeckoPriceEvaluator;
         this.yahooPriceEvaluator = yahooPriceEvaluator;
@@ -112,6 +114,7 @@ public class Scheduler {
         this.ohlcvBackfillService = ohlcvBackfillService;
         this.livePriceCache = livePriceCache;
         this.marketHolidayNotifier = marketHolidayNotifier;
+        this.treasuryTracker = treasuryTracker;
     }
 
     @Scheduled(initialDelay = 0, fixedRate = 300000)
@@ -197,6 +200,12 @@ public class Scheduler {
     protected void dailyEarningsCalendarCheck() {
         rootErrorHandler.run(earningsCalendarTracker::checkAndAlert);
         log.info("Daily earnings calendar check completed.");
+    }
+
+    @Scheduled(cron = "0 30 8 * * MON-FRI", zone = "CET")
+    protected void dailyTreasuryReport() {
+        rootErrorHandler.run(treasuryTracker::checkAndAlert);
+        log.info("Daily Treasury macro report completed.");
     }
 
     @Scheduled(fixedRate = 600000)
@@ -356,6 +365,12 @@ public class Scheduler {
     public boolean manualEarningsCalendarCheck() {
         boolean success = rootErrorHandler.runWithStatus(earningsCalendarTracker::checkAndAlert);
         log.info("Manual earnings calendar check completed.");
+        return success;
+    }
+
+    public boolean manualTreasuryReport() {
+        boolean success = rootErrorHandler.runWithStatus(treasuryTracker::checkAndAlert);
+        log.info("Manual Treasury macro report completed.");
         return success;
     }
 

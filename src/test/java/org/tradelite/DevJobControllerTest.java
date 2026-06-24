@@ -254,6 +254,29 @@ class DevJobControllerTest {
     }
 
     @Test
+    void treasury_callsManualJob() {
+        when(scheduler.manualTreasuryReport()).thenReturn(true);
+
+        ResponseEntity<Map<String, String>> response = controller.treasury();
+
+        verify(scheduler, times(1)).manualTreasuryReport();
+        assertThat(response.getStatusCode(), is(HttpStatus.OK));
+        assertThat(response.getBody().get("status"), is("ok"));
+        assertThat(response.getBody().get("job"), is("treasury"));
+    }
+
+    @Test
+    void treasury_returnsServerErrorWhenJobFails() {
+        when(scheduler.manualTreasuryReport()).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = controller.treasury();
+
+        assertThat(response.getStatusCode(), is(HttpStatus.INTERNAL_SERVER_ERROR));
+        assertThat(response.getBody().get("status"), is("error"));
+        assertThat(response.getBody().get("job"), is("treasury"));
+    }
+
+    @Test
     void emaReport_callsJob() {
         when(scheduler.manualEmaReport()).thenReturn(true);
 
