@@ -129,6 +129,7 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/yahoo-price-evaluation` | Yahoo intraday price evaluation (international) |
 | `/dev/jobs/earnings-calendar` | Earnings calendar 7-day look-ahead |
 | `/dev/jobs/accumulation-detection` | Institutional accumulation detection |
+| `/dev/jobs/market-holiday-notification` | Consolidated "Markets closed today" alert across NYSE + international exchanges |
 | `/dev/jobs/treasury` | US Treasury macro report (yield curve + real yield + term premium via FRED) |
 | `/dev/jobs/run-all` | Phased smoke test (runs all 19 jobs) |
 
