@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tradelite.client.fred.FredClient;
 import org.tradelite.client.fred.FredObservation;
@@ -75,7 +76,7 @@ public class TreasuryTracker {
     private final TreasuryIndicatorStateRepository stateRepository;
     private final Clock clock;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public TreasuryTracker(
             FredClient fredClient,
             TelegramGateway telegramClient,
