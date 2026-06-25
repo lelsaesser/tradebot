@@ -173,7 +173,7 @@ public class TreasuryTracker {
         YieldCurveSpreadLevel previousBand;
         try {
             previousBand = YieldCurveSpreadLevel.valueOf(prior.get().lastBand());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             // Stale state from an older code path with different enum constants — re-baseline.
             log.warn(
                     "Unrecognized stored band {} for {} — re-baselining",
@@ -306,18 +306,5 @@ public class TreasuryTracker {
         // other indicators. Caller never inspects exact representation, only readability.
         TermPremiumLevel band = TermPremiumLevel.fromPremium(value);
         return String.format("%s %s: %.2f%% (%s)", band.getEmoji(), label, value, band);
-    }
-
-    /**
-     * Returns a map of the four series IDs to their human-readable display names. Exposed for
-     * potential future use by {@code /show treasury} or similar UX surfaces; not used internally.
-     */
-    static Map<String, String> seriesDisplayNames() {
-        Map<String, String> names = new LinkedHashMap<>();
-        names.put(SERIES_T10Y3M, "10Y−3M spread");
-        names.put(SERIES_T10Y2Y, "10Y−2Y spread");
-        names.put(SERIES_DFII10, "10Y real yield (DFII10)");
-        names.put(SERIES_THREEFYTP10, "10Y term premium");
-        return names;
     }
 }
