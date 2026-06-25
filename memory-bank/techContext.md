@@ -51,6 +51,8 @@ This document covers the technologies used, development setup, technical constra
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
 | Twelve Data | `TwelveDataClient` | Daily OHLCV data (400 data points) | API Key |
 | Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (`java.net.http.HttpClient`) |
+| Enrico (Kayaposoft) | `EnricoClient` | Public-holiday calendars per country | No auth |
+| FRED | `FredClient` | US Treasury macro time series (yield-curve spreads, real yield, term premium). Free API key (email signup); single 32-char key as `api_key` query param. Not metered — ~4 requests/day total. ToS requires attribution in consumer-facing renderings. Added in #516. | API Key |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |
@@ -91,7 +93,7 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 ## Runtime Profiles
 
 ### Default Runtime (Production)
-- Uses `FINNHUB_API_KEY`, `COINGECKO_API_KEY`, `TWELVEDATA_API_KEY`
+- Uses `FINNHUB_API_KEY`, `COINGECKO_API_KEY`, `TWELVEDATA_API_KEY`, `FRED_API_KEY`
 - Uses `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_GROUP_CHAT_ID`
 - All schedulers active
 
@@ -127,13 +129,15 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/yahoo-price-evaluation` | Yahoo intraday price evaluation (international) |
 | `/dev/jobs/earnings-calendar` | Earnings calendar 7-day look-ahead |
 | `/dev/jobs/accumulation-detection` | Institutional accumulation detection |
-| `/dev/jobs/run-all` | Phased smoke test (runs all 18 jobs) |
+| `/dev/jobs/market-holiday-notification` | Consolidated "Markets closed today" alert across NYSE + international exchanges |
+| `/dev/jobs/treasury` | US Treasury macro report (yield curve + real yield + term premium via FRED) |
+| `/dev/jobs/run-all` | Phased smoke test (runs all 19 jobs) |
 
 ### Bruno API Collection
 
 Location: `TradeliteBrunoCollection/DevController/`
 
-Bruno (open-source API client) collection for manually triggering dev endpoints. All requests target `http://localhost:9090`. The collection contains 14 individual request files (one per endpoint above) plus `runAll.yml` for the phased smoke test. The collection can be opened in Bruno by pointing it at the `TradeliteBrunoCollection/` directory.
+Bruno (open-source API client) collection for manually triggering dev endpoints. All requests target `http://localhost:9090`. The collection contains one request file per endpoint above plus `runAll.yml` for the phased smoke test. The collection can be opened in Bruno by pointing it at the `TradeliteBrunoCollection/` directory.
 
 ### Pre-Deployment Smoke Test
 

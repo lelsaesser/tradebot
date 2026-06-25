@@ -71,6 +71,7 @@ class SchedulerTest {
     @Mock private OhlcvBackfillService ohlcvBackfillService;
     @Mock private LivePriceCache livePriceCache;
     @Mock private MarketHolidayNotifier marketHolidayNotifier;
+    @Mock private org.tradelite.core.TreasuryTracker treasuryTracker;
 
     private Scheduler scheduler;
 
@@ -103,7 +104,8 @@ class SchedulerTest {
                         accumulationDetectionTracker,
                         ohlcvBackfillService,
                         livePriceCache,
-                        marketHolidayNotifier);
+                        marketHolidayNotifier,
+                        treasuryTracker);
     }
 
     @Test
@@ -560,5 +562,26 @@ class SchedulerTest {
 
         assertTrue(success);
         verify(marketHolidayNotifier, times(1)).sendDailyReport();
+    }
+
+    @Test
+    void dailyTreasuryReport_delegatesToTracker() throws Exception {
+        scheduler.dailyTreasuryReport();
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(treasuryTracker, times(1)).checkAndAlert();
+    }
+
+    @Test
+    void manualTreasuryReport_delegatesToTracker() {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualTreasuryReport();
+
+        assertTrue(success);
+        verify(treasuryTracker, times(1)).checkAndAlert();
     }
 }
