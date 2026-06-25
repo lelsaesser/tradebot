@@ -18,13 +18,13 @@ import lombok.Getter;
 @Getter
 public enum RealYieldLevel {
     /** Yield &lt; 0. Cheap-money / QE-era regime; risk-asset tailwind. */
-    DEEPLY_NEGATIVE("🔴"),
+    DEEPLY_NEGATIVE("🟢"),
 
     /** 0 ≤ y &lt; 1%. Below current r* estimates; accommodative policy. */
-    LOW("🟡"),
+    LOW("🟢"),
 
     /** 1% ≤ y &lt; 1.5%. Around r*; policy roughly neutral. */
-    NEUTRAL("🟢"),
+    NEUTRAL("🟡"),
 
     /** 1.5% ≤ y &lt; 2.5%. Materially above r*; equity-multiple headwind. */
     RESTRICTIVE("🟠"),

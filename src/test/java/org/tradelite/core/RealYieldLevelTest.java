@@ -35,9 +35,9 @@ class RealYieldLevelTest {
 
     @ParameterizedTest
     @CsvSource({
-        "DEEPLY_NEGATIVE, 🔴",
-        "LOW, 🟡",
-        "NEUTRAL, 🟢",
+        "DEEPLY_NEGATIVE, 🟢",
+        "LOW, 🟢",
+        "NEUTRAL, 🟡",
         "RESTRICTIVE, 🟠",
         "DEEPLY_RESTRICTIVE, 🔴",
     })
