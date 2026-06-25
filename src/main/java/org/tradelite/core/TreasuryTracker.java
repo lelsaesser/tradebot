@@ -40,9 +40,11 @@ import org.tradelite.repository.TreasuryIndicatorStateRepository;
  * logged at WARN; the other series still alert and report independently.
  *
  * <p>Per-series state is persisted via {@link TreasuryIndicatorStateRepository}. The first time we
- * observe a series (no row exists), we write {@code initialized=false} and suppress the transition
- * alert — matching the same "no ghost alerts on first deploy" pattern as {@code MomentumRocState}.
- * Subsequent runs see {@code initialized=true} and alert on real transitions.
+ * observe a series the row doesn't exist yet — we write it and suppress that run's alert (so a
+ * fresh deploy never produces a ghost transition against nothing). Subsequent runs find the row and
+ * compare bands. The {@code initialized} column matches the {@code momentum_roc_state} convention
+ * and exists as a hatch for manually-seeded rows (production code always writes {@code true});
+ * first-run suppression in practice fires off the "row absent" branch, not the flag.
  *
  * <p>FRED ToS requires attribution. The daily report footer includes:
  *

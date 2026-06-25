@@ -52,8 +52,10 @@ CREATE TABLE IF NOT EXISTS momentum_roc_state (
 -- treasury_indicator_state: Per-series state for US Treasury macro indicators (#516).
 -- One row per FRED series (T10Y3M / T10Y2Y / DFII10 / THREEFYTP10). last_band is the
 -- enum name from YieldCurveSpreadLevel / RealYieldLevel / TermPremiumLevel; TreasuryTracker
--- compares against today's classification to detect transitions. initialized=0 on first
--- write suppresses ghost alerts.
+-- compares against today's classification to detect transitions. First-run alert suppression
+-- comes from row-absence (no prior row → skip alert, then INSERT), not the initialized flag.
+-- The flag matches the momentum_roc_state convention as a hatch for manually-seeded rows;
+-- production code always writes initialized=1.
 CREATE TABLE IF NOT EXISTS treasury_indicator_state (
     series_id TEXT PRIMARY KEY,
     last_band TEXT NOT NULL,
