@@ -306,6 +306,7 @@ class DevJobControllerTest {
         when(scheduler.manualEarningsCalendarCheck()).thenReturn(true);
         when(scheduler.manualAccumulationDetection()).thenReturn(true);
         when(scheduler.manualMarketHolidayNotification()).thenReturn(true);
+        when(scheduler.manualTreasuryReport()).thenReturn(true);
         when(scheduler.manualYahooPriceEvaluation()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
@@ -314,13 +315,14 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatus.OK));
         assertThat(response.getBody().get("status"), is("ok"));
         assertThat(response.getBody().get("failed"), is(0));
-        assertThat(response.getBody().get("total"), is(18));
+        assertThat(response.getBody().get("total"), is(19));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("vfi-report"), is("ok"));
         assertThat(results.get("seed-analytics"), is("ok"));
         assertThat(results.get("pullback-buy-alert"), is("ok"));
         assertThat(results.get("earnings-calendar"), is("ok"));
+        assertThat(results.get("treasury"), is("ok"));
     }
 
     @Test
@@ -342,6 +344,7 @@ class DevJobControllerTest {
         when(scheduler.manualEarningsCalendarCheck()).thenReturn(true);
         when(scheduler.manualAccumulationDetection()).thenReturn(true);
         when(scheduler.manualMarketHolidayNotification()).thenReturn(true);
+        when(scheduler.manualTreasuryReport()).thenReturn(true);
         when(scheduler.manualYahooPriceEvaluation()).thenReturn(true);
         when(scheduler.manualVfiReport()).thenReturn(true);
 
@@ -350,7 +353,7 @@ class DevJobControllerTest {
         assertThat(response.getStatusCode(), is(HttpStatusCode.valueOf(207)));
         assertThat(response.getBody().get("status"), is("partial"));
         assertThat(response.getBody().get("failed"), is(1));
-        assertThat(response.getBody().get("passed"), is(17));
+        assertThat(response.getBody().get("passed"), is(18));
 
         Map<String, String> results = (Map<String, String>) response.getBody().get("results");
         assertThat(results.get("crypto-monitoring"), is("error"));

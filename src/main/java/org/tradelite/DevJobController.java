@@ -177,6 +177,7 @@ public class DevJobController {
                         results,
                         "market-holiday-notification",
                         scheduler::manualMarketHolidayNotification);
+        failures += runAndRecord(results, "treasury", scheduler::manualTreasuryReport);
         failures +=
                 runAndRecord(
                         results, "yahoo-price-evaluation", scheduler::manualYahooPriceEvaluation);

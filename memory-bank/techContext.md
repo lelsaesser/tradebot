@@ -129,13 +129,14 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/yahoo-price-evaluation` | Yahoo intraday price evaluation (international) |
 | `/dev/jobs/earnings-calendar` | Earnings calendar 7-day look-ahead |
 | `/dev/jobs/accumulation-detection` | Institutional accumulation detection |
-| `/dev/jobs/run-all` | Phased smoke test (runs all 18 jobs) |
+| `/dev/jobs/treasury` | US Treasury macro report (yield curve + real yield + term premium via FRED) |
+| `/dev/jobs/run-all` | Phased smoke test (runs all 19 jobs) |
 
 ### Bruno API Collection
 
 Location: `TradeliteBrunoCollection/DevController/`
 
-Bruno (open-source API client) collection for manually triggering dev endpoints. All requests target `http://localhost:9090`. The collection contains 14 individual request files (one per endpoint above) plus `runAll.yml` for the phased smoke test. The collection can be opened in Bruno by pointing it at the `TradeliteBrunoCollection/` directory.
+Bruno (open-source API client) collection for manually triggering dev endpoints. All requests target `http://localhost:9090`. The collection contains one request file per endpoint above plus `runAll.yml` for the phased smoke test. The collection can be opened in Bruno by pointing it at the `TradeliteBrunoCollection/` directory.
 
 ### Pre-Deployment Smoke Test
 
