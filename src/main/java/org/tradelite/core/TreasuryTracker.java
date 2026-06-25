@@ -302,9 +302,9 @@ public class TreasuryTracker {
                         .orElse(TermPremiumLevel.NORMAL);
 
         StringBuilder sb = new StringBuilder();
-        sb.append("*Reading*").append('\n');
-        sb.append(TreasuryReportNarrative.compositeRegime(curveBand, realYieldBand)).append('\n');
-        sb.append(TreasuryReportNarrative.curveReading(curveBand)).append('\n');
+        sb.append("*Reading*").append("\n\n");
+        sb.append(TreasuryReportNarrative.compositeRegime(curveBand, realYieldBand)).append("\n\n");
+        sb.append(TreasuryReportNarrative.curveReading(curveBand)).append("\n\n");
         sb.append(TreasuryReportNarrative.macroContextReading(realYieldBand, termPremiumBand))
                 .append('\n');
         return sb.toString();
