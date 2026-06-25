@@ -360,10 +360,23 @@ class TreasuryTrackerTest {
         assertThat(report).contains("_2026-06-23_");
         assertThat(report).contains("*Yield curve*");
         assertThat(report).contains("*Macro context*");
+        assertThat(report).contains("*Reading*");
         assertThat(report).contains("10Y−3M spread: +0.65%");
         assertThat(report).contains("10Y−2Y spread: +0.34%");
         assertThat(report).contains("10Y real yield (DFII10): 2.28%");
         assertThat(report).contains("10Y term premium: 0.75%");
+        // Layer 3 (composite regime) — TL;DR; today's bands map to "Mid-to-late cycle".
+        assertThat(report).contains("Mid-to-late cycle expansion under tight monetary policy.");
+        // Layer 1 (curve reading).
+        assertThat(report)
+                .contains(
+                        "The yield curve is normal and the bond market sees no near-term"
+                                + " recession risk.");
+        // Layer 2 (macro context reading).
+        assertThat(report)
+                .contains(
+                        "Real yields are restrictive — a multi-quarter headwind on equity"
+                                + " multiples");
         assertThat(report).contains("FRED®");
         assertThat(report).contains("not endorsed by FRBSL");
         // No flag emoji.
@@ -400,8 +413,79 @@ class TreasuryTrackerTest {
         assertThat(report).contains("10Y−2Y spread: —");
         assertThat(report).contains("10Y real yield (DFII10): —");
         assertThat(report).contains("10Y term premium: —");
+        // Reading section skipped — generating narrative from missing inputs would be
+        // confusing without adding information.
+        assertThat(report).doesNotContain("*Reading*");
         // Attribution footer still present even with all-missing data.
         assertThat(report).contains("FRED®");
+    }
+
+    @Test
+    void buildDailyReport_missingT10Y3M_skipsReadingSection() {
+        // T10Y3M drives Layers 1+3; without it the narrative can't be built. Other signals
+        // are still rendered as data lines.
+        String report =
+                tracker.buildDailyReport(
+                        TODAY,
+                        Optional.empty(),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 23), 0.34)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 22), 2.28)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 18), 0.75)));
+
+        assertThat(report).doesNotContain("*Reading*");
+        assertThat(report).contains("10Y−2Y spread: +0.34%");
+        assertThat(report).contains("10Y real yield");
+    }
+
+    @Test
+    void buildDailyReport_missingDFII10_skipsReadingSection() {
+        // DFII10 drives Layer 2 and Layer 3's healthy-curve branch. Without it the narrative
+        // can't be built deterministically.
+        String report =
+                tracker.buildDailyReport(
+                        TODAY,
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 23), 0.65)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 23), 0.34)),
+                        Optional.empty(),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 18), 0.75)));
+
+        assertThat(report).doesNotContain("*Reading*");
+    }
+
+    @Test
+    void buildDailyReport_missingOnlyTermPremium_stillRendersReadingSection() {
+        // TP10 is weekly-published and can be missing mid-week. Layer 2 falls back to a NORMAL
+        // TP10 default (avoiding the ELEVATED-specific phrasing) so the narrative still renders.
+        String report =
+                tracker.buildDailyReport(
+                        TODAY,
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 23), 0.65)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 23), 0.34)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 22), 2.28)),
+                        Optional.empty());
+
+        assertThat(report).contains("*Reading*");
+        assertThat(report).contains("Mid-to-late cycle expansion under tight monetary policy.");
+    }
+
+    @Test
+    void buildDailyReport_invertedCurve_narrativeShowsRecessionWarning() {
+        // Inverted T10Y3M; the composite-regime sentence should NOT mention "expansion" or
+        // "cycle stage" — instead the recession-warning regime takes priority.
+        String report =
+                tracker.buildDailyReport(
+                        TODAY,
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 23), -0.20)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 23), -0.30)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 22), 2.28)),
+                        Optional.of(new FredObservation(LocalDate.of(2026, 6, 18), 0.75)));
+
+        assertThat(report).contains("*Reading*");
+        assertThat(report).contains("Recession warning regime");
+        assertThat(report)
+                .contains(
+                        "The yield curve is inverted — the bond market is pricing future Fed"
+                                + " rate cuts");
     }
 
     // ---------- Helpers ----------

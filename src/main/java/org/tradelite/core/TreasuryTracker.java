@@ -275,7 +275,38 @@ public class TreasuryTracker {
         sb.append(formatRealYieldLine("10Y real yield (DFII10)", dfii10)).append('\n');
         sb.append(formatTermPremiumLine("10Y term premium", tp10)).append('\n');
 
+        // Reading section: deterministic narrative from the same band classifications driving
+        // the emojis above. Skipped if either of the two narrative-driving series (T10Y3M for
+        // the curve / Layers 1+3, DFII10 for Layer 2) is missing — generating a partial
+        // narrative from partial data would be confusing without adding information.
+        if (t10y3m.isPresent() && dfii10.isPresent()) {
+            sb.append('\n').append(buildReadingSection(t10y3m.get(), dfii10.get(), tp10));
+        }
+
         sb.append('\n').append(FRED_ATTRIBUTION);
+        return sb.toString();
+    }
+
+    /**
+     * Build the *Reading* section. Layer 3 (composite regime / TL;DR) first, then Layers 1+2 as
+     * elaboration. Each sentence is generated deterministically from the band classifications.
+     */
+    private String buildReadingSection(
+            FredObservation t10y3m, FredObservation dfii10, Optional<FredObservation> tp10) {
+        YieldCurveSpreadLevel curveBand = YieldCurveSpreadLevel.fromSpread(t10y3m.value());
+        RealYieldLevel realYieldBand = RealYieldLevel.fromYield(dfii10.value());
+        // TP10 may be missing on weekly-publication weeks; default to NORMAL for the narrative
+        // (it's a fallback that doesn't trigger any of the ELEVATED-specific phrasing).
+        TermPremiumLevel termPremiumBand =
+                tp10.map(obs -> TermPremiumLevel.fromPremium(obs.value()))
+                        .orElse(TermPremiumLevel.NORMAL);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("*Reading*").append('\n');
+        sb.append(TreasuryReportNarrative.compositeRegime(curveBand, realYieldBand)).append('\n');
+        sb.append(TreasuryReportNarrative.curveReading(curveBand)).append('\n');
+        sb.append(TreasuryReportNarrative.macroContextReading(realYieldBand, termPremiumBand))
+                .append('\n');
         return sb.toString();
     }
 
