@@ -16,6 +16,7 @@ import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.common.TargetSide;
 
 @SuppressWarnings("OptionalGetWithoutIsPresent")
 @ExtendWith(MockitoExtension.class)
@@ -57,10 +58,16 @@ class SetCommandProcessorTest {
 
         verify(targetPriceProvider, times(1))
                 .updateTargetPrice(
-                        CoinId.fromString("BITCOIN").get(), 50000.0, null, AssetType.COIN);
+                        CoinId.fromString("BITCOIN").get(),
+                        TargetSide.BUY,
+                        50000.0,
+                        AssetType.COIN);
         verify(targetPriceProvider, never())
                 .updateTargetPrice(
-                        any(StockSymbol.class), anyDouble(), anyDouble(), any(AssetType.class));
+                        any(StockSymbol.class),
+                        any(TargetSide.class),
+                        anyDouble(),
+                        any(AssetType.class));
     }
 
     @Test
@@ -72,10 +79,13 @@ class SetCommandProcessorTest {
         setCommandProcessor.processCommand(command);
 
         verify(targetPriceProvider, times(1))
-                .updateTargetPrice(aaplSymbol, null, 150.0, AssetType.STOCK);
+                .updateTargetPrice(aaplSymbol, TargetSide.SELL, 150.0, AssetType.STOCK);
         verify(targetPriceProvider, never())
                 .updateTargetPrice(
-                        any(CoinId.class), anyDouble(), anyDouble(), any(AssetType.class));
+                        any(CoinId.class),
+                        any(TargetSide.class),
+                        anyDouble(),
+                        any(AssetType.class));
     }
 
     @Test
@@ -87,7 +97,7 @@ class SetCommandProcessorTest {
                 IllegalArgumentException.class, () -> setCommandProcessor.processCommand(command));
 
         verify(targetPriceProvider, never())
-                .updateTargetPrice(any(), anyDouble(), anyDouble(), any(AssetType.class));
+                .updateTargetPrice(any(), any(TargetSide.class), anyDouble(), any(AssetType.class));
     }
 
     @Test
@@ -98,6 +108,6 @@ class SetCommandProcessorTest {
                 IllegalArgumentException.class, () -> setCommandProcessor.processCommand(command));
 
         verify(targetPriceProvider, never())
-                .updateTargetPrice(any(), anyDouble(), anyDouble(), any(AssetType.class));
+                .updateTargetPrice(any(), any(TargetSide.class), anyDouble(), any(AssetType.class));
     }
 }

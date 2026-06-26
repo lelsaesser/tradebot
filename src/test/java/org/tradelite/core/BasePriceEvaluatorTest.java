@@ -12,6 +12,7 @@ import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class BasePriceEvaluatorTest {
@@ -19,6 +20,8 @@ class BasePriceEvaluatorTest {
     @Mock private TelegramGateway telegramClient;
 
     @Mock private TargetPriceProvider targetPriceProvider;
+
+    @Mock private DashboardEventPublisher dashboardEventPublisher;
 
     @InjectMocks private TestPriceEvaluator priceEvaluator;
 
@@ -31,8 +34,10 @@ class BasePriceEvaluatorTest {
 
     static class TestPriceEvaluator extends BasePriceEvaluator {
         public TestPriceEvaluator(
-                TelegramGateway telegramClient, TargetPriceProvider targetPriceProvider) {
-            super(telegramClient, targetPriceProvider);
+                TelegramGateway telegramClient,
+                TargetPriceProvider targetPriceProvider,
+                DashboardEventPublisher dashboardEventPublisher) {
+            super(telegramClient, targetPriceProvider, dashboardEventPublisher);
         }
 
         @Override

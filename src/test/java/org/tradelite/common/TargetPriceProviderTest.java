@@ -212,12 +212,12 @@ class TargetPriceProviderTest {
     }
 
     @Test
-    void updateTargetPrice_ok() {
+    void updateTargetPrice_setBuyTarget() {
         List<TargetPrice> prices = new ArrayList<>();
         prices.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
         when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(prices);
 
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 160.0, 200.0, AssetType.COIN);
+        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, TargetSide.BUY, 160.0, AssetType.COIN);
 
         verify(targetPriceRepository)
                 .save(
@@ -225,17 +225,18 @@ class TargetPriceProviderTest {
                                 tp ->
                                         tp.getSymbol().equals(CoinId.SOLANA.getName())
                                                 && tp.getBuyTarget() == 160.0
-                                                && tp.getSellTarget() == 200.0),
+                                                && tp.getSellTarget() == 150.0),
                         eq(AssetType.COIN));
     }
 
     @Test
-    void updateTargetPrice_withNullBuyTarget() {
+    void updateTargetPrice_setSellTarget() {
         List<TargetPrice> prices = new ArrayList<>();
         prices.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
         when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(prices);
 
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, null, 1105.0, AssetType.COIN);
+        targetPriceProvider.updateTargetPrice(
+                CoinId.SOLANA, TargetSide.SELL, 1105.0, AssetType.COIN);
 
         verify(targetPriceRepository)
                 .save(
@@ -248,29 +249,11 @@ class TargetPriceProviderTest {
     }
 
     @Test
-    void updateTargetPrice_withNullSellTarget() {
-        List<TargetPrice> prices = new ArrayList<>();
-        prices.add(new TargetPrice(CoinId.SOLANA.getName(), 100.0, 150.0));
-        when(targetPriceRepository.findByAssetType(AssetType.COIN)).thenReturn(prices);
-
-        targetPriceProvider.updateTargetPrice(CoinId.SOLANA, 165.0, null, AssetType.COIN);
-
-        verify(targetPriceRepository)
-                .save(
-                        argThat(
-                                tp ->
-                                        tp.getSymbol().equals(CoinId.SOLANA.getName())
-                                                && tp.getBuyTarget() == 165.0
-                                                && tp.getSellTarget() == 150.0),
-                        eq(AssetType.COIN));
-    }
-
-    @Test
     void updateTargetPrice_symbolNotFound_nothingSaved() {
         when(targetPriceRepository.findByAssetType(AssetType.STOCK)).thenReturn(new ArrayList<>());
 
         targetPriceProvider.updateTargetPrice(
-                new StockSymbol("GOOG", "Google"), 160.0, 200.0, AssetType.STOCK);
+                new StockSymbol("GOOG", "Google"), TargetSide.BUY, 160.0, AssetType.STOCK);
 
         verify(targetPriceRepository, never()).save(any(), any());
     }

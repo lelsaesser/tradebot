@@ -18,6 +18,7 @@ import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.MarketStatusService;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @Slf4j
 @Component
@@ -42,8 +43,9 @@ public class YahooPriceEvaluator extends BasePriceEvaluator {
             PriceQuoteRepository priceQuoteRepository,
             FeatureToggleService featureToggleService,
             MarketStatusService marketStatusService,
-            LivePriceCache livePriceCache) {
-        super(telegramClient, targetPriceProvider);
+            LivePriceCache livePriceCache,
+            DashboardEventPublisher dashboardEventPublisher) {
+        super(telegramClient, targetPriceProvider, dashboardEventPublisher);
         this.yahooFinanceClient = yahooFinanceClient;
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;

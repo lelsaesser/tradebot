@@ -1,19 +1,29 @@
 package org.tradelite.core;
 
-import lombok.RequiredArgsConstructor;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolType;
 import org.tradelite.common.TargetPriceProvider;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @Slf4j
-@RequiredArgsConstructor
 public abstract class BasePriceEvaluator {
 
     private final TelegramGateway telegramClient;
     private final TargetPriceProvider targetPriceProvider;
+    private final DashboardEventPublisher dashboardEventPublisher;
+
+    protected BasePriceEvaluator(
+            TelegramGateway telegramClient,
+            TargetPriceProvider targetPriceProvider,
+            DashboardEventPublisher dashboardEventPublisher) {
+        this.telegramClient = telegramClient;
+        this.targetPriceProvider = targetPriceProvider;
+        this.dashboardEventPublisher = dashboardEventPublisher;
+    }
 
     public abstract int evaluatePrice() throws InterruptedException;
 
@@ -29,11 +39,14 @@ public abstract class BasePriceEvaluator {
                         symbol, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold)) {
             String displayName = symbol.getDisplayName();
             log.info("High price change detected for {}: {}%", displayName, changePercent);
-            String emoji = changePercent > 0 ? "\uD83D\uDCC8" : "\uD83D\uDCC9";
+            String emoji = changePercent > 0 ? "📈" : "📉";
             telegramClient.sendMessage(
                     emoji + " " + displayName + ": " + String.format("%.2f", changePercent) + "%");
             targetPriceProvider.addIgnoredSymbol(
                     symbol, IgnoreReason.CHANGE_PERCENT_ALERT, alertThreshold);
+            dashboardEventPublisher.publish(
+                    "price-swing",
+                    Map.of("ticker", symbol.getName(), "changePercent", changePercent));
         }
     }
 
@@ -60,6 +73,17 @@ public abstract class BasePriceEvaluator {
                             + ", Target Price: "
                             + targetPriceSell);
             targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.SELL_ALERT);
+            dashboardEventPublisher.publish(
+                    "price-alert",
+                    Map.of(
+                            "ticker",
+                            ticker.getName().toUpperCase(),
+                            "side",
+                            "SELL",
+                            "currentPrice",
+                            currentPrice,
+                            "target",
+                            targetPriceSell));
         }
 
         if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
@@ -75,6 +99,17 @@ public abstract class BasePriceEvaluator {
                             + ", Target Price: "
                             + targetPriceBuy);
             targetPriceProvider.addIgnoredSymbol(ticker, IgnoreReason.BUY_ALERT);
+            dashboardEventPublisher.publish(
+                    "price-alert",
+                    Map.of(
+                            "ticker",
+                            ticker.getName().toUpperCase(),
+                            "side",
+                            "BUY",
+                            "currentPrice",
+                            currentPrice,
+                            "target",
+                            targetPriceBuy));
         }
     }
 }

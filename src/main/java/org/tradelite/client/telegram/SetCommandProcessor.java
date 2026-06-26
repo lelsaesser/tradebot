@@ -8,6 +8,7 @@ import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPriceProvider;
+import org.tradelite.common.TargetSide;
 
 @Component
 public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand> {
@@ -33,13 +34,11 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
 
     @Override
     public void processCommand(SetCommand command) {
-        Double sellTarget = null;
-        Double buyTarget = null;
-
+        TargetSide side;
         if ("buy".equalsIgnoreCase(command.getSubCommand())) {
-            buyTarget = command.getTarget();
+            side = TargetSide.BUY;
         } else if ("sell".equalsIgnoreCase(command.getSubCommand())) {
-            sellTarget = command.getTarget();
+            side = TargetSide.SELL;
         } else {
             throw new IllegalArgumentException("Invalid sub-command: " + command.getSubCommand());
         }
@@ -52,11 +51,11 @@ public class SetCommandProcessor implements TelegramCommandProcessor<SetCommand>
         if (coinId.isPresent()) {
             displayName = coinId.get().getName();
             targetPriceProvider.updateTargetPrice(
-                    coinId.get(), buyTarget, sellTarget, AssetType.COIN);
+                    coinId.get(), side, command.getTarget(), AssetType.COIN);
         } else if (stockSymbol.isPresent()) {
             displayName = stockSymbol.get().getDisplayName();
             targetPriceProvider.updateTargetPrice(
-                    stockSymbol.get(), buyTarget, sellTarget, AssetType.STOCK);
+                    stockSymbol.get(), side, command.getTarget(), AssetType.STOCK);
         } else {
             throw new IllegalArgumentException("Invalid symbol: " + symbol);
         }

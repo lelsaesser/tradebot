@@ -16,6 +16,7 @@ import org.tradelite.repository.PriceQuoteRepository;
 import org.tradelite.service.FeatureToggleService;
 import org.tradelite.service.LivePriceCache;
 import org.tradelite.service.MarketStatusService;
+import org.tradelite.web.dashboard.DashboardEventPublisher;
 
 @Slf4j
 @Component
@@ -38,8 +39,9 @@ public class FinnhubPriceEvaluator extends BasePriceEvaluator {
             PriceQuoteRepository priceQuoteRepository,
             FeatureToggleService featureToggleService,
             MarketStatusService marketStatusService,
-            LivePriceCache livePriceCache) {
-        super(telegramClient, targetPriceProvider);
+            LivePriceCache livePriceCache,
+            DashboardEventPublisher dashboardEventPublisher) {
+        super(telegramClient, targetPriceProvider, dashboardEventPublisher);
         this.finnhubClient = finnhubClient;
         this.targetPriceProvider = targetPriceProvider;
         this.symbolRegistry = symbolRegistry;

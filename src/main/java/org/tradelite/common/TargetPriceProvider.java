@@ -90,16 +90,15 @@ public class TargetPriceProvider {
     }
 
     public void updateTargetPrice(
-            TickerSymbol symbol, Double newBuyTarget, Double newSellTarget, AssetType type) {
+            TickerSymbol symbol, TargetSide side, double price, AssetType type) {
         List<TargetPrice> prices = targetPriceRepository.findByAssetType(type);
 
         for (TargetPrice tp : prices) {
             if (tp.getSymbol().equalsIgnoreCase(symbol.getName())) {
-                if (newBuyTarget != null) {
-                    tp.setBuyTarget(newBuyTarget);
-                }
-                if (newSellTarget != null) {
-                    tp.setSellTarget(newSellTarget);
+                if (side == TargetSide.BUY) {
+                    tp.setBuyTarget(price);
+                } else {
+                    tp.setSellTarget(price);
                 }
                 targetPriceRepository.save(tp, type);
                 return;
