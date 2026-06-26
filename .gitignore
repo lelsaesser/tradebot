@@ -46,6 +46,3 @@ log-reports/
 # Dashboard frontend
 dashboard/node_modules/
 dashboard/dist/
-
-# Local Maven settings (per-developer override of global ~/.m2/settings.xml)
-.mvn/
