@@ -1,58 +1,88 @@
 package org.tradelite.client.telegram;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+import org.tradelite.client.telegram.dto.TelegramChat;
 import org.tradelite.client.telegram.dto.TelegramMessage;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.CoinId;
+import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.config.TradebotTelegramProperties;
 
 @ExtendWith(MockitoExtension.class)
+// Sender-validation tests share the TelegramMessageProcessor logger via ListAppender; serialize
+// within this class so concurrent tests don't leak log events into each other's appenders.
+@Execution(ExecutionMode.SAME_THREAD)
 class TelegramMessageProcessorTest {
+
+    private static final long ALLOWED_CHAT_ID = -1001234567890L;
 
     @Mock private TelegramGateway telegramClient;
     @Mock private TelegramCommandDispatcher commandDispatcher;
     @Mock private TelegramMessageTracker messageTracker;
-    @Mock private org.tradelite.common.SymbolRegistry symbolRegistry;
+    @Mock private SymbolRegistry symbolRegistry;
 
     private TelegramMessageProcessor messageProcessor;
+    private Logger logger;
+    private ListAppender<ILoggingEvent> logAppender;
 
     @BeforeEach
     void setUp() {
+        TradebotTelegramProperties properties = new TradebotTelegramProperties();
+        properties.setGroupChatId(String.valueOf(ALLOWED_CHAT_ID));
+
         messageProcessor =
                 new TelegramMessageProcessor(
-                        telegramClient, commandDispatcher, messageTracker, symbolRegistry);
+                        telegramClient,
+                        commandDispatcher,
+                        messageTracker,
+                        symbolRegistry,
+                        properties);
+
+        logger = (Logger) LoggerFactory.getLogger(TelegramMessageProcessor.class);
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
 
         // Setup lenient mock responses for common stock symbols
         lenient()
                 .when(symbolRegistry.fromString("pltr"))
-                .thenReturn(
-                        java.util.Optional.of(
-                                new org.tradelite.common.StockSymbol("PLTR", "Palantir")));
+                .thenReturn(Optional.of(new StockSymbol("PLTR", "Palantir")));
         lenient()
                 .when(symbolRegistry.fromString("aapl"))
-                .thenReturn(
-                        java.util.Optional.of(
-                                new org.tradelite.common.StockSymbol("AAPL", "Apple")));
-        lenient()
-                .when(symbolRegistry.fromString("invalid_symbol"))
-                .thenReturn(java.util.Optional.empty());
+                .thenReturn(Optional.of(new StockSymbol("AAPL", "Apple")));
+        lenient().when(symbolRegistry.fromString("invalid_symbol")).thenReturn(Optional.empty());
         lenient()
                 .when(
                         symbolRegistry.fromString(
@@ -62,7 +92,14 @@ class TelegramMessageProcessorTest {
                                                         && !s.equals("pltr")
                                                         && !s.equals("aapl")
                                                         && !s.equals("invalid_symbol"))))
-                .thenReturn(java.util.Optional.empty());
+                .thenReturn(Optional.empty());
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (logger != null && logAppender != null) {
+            logger.detachAppender(logAppender);
+        }
     }
 
     @ParameterizedTest
@@ -222,14 +259,8 @@ class TelegramMessageProcessorTest {
 
     @Test
     void processUpdates_validUpdate_processesCommand() {
-        TelegramMessage message = new TelegramMessage();
-        message.setText("/set buy bitcoin 50000.0");
-        message.setMessageId(1L);
-
-        TelegramUpdateResponse update = new TelegramUpdateResponse();
-        update.setMessage(message);
-
-        messageProcessor.processUpdates(List.of(update));
+        messageProcessor.processUpdates(
+                List.of(buildUpdateForProcess("/set buy bitcoin 50000.0", 1L, ALLOWED_CHAT_ID)));
 
         verify(commandDispatcher, times(1)).dispatch(any(SetCommand.class));
         verify(messageTracker, times(1)).setLastProcessedMessageId(1L);
@@ -239,14 +270,8 @@ class TelegramMessageProcessorTest {
     void processUpdates_alreadyProcessedMessage_skipsProcessing() {
         when(messageTracker.getLastProcessedMessageId()).thenReturn(1L);
 
-        TelegramMessage message = new TelegramMessage();
-        message.setText("/set buy bitcoin 50000.0");
-        message.setMessageId(1L);
-
-        TelegramUpdateResponse update = new TelegramUpdateResponse();
-        update.setMessage(message);
-
-        messageProcessor.processUpdates(List.of(update));
+        messageProcessor.processUpdates(
+                List.of(buildUpdateForProcess("/set buy bitcoin 50000.0", 1L, ALLOWED_CHAT_ID)));
 
         verify(messageTracker, times(1)).getLastProcessedMessageId();
         verify(commandDispatcher, never()).dispatch(any(SetCommand.class));
@@ -448,9 +473,33 @@ class TelegramMessageProcessorTest {
         verify(telegramClient, times(1)).sendMessage(anyString());
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "/set",
+        "/set buy",
+        "/set buy AAPL",
+        "/set buy AAPL abc",
+    })
+    void parseSetCommand_malformedShape_sendsErrorAndReturnsEmpty(String commandText) {
+        var command = messageProcessor.parseMessage(buildUpdate(commandText));
+
+        assertThat(command.isPresent(), is(false));
+        verify(telegramClient, times(1)).sendMessage(anyString());
+    }
+
     @Test
     void parseToggleCommand_noArgs_returnsShowAllCommand() {
         Optional<ToggleCommand> command = messageProcessor.parseToggleCommand("/toggle");
+
+        assertThat(command.isPresent(), is(true));
+        assertThat(command.get().getFeatureName(), is((String) null));
+        assertThat(command.get().getEnabled(), is((Boolean) null));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"/toggle list", "/toggle LIST", "/toggle List"})
+    void parseToggleCommand_listAlias_returnsShowAllCommand(String commandText) {
+        Optional<ToggleCommand> command = messageProcessor.parseToggleCommand(commandText);
 
         assertThat(command.isPresent(), is(true));
         assertThat(command.get().getFeatureName(), is((String) null));
@@ -490,6 +539,74 @@ class TelegramMessageProcessorTest {
         verify(telegramClient, times(1)).sendMessage(anyString());
     }
 
+    /**
+     * Regression for #456: the invalid-format error message contained {@code <feature_name>} and
+     * {@code <on|off>}, whose underscore made Telegram's Markdown parser fail with "Can't find end
+     * of the entity starting at byte offset 44". Underscore-bearing placeholders must be wrapped in
+     * backticks so {@code parse_mode=Markdown} treats them as inline code.
+     */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "/toggle emaReport yes",
+                "/toggle emaReport on extra",
+                "/add foo",
+                "/add foo bar baz",
+                "/remove",
+                "/remove foo bar",
+                "/rsi",
+                "/rsi foo bar",
+                "/data reset",
+                "/data reset foo bar",
+                "/set foo bar 1.0",
+                "/set",
+                "/set buy",
+                "/set buy AAPL",
+                "/set buy AAPL abc",
+            })
+    void parseInvalidCommand_errorMessageHasNoUnescapedMarkdownSpecials(String commandText) {
+        messageProcessor.parseMessage(buildUpdate(commandText));
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient, atLeastOnce()).sendMessage(captor.capture());
+
+        for (String msg : captor.getAllValues()) {
+            // Strip backtick-delimited spans (inline code is escaped by Telegram's Markdown
+            // parser),
+            // then assert the remaining text contains no Markdown specials that would break
+            // parsing.
+            String outsideCode = msg.replaceAll("`[^`]*`", "");
+            assertThat(
+                    "Markdown specials outside backtick spans in: " + msg,
+                    outsideCode,
+                    not(anyOf(containsString("_"), containsString("*"), containsString("["))));
+        }
+    }
+
+    private TelegramUpdateResponse buildUpdate(String text) {
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+        return update;
+    }
+
+    /**
+     * Build an update suitable for {@link TelegramMessageProcessor#processUpdates} — sets text,
+     * messageId, and chat ID so the new auth gate ({@code #465}) is reachable.
+     */
+    private TelegramUpdateResponse buildUpdateForProcess(String text, long messageId, long chatId) {
+        TelegramChat chat = new TelegramChat();
+        chat.setChatId(chatId);
+        TelegramMessage message = new TelegramMessage();
+        message.setText(text);
+        message.setMessageId(messageId);
+        message.setChat(chat);
+        TelegramUpdateResponse update = new TelegramUpdateResponse();
+        update.setMessage(message);
+        return update;
+    }
+
     @Test
     void parseMessage_validToggleCommand_returnsToggleCommand() {
         TelegramMessage message = new TelegramMessage();
@@ -514,5 +631,91 @@ class TelegramMessageProcessorTest {
 
         assertThat(command.isPresent(), is(true));
         assertThat(command.get(), is(instanceOf(ToggleCommand.class)));
+    }
+
+    // --- Sender validation tests (#465) ---
+
+    @Test
+    void processUpdates_unauthorizedChat_rejectsAndAdvancesWatermark() {
+        long unauthorizedChatId = 99999L;
+        TelegramUpdateResponse update =
+                buildUpdateForProcess("/data reset AAPL", 7L, unauthorizedChatId);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        verify(commandDispatcher, never()).dispatch(any());
+        verify(telegramClient, never()).sendMessage(anyString());
+        verify(messageTracker, times(1)).setLastProcessedMessageId(7L);
+    }
+
+    @Test
+    void processUpdates_authorizedChat_dispatchesNormally() {
+        TelegramUpdateResponse update = buildUpdateForProcess("/show all", 2L, ALLOWED_CHAT_ID);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        verify(commandDispatcher, times(1)).dispatch(any(ShowCommand.class));
+        verify(messageTracker, times(1)).setLastProcessedMessageId(2L);
+    }
+
+    @Test
+    void processUpdates_unauthorizedChat_logsCommandPrefixOnly() {
+        long unauthorizedChatId = 99999L;
+        TelegramUpdateResponse update =
+                buildUpdateForProcess("/set buy bitcoin 50000.0", 3L, unauthorizedChatId);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        Optional<ILoggingEvent> warn =
+                logAppender.list.stream()
+                        .filter(e -> e.getLevel() == Level.WARN)
+                        .filter(e -> e.getFormattedMessage().contains("Rejected command"))
+                        .findFirst();
+        assertThat(warn.isPresent(), is(true));
+        String msg = warn.get().getFormattedMessage();
+        assertThat(msg, containsString("prefix=/set"));
+        // The full payload must not leak into the log line — it's attacker-controlled.
+        assertThat(msg, not(containsString("buy")));
+        assertThat(msg, not(containsString("bitcoin")));
+        assertThat(msg, not(containsString("50000")));
+    }
+
+    @Test
+    void processUpdates_oldUnauthorizedMessageId_skippedAsAlreadyProcessed() {
+        when(messageTracker.getLastProcessedMessageId()).thenReturn(10L);
+
+        long unauthorizedChatId = 99999L;
+        // messageId == 10 → not greater than watermark → dedup gate trips first.
+        TelegramUpdateResponse update =
+                buildUpdateForProcess("/data reset AAPL", 10L, unauthorizedChatId);
+
+        messageProcessor.processUpdates(List.of(update));
+
+        boolean anyRejection =
+                logAppender.list.stream()
+                        .filter(e -> e.getLevel() == Level.WARN)
+                        .anyMatch(e -> e.getFormattedMessage().contains("Rejected command"));
+        assertThat(
+                "Rejection WARN must not fire for already-processed messages",
+                anyRejection,
+                is(false));
+        verify(commandDispatcher, never()).dispatch(any());
+        verify(messageTracker, never()).setLastProcessedMessageId(anyLong());
+    }
+
+    @Test
+    void constructor_malformedGroupChatId_throwsNumberFormatException() {
+        TradebotTelegramProperties badProps = new TradebotTelegramProperties();
+        badProps.setGroupChatId("not-a-number");
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                NumberFormatException.class,
+                () ->
+                        new TelegramMessageProcessor(
+                                telegramClient,
+                                commandDispatcher,
+                                messageTracker,
+                                symbolRegistry,
+                                badProps));
     }
 }

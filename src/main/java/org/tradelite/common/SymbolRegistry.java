@@ -66,7 +66,8 @@ public class SymbolRegistry {
                     Map.entry("FINX", "FinTech"),
                     Map.entry("LIT", "Batteries"),
                     Map.entry("BOTZ", "Robotics"),
-                    Map.entry("STCE", "Crypto"));
+                    Map.entry("STCE", "Crypto"),
+                    Map.entry("DRAM", "Memory Chips"));
 
     private static final Set<String> SECTOR_ETF_SYMBOLS;
     private static final Set<String> ETF_SYMBOLS;

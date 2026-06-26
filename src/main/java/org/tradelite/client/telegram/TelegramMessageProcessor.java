@@ -5,10 +5,12 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.tradelite.client.telegram.dto.TelegramMessage;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TickerSymbol;
+import org.tradelite.config.TradebotTelegramProperties;
 
 @Slf4j
 @Component
@@ -16,22 +18,33 @@ public class TelegramMessageProcessor {
 
     private static final String ERROR_MSG_INVALID_SYMBOL =
             "Invalid symbol. Please provide a valid symbol.";
+    private static final String SET_ERROR_FORMAT =
+            "Invalid command format. Use /set `<buy|sell>` `<symbol>` `<target>`";
 
     private final TelegramGateway telegramClient;
     private final TelegramCommandDispatcher telegramCommandDispatcher;
     private final TelegramMessageTracker telegramMessageTracker;
     private final SymbolRegistry symbolRegistry;
 
+    /**
+     * Chat ID authorized to issue commands. Parsed once at construction time from {@link
+     * TradebotTelegramProperties#getGroupChatId()} — a malformed value fails bean creation rather
+     * than silently disabling validation at runtime.
+     */
+    private final long allowedChatId;
+
     @Autowired
     public TelegramMessageProcessor(
             TelegramGateway telegramClient,
             TelegramCommandDispatcher telegramCommandDispatcher,
             TelegramMessageTracker telegramMessageTracker,
-            SymbolRegistry symbolRegistry) {
+            SymbolRegistry symbolRegistry,
+            TradebotTelegramProperties telegramProperties) {
         this.telegramClient = telegramClient;
         this.telegramCommandDispatcher = telegramCommandDispatcher;
         this.telegramMessageTracker = telegramMessageTracker;
         this.symbolRegistry = symbolRegistry;
+        this.allowedChatId = Long.parseLong(telegramProperties.getGroupChatId());
     }
 
     public void processUpdates(List<TelegramUpdateResponse> chatUpdates) {
@@ -39,13 +52,32 @@ public class TelegramMessageProcessor {
 
         for (TelegramUpdateResponse chatUpdate : chatUpdates) {
 
-            if (chatUpdate.getMessage() == null || chatUpdate.getMessage().getText() == null) {
+            TelegramMessage msg = chatUpdate.getMessage();
+            if (msg == null
+                    || msg.getText() == null
+                    || msg.getChat() == null
+                    || msg.getChat().getChatId() == null) {
                 continue;
             }
 
-            long messageId = chatUpdate.getMessage().getMessageId();
+            long messageId = msg.getMessageId();
             if (messageId <= lastProcessedMessageId) {
                 log.info("Skipping already processed message with ID: {}", messageId);
+                continue;
+            }
+
+            long incomingChatId = msg.getChat().getChatId();
+            if (incomingChatId != allowedChatId) {
+                // Closes the leaked-token attack vector: even with the bot token an attacker
+                // cannot drive commands unless their message arrives in the configured group.
+                // Log the command prefix only — full text is attacker-controlled and would
+                // expand the log-injection surface (#465).
+                String prefix = msg.getText().split("\\s+", 2)[0];
+                log.warn(
+                        "Rejected command from unexpected chat id={} prefix={}",
+                        incomingChatId,
+                        prefix);
+                telegramMessageTracker.setLastProcessedMessageId(messageId);
                 continue;
             }
 
@@ -61,21 +93,10 @@ public class TelegramMessageProcessor {
     protected Optional<TelegramCommand> parseMessage(TelegramUpdateResponse update) {
         String messageText = update.getMessage().getText();
         if (messageText != null && messageText.toLowerCase().startsWith("/set")) {
-            String[] parts = messageText.split("\\s+");
-            if (parts.length == 4) {
-                String subCommand = parts[1]; // buy or sell
-                String symbol = parts[2];
-                double target = Double.parseDouble(parts[3]);
-
-                Optional<SetCommand> cmd = buildSetCommand(subCommand, symbol, target);
-                if (cmd.isPresent()) {
-                    log.info(
-                            "Received set command: {}, symbol: {}, target: {}",
-                            subCommand,
-                            symbol,
-                            target);
-                    return Optional.of(cmd.get());
-                }
+            Optional<SetCommand> setCommand = parseSetCommand(messageText);
+            if (setCommand.isPresent()) {
+                log.info("Received set command: {}", setCommand.get());
+                return Optional.of(setCommand.get());
             }
         } else if (messageText != null && messageText.toLowerCase().startsWith("/show")) {
             String[] parts = messageText.split("\\s+");
@@ -121,16 +142,14 @@ public class TelegramMessageProcessor {
 
     protected Optional<SetCommand> buildSetCommand(
             String subCommand, String symbol, double target) {
-        String errorMessageCommandFormat =
-                "Invalid command format. Use /set <buy|sell> <symbol> <target>";
         String errorMessageInvalidTarget = "Invalid target. Please provide a valid target price.";
 
         if (subCommand == null) {
-            telegramClient.sendMessage(errorMessageCommandFormat);
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
             return Optional.empty();
         }
         if (!subCommand.equalsIgnoreCase("buy") && !subCommand.equalsIgnoreCase("sell")) {
-            telegramClient.sendMessage(errorMessageCommandFormat);
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
             return Optional.empty();
         }
         if (symbol == null || symbol.isEmpty()) {
@@ -149,10 +168,36 @@ public class TelegramMessageProcessor {
         return Optional.of(new SetCommand(subCommand, symbol, target));
     }
 
+    /**
+     * Shape check + target parsing for {@code /set}. Mirrors the pattern of every other parseXxx
+     * helper: malformed shape (or unparseable target) is reported back to the user via Telegram
+     * here, then delegated to {@link #buildSetCommand} for content validation. Extracted in #460 to
+     * close the silent-fallthrough gap where {@code /set}, {@code /set buy}, or {@code /set buy
+     * AAPL} were swallowed without an error message.
+     */
+    protected Optional<SetCommand> parseSetCommand(String commandText) {
+        String[] parts = commandText.split("\\s+");
+        if (parts.length != 4) {
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
+            return Optional.empty();
+        }
+        String subCommand = parts[1];
+        String symbol = parts[2];
+        double target;
+        try {
+            target = Double.parseDouble(parts[3]);
+        } catch (NumberFormatException e) {
+            telegramClient.sendMessage(SET_ERROR_FORMAT);
+            return Optional.empty();
+        }
+        return buildSetCommand(subCommand, symbol, target);
+    }
+
     protected Optional<AddCommand> parseAddCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 3) {
-            telegramClient.sendMessage("Invalid command format. Use /add <TICKER> <Display_Name>");
+            telegramClient.sendMessage(
+                    "Invalid command format. Use /add `<TICKER>` `<Display_Name>`");
             return Optional.empty();
         }
 
@@ -165,7 +210,7 @@ public class TelegramMessageProcessor {
     protected Optional<RemoveCommand> parseRemoveCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 2) {
-            telegramClient.sendMessage("Invalid command format. Use /remove <TICKER>");
+            telegramClient.sendMessage("Invalid command format. Use /remove `<TICKER>`");
             return Optional.empty();
         }
 
@@ -188,7 +233,7 @@ public class TelegramMessageProcessor {
     protected Optional<RsiCommand> parseRsiCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 2) {
-            telegramClient.sendMessage("Invalid command format. Use /rsi <symbol>");
+            telegramClient.sendMessage("Invalid command format. Use /rsi `<symbol>`");
             return Optional.empty();
         }
 
@@ -205,7 +250,7 @@ public class TelegramMessageProcessor {
     protected Optional<DataResetCommand> parseDataResetCommand(String commandText) {
         String[] parts = commandText.split("\\s+");
         if (parts.length != 3 || !parts[1].equalsIgnoreCase("reset")) {
-            telegramClient.sendMessage("Invalid command format. Use /data reset <SYMBOL>");
+            telegramClient.sendMessage("Invalid command format. Use /data reset `<SYMBOL>`");
             return Optional.empty();
         }
         String ticker = parts[2].toUpperCase();
@@ -217,6 +262,10 @@ public class TelegramMessageProcessor {
         if (parts.length == 1) {
             return Optional.of(new ToggleCommand(null, null));
         }
+        // `/toggle list` is a discoverability alias for the no-args show-all form (#461).
+        if (parts.length == 2 && "list".equalsIgnoreCase(parts[1])) {
+            return Optional.of(new ToggleCommand(null, null));
+        }
         if (parts.length == 3) {
             String featureName = parts[1];
             String onOff = parts[2].toLowerCase();
@@ -226,7 +275,8 @@ public class TelegramMessageProcessor {
                 return Optional.of(new ToggleCommand(featureName, false));
             }
         }
-        telegramClient.sendMessage("Invalid command format. Use /toggle <feature_name> <on|off>");
+        telegramClient.sendMessage(
+                "Invalid command format. Use /toggle `<feature_name>` `<on|off>`");
         return Optional.empty();
     }
 }

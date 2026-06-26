@@ -12,8 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.tradelite.client.telegram.TelegramGateway;
+import org.tradelite.common.FeatureToggle;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
+import org.tradelite.service.FeatureToggleService;
 
 @ExtendWith(MockitoExtension.class)
 class EmaTrackerTest {
@@ -21,16 +23,18 @@ class EmaTrackerTest {
     @Mock private EmaService emaService;
     @Mock private TelegramGateway telegramClient;
     @Mock private SymbolRegistry symbolRegistry;
+    @Mock private FeatureToggleService featureToggleService;
 
     private EmaTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new EmaTracker(emaService, telegramClient, symbolRegistry);
+        tracker = new EmaTracker(emaService, telegramClient, symbolRegistry, featureToggleService);
     }
 
     @Test
     void sendDailyReport_sendsMessageWhenAnalysesExist() {
+        when(featureToggleService.isEnabled(FeatureToggle.EMA_REPORT)).thenReturn(true);
         StockSymbol aapl = new StockSymbol("AAPL", "Apple");
         when(symbolRegistry.getAll()).thenReturn(List.of(aapl));
         when(emaService.analyze("AAPL", "Apple"))
@@ -56,12 +60,25 @@ class EmaTrackerTest {
 
     @Test
     void sendDailyReport_doesNotSendWhenNoAnalyses() {
+        when(featureToggleService.isEnabled(FeatureToggle.EMA_REPORT)).thenReturn(true);
         StockSymbol aapl = new StockSymbol("AAPL", "Apple");
         when(symbolRegistry.getAll()).thenReturn(List.of(aapl));
         when(emaService.analyze("AAPL", "Apple")).thenReturn(Optional.empty());
 
         tracker.sendDailyReport();
 
+        verify(telegramClient, never()).sendMessage(anyString());
+    }
+
+    @Test
+    void sendDailyReport_featureDisabled_doesNotRun() {
+        when(featureToggleService.isEnabled(FeatureToggle.EMA_REPORT)).thenReturn(false);
+
+        tracker.sendDailyReport();
+
+        // Short-circuit before the expensive per-symbol analysis and before any Telegram I/O.
+        verify(symbolRegistry, never()).getAll();
+        verify(emaService, never()).analyze(anyString(), anyString());
         verify(telegramClient, never()).sendMessage(anyString());
     }
 

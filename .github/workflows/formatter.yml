@@ -3,12 +3,15 @@ name: Code Formatter
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   format:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:

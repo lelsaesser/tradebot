@@ -8,6 +8,8 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +31,9 @@ class YahooFinanceClientTest {
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
-        client = new YahooFinanceClient(objectMapper, meteringService);
+        HttpClient httpClient =
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        client = new YahooFinanceClient(objectMapper, meteringService, httpClient);
     }
 
     @Test
@@ -289,43 +293,19 @@ class YahooFinanceClientTest {
 
     @Test
     void fetchDailyOhlcv_incrementsMeter() {
-        // This test verifies metering is called even when the curl fails
-        // (since metering happens before the process starts)
+        // Metering happens before the HTTP call, so it increments even when the request fails.
         assertThrows(YahooFetchException.class, () -> client.fetchDailyOhlcv("INVALID.XX", 5));
 
         verify(meteringService, times(1)).incrementYahooRequests();
     }
 
     @Test
-    void executeCurl_invalidUrl_throwsYahooFetchException() {
-        // Tests the actual ProcessBuilder execution with an unreachable URL
-        YahooFetchException ex =
-                assertThrows(
-                        YahooFetchException.class,
-                        () -> client.executeCurl("TEST.XX", "https://localhost:1/nonexistent"));
-
-        assertThat(ex.getMessage(), containsString("TEST.XX"));
-        assertThat(ex.getMessage(), containsString("curl exited with code"));
-    }
-
-    @Test
-    void executeCurl_validEchoCommand_returnsOutput() {
-        // Test executeCurl indirectly by calling fetchDailyOhlcv with the real client
-        // which will hit Yahoo and fail (since INVALID.XX doesn't exist)
-        YahooFetchException ex =
-                assertThrows(
-                        YahooFetchException.class,
-                        () -> client.fetchDailyOhlcv("NONEXISTENT.ZZ", 5));
-
-        assertThat(ex.getMessage(), containsString("NONEXISTENT.ZZ"));
-    }
-
-    @Test
-    void executeCurl_realYahooCall_returnsValidJson() {
-        // Integration test: actually calls Yahoo Finance for a known symbol
-        // This covers the success path of executeCurl (ProcessBuilder + stdout reading)
+    void executeRequest_realYahooCall_returnsValidJson() {
+        // Integration test: covers the HttpClient success path against live Yahoo. If Yahoo ever
+        // started TLS-fingerprinting Java HTTP clients, this test would fail with an SSL exception
+        // — providing fast disproof rather than waiting for the next deploy to surface the issue.
         String json =
-                client.executeCurl(
+                client.executeRequest(
                         "SAP",
                         "https://query1.finance.yahoo.com/v8/finance/chart/SAP?interval=1d&range=5d");
 
@@ -334,8 +314,21 @@ class YahooFinanceClientTest {
     }
 
     @Test
+    void executeRequest_invalidUrl_throwsYahooFetchException() {
+        // Tests the HttpClient connection-failure branch deterministically.
+        YahooFetchException ex =
+                assertThrows(
+                        YahooFetchException.class,
+                        () -> client.executeRequest("TEST.XX", "https://localhost:1/nonexistent"));
+
+        assertThat(ex.getMessage(), containsString("TEST.XX"));
+        assertThat(ex.getMessage(), containsString("I/O error"));
+        assertThat(ex.getMessage(), containsString("ConnectException"));
+    }
+
+    @Test
     void fetchDailyOhlcv_realCall_returnsRecords() {
-        // Integration test: full end-to-end with a real API call
+        // Integration test: full end-to-end with a real API call.
         List<OhlcvRecord> records = client.fetchDailyOhlcv("SAP", 5);
 
         assertThat(records, is(not(empty())));

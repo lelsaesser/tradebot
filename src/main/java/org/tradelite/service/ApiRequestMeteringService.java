@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.repository.ApiMeteringRecord;
 import org.tradelite.repository.ApiMeteringRepository;
 
@@ -25,10 +26,12 @@ public class ApiRequestMeteringService {
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final ApiMeteringRepository repository;
+    private final TelegramGateway telegramClient;
     private final Map<String, AtomicInteger> counters = new ConcurrentHashMap<>();
 
-    ApiRequestMeteringService(ApiMeteringRepository repository) {
+    ApiRequestMeteringService(ApiMeteringRepository repository, TelegramGateway telegramClient) {
         this.repository = repository;
+        this.telegramClient = telegramClient;
         counters.put(FINNHUB, new AtomicInteger(0));
         counters.put(COINGECKO, new AtomicInteger(0));
         counters.put(TWELVEDATA, new AtomicInteger(0));
@@ -94,6 +97,51 @@ public class ApiRequestMeteringService {
                 counters.get(COINGECKO).get(),
                 counters.get(TWELVEDATA).get(),
                 counters.get(YAHOO).get());
+    }
+
+    /**
+     * Build and send the previous month's API usage summary to Telegram, then reset all counters.
+     * Skips the Telegram send when no usage was recorded, but always resets counters so the new
+     * month starts at zero.
+     */
+    public void sendMonthlyUsageReport() {
+        int finnhubCount = getFinnhubRequestCount();
+        int coingeckoCount = getCoingeckoRequestCount();
+        int twelveDataCount = getTwelveDataRequestCount();
+        int yahooCount = getYahooRequestCount();
+
+        if (finnhubCount > 0 || coingeckoCount > 0 || twelveDataCount > 0 || yahooCount > 0) {
+            String previousMonth = getPreviousMonth();
+
+            String message =
+                    String.format(
+                            """
+                            *Monthly API Usage Report - %s*
+                            🔹 *Finnhub API*: %,d requests
+                            🔹 *CoinGecko API*: %,d requests
+                            🔹 *Twelve Data API*: %,d requests
+                            🔹 *Yahoo Finance*: %,d requests
+                            🔹 *Total*: %,d requests""",
+                            previousMonth,
+                            finnhubCount,
+                            coingeckoCount,
+                            twelveDataCount,
+                            yahooCount,
+                            finnhubCount + coingeckoCount + twelveDataCount + yahooCount);
+
+            telegramClient.sendMessage(message);
+            log.info(
+                    "Monthly API usage report sent for {}: Finnhub={}, CoinGecko={}, TwelveData={}, Yahoo={}",
+                    previousMonth,
+                    finnhubCount,
+                    coingeckoCount,
+                    twelveDataCount,
+                    yahooCount);
+        } else {
+            log.info("No API requests recorded for the previous month, skipping report");
+        }
+
+        resetCounters();
     }
 
     public void resetCounters() {

@@ -1,8 +1,7 @@
-interface HeaderProps {
-  isLive: boolean
-}
+import { useSSE } from '../context/SSEProvider'
 
-export function Header({ isLive }: HeaderProps) {
+export function Header() {
+  const { isLive } = useSSE()
   return (
     <header className="flex items-center justify-between px-6 py-4 bg-gray-900 border-b border-gray-700">
       <span className="text-white font-semibold text-lg">Tradebot</span>

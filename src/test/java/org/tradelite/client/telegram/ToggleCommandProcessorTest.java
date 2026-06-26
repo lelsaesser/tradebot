@@ -36,6 +36,7 @@ class ToggleCommandProcessorTest {
                 .thenReturn(true);
         when(featureToggleService.isEnabled(FeatureToggle.ACCUMULATION_DETECTION))
                 .thenReturn(false);
+        when(featureToggleService.isEnabled(FeatureToggle.RSI_REPORT)).thenReturn(true);
         when(featureToggleService.isEnabled(FeatureToggle.YAHOO_INTRADAY_PRICE_FETCH))
                 .thenReturn(true);
 
@@ -52,6 +53,7 @@ class ToggleCommandProcessorTest {
                         pullbackBuyAlert: ON
                         earningsCalendarAlert: ON
                         accumulationDetection: OFF
+                        rsiReport: ON
                         yahooIntradayPriceFetch: ON""");
     }
 

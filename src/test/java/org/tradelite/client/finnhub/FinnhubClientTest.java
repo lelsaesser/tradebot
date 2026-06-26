@@ -130,6 +130,66 @@ class FinnhubClientTest {
     }
 
     @Test
+    void tryGetPriceQuote_ok_returnsQuote() {
+        PriceQuoteResponse response = new PriceQuoteResponse();
+        response.setCurrentPrice(123.0);
+
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class)))
+                .thenReturn(ResponseEntity.ok(response));
+
+        java.util.Optional<PriceQuoteResponse> result =
+                finnhubClient.tryGetPriceQuote(new StockSymbol("META", "Meta Platforms"));
+
+        assertThat(result.isPresent(), is(true));
+        assertThat(result.get().getCurrentPrice(), is(123.0));
+    }
+
+    @Test
+    void tryGetPriceQuote_restClientException_returnsEmpty() {
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class)))
+                .thenThrow(new RestClientException("Error fetching price quote"));
+
+        java.util.Optional<PriceQuoteResponse> result =
+                finnhubClient.tryGetPriceQuote(new StockSymbol("SIVE", "Sivers"));
+
+        assertThat(result.isEmpty(), is(true));
+    }
+
+    @Test
+    void tryGetPriceQuote_no2xxResponse_returnsEmpty() {
+        when(restTemplate.exchange(
+                        anyString(),
+                        eq(HttpMethod.GET),
+                        any(HttpEntity.class),
+                        eq(PriceQuoteResponse.class)))
+                .thenReturn(ResponseEntity.notFound().build());
+
+        java.util.Optional<PriceQuoteResponse> result =
+                finnhubClient.tryGetPriceQuote(new StockSymbol("UNKNOWN", "Unknown"));
+
+        assertThat(result.isEmpty(), is(true));
+    }
+
+    @Test
+    void tryGetPriceQuote_missingKey_returnsEmpty() {
+        properties.setFinnhubKey("");
+
+        java.util.Optional<PriceQuoteResponse> result =
+                finnhubClient.tryGetPriceQuote(new StockSymbol("AAPL", "Apple"));
+
+        assertThat(result.isEmpty(), is(true));
+        verifyNoInteractions(restTemplate);
+    }
+
+    @Test
     void getInsiderTransactions_ok() {
         InsiderTransactionResponse response =
                 new InsiderTransactionResponse(

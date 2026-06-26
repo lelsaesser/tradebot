@@ -35,14 +35,6 @@ public record TailRiskAnalysis(
         int dataPoints) {
 
     /**
-     * Returns true if sufficient data was available for reliable kurtosis calculation. Kurtosis
-     * requires at least 20 data points for meaningful calculation.
-     */
-    public boolean hasReliableData() {
-        return dataPoints >= 20;
-    }
-
-    /**
      * Returns true if the analysis indicates elevated crash risk. This is when we have fat tails
      * (high kurtosis) combined with negative skewness.
      */

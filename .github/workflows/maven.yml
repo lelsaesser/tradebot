@@ -11,8 +11,21 @@ name: Java CI with Maven
 on:
   push:
     branches: [ "main" ]
+    # The badge-commit step at the end of this workflow pushes back to main
+    # via PAT_GITHUB. PAT-driven pushes re-trigger workflows (only GITHUB_TOKEN
+    # pushes are exempt), so without this filter every badge push starts a
+    # fresh run of this workflow. Excluding the badges directory breaks the
+    # loop while still running on real source changes. See issue tracker for
+    # the underlying branch-count flap that makes the loop non-converging.
+    paths-ignore:
+      - '.github/badges/**'
   pull_request:
     branches: [ "main" ]
+
+# GITHUB_TOKEN only needs read access here. The badge-commit step pushes
+# to main via PAT_GITHUB, which carries its own credentials.
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -20,9 +33,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         token: ${{ secrets.PAT_GITHUB }}
+        # paths-filter compares against the previous commit; ensure it's available.
+        fetch-depth: 2
+    - name: Detect source changes
+      id: changes
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: dorny/paths-filter@v4
+      with:
+        filters: |
+          src:
+            - 'src/**'
+            - 'pom.xml'
     - name: Set up JDK 25
       uses: actions/setup-java@v5
       with:
@@ -31,8 +55,13 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn clean verify
-      
+
+    # Coverage badge regenerates only when the push to main actually changed
+    # Java sources or pom.xml. Workflow-only / docs-only / config-only pushes
+    # still build (above) but skip the badge regen+commit, so the badge
+    # doesn't churn on non-code changes.
     - name: Generate code coverage badge
+      if: github.ref == 'refs/heads/main' && steps.changes.outputs.src == 'true'
       uses: cicirello/jacoco-badge-generator@v2
       with:
         jacoco-csv-file: target/site/jacoco/jacoco.csv
@@ -42,9 +71,9 @@ jobs:
         generate-summary: true
         generate-workflow-summary: true
         workflow-summary-heading: "Code Coverage"
-        
+
     - name: Commit coverage badgeMore actions
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main' && steps.changes.outputs.src == 'true'
       env:
         GIT_AUTH_TOKEN: ${{ secrets.PAT_GITHUB }}
       run: |

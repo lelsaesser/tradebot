@@ -2,16 +2,13 @@ package org.tradelite;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Queue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.tradelite.client.finnhub.dto.MarketHolidayResponse;
 import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.client.telegram.TelegramMessageProcessor;
 import org.tradelite.common.TargetPriceProvider;
@@ -28,6 +24,7 @@ import org.tradelite.core.CoinGeckoPriceEvaluator;
 import org.tradelite.core.EarningsCalendarTracker;
 import org.tradelite.core.FinnhubPriceEvaluator;
 import org.tradelite.core.InsiderTracker;
+import org.tradelite.core.MarketHolidayNotifier;
 import org.tradelite.core.RelativeStrengthTracker;
 import org.tradelite.core.SectorMomentumRocTracker;
 import org.tradelite.core.SectorRelativeStrengthTracker;
@@ -73,6 +70,8 @@ class SchedulerTest {
     @Mock private AccumulationDetectionTracker accumulationDetectionTracker;
     @Mock private OhlcvBackfillService ohlcvBackfillService;
     @Mock private LivePriceCache livePriceCache;
+    @Mock private MarketHolidayNotifier marketHolidayNotifier;
+    @Mock private org.tradelite.core.TreasuryTracker treasuryTracker;
 
     private Scheduler scheduler;
 
@@ -104,7 +103,9 @@ class SchedulerTest {
                         earningsCalendarTracker,
                         accumulationDetectionTracker,
                         ohlcvBackfillService,
-                        livePriceCache);
+                        livePriceCache,
+                        marketHolidayNotifier,
+                        treasuryTracker);
     }
 
     @Test
@@ -116,12 +117,13 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        // Called 5 times: finnhubPriceEvaluator, pullbackBuyTracker,
-        // sectorRelativeStrengthTracker, sectorMomentumRocTracker, yahooPriceEvaluator
-        verify(rootErrorHandler, times(5)).run(any(ThrowingRunnable.class));
+        // Called 6 times: finnhubPriceEvaluator, pullbackBuyTracker.analyzeDomestic,
+        // sectorRelativeStrengthTracker, sectorMomentumRocTracker, yahooPriceEvaluator,
+        // pullbackBuyTracker.analyzeInternational
+        verify(rootErrorHandler, times(6)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(5)).run(captor.capture());
+        verify(rootErrorHandler, times(6)).run(captor.capture());
 
         // Execute all captured runnables
         for (ThrowingRunnable runnable : captor.getAllValues()) {
@@ -130,7 +132,8 @@ class SchedulerTest {
 
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
         verify(yahooPriceEvaluator, times(1)).evaluatePrice();
-        verify(pullbackBuyTracker, times(1)).analyzeAndSendAlerts();
+        verify(pullbackBuyTracker, times(1)).analyzeDomestic();
+        verify(pullbackBuyTracker, times(1)).analyzeInternational();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
         verify(bollingerBandTracker, never()).analyzeAndSendAlerts();
@@ -146,8 +149,9 @@ class SchedulerTest {
 
         scheduler.stockMarketMonitoring();
 
-        // Yahoo evaluator still runs (handles its own exchange-hours gating)
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
+        // Yahoo evaluator + analyzeInternational still run (both handle their own per-symbol
+        // exchange-hours gating)
+        verify(rootErrorHandler, times(2)).run(any(ThrowingRunnable.class));
         verify(finnhubPriceEvaluator, never()).evaluatePrice();
         verify(coinGeckoPriceEvaluator, never()).evaluatePrice();
     }
@@ -275,128 +279,14 @@ class SchedulerTest {
     }
 
     @Test
-    void monthlyApiUsageReport_withRequests_shouldSendReportAndReset() throws Exception {
-        // Setup: Mock API request counts
-        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(150);
-        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(75);
-        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(30);
-        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-09");
-
+    void monthlyApiUsageReport_delegatesToMeteringService() throws Exception {
         scheduler.monthlyApiUsageReport();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
         verify(rootErrorHandler, times(1)).run(captor.capture());
         captor.getValue().run();
 
-        // Verify that counts were retrieved
-        verify(apiRequestMeteringService, times(1)).getFinnhubRequestCount();
-        verify(apiRequestMeteringService, times(1)).getCoingeckoRequestCount();
-        verify(apiRequestMeteringService, times(1)).getTwelveDataRequestCount();
-        verify(apiRequestMeteringService, times(1)).getPreviousMonth();
-
-        // Verify Telegram message was sent
-        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
-
-        String sentMessage = messageCaptor.getValue();
-        assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-09*"));
-        assertTrue(sentMessage.contains("🔹 *Finnhub API*: 150 requests"));
-        assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 75 requests"));
-        assertTrue(sentMessage.contains("🔹 *Twelve Data API*: 30 requests"));
-        assertTrue(sentMessage.contains("🔹 *Total*: 255 requests"));
-
-        // Verify counters were reset
-        verify(apiRequestMeteringService, times(1)).resetCounters();
-    }
-
-    @Test
-    void monthlyApiUsageReport_withNoRequests_shouldSkipReportButStillReset() throws Exception {
-        // Setup: Mock zero API request counts
-        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(0);
-
-        scheduler.monthlyApiUsageReport();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
-
-        // Verify that counts were retrieved
-        verify(apiRequestMeteringService, times(1)).getFinnhubRequestCount();
-        verify(apiRequestMeteringService, times(1)).getCoingeckoRequestCount();
-        verify(apiRequestMeteringService, times(1)).getTwelveDataRequestCount();
-
-        // Verify NO Telegram message was sent (since no requests)
-        verify(telegramClient, never()).sendMessage(anyString());
-        verify(apiRequestMeteringService, never()).getPreviousMonth();
-
-        // Verify counters were still reset
-        verify(apiRequestMeteringService, times(1)).resetCounters();
-    }
-
-    @Test
-    void monthlyApiUsageReport_withOnlyFinnhubRequests_shouldSendReport() throws Exception {
-        // Setup: Mock only Finnhub requests
-        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(100);
-        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-08");
-
-        scheduler.monthlyApiUsageReport();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
-
-        // Verify Telegram message was sent (since finnhubCount > 0)
-        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
-
-        String sentMessage = messageCaptor.getValue();
-        assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-08*"));
-        assertTrue(sentMessage.contains("🔹 *Finnhub API*: 100 requests"));
-        assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 0 requests"));
-        assertTrue(sentMessage.contains("🔹 *Twelve Data API*: 0 requests"));
-        assertTrue(sentMessage.contains("🔹 *Total*: 100 requests"));
-
-        verify(apiRequestMeteringService, times(1)).resetCounters();
-    }
-
-    @Test
-    void monthlyApiUsageReport_withOnlyCoingeckoRequests_shouldSendReport() throws Exception {
-        // Setup: Mock only CoinGecko requests
-        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(50);
-        when(apiRequestMeteringService.getTwelveDataRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2025-07");
-
-        scheduler.monthlyApiUsageReport();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
-
-        // Verify Telegram message was sent (since coingeckoCount > 0)
-        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
-
-        String sentMessage = messageCaptor.getValue();
-        assertTrue(sentMessage.contains("*Monthly API Usage Report - 2025-07*"));
-        assertTrue(sentMessage.contains("🔹 *Finnhub API*: 0 requests"));
-        assertTrue(sentMessage.contains("🔹 *CoinGecko API*: 50 requests"));
-        assertTrue(sentMessage.contains("🔹 *Twelve Data API*: 0 requests"));
-        assertTrue(sentMessage.contains("🔹 *Total*: 50 requests"));
-
-        verify(apiRequestMeteringService, times(1)).resetCounters();
+        verify(apiRequestMeteringService, times(1)).sendMonthlyUsageReport();
     }
 
     @Test
@@ -431,10 +321,10 @@ class SchedulerTest {
 
         boolean success = scheduler.manualStockMarketMonitoring();
 
-        verify(rootErrorHandler, times(5)).runWithStatus(any(ThrowingRunnable.class));
+        verify(rootErrorHandler, times(6)).runWithStatus(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(5)).runWithStatus(captor.capture());
+        verify(rootErrorHandler, times(6)).runWithStatus(captor.capture());
         for (ThrowingRunnable runnable : captor.getAllValues()) {
             runnable.run();
         }
@@ -442,7 +332,8 @@ class SchedulerTest {
         assertTrue(success);
         verify(finnhubPriceEvaluator, times(1)).evaluatePrice();
         verify(yahooPriceEvaluator, times(1)).evaluatePrice();
-        verify(pullbackBuyTracker, times(1)).analyzeAndSendAlerts();
+        verify(pullbackBuyTracker, times(1)).analyzeDomestic();
+        verify(pullbackBuyTracker, times(1)).analyzeInternational();
         verify(sectorRelativeStrengthTracker, times(1)).analyzeAndSendAlerts();
         verify(sectorMomentumRocTracker, times(1)).analyzeAndSendAlerts();
     }
@@ -535,33 +426,14 @@ class SchedulerTest {
     }
 
     @Test
-    void manualMonthlyApiUsageReport_withRequestsShouldSendReportAndReset() {
-        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(10);
-        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(5);
-        when(apiRequestMeteringService.getPreviousMonth()).thenReturn("2026-03");
+    void manualMonthlyApiUsageReport_delegatesToMeteringService() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualMonthlyApiUsageReport();
 
         assertTrue(success);
         verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
-        verify(telegramClient).sendMessage(contains("*Monthly API Usage Report - 2026-03*"));
-        verify(apiRequestMeteringService).resetCounters();
-    }
-
-    @Test
-    void manualMonthlyApiUsageReport_withNoRequestsShouldStillResetCounters() {
-        when(apiRequestMeteringService.getFinnhubRequestCount()).thenReturn(0);
-        when(apiRequestMeteringService.getCoingeckoRequestCount()).thenReturn(0);
-        stubRunWithStatus(true);
-
-        boolean success = scheduler.manualMonthlyApiUsageReport();
-
-        assertTrue(success);
-        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
-        verify(telegramClient, never()).sendMessage(anyString());
-        verify(apiRequestMeteringService).resetCounters();
-        verify(apiRequestMeteringService, never()).getPreviousMonth();
+        verify(apiRequestMeteringService, times(1)).sendMonthlyUsageReport();
     }
 
     @Test
@@ -632,8 +504,9 @@ class SchedulerTest {
         boolean success = scheduler.manualPullbackBuyAlert();
 
         assertTrue(success);
-        verify(rootErrorHandler).runWithStatus(any(ThrowingRunnable.class));
-        verify(pullbackBuyTracker).analyzeAndSendAlerts();
+        verify(rootErrorHandler, times(2)).runWithStatus(any(ThrowingRunnable.class));
+        verify(pullbackBuyTracker).analyzeDomestic();
+        verify(pullbackBuyTracker).analyzeInternational();
     }
 
     @Test
@@ -671,79 +544,44 @@ class SchedulerTest {
     // --- Market holiday notification tests ---
 
     @Test
-    void dailyMarketHolidayNotification_fullClose_sendsMessage() throws Exception {
-        MarketHolidayResponse.MarketHoliday holiday = new MarketHolidayResponse.MarketHoliday();
-        holiday.setEventName("Memorial Day");
-        holiday.setTradingHour("");
-        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
-
+    void dailyMarketHolidayNotification_delegatesToNotifier() throws Exception {
         scheduler.dailyMarketHolidayNotification();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
 
         ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
         verify(rootErrorHandler, times(1)).run(captor.capture());
         captor.getValue().run();
 
-        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
-
-        String msg = messageCaptor.getValue();
-        assertTrue(msg.contains("*Market Holiday*"));
-        assertTrue(msg.contains("Memorial Day"));
-        assertTrue(msg.contains("Markets are closed"));
+        verify(marketHolidayNotifier, times(1)).sendDailyReport();
     }
 
     @Test
-    void dailyMarketHolidayNotification_earlyClose_sendsMessage() throws Exception {
-        MarketHolidayResponse.MarketHoliday holiday = new MarketHolidayResponse.MarketHoliday();
-        holiday.setEventName("Day After Thanksgiving");
-        holiday.setTradingHour("09:30-13:00");
-        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
-
-        scheduler.dailyMarketHolidayNotification();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
-
-        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-        verify(telegramClient).sendMessage(messageCaptor.capture());
-
-        String msg = messageCaptor.getValue();
-        assertTrue(msg.contains("*Early Close*"));
-        assertTrue(msg.contains("Day After Thanksgiving"));
-        assertTrue(msg.contains("13:00 ET"));
-    }
-
-    @Test
-    void dailyMarketHolidayNotification_noHoliday_sendsNoMessage() throws Exception {
-        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.empty());
-
-        scheduler.dailyMarketHolidayNotification();
-
-        verify(rootErrorHandler, times(1)).run(any(ThrowingRunnable.class));
-
-        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
-        verify(rootErrorHandler, times(1)).run(captor.capture());
-        captor.getValue().run();
-
-        verify(telegramClient, never()).sendMessage(anyString());
-    }
-
-    @Test
-    void manualMarketHolidayNotification_fullClose_sendsMessageAndReturnsTrue() {
-        MarketHolidayResponse.MarketHoliday holiday = new MarketHolidayResponse.MarketHoliday();
-        holiday.setEventName("Independence Day");
-        holiday.setTradingHour(null);
-        when(marketStatusService.getTodayHoliday()).thenReturn(Optional.of(holiday));
+    void manualMarketHolidayNotification_delegatesToNotifier() {
         stubRunWithStatus(true);
 
         boolean success = scheduler.manualMarketHolidayNotification();
 
         assertTrue(success);
-        verify(telegramClient).sendMessage(contains("Independence Day"));
+        verify(marketHolidayNotifier, times(1)).sendDailyReport();
+    }
+
+    @Test
+    void dailyTreasuryReport_delegatesToTracker() throws Exception {
+        scheduler.dailyTreasuryReport();
+
+        ArgumentCaptor<ThrowingRunnable> captor = ArgumentCaptor.forClass(ThrowingRunnable.class);
+        verify(rootErrorHandler, times(1)).run(captor.capture());
+        captor.getValue().run();
+
+        verify(treasuryTracker, times(1)).checkAndAlert();
+    }
+
+    @Test
+    void manualTreasuryReport_delegatesToTracker() {
+        stubRunWithStatus(true);
+
+        boolean success = scheduler.manualTreasuryReport();
+
+        assertTrue(success);
+        verify(treasuryTracker, times(1)).checkAndAlert();
     }
 }

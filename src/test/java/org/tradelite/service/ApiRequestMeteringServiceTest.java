@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.tradelite.client.telegram.TelegramGateway;
 import org.tradelite.repository.ApiMeteringRecord;
 import org.tradelite.repository.ApiMeteringRepository;
 
@@ -21,6 +22,7 @@ import org.tradelite.repository.ApiMeteringRepository;
 class ApiRequestMeteringServiceTest {
 
     @Mock private ApiMeteringRepository repository;
+    @Mock private TelegramGateway telegramClient;
 
     private ApiRequestMeteringService meteringService;
 
@@ -29,7 +31,7 @@ class ApiRequestMeteringServiceTest {
     @BeforeEach
     void setUp() {
         when(repository.findByMonth(anyString())).thenReturn(List.of());
-        meteringService = new ApiRequestMeteringService(repository);
+        meteringService = new ApiRequestMeteringService(repository, telegramClient);
         meteringService.startup();
     }
 
@@ -167,7 +169,8 @@ class ApiRequestMeteringServiceTest {
                                 new ApiMeteringRecord("twelvedata", currentMonth, 99, now),
                                 new ApiMeteringRecord("yahoo", currentMonth, 5, now)));
 
-        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        ApiRequestMeteringService service =
+                new ApiRequestMeteringService(repository, telegramClient);
         service.startup();
 
         assertEquals(42, service.getFinnhubRequestCount());
@@ -186,7 +189,8 @@ class ApiRequestMeteringServiceTest {
                         List.of(new ApiMeteringRecord("unknown_provider", currentMonth, 100, now)));
 
         // Should not throw
-        ApiRequestMeteringService service = new ApiRequestMeteringService(repository);
+        ApiRequestMeteringService service =
+                new ApiRequestMeteringService(repository, telegramClient);
         service.startup();
 
         assertEquals(0, service.getFinnhubRequestCount());
@@ -252,5 +256,59 @@ class ApiRequestMeteringServiceTest {
         assertEquals(expectedPerProvider, meteringService.getCoingeckoRequestCount());
         assertEquals(expectedPerProvider, meteringService.getTwelveDataRequestCount());
         assertEquals(expectedPerProvider, meteringService.getYahooRequestCount());
+    }
+
+    // --- sendMonthlyUsageReport tests (moved from SchedulerTest) ---
+
+    @Test
+    void sendMonthlyUsageReport_withRequests_sendsReportAndResets() {
+        meteringService.incrementFinnhubRequests();
+        for (int i = 0; i < 75; i++) {
+            meteringService.incrementCoingeckoRequests();
+        }
+        meteringService.incrementTwelveDataRequests();
+
+        meteringService.sendMonthlyUsageReport();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
+
+        String sent = messageCaptor.getValue();
+        String expectedPreviousMonth = LocalDateTime.now().minusMonths(1).format(MONTH_FORMATTER);
+        assertTrue(sent.contains("*Monthly API Usage Report - " + expectedPreviousMonth + "*"));
+        assertTrue(sent.contains("🔹 *Finnhub API*: 1 requests"));
+        assertTrue(sent.contains("🔹 *CoinGecko API*: 75 requests"));
+        assertTrue(sent.contains("🔹 *Twelve Data API*: 1 requests"));
+        assertTrue(sent.contains("🔹 *Total*: 77 requests"));
+
+        // Counters reset (resetCounters flushes via repository)
+        assertEquals(0, meteringService.getFinnhubRequestCount());
+        assertEquals(0, meteringService.getCoingeckoRequestCount());
+        assertEquals(0, meteringService.getTwelveDataRequestCount());
+        verify(repository, atLeastOnce()).saveAll(anyList());
+    }
+
+    @Test
+    void sendMonthlyUsageReport_withNoRequests_skipsTelegramButResets() {
+        meteringService.sendMonthlyUsageReport();
+
+        verify(telegramClient, never()).sendMessage(anyString());
+        // resetCounters always runs and flushes
+        verify(repository, atLeastOnce()).saveAll(anyList());
+    }
+
+    @Test
+    void sendMonthlyUsageReport_withOnlyYahooRequests_sendsReport() {
+        meteringService.incrementYahooRequests();
+        meteringService.incrementYahooRequests();
+
+        meteringService.sendMonthlyUsageReport();
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(telegramClient, times(1)).sendMessage(messageCaptor.capture());
+
+        String sent = messageCaptor.getValue();
+        assertTrue(sent.contains("🔹 *Yahoo Finance*: 2 requests"));
+        assertTrue(sent.contains("🔹 *Total*: 2 requests"));
     }
 }

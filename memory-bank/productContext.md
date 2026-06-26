@@ -69,14 +69,14 @@ All alerts and reports delivered as Telegram messages (no user action required).
 | Finnhub | Live stock prices, insider trades, market holidays, earnings calendar | API key | — |
 | CoinGecko | Crypto prices | None | — |
 | Twelve Data | Daily OHLCV (400 data points) | API key | 8 req/min |
-| Yahoo Finance | International OHLCV + intraday quotes (via curl/ProcessBuilder) | None | 3s delay |
+| Yahoo Finance | International OHLCV + intraday quotes (via `java.net.http.HttpClient`) | None | 3s delay |
 | FinViz | Industry sector performance (web scraping) | None | — |
 
 ## Tracked Symbols
 
-### Sector & Thematic ETFs (20 total)
+### Sector & Thematic ETFs (29 total)
 **Broad Sectors (11 SPDR):** XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLC, XLRE, XLB, XLU
-**Thematic (9):** SMH (Semiconductors), URA (Uranium), SHLD (Cybersecurity), IGV (Software), XOP (Oil & Gas), XHB (Homebuilders), ITA (Aerospace & Defense), XBI (Biotech), TAN (Solar)
+**Thematic (18):** SMH (Semiconductors), SHLD (Defence Tech), IGV (Software), XOP (Oil & Gas), XHB (Homebuilders), ITA (Aerospace & Defence), XBI (Biotech), UFO (Space), TAN (Solar), URA (Uranium & Nuclear), REMX (Rare Earths), QTUM (Quantum), DTCR (Data Centers), FINX (FinTech), LIT (Batteries), BOTZ (Robotics), STCE (Crypto), DRAM (Memory Chips)
 
 ### International Stocks
 - German XETRA: RHM.DE (Rheinmetall), ENR.DE (Siemens Energy)

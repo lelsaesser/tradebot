@@ -47,11 +47,4 @@ public class SqliteTargetPriceRepository implements TargetPriceRepository {
         String sql = "DELETE FROM target_prices WHERE symbol = ? AND asset_type = ?";
         return jdbcTemplate.update(sql, symbol, type.name()) > 0;
     }
-
-    @Override
-    public int count() {
-        Integer result =
-                jdbcTemplate.queryForObject("SELECT COUNT(*) FROM target_prices", Integer.class);
-        return result != null ? result : 0;
-    }
 }

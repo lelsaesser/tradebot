@@ -3,10 +3,18 @@
 This document covers the technologies used, development setup, technical constraints, dependencies, and tool usage patterns.
 
 ## Technologies
-- **Language:** Java 23
+- **Language:** Java 25
 - **Framework:** Spring Boot 4.0.6
-- **Build Tool:** Maven 
+- **Build Tool:** Maven (use `mvn` directly — there is no `./mvnw` wrapper)
 - **Database:** SQLite (embedded, via JdbcTemplate)
+
+### Dashboard (React Frontend)
+- **Framework:** React 19 + Vite 6
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS v4
+- **Testing:** Vitest + @testing-library/react
+- **Dev proxy:** Vite server proxy → localhost:9090
+- **SSE:** Single EventSource in SSEProvider context, `/api/v1/events`
 
 ## Dependencies
 - **Spring Boot Starters:** 
@@ -19,18 +27,19 @@ This document covers the technologies used, development setup, technical constra
 - **Lombok 1.18.34:** Reduces boilerplate code with annotations like `@Slf4j`, `@RequiredArgsConstructor`, `@Getter`, etc.
 - **Jackson:** JSON serialization/deserialization with JSR-310 (Java Time) datatype support
 - **JSoup 1.22.2:** HTML parsing library for web scraping (FinViz sector data)
-- **SQLite JDBC 3.53.0.0:** Embedded SQLite database driver for historical price storage
+- **SQLite JDBC 3.53.1.0:** Embedded SQLite database driver for historical price storage
+- **Apache Commons Statistics Descriptive 1.3+:** Bias-corrected sample moment estimators (Fisher-Pearson G1 skewness, G2 kurtosis). Consumed by `TailRiskService` for fat-tail detection. Industry-standard formulas matching Pandas / NumPy `bias=False` / Excel `KURT`/`SKEW` / Basel-FRTB. Replaces the legacy `commons-math3` artifact (which Apache themselves marked as "not supported anymore" — see `apache/commons-math` README). Single direct dep with two tiny transitive ones (`commons-numbers-core`, `commons-numbers-arrays`).
 - **Testing:** 
-  - JUnit Jupiter 6.0.3
+  - JUnit Jupiter 6.1.0
   - Mockito 5.23.0 (core and junit-jupiter integration)
   - Hamcrest 3.0
   - Spring Boot Test support
 
 ## Build Configuration
-- **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 23 with Lombok annotation processing
+- **Compiler:** `maven-compiler-plugin` 3.15.0 configured for Java 25 with Lombok annotation processing
 - **Packaging:** `spring-boot-maven-plugin` for creating executable JARs
 - **Code Coverage:** `jacoco-maven-plugin` 0.8.14 enforces 97% instruction coverage ratio
-- **Code Formatting:** `spotless-maven-plugin` 3.4.0 with Google Java Format 1.30.0 (AOSP style)
+- **Code Formatting:** `spotless-maven-plugin` 3.6.0 with Google Java Format 1.30.0 (AOSP style)
 
 ## External Data Sources
 
@@ -41,7 +50,9 @@ This document covers the technologies used, development setup, technical constra
 | CoinGecko | `CoinGeckoClient` | Cryptocurrency prices | No auth |
 | Telegram | `TelegramClient` | Bot messaging | Bot Token |
 | Twelve Data | `TwelveDataClient` | Daily OHLCV data (400 data points) | API Key |
-| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (ProcessBuilder + curl) |
+| Yahoo Finance | `YahooFinanceClient` | International stock OHLCV + intraday price quotes | No auth (`java.net.http.HttpClient`) |
+| Enrico (Kayaposoft) | `EnricoClient` | Public-holiday calendars per country | No auth |
+| FRED | `FredClient` | US Treasury macro time series (yield-curve spreads, real yield, term premium). Free API key (email signup); single 32-char key as `api_key` query param. Not metered — ~4 requests/day total. ToS requires attribution in consumer-facing renderings. Added in #516. | API Key |
 
 ### Web Scraping
 | Source | Client | Purpose | Auth |
@@ -77,11 +88,12 @@ All repositories use Spring's `JdbcTemplate` (not raw JDBC). Schema is centraliz
 | `config/feature-toggles.json` | JSON | Runtime feature flags (FINNHUB_PRICE_COLLECTION, EMA_REPORT, VFI_REPORT, PULLBACK_BUY_ALERT, ACCUMULATION_DETECTION, EARNINGS_CALENDAR_ALERT) |
 | `config/dev-telegram-messages.log` | Text | Dev-only local Telegram sink |
 | `data/tradebot.db` | SQLite | All SQLite tables |
+| `src/main/resources/logback-spring.xml` | XML | Logback configuration: Spring Boot defaults via `<include>` + global `SecretRedactingTurboFilter` registration |
 
 ## Runtime Profiles
 
 ### Default Runtime (Production)
-- Uses `FINNHUB_API_KEY`, `COINGECKO_API_KEY`, `TWELVEDATA_API_KEY`
+- Uses `FINNHUB_API_KEY`, `COINGECKO_API_KEY`, `TWELVEDATA_API_KEY`, `FRED_API_KEY`
 - Uses `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_GROUP_CHAT_ID`
 - All schedulers active
 
@@ -117,13 +129,15 @@ All endpoints are POST, dev-profile-only, and return `{"status":"ok","job":"<nam
 | `/dev/jobs/yahoo-price-evaluation` | Yahoo intraday price evaluation (international) |
 | `/dev/jobs/earnings-calendar` | Earnings calendar 7-day look-ahead |
 | `/dev/jobs/accumulation-detection` | Institutional accumulation detection |
-| `/dev/jobs/run-all` | Phased smoke test (runs all 18 jobs) |
+| `/dev/jobs/market-holiday-notification` | Consolidated "Markets closed today" alert across NYSE + international exchanges |
+| `/dev/jobs/treasury` | US Treasury macro report (yield curve + real yield + term premium via FRED) |
+| `/dev/jobs/run-all` | Phased smoke test (runs all 19 jobs) |
 
 ### Bruno API Collection
 
 Location: `TradeliteBrunoCollection/DevController/`
 
-Bruno (open-source API client) collection for manually triggering dev endpoints. All requests target `http://localhost:9090`. The collection contains 14 individual request files (one per endpoint above) plus `runAll.yml` for the phased smoke test. The collection can be opened in Bruno by pointing it at the `TradeliteBrunoCollection/` directory.
+Bruno (open-source API client) collection for manually triggering dev endpoints. All requests target `http://localhost:9090`. The collection contains one request file per endpoint above plus `runAll.yml` for the phased smoke test. The collection can be opened in Bruno by pointing it at the `TradeliteBrunoCollection/` directory.
 
 ### Pre-Deployment Smoke Test
 
@@ -190,6 +204,8 @@ src/main/java/org/tradelite/
 │   ├── SectorRelativeStrengthTracker.java
 │   ├── SectorMomentumRocTracker.java
 │   └── ...
+├── logging/                     # Logging infrastructure
+│   └── SecretRedactingTurboFilter.java  # Global Logback filter dropping events containing known secret shapes (#470)
 ├── quant/                       # Quantitative analysis
 │   ├── VfiService.java          # Volume Flow Indicator calculation
 │   ├── VfiTracker.java          # Combined RS+VFI daily report
@@ -197,6 +213,7 @@ src/main/java/org/tradelite/
 │   ├── BollingerBandService.java / BollingerBandTracker.java
 │   ├── EmaService.java / EmaTracker.java
 │   ├── TailRiskService.java / TailRiskTracker.java
+│   ├── TailRiskWindow.java      # (lookbackCalendarDays, minDataPoints) record
 │   ├── StatisticsUtil.java      # Shared math utilities
 │   └── ...
 ├── repository/                  # Data persistence layer
@@ -220,7 +237,7 @@ src/main/java/org/tradelite/
 ### Test Coverage
 - **Target:** 97% instruction coverage
 - **Current:** 97%
-- **Total Tests:** ~1061
+- **Total Tests:** ~1164
 
 ### Test Patterns
 - **Unit Tests:** All components have dedicated test classes
@@ -233,6 +250,8 @@ src/main/java/org/tradelite/
 - **Configurable delays:** `OhlcvFetcher.setRequestDelayMs(0)` in tests to avoid 8s sleeps
 
 ## Build Commands
+
+**Use `mvn` directly. There is no Maven wrapper (`./mvnw`) and no Gradle in this project.** The `mvn` binary is on `PATH`; do not look for or invoke `./mvnw`.
 
 ```bash
 mvn test              # Run all tests

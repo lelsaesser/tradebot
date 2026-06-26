@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -14,6 +15,7 @@ import org.tradelite.client.telegram.dto.TelegramSendMessageResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponse;
 import org.tradelite.client.telegram.dto.TelegramUpdateResponseWrapper;
 import org.tradelite.config.TradebotTelegramProperties;
+import org.tradelite.logging.SecretRedactingTurboFilter;
 
 @Slf4j
 @Component
@@ -21,6 +23,18 @@ public class TelegramClient implements TelegramGateway {
 
     protected static final String BASE_URL = "https://api.telegram.org/bot%s/sendMessage";
     protected static final String DELETE_URL = "https://api.telegram.org/bot%s/deleteMessage";
+
+    /**
+     * Matches the {@code /bot<TOKEN>/} URL path segment that Telegram requires for authentication
+     * (see <a href="https://core.telegram.org/bots/api">Bot API docs</a>: the token must live in
+     * the URL — there is no header- or body-based alternative). Used by {@link #redact(String)} to
+     * scrub tokens from any string that might reach a logger or an exception message.
+     *
+     * <p>Targets the URL path shape rather than the bare token shape, since {@code RestTemplate}
+     * exception messages always carry the token embedded in the URL. The trailing {@code /} anchors
+     * the match to the path segment and avoids over-matching.
+     */
+    private static final Pattern TOKEN_URL_PATTERN = Pattern.compile("/bot[^/\\s]+/");
 
     private final RestTemplate restTemplate;
     private final String botToken;
@@ -90,7 +104,7 @@ public class TelegramClient implements TelegramGateway {
                 return OptionalLong.empty();
             }
         } catch (Exception e) {
-            log.error("Error sending message: {}", e.getMessage());
+            log.error("Error sending message: {}", redact(e.getMessage()));
             return OptionalLong.empty();
         }
     }
@@ -120,7 +134,7 @@ public class TelegramClient implements TelegramGateway {
                 log.warn("Failed to delete message {}: {}", messageId, response.getBody());
             }
         } catch (Exception e) {
-            log.warn("Error deleting message {}: {}", messageId, e.getMessage());
+            log.warn("Error deleting message {}: {}", messageId, redact(e.getMessage()));
         }
     }
 
@@ -138,8 +152,23 @@ public class TelegramClient implements TelegramGateway {
                             url, HttpMethod.GET, entity, TelegramUpdateResponseWrapper.class);
             return response.getBody().getResult();
         } catch (Exception e) {
-            log.error("Error fetching chat updates: {}", e.getMessage());
-            throw new IllegalStateException("Error while fetching chat updates: " + e.getMessage());
+            String safeMessage = redact(e.getMessage());
+            log.error("Error fetching chat updates: {}", safeMessage);
+            throw new IllegalStateException("Error while fetching chat updates: " + safeMessage);
         }
+    }
+
+    /**
+     * Strips Telegram bot tokens from the {@code /bot<TOKEN>/} URL path segment that {@code
+     * RestTemplate} exception messages embed when an HTTP call fails. Null-safe.
+     *
+     * <p>This is the primary defense — done at the source so the diagnostic log line stays readable
+     * and the {@link SecretRedactingTurboFilter} (defense-in-depth) does not need to drop the
+     * event. Without this, both the local {@code log.error} and any rethrown {@code
+     * IllegalStateException} carrying the same message would propagate the token to every
+     * downstream sink (journald, monitoring, GitHub paste).
+     */
+    static String redact(String s) {
+        return s == null ? null : TOKEN_URL_PATTERN.matcher(s).replaceAll("/bot<redacted>/");
     }
 }
