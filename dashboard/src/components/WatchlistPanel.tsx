@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSSE } from '../context/SSEProvider'
+import { API_BASE } from '../api/config'
 
 interface WatchlistRow {
   ticker: string
@@ -30,9 +31,12 @@ interface PriceSwingPayload {
 
 function ExchangeBadge({ exchange }: { exchange: string }) {
   const colours: Record<string, string> = {
-    NASDAQ: 'bg-blue-900 text-blue-200',
+    US: 'bg-blue-900 text-blue-200',
     XETRA: 'bg-green-900 text-green-200',
     KRX: 'bg-purple-900 text-purple-200',
+    JPX: 'bg-pink-900 text-pink-200',
+    STO: 'bg-cyan-900 text-cyan-200',
+    PAR: 'bg-indigo-900 text-indigo-200',
     ETF: 'bg-yellow-900 text-yellow-200',
   }
   const cls = colours[exchange] ?? 'bg-gray-700 text-gray-200'
@@ -56,12 +60,13 @@ export function WatchlistPanel() {
   const [addTicker, setAddTicker] = useState('')
   const [addName, setAddName] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const highlightTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   async function loadWatchlist() {
     try {
-      const res = await fetch('/api/watchlist')
+      const res = await fetch(`${API_BASE}/watchlist`)
       if (!res.ok) throw new Error('Failed to load watchlist')
       const data: WatchlistResponse = await res.json()
       setRows(data.symbols)
@@ -102,7 +107,7 @@ export function WatchlistPanel() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     setAddError(null)
-    const res = await fetch('/api/symbols', {
+    const res = await fetch(`${API_BASE}/symbols`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticker: addTicker.toUpperCase(), displayName: addName }),
@@ -117,20 +122,31 @@ export function WatchlistPanel() {
   }
 
   async function handleRemove(ticker: string) {
-    await fetch(`/api/symbols/${ticker}`, { method: 'DELETE' })
+    setMutationError(null)
+    const res = await fetch(`${API_BASE}/symbols/${ticker}`, { method: 'DELETE' })
+    if (!res.ok) {
+      setMutationError(`Failed to remove ${ticker}.`)
+      return
+    }
     setRows(prev => prev.filter(r => r.ticker !== ticker))
   }
 
   async function handleSetTarget(ticker: string, side: AlertSide, price: number) {
-    await fetch('/api/targets', {
+    setMutationError(null)
+    const res = await fetch(`${API_BASE}/targets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticker, side, price }),
     })
+    if (!res.ok) {
+      setMutationError(`Failed to set ${side.toLowerCase()} target for ${ticker}.`)
+      return
+    }
+    const newTarget = price === 0 ? null : price
     setRows(prev =>
       prev.map(r => {
         if (r.ticker !== ticker) return r
-        return side === 'BUY' ? { ...r, buyTarget: price } : { ...r, sellTarget: price }
+        return side === 'BUY' ? { ...r, buyTarget: newTarget } : { ...r, sellTarget: newTarget }
       }),
     )
   }
@@ -163,6 +179,10 @@ export function WatchlistPanel() {
         </button>
         {addError && <p className="w-full text-red-400 text-xs mt-1">{addError}</p>}
       </form>
+
+      {mutationError && (
+        <p className="text-red-400 text-xs mb-2">{mutationError}</p>
+      )}
 
       {/* Table */}
       {loading ? (
@@ -261,7 +281,7 @@ function TargetCell({
 
   function commit() {
     const parsed = parseFloat(input)
-    if (!isNaN(parsed) && parsed > 0) onSet(parsed)
+    if (!isNaN(parsed) && parsed >= 0) onSet(parsed)
     setEditing(false)
     setInput('')
   }
