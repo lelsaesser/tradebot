@@ -1,11 +1,13 @@
 package org.tradelite.web.dashboard;
 
+import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.tradelite.common.AssetType;
+import org.tradelite.common.Exchange;
 import org.tradelite.common.StockSymbol;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
@@ -26,7 +29,8 @@ import org.tradelite.web.dashboard.dto.WatchlistResponse;
 import org.tradelite.web.dashboard.dto.WatchlistRow;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
+@Validated
 public class WatchlistController {
 
     private final SymbolRegistry symbolRegistry;
@@ -58,26 +62,22 @@ public class WatchlistController {
         for (StockSymbol symbol : symbolRegistry.getAll()) {
             String ticker = symbol.getName().toUpperCase();
             TargetPrice tp = targets.get(ticker);
+            Double buyTarget = tp != null && tp.getBuyTarget() != 0.0 ? tp.getBuyTarget() : null;
+            Double sellTarget = tp != null && tp.getSellTarget() != 0.0 ? tp.getSellTarget() : null;
             rows.add(
                     new WatchlistRow(
                             ticker,
                             symbol.getDisplayName(),
                             deriveExchange(ticker),
                             prices.get(ticker),
-                            tp != null ? tp.getBuyTarget() : null,
-                            tp != null ? tp.getSellTarget() : null));
+                            buyTarget,
+                            sellTarget));
         }
         return new WatchlistResponse(rows);
     }
 
     @PostMapping("/symbols")
-    public ResponseEntity<String> addSymbol(@RequestBody AddSymbolRequest request) {
-        if (request.ticker() == null
-                || request.ticker().isBlank()
-                || request.displayName() == null
-                || request.displayName().isBlank()) {
-            return ResponseEntity.badRequest().body("ticker and displayName are required");
-        }
+    public ResponseEntity<String> addSymbol(@Valid @RequestBody AddSymbolRequest request) {
         SymbolManagementService.AddResult result =
                 symbolManagementService.addSymbol(
                         request.ticker().toUpperCase(), request.displayName(), null, null);
@@ -94,10 +94,7 @@ public class WatchlistController {
     }
 
     @PostMapping("/targets")
-    public ResponseEntity<String> setTarget(@RequestBody SetTargetRequest request) {
-        if (request.ticker() == null || request.ticker().isBlank() || request.side() == null) {
-            return ResponseEntity.badRequest().body("ticker and side are required");
-        }
+    public ResponseEntity<String> setTarget(@Valid @RequestBody SetTargetRequest request) {
         var symbol = symbolRegistry.fromString(request.ticker().toUpperCase());
         if (symbol.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -107,16 +104,16 @@ public class WatchlistController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Labels a ticker by its trading venue or asset class. ETFs win first (they're an asset class
+     * regardless of listing exchange). International tickers resolve via {@link
+     * Exchange#fromTicker} added in #498 (XETRA / KRX / JPX / STO / PAR). Domestic stocks fall back
+     * to "US" — honest about not distinguishing NYSE / NASDAQ / AMEX in the registry.
+     */
     private String deriveExchange(String ticker) {
         if (symbolRegistry.isEtf(ticker)) {
             return "ETF";
         }
-        if (ticker.endsWith(".DE")) {
-            return "XETRA";
-        }
-        if (ticker.endsWith(".KS")) {
-            return "KRX";
-        }
-        return "NASDAQ";
+        return Exchange.fromTicker(ticker).map(Enum::name).orElse("US");
     }
 }

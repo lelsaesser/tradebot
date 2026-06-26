@@ -77,7 +77,7 @@ public abstract class BasePriceEvaluator {
                     "price-alert",
                     Map.of(
                             "ticker",
-                            ticker.getName(),
+                            ticker.getName().toUpperCase(),
                             "side",
                             "SELL",
                             "currentPrice",
@@ -103,7 +103,7 @@ public abstract class BasePriceEvaluator {
                     "price-alert",
                     Map.of(
                             "ticker",
-                            ticker.getName(),
+                            ticker.getName().toUpperCase(),
                             "side",
                             "BUY",
                             "currentPrice",

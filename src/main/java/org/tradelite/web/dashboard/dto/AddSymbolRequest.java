@@ -1,3 +1,5 @@
 package org.tradelite.web.dashboard.dto;
 
-public record AddSymbolRequest(String ticker, String displayName) {}
+import jakarta.validation.constraints.NotBlank;
+
+public record AddSymbolRequest(@NotBlank String ticker, @NotBlank String displayName) {}
