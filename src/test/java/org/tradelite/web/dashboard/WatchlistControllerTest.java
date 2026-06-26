@@ -72,10 +72,10 @@ class WatchlistControllerTest {
         TargetPrice appleTarget = new TargetPrice("AAPL", 170.0, 200.0);
         when(targetPriceProvider.getStockTargetPrices()).thenReturn(List.of(appleTarget));
 
-        mockMvc.perform(get("/api/watchlist"))
+        mockMvc.perform(get("/api/v1/watchlist"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.symbols[0].ticker").value("AAPL"))
-                .andExpect(jsonPath("$.symbols[0].exchange").value("NASDAQ"))
+                .andExpect(jsonPath("$.symbols[0].exchange").value("US"))
                 .andExpect(jsonPath("$.symbols[0].currentPrice").value(182.0))
                 .andExpect(jsonPath("$.symbols[0].buyTarget").value(170.0))
                 .andExpect(jsonPath("$.symbols[1].ticker").value("SAP.DE"))
@@ -90,7 +90,7 @@ class WatchlistControllerTest {
                 .thenReturn(new AddResult(true, "Added Microsoft (MSFT)."));
 
         mockMvc.perform(
-                        post("/api/symbols")
+                        post("/api/v1/symbols")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"ticker\":\"MSFT\",\"displayName\":\"Microsoft\"}"))
                 .andExpect(status().isOk());
@@ -102,7 +102,7 @@ class WatchlistControllerTest {
                 .thenReturn(new AddResult(false, "Invalid ticker: INVALID."));
 
         mockMvc.perform(
-                        post("/api/symbols")
+                        post("/api/v1/symbols")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"ticker\":\"INVALID\",\"displayName\":\"Bad\"}"))
                 .andExpect(status().isBadRequest());
@@ -112,14 +112,14 @@ class WatchlistControllerTest {
     void removeSymbol_200whenFound() throws Exception {
         when(symbolManagementService.removeSymbol("AAPL")).thenReturn(true);
 
-        mockMvc.perform(delete("/api/symbols/AAPL")).andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v1/symbols/AAPL")).andExpect(status().isOk());
     }
 
     @Test
     void removeSymbol_404whenNotFound() throws Exception {
         when(symbolManagementService.removeSymbol("UNKNOWN")).thenReturn(false);
 
-        mockMvc.perform(delete("/api/symbols/UNKNOWN")).andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/v1/symbols/UNKNOWN")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -128,7 +128,7 @@ class WatchlistControllerTest {
         when(symbolRegistry.fromString("AAPL")).thenReturn(Optional.of(aapl));
 
         mockMvc.perform(
-                        post("/api/targets")
+                        post("/api/v1/targets")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"ticker\":\"AAPL\",\"side\":\"BUY\",\"price\":170.0}"))
                 .andExpect(status().isOk());
@@ -142,7 +142,7 @@ class WatchlistControllerTest {
         when(symbolRegistry.fromString("GHOST")).thenReturn(Optional.empty());
 
         mockMvc.perform(
-                        post("/api/targets")
+                        post("/api/v1/targets")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"ticker\":\"GHOST\",\"side\":\"SELL\",\"price\":50.0}"))
                 .andExpect(status().isNotFound());
