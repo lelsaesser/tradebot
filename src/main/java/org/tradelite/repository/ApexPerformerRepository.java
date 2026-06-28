@@ -24,4 +24,12 @@ public interface ApexPerformerRepository {
      * @return Set of tickers
      */
     Set<String> findAll();
+
+    /**
+     * Deletes all rows for the given symbol.
+     *
+     * @param symbol The stock ticker symbol
+     * @return Number of rows deleted
+     */
+    int deleteBySymbol(String symbol);
 }

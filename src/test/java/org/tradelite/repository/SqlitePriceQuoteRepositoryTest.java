@@ -88,6 +88,33 @@ class SqlitePriceQuoteRepositoryTest extends AbstractSqliteRepositoryTest {
         assertThat(results, is(notNullValue()));
     }
 
+    @Test
+    void deleteBySymbol_removesOnlyTargetSymbol() {
+        repository.save(createPriceQuote("AAPL", 175.50));
+        repository.save(createPriceQuote("GOOG", 150.25));
+
+        int deleted = repository.deleteBySymbol("AAPL");
+
+        assertThat(deleted, greaterThanOrEqualTo(1));
+        assertThat(repository.findDailyClosingPrices("AAPL", 30), is(empty()));
+        assertThat(repository.findDailyClosingPrices("GOOG", 30), hasSize(1));
+    }
+
+    @Test
+    void deleteBySymbol_unknownSymbol_returnsZero() {
+        int deleted = repository.deleteBySymbol("UNKNOWN");
+        assertThat(deleted, is(0));
+    }
+
+    @Test
+    void onSymbolRemoved_delegatesToDeleteBySymbol() {
+        repository.save(createPriceQuote("AAPL", 175.50));
+
+        repository.onSymbolRemoved("AAPL");
+
+        assertThat(repository.findDailyClosingPrices("AAPL", 30), is(empty()));
+    }
+
     private PriceQuoteResponse createPriceQuote(String symbol, double price) {
         PriceQuoteResponse priceQuote = new PriceQuoteResponse();
         priceQuote.setStockSymbol(new StockSymbol(symbol, symbol + " Inc."));

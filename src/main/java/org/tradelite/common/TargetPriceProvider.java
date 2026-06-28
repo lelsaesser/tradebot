@@ -15,7 +15,7 @@ import org.tradelite.repository.TargetPriceRepository;
 
 @Slf4j
 @Component
-public class TargetPriceProvider {
+public class TargetPriceProvider implements SymbolLifecycleListener {
 
     public static final long IGNORE_DURATION_TTL_SECONDS = 3600L * 12; // 12 hours
 
@@ -124,5 +124,15 @@ public class TargetPriceProvider {
 
     public boolean removeSymbolFromTargetPrices(String ticker, AssetType type) {
         return targetPriceRepository.deleteBySymbolAndType(ticker, type);
+    }
+
+    /**
+     * Lifecycle hook: clears {@code ignored_symbols} rows for the removed ticker. Note that {@code
+     * target_prices} cleanup runs via the legacy {@link #removeSymbolFromTargetPrices} path, not
+     * through this listener — see {@link SymbolLifecycleListener} javadoc for the rationale.
+     */
+    @Override
+    public void onSymbolRemoved(String ticker) {
+        ignoredSymbolRepository.deleteBySymbol(ticker);
     }
 }

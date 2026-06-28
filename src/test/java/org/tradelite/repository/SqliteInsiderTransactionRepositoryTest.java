@@ -115,4 +115,35 @@ class SqliteInsiderTransactionRepositoryTest extends AbstractSqliteRepositoryTes
                         .orElseThrow()
                         .count());
     }
+
+    @Test
+    void deleteBySymbol_removesOnlyTargetSymbolRowsAcrossTypes() {
+        repository.saveAll(
+                List.of(
+                        new InsiderTransactionRow("AAPL", "S", 10),
+                        new InsiderTransactionRow("AAPL", "P", 5),
+                        new InsiderTransactionRow("GOOG", "S", 3)));
+
+        int deleted = repository.deleteBySymbol("AAPL");
+
+        assertEquals(2, deleted);
+        List<InsiderTransactionRow> remaining = repository.findAll();
+        assertEquals(1, remaining.size());
+        assertEquals("GOOG", remaining.getFirst().symbol());
+    }
+
+    @Test
+    void deleteBySymbol_unknownSymbol_returnsZero() {
+        int deleted = repository.deleteBySymbol("UNKNOWN");
+        assertEquals(0, deleted);
+    }
+
+    @Test
+    void onSymbolRemoved_delegatesToDeleteBySymbol() {
+        repository.saveAll(List.of(new InsiderTransactionRow("AAPL", "S", 10)));
+
+        repository.onSymbolRemoved("AAPL");
+
+        assertTrue(repository.findAll().isEmpty());
+    }
 }

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.tradelite.common.SymbolLifecycleListener;
 import org.tradelite.core.AccumulationStreak;
 
 /**
@@ -20,7 +21,8 @@ import org.tradelite.core.AccumulationStreak;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class SqliteAccumulationStreakRepository implements AccumulationStreakRepository {
+public class SqliteAccumulationStreakRepository
+        implements AccumulationStreakRepository, SymbolLifecycleListener {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -72,5 +74,20 @@ public class SqliteAccumulationStreakRepository implements AccumulationStreakRep
                 rs.getString("symbol"),
                 rs.getInt("streak_days"),
                 LocalDate.parse(rs.getString("last_updated")));
+    }
+
+    @Override
+    public int deleteBySymbol(String symbol) {
+        String sql = "DELETE FROM accumulation_streaks WHERE symbol = ?";
+        int deleted = jdbcTemplate.update(sql, symbol);
+        if (deleted > 0) {
+            log.info("Deleted {} accumulation streak rows for symbol {}", deleted, symbol);
+        }
+        return deleted;
+    }
+
+    @Override
+    public void onSymbolRemoved(String ticker) {
+        deleteBySymbol(ticker);
     }
 }
