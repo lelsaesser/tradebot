@@ -32,4 +32,12 @@ public interface SectorRsStreakRepository {
      * @return Map of symbol to streak data
      */
     Map<String, SectorRsStreak> findAll();
+
+    /**
+     * Deletes all rows for the given symbol.
+     *
+     * @param symbol The sector ETF symbol
+     * @return Number of rows deleted
+     */
+    int deleteBySymbol(String symbol);
 }

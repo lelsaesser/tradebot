@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.tradelite.common.SymbolLifecycleListener;
 
 /**
  * SQLite implementation of {@link InsiderTransactionRepository}.
@@ -19,7 +20,8 @@ import org.springframework.stereotype.Repository;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class SqliteInsiderTransactionRepository implements InsiderTransactionRepository {
+public class SqliteInsiderTransactionRepository
+        implements InsiderTransactionRepository, SymbolLifecycleListener {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -74,5 +76,20 @@ public class SqliteInsiderTransactionRepository implements InsiderTransactionRep
                                 rs.getString("symbol"),
                                 rs.getString("transaction_type"),
                                 rs.getInt("count")));
+    }
+
+    @Override
+    public int deleteBySymbol(String symbol) {
+        String sql = "DELETE FROM insider_transactions WHERE symbol = ?";
+        int deleted = jdbcTemplate.update(sql, symbol);
+        if (deleted > 0) {
+            log.info("Deleted {} insider transaction rows for symbol {}", deleted, symbol);
+        }
+        return deleted;
+    }
+
+    @Override
+    public void onSymbolRemoved(String ticker) {
+        deleteBySymbol(ticker);
     }
 }

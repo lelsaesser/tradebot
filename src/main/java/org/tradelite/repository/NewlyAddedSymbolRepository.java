@@ -13,4 +13,12 @@ public interface NewlyAddedSymbolRepository {
     void deleteAll(List<String> tickers);
 
     List<String> deleteExpiredReturning(long cutoffTimestamp);
+
+    /**
+     * Deletes the row for the given ticker, if present.
+     *
+     * @param ticker The ticker symbol
+     * @return Number of rows deleted (0 or 1)
+     */
+    int deleteByTicker(String ticker);
 }

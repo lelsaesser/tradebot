@@ -21,4 +21,12 @@ public interface PriceQuoteRepository {
      * @return List of daily prices, sorted by date ascending
      */
     List<DailyPrice> findDailyClosingPrices(String symbol, int days);
+
+    /**
+     * Deletes all rows for the given symbol.
+     *
+     * @param symbol The stock ticker symbol
+     * @return Number of rows deleted
+     */
+    int deleteBySymbol(String symbol);
 }

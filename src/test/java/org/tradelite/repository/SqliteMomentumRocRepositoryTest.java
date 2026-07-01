@@ -172,4 +172,39 @@ class SqliteMomentumRocRepositoryTest extends AbstractSqliteRepositoryTest {
         assertTrue(upperResult.isPresent());
         assertTrue(lowerResult.isEmpty());
     }
+
+    @Test
+    void deleteBySymbol_existingSymbol_removesOnlyTargetRow() {
+        MomentumRocData data = new MomentumRocData();
+        data.setPreviousRoc10(1.0);
+        data.setPreviousRoc20(2.0);
+        data.setInitialized(true);
+        repository.save("XLK", data);
+        repository.save("XLF", data);
+
+        int deleted = repository.deleteBySymbol("XLK");
+
+        assertEquals(1, deleted);
+        assertTrue(repository.findBySymbol("XLK").isEmpty());
+        assertTrue(repository.findBySymbol("XLF").isPresent());
+    }
+
+    @Test
+    void deleteBySymbol_unknownSymbol_returnsZero() {
+        int deleted = repository.deleteBySymbol("UNKNOWN");
+        assertEquals(0, deleted);
+    }
+
+    @Test
+    void onSymbolRemoved_delegatesToDeleteBySymbol() {
+        MomentumRocData data = new MomentumRocData();
+        data.setPreviousRoc10(1.0);
+        data.setPreviousRoc20(2.0);
+        data.setInitialized(true);
+        repository.save("XLK", data);
+
+        repository.onSymbolRemoved("XLK");
+
+        assertTrue(repository.findBySymbol("XLK").isEmpty());
+    }
 }

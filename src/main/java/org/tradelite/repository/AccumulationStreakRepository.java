@@ -33,4 +33,12 @@ public interface AccumulationStreakRepository {
      * @param symbols Symbols to keep
      */
     void deleteAllExcept(Set<String> symbols);
+
+    /**
+     * Deletes all rows for the given symbol.
+     *
+     * @param symbol The stock ticker symbol
+     * @return Number of rows deleted
+     */
+    int deleteBySymbol(String symbol);
 }

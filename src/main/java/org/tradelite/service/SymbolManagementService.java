@@ -1,5 +1,6 @@
 package org.tradelite.service;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.common.AssetType;
 import org.tradelite.common.CoinId;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolLifecycleListener;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -31,6 +33,7 @@ public class SymbolManagementService {
     private final CoinGeckoClient coinGeckoClient;
     private final YahooFinanceClient yahooFinanceClient;
     private final NewlyAddedSymbolRepository newlyAddedSymbolRepository;
+    private final List<SymbolLifecycleListener> lifecycleListeners;
 
     /**
      * Result of an add-symbol operation.
@@ -92,17 +95,32 @@ public class SymbolManagementService {
     }
 
     /**
-     * Removes a symbol from the registry and target prices.
+     * Removes a symbol from the registry, target prices, and all per-symbol state owned by
+     * registered {@link SymbolLifecycleListener} beans (RSI/RS/ROC state, OHLCV cache, accumulation
+     * streaks, etc.). Listener fan-out is fail-isolated — a single listener throwing is logged and
+     * does not block the others or change the return value.
      *
      * @param ticker uppercase ticker symbol
      * @return true if removed, false if not found
      */
     public boolean removeSymbol(String ticker) {
         boolean removed = symbolRegistry.removeSymbol(ticker);
-        if (removed) {
-            targetPriceProvider.removeSymbolFromTargetPrices(ticker, AssetType.STOCK);
+        if (!removed) {
+            return false;
         }
-        return removed;
+        targetPriceProvider.removeSymbolFromTargetPrices(ticker, AssetType.STOCK);
+        for (SymbolLifecycleListener listener : lifecycleListeners) {
+            try {
+                listener.onSymbolRemoved(ticker);
+            } catch (Exception e) {
+                log.warn(
+                        "Lifecycle listener {} failed for ticker {}: {}",
+                        listener.getClass().getSimpleName(),
+                        ticker,
+                        e.getMessage());
+            }
+        }
+        return true;
     }
 
     public boolean isValidTicker(String ticker, String displayName) {
