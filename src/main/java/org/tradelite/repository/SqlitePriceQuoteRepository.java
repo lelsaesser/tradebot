@@ -13,12 +13,13 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.tradelite.client.finnhub.dto.PriceQuoteResponse;
+import org.tradelite.common.SymbolLifecycleListener;
 import org.tradelite.service.model.DailyPrice;
 
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
+public class SqlitePriceQuoteRepository implements PriceQuoteRepository, SymbolLifecycleListener {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -96,7 +97,10 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
     @Override
     public List<DailyPrice> findDailyClosingPrices(String symbol, int days) {
         long startTimestamp =
-                LocalDate.now().minusDays(days).atStartOfDay(ZoneId.of("UTC")).toEpochSecond();
+                LocalDate.now(ZoneId.of("UTC"))
+                        .minusDays(days)
+                        .atStartOfDay(ZoneId.of("UTC"))
+                        .toEpochSecond();
 
         String sql =
                 """
@@ -119,5 +123,20 @@ public class SqlitePriceQuoteRepository implements PriceQuoteRepository {
                 },
                 symbol,
                 startTimestamp);
+    }
+
+    @Override
+    public int deleteBySymbol(String symbol) {
+        String sql = "DELETE FROM finnhub_price_quotes WHERE symbol = ?";
+        int deleted = jdbcTemplate.update(sql, symbol);
+        if (deleted > 0) {
+            log.info("Deleted {} price quote rows for symbol {}", deleted, symbol);
+        }
+        return deleted;
+    }
+
+    @Override
+    public void onSymbolRemoved(String ticker) {
+        deleteBySymbol(ticker);
     }
 }

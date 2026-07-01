@@ -26,4 +26,12 @@ public interface RsCrossoverStateRepository {
      * @return Map of symbol to RelativeStrengthData (only crossover fields populated)
      */
     Map<String, RelativeStrengthData> findAll();
+
+    /**
+     * Deletes all rows for the given symbol.
+     *
+     * @param symbol The stock ticker symbol
+     * @return Number of rows deleted
+     */
+    int deleteBySymbol(String symbol);
 }

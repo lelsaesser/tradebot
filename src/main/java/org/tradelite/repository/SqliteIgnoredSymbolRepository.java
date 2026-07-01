@@ -57,4 +57,19 @@ public class SqliteIgnoredSymbolRepository {
             log.info("Deleted {} expired ignored symbol entries", deleted);
         }
     }
+
+    /**
+     * Deletes all rows for the given symbol (across all reasons).
+     *
+     * @param symbol The stock ticker symbol
+     * @return Number of rows deleted
+     */
+    public int deleteBySymbol(String symbol) {
+        String sql = "DELETE FROM ignored_symbols WHERE symbol = ?";
+        int deleted = jdbcTemplate.update(sql, symbol);
+        if (deleted > 0) {
+            log.info("Deleted {} ignored symbol rows for symbol {}", deleted, symbol);
+        }
+        return deleted;
+    }
 }

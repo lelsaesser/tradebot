@@ -26,4 +26,12 @@ public interface MomentumRocRepository {
      * @return Optional containing the momentum data if found
      */
     Optional<MomentumRocData> findBySymbol(String symbol);
+
+    /**
+     * Deletes all rows for the given symbol.
+     *
+     * @param symbol The stock ticker symbol
+     * @return Number of rows deleted
+     */
+    int deleteBySymbol(String symbol);
 }
