@@ -120,4 +120,40 @@ class SqliteRsCrossoverStateRepositoryTest extends AbstractSqliteRepositoryTest 
         assertEquals(-0.5, result.get("TEST").getPreviousRs(), 0.001);
         assertEquals(-0.3, result.get("TEST").getPreviousEma(), 0.001);
     }
+
+    @Test
+    void deleteBySymbol_existingSymbol_removesOnlyTargetRow() {
+        RelativeStrengthData data = new RelativeStrengthData();
+        data.setPreviousRs(1.0);
+        data.setPreviousEma(0.9);
+        data.setInitialized(true);
+        repository.save("NVDA", data);
+        repository.save("AMD", data);
+
+        int deleted = repository.deleteBySymbol("NVDA");
+
+        assertEquals(1, deleted);
+        Map<String, RelativeStrengthData> result = repository.findAll();
+        assertFalse(result.containsKey("NVDA"));
+        assertTrue(result.containsKey("AMD"));
+    }
+
+    @Test
+    void deleteBySymbol_unknownSymbol_returnsZero() {
+        int deleted = repository.deleteBySymbol("UNKNOWN");
+        assertEquals(0, deleted);
+    }
+
+    @Test
+    void onSymbolRemoved_delegatesToDeleteBySymbol() {
+        RelativeStrengthData data = new RelativeStrengthData();
+        data.setPreviousRs(1.0);
+        data.setPreviousEma(0.9);
+        data.setInitialized(true);
+        repository.save("NVDA", data);
+
+        repository.onSymbolRemoved("NVDA");
+
+        assertFalse(repository.findAll().containsKey("NVDA"));
+    }
 }

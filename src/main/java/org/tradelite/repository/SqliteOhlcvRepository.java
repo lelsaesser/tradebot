@@ -11,6 +11,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.tradelite.common.OhlcvRecord;
 
+/**
+ * SQLite-backed implementation of {@link OhlcvRepository}. Note that {@link CachingOhlcvRepository}
+ * is the {@code @Primary} bean and the {@code SymbolLifecycleListener} for this table — do NOT make
+ * this class a listener too, or symbol-removal will trigger two DELETEs (one with cache
+ * invalidation via the decorator, one without via this class).
+ */
 @Slf4j
 @Repository
 @RequiredArgsConstructor
@@ -84,7 +90,9 @@ public class SqliteOhlcvRepository implements OhlcvRepository {
     public int deleteBySymbol(String symbol) {
         String sql = "DELETE FROM twelvedata_daily_ohlcv WHERE symbol = ?";
         int deleted = jdbcTemplate.update(sql, symbol);
-        log.info("Deleted {} OHLCV records for symbol {}", deleted, symbol);
+        if (deleted > 0) {
+            log.info("Deleted {} OHLCV records for symbol {}", deleted, symbol);
+        }
         return deleted;
     }
 }

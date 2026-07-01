@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.tradelite.common.SymbolLifecycleListener;
 import org.tradelite.service.model.RelativeStrengthData;
 
 /**
@@ -17,7 +18,8 @@ import org.tradelite.service.model.RelativeStrengthData;
 @Slf4j
 @Repository
 @RequiredArgsConstructor
-public class SqliteRsCrossoverStateRepository implements RsCrossoverStateRepository {
+public class SqliteRsCrossoverStateRepository
+        implements RsCrossoverStateRepository, SymbolLifecycleListener {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -62,5 +64,20 @@ public class SqliteRsCrossoverStateRepository implements RsCrossoverStateReposit
                     return data;
                 });
         return result;
+    }
+
+    @Override
+    public int deleteBySymbol(String symbol) {
+        String sql = "DELETE FROM rs_crossover_state WHERE symbol = ?";
+        int deleted = jdbcTemplate.update(sql, symbol);
+        if (deleted > 0) {
+            log.info("Deleted {} RS crossover state rows for symbol {}", deleted, symbol);
+        }
+        return deleted;
+    }
+
+    @Override
+    public void onSymbolRemoved(String ticker) {
+        deleteBySymbol(ticker);
     }
 }

@@ -48,4 +48,29 @@ class SqliteApexPerformerRepositoryTest extends AbstractSqliteRepositoryTest {
     void findAll_whenEmpty_returnsEmptySet() {
         assertTrue(repository.findAll().isEmpty());
     }
+
+    @Test
+    void deleteBySymbol_existingSymbol_removesOnlyTargetRow() {
+        repository.replaceAll(Set.of("AAPL", "NVDA"));
+
+        int deleted = repository.deleteBySymbol("AAPL");
+
+        assertEquals(1, deleted);
+        assertEquals(Set.of("NVDA"), repository.findAll());
+    }
+
+    @Test
+    void deleteBySymbol_unknownSymbol_returnsZero() {
+        int deleted = repository.deleteBySymbol("UNKNOWN");
+        assertEquals(0, deleted);
+    }
+
+    @Test
+    void onSymbolRemoved_delegatesToDeleteBySymbol() {
+        repository.replaceAll(Set.of("AAPL", "NVDA"));
+
+        repository.onSymbolRemoved("AAPL");
+
+        assertEquals(Set.of("NVDA"), repository.findAll());
+    }
 }

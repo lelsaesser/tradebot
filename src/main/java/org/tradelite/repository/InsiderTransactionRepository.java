@@ -26,6 +26,14 @@ public interface InsiderTransactionRepository {
     List<InsiderTransactionRow> findAll();
 
     /**
+     * Deletes all rows for the given symbol (across all transaction types).
+     *
+     * @param symbol The stock ticker symbol
+     * @return Number of rows deleted
+     */
+    int deleteBySymbol(String symbol);
+
+    /**
      * A single row in the insider_transactions table.
      *
      * @param symbol The stock ticker symbol

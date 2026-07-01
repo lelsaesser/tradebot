@@ -3,6 +3,7 @@ package org.tradelite.repository;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,8 @@ class SqliteSectorRsStreakRepositoryTest extends AbstractSqliteRepositoryTest {
 
     @Test
     void save_newSymbol_insertsRecord() {
-        SectorRsStreak streak = new SectorRsStreak("XLK", 3, true, LocalDate.of(2026, 4, 25));
+        SectorRsStreak streak =
+                new SectorRsStreak("XLK", 3, true, LocalDate.of(2026, Month.APRIL, 25));
 
         repository.save(streak);
 
@@ -33,19 +35,19 @@ class SqliteSectorRsStreakRepositoryTest extends AbstractSqliteRepositoryTest {
         assertEquals("XLK", result.get().symbol());
         assertEquals(3, result.get().streakDays());
         assertTrue(result.get().isOutperforming());
-        assertEquals(LocalDate.of(2026, 4, 25), result.get().lastUpdated());
+        assertEquals(LocalDate.of(2026, Month.APRIL, 25), result.get().lastUpdated());
     }
 
     @Test
     void save_existingSymbol_updatesRecord() {
-        repository.save(new SectorRsStreak("XLK", 3, true, LocalDate.of(2026, 4, 25)));
-        repository.save(new SectorRsStreak("XLK", 1, false, LocalDate.of(2026, 4, 26)));
+        repository.save(new SectorRsStreak("XLK", 3, true, LocalDate.of(2026, Month.APRIL, 25)));
+        repository.save(new SectorRsStreak("XLK", 1, false, LocalDate.of(2026, Month.APRIL, 26)));
 
         Optional<SectorRsStreak> result = repository.findBySymbol("XLK");
         assertTrue(result.isPresent());
         assertEquals(1, result.get().streakDays());
         assertFalse(result.get().isOutperforming());
-        assertEquals(LocalDate.of(2026, 4, 26), result.get().lastUpdated());
+        assertEquals(LocalDate.of(2026, Month.APRIL, 26), result.get().lastUpdated());
     }
 
     @Test
@@ -62,9 +64,9 @@ class SqliteSectorRsStreakRepositoryTest extends AbstractSqliteRepositoryTest {
 
     @Test
     void findAll_withData_returnsAllStreaks() {
-        repository.save(new SectorRsStreak("XLK", 5, true, LocalDate.of(2026, 4, 25)));
-        repository.save(new SectorRsStreak("XLU", 2, false, LocalDate.of(2026, 4, 25)));
-        repository.save(new SectorRsStreak("XLF", 1, true, LocalDate.of(2026, 4, 25)));
+        repository.save(new SectorRsStreak("XLK", 5, true, LocalDate.of(2026, Month.APRIL, 25)));
+        repository.save(new SectorRsStreak("XLU", 2, false, LocalDate.of(2026, Month.APRIL, 25)));
+        repository.save(new SectorRsStreak("XLF", 1, true, LocalDate.of(2026, Month.APRIL, 25)));
 
         Map<String, SectorRsStreak> result = repository.findAll();
         assertEquals(3, result.size());
@@ -77,8 +79,8 @@ class SqliteSectorRsStreakRepositoryTest extends AbstractSqliteRepositoryTest {
 
     @Test
     void save_multipleSymbols_storesIndependently() {
-        repository.save(new SectorRsStreak("XLK", 10, true, LocalDate.of(2026, 4, 25)));
-        repository.save(new SectorRsStreak("XLU", 3, false, LocalDate.of(2026, 4, 25)));
+        repository.save(new SectorRsStreak("XLK", 10, true, LocalDate.of(2026, Month.APRIL, 25)));
+        repository.save(new SectorRsStreak("XLU", 3, false, LocalDate.of(2026, Month.APRIL, 25)));
 
         Optional<SectorRsStreak> xlk = repository.findBySymbol("XLK");
         Optional<SectorRsStreak> xlu = repository.findBySymbol("XLU");
@@ -89,5 +91,32 @@ class SqliteSectorRsStreakRepositoryTest extends AbstractSqliteRepositoryTest {
         assertTrue(xlk.get().isOutperforming());
         assertEquals(3, xlu.get().streakDays());
         assertFalse(xlu.get().isOutperforming());
+    }
+
+    @Test
+    void deleteBySymbol_existingSymbol_removesOnlyTargetRow() {
+        repository.save(new SectorRsStreak("XLK", 3, true, LocalDate.of(2026, Month.APRIL, 25)));
+        repository.save(new SectorRsStreak("XLF", 2, false, LocalDate.of(2026, Month.APRIL, 25)));
+
+        int deleted = repository.deleteBySymbol("XLK");
+
+        assertEquals(1, deleted);
+        assertTrue(repository.findBySymbol("XLK").isEmpty());
+        assertTrue(repository.findBySymbol("XLF").isPresent());
+    }
+
+    @Test
+    void deleteBySymbol_unknownSymbol_returnsZero() {
+        int deleted = repository.deleteBySymbol("UNKNOWN");
+        assertEquals(0, deleted);
+    }
+
+    @Test
+    void onSymbolRemoved_delegatesToDeleteBySymbol() {
+        repository.save(new SectorRsStreak("XLK", 3, true, LocalDate.of(2026, Month.APRIL, 25)));
+
+        repository.onSymbolRemoved("XLK");
+
+        assertTrue(repository.findBySymbol("XLK").isEmpty());
     }
 }

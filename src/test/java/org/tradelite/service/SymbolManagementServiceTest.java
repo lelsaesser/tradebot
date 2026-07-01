@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,7 @@ import org.tradelite.client.yahoo.YahooFinanceClient;
 import org.tradelite.common.AssetType;
 import org.tradelite.common.OhlcvRecord;
 import org.tradelite.common.StockSymbol;
+import org.tradelite.common.SymbolLifecycleListener;
 import org.tradelite.common.SymbolRegistry;
 import org.tradelite.common.TargetPrice;
 import org.tradelite.common.TargetPriceProvider;
@@ -42,6 +44,8 @@ class SymbolManagementServiceTest {
     @Mock private CoinGeckoClient coinGeckoClient;
     @Mock private YahooFinanceClient yahooFinanceClient;
     @Mock private NewlyAddedSymbolRepository newlyAddedSymbolRepository;
+    @Mock private SymbolLifecycleListener listenerA;
+    @Mock private SymbolLifecycleListener listenerB;
 
     private SymbolManagementService service;
 
@@ -61,7 +65,8 @@ class SymbolManagementServiceTest {
                         finnhubClient,
                         coinGeckoClient,
                         yahooFinanceClient,
-                        newlyAddedSymbolRepository);
+                        newlyAddedSymbolRepository,
+                        List.of(listenerA, listenerB));
     }
 
     @Test
@@ -98,10 +103,17 @@ class SymbolManagementServiceTest {
 
     @Test
     void addSymbol_internationalStock_happyPath() {
-        OhlcvRecord record =
-                new OhlcvRecord("SAP.DE", LocalDate.now(), 100.0, 110.0, 95.0, 105.0, 1_000L);
+        OhlcvRecord ohlcvRecord =
+                new OhlcvRecord(
+                        "SAP.DE",
+                        LocalDate.of(2026, Month.APRIL, 25),
+                        100.0,
+                        110.0,
+                        95.0,
+                        105.0,
+                        1_000L);
         when(symbolRegistry.isInternationalSymbol("SAP.DE")).thenReturn(true);
-        when(yahooFinanceClient.fetchDailyOhlcv("SAP.DE", 5)).thenReturn(List.of(record));
+        when(yahooFinanceClient.fetchDailyOhlcv("SAP.DE", 5)).thenReturn(List.of(ohlcvRecord));
         when(symbolRegistry.addSymbol("SAP.DE", "SAP SE")).thenReturn(true);
         when(targetPriceProvider.addTargetPrice(any(TargetPrice.class), eq(AssetType.STOCK)))
                 .thenReturn(true);
@@ -219,5 +231,41 @@ class SymbolManagementServiceTest {
         assertThat(removed, is(false));
         verify(targetPriceProvider, never())
                 .removeSymbolFromTargetPrices(anyString(), any(AssetType.class));
+    }
+
+    @Test
+    void removeSymbol_existing_invokesAllListeners() {
+        when(symbolRegistry.removeSymbol("AAPL")).thenReturn(true);
+
+        boolean removed = service.removeSymbol("AAPL");
+
+        assertThat(removed, is(true));
+        verify(listenerA).onSymbolRemoved("AAPL");
+        verify(listenerB).onSymbolRemoved("AAPL");
+    }
+
+    @Test
+    void removeSymbol_notFound_doesNotInvokeListeners() {
+        when(symbolRegistry.removeSymbol("GHOST")).thenReturn(false);
+
+        service.removeSymbol("GHOST");
+
+        verify(listenerA, never()).onSymbolRemoved(anyString());
+        verify(listenerB, never()).onSymbolRemoved(anyString());
+    }
+
+    @Test
+    void removeSymbol_oneListenerThrows_othersStillInvokedAndReturnTrue() {
+        when(symbolRegistry.removeSymbol("AAPL")).thenReturn(true);
+        org.mockito.Mockito.doThrow(new RuntimeException("boom"))
+                .when(listenerA)
+                .onSymbolRemoved("AAPL");
+
+        boolean removed = service.removeSymbol("AAPL");
+
+        assertThat(removed, is(true));
+        verify(listenerA).onSymbolRemoved("AAPL");
+        verify(listenerB).onSymbolRemoved("AAPL");
+        verify(targetPriceProvider).removeSymbolFromTargetPrices("AAPL", AssetType.STOCK);
     }
 }
