@@ -60,10 +60,9 @@ public abstract class BasePriceEvaluator {
             displayName = ticker.getDisplayName();
         }
 
-        if (currentPrice >= targetPriceSell && (int) targetPriceSell > 0) {
-            if (targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.SELL_ALERT)) {
-                return;
-            }
+        if (currentPrice >= targetPriceSell
+                && (int) targetPriceSell > 0
+                && !targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.SELL_ALERT)) {
             log.info("Potential sell opportunity for {}", displayName);
             telegramClient.sendMessage(
                     "💰 Potential sell opportunity for "
@@ -86,10 +85,9 @@ public abstract class BasePriceEvaluator {
                             targetPriceSell));
         }
 
-        if (currentPrice <= targetPriceBuy && (int) targetPriceBuy > 0) {
-            if (targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.BUY_ALERT)) {
-                return;
-            }
+        if (currentPrice <= targetPriceBuy
+                && (int) targetPriceBuy > 0
+                && !targetPriceProvider.isSymbolIgnored(ticker, IgnoreReason.BUY_ALERT)) {
             log.info("Potential buy opportunity for {}", displayName);
             telegramClient.sendMessage(
                     "🚀 Potential buy opportunity for "

@@ -97,4 +97,38 @@ class BasePriceEvaluatorTest {
         verify(telegramClient, never()).sendMessage(anyString());
         verify(targetPriceProvider, never()).addIgnoredSymbol(any(), any());
     }
+
+    @Test
+    void testComparePrices_bothSidesEligible_emitsBothAlerts() {
+        // Inverted band: buy=200, sell=180, price=190 straddles both targets.
+        // Neither side is ignored — both alerts must fire independently.
+        when(targetPriceProvider.isSymbolIgnored(stockSymbol, IgnoreReason.SELL_ALERT))
+                .thenReturn(false);
+        when(targetPriceProvider.isSymbolIgnored(stockSymbol, IgnoreReason.BUY_ALERT))
+                .thenReturn(false);
+
+        priceEvaluator.comparePrices(stockSymbol, 190, 200, 180);
+
+        verify(telegramClient).sendMessage(contains("sell opportunity"));
+        verify(telegramClient).sendMessage(contains("buy opportunity"));
+        verify(targetPriceProvider).addIgnoredSymbol(stockSymbol, IgnoreReason.SELL_ALERT);
+        verify(targetPriceProvider).addIgnoredSymbol(stockSymbol, IgnoreReason.BUY_ALERT);
+    }
+
+    @Test
+    void testComparePrices_bothSidesEligible_sellIgnored_buyStillFires() {
+        // Regression for the "SELL hides BUY" bug: with SELL debounced by its own ignore-set,
+        // the BUY alert on the same tick must still emit.
+        when(targetPriceProvider.isSymbolIgnored(stockSymbol, IgnoreReason.SELL_ALERT))
+                .thenReturn(true);
+        when(targetPriceProvider.isSymbolIgnored(stockSymbol, IgnoreReason.BUY_ALERT))
+                .thenReturn(false);
+
+        priceEvaluator.comparePrices(stockSymbol, 190, 200, 180);
+
+        verify(telegramClient, never()).sendMessage(contains("sell opportunity"));
+        verify(telegramClient).sendMessage(contains("buy opportunity"));
+        verify(targetPriceProvider, never()).addIgnoredSymbol(stockSymbol, IgnoreReason.SELL_ALERT);
+        verify(targetPriceProvider).addIgnoredSymbol(stockSymbol, IgnoreReason.BUY_ALERT);
+    }
 }
