@@ -1,5 +1,6 @@
 package org.tradelite.service;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,7 @@ public class SymbolManagementService {
     private final CoinGeckoClient coinGeckoClient;
     private final YahooFinanceClient yahooFinanceClient;
     private final NewlyAddedSymbolRepository newlyAddedSymbolRepository;
-    private final java.util.List<SymbolLifecycleListener> lifecycleListeners;
+    private final List<SymbolLifecycleListener> lifecycleListeners;
 
     /**
      * Result of an add-symbol operation.
